@@ -100,3 +100,16 @@ Thèmes réservés (ne pas utiliser comme premier segment) : `admin`, `api`, `em
 Site : https://outils.alertes-meteo.com (nginx → PM2 `outils-meteo`, port 3001, dossier `/home/ubuntu/outils-meteo`).
 Mise à jour après un `git push` : se connecter au VPS puis lancer `./deploy.sh`.
 Le `.env` du serveur n'est pas dans Git (`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SITE_NAME`, et pour l'admin `DATABASE_URL`, `ADMIN_PASSWORD`).
+
+### Administration en production
+Postgres est installé sur le VPS (écoute locale uniquement, base `outils`, schéma appliqué avec `npx prisma db push`). `DATABASE_URL` et `ADMIN_USER` sont dans le `.env` du serveur.
+L'admin reste **désactivée (404)** tant que `ADMIN_PASSWORD` (12 caractères minimum) n'est pas défini dans ce `.env`. Pour l'activer :
+```bash
+ssh ubuntu@152.228.131.140
+nano /home/ubuntu/outils-meteo/.env     # ajouter une ligne : ADMIN_PASSWORD=votre-mot-de-passe-long
+pm2 restart outils-meteo --update-env
+```
+Puis ouvrir https://outils.alertes-meteo.com/admin/ (identifiant `admin`, authentification HTTP Basic). Sauvegarde de la base : `sudo -u postgres pg_dump outils > outils.sql`.
+
+## Sources des données
+Les facteurs d'émission de l'outil `/climat/empreinte-carbone/` sont extraits de l'API publique ADEME (Base Empreinte®, data.ademe.fr) et stockés dans `src/lib/tools/data/ademe-transport.ts`, avec l'identifiant ADEME de chaque facteur. Ils sont datés de l'export (2026-09-19) : à régénérer périodiquement, la base étant révisée régulièrement.
