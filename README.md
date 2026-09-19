@@ -95,3 +95,8 @@ Chaque outil déclare son `path` (`/<thème>/<page>`) ; `slug` reste l'identifia
 Les hubs `/pluie/`, `/assurance/`, `/meteo/`… listent les outils (définis dans `src/lib/tools/hubs.ts`) ; un hub sans outil est en `noindex` et hors sitemap.
 Thèmes réservés (ne pas utiliser comme premier segment) : `admin`, `api`, `embed`, `outils`, `confidentialite`, `attestation-meteo` (vérifié par `npm test`).
 `/climat/empreinte-carbone/` n'existe pas encore : l'outil est à créer (facteurs d'émission à sourcer, ex. Base Empreinte ADEME).
+
+## Déploiement en production (VPS OVH)
+Site : https://outils.alertes-meteo.com (nginx → PM2 `outils-meteo`, port 3001, dossier `/home/ubuntu/outils-meteo`).
+Mise à jour après un `git push` : se connecter au VPS puis lancer `./deploy.sh`.
+Le `.env` du serveur n'est pas dans Git (`NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SITE_NAME`, et pour l'admin `DATABASE_URL`, `ADMIN_PASSWORD`).
