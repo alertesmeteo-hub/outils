@@ -10,7 +10,7 @@ export const categories: Category[] = [
   { slug: 'risques', name: 'Risques naturels', icon: '⚠️', description: 'Évaluer l’exposition aux phénomènes naturels : tempête, grêle, chaleur, inondation.', topics: ['Inondation', 'Feu de forêt', 'Sécheresse', 'Chaleur', 'Tempête', 'Submersion', 'Grêle'],
     planned: ['Risque feu de forêt', 'Sécheresse', 'Checklist tempête', 'Checklist inondation'] },
   { slug: 'climat', name: 'Climat', icon: '🌍', description: 'Empreinte carbone, réchauffement, évolution des températures, niveau de la mer.', topics: ['CO₂', 'Empreinte carbone', 'Réchauffement', 'Températures', 'Niveau de la mer'],
-    planned: ['Empreinte carbone', 'Émissions d’un trajet', 'Degrés-jours et chauffage', 'Montée du niveau marin', 'Récupération d’eau de pluie', 'Volume d’une citerne'] },
+    planned: ['Degrés-jours et chauffage', 'Montée du niveau marin', 'Récupération d’eau de pluie', 'Volume d’une citerne'] },
   { slug: 'btp', name: 'BTP', icon: '🏗️', description: 'Conditions de chantier : pluie, gel, vent, intempéries, rapport météo.', topics: ['Pluie chantier', 'Gel', 'Vent', 'Intempéries', 'Jours perdus'],
     planned: ['Calculateur de charge de neige', 'Jours d’intempéries cumulés'] },
 ];

@@ -9,6 +9,7 @@ import { degatsGrele } from './defs/degats-grele';
 import { degatsTempete } from './defs/degats-tempete';
 import { calculIndemnisation } from './defs/calcul-indemnisation-assurance';
 import { intemperiesBtp } from './defs/intemperies-btp';
+import { empreinteCarbone } from './defs/empreinte-carbone';
 
 /**
  * REGISTRE CENTRAL. Pour ajouter un outil :
@@ -17,7 +18,7 @@ import { intemperiesBtp } from './defs/intemperies-btp';
  */
 export const toolRegistry: ToolDefinition[] = [
   mmPluieLitres, convertisseurVent, distanceOrage, temperatureRessentie, indiceChaleur,
-  pointDeRosee, degatsGrele, degatsTempete, calculIndemnisation, intemperiesBtp,
+  pointDeRosee, degatsGrele, degatsTempete, calculIndemnisation, intemperiesBtp, empreinteCarbone,
 ];
 
 const bySlug = new Map(toolRegistry.map((t) => [t.slug, t]));
