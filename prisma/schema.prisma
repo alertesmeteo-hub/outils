@@ -1,0 +1,80 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- MVP : administration éditoriale ----------
+// Les outils (champs, calculs) vivent dans le code (registre). Cette table ne contient que
+// des SURCHARGES éditoriales et l'activation. Sans ligne = valeurs du registre.
+model ToolOverride {
+  slug            String   @id
+  enabled         Boolean  @default(true)
+  name            String?
+  title           String?
+  metaDescription String?
+  intro           String?
+  ctaTitle        String?
+  ctaText         String?
+  ctaLabel        String?
+  sources         String?  // une source par ligne
+  faqJson         String?  // [{ "q": "...", "a": "..." }]
+  updatedAt       DateTime @updatedAt
+}
+
+// ---------- Préparé pour la suite (comptes, historique, dossiers, abonnements) ----------
+// Non utilisé par le MVP. Compatible Auth.js (adapter Prisma) : ajouter Account/Session/VerificationToken le moment venu.
+enum Plan {
+  FREE
+  REPORT
+  PRO
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  plan         Plan          @default(FREE)
+  createdAt    DateTime      @default(now())
+  calculations Calculation[]
+  claims       ClaimFile[]
+  sites        MonitoredSite[]
+}
+
+// Historique de calculs : ne stocker ni adresse précise ni donnée inutile (RGPD, minimisation).
+model Calculation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  toolSlug  String
+  inputs    Json
+  result    Json
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model ClaimFile {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  eventDate DateTime?
+  postalCode String? // jamais d'adresse précise par défaut
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model MonitoredSite {
+  id         String  @id @default(cuid())
+  userId     String
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String
+  postalCode String
+  alerts     Boolean @default(false)
+}

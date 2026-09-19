@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --text: #14202e;
+  --muted: #566274;
+  --border: #d9e0ea;
+  --primary: #0a62c4;
+  --danger: #c62828;
+  --ok: #1b7f4b;
+  --warn: #b26a00;
+  --extreme: #8e1b1b;
+  --anthracite: #1f2933;
+}
+.dark {
+  --bg: #0f151c;
+  --surface: #17202a;
+  --text: #e8eef5;
+  --muted: #9fb0c3;
+  --border: #2a3644;
+  --primary: #5aa9ff;
+  --danger: #ff6b6b;
+  --ok: #4cd08a;
+  --warn: #f0b04a;
+  --extreme: #ff8a8a;
+  --anthracite: #0b1016;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+
+@layer components {
+  .card { @apply rounded-xl border border-border bg-surface shadow-sm; }
+  .btn { @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-5 py-2 text-base font-semibold transition-colors; }
+  .btn-primary { @apply bg-primary text-white hover:opacity-90; }
+  .dark .btn-primary { color: #06213f; }
+  .btn-ghost { @apply border border-border bg-surface text-text hover:bg-bg; }
+  .input { @apply min-h-[44px] w-full rounded-lg border border-border bg-surface px-3 py-2 text-base text-text placeholder:text-muted; }
+  .input[aria-invalid='true'] { border-color: var(--danger); }
+  .chip { @apply inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold; }
+  .prose-tool p { @apply mb-3; }
+  .prose-tool ul { @apply mb-3 list-disc pl-6; }
+  .prose-tool h2 { @apply mb-3 mt-10 text-2xl font-bold; }
+}
+
+/* Teintes de résultat : --tone est défini en inline via ResultView */
+.tone-bg { background: color-mix(in srgb, var(--tone) 12%, var(--surface)); border-color: color-mix(in srgb, var(--tone) 45%, var(--border)); }
+.tone-fg { color: var(--tone); }
+
+@media print {
+  header, footer, .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+}
