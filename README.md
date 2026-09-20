@@ -32,7 +32,7 @@ src/
     types.ts            contrat d'un outil (champs, calcul, SEO, FAQ…)
     engine.ts           validation + exécution, partagés client/serveur
     registry.ts         REGISTRE CENTRAL des outils (ajouter un outil = 1 fichier + 1 ligne)
-    defs/*.ts           les 10 outils du MVP
+    defs/*.ts           les 11 outils
     categories.ts       5 rubriques + outils prévus
     resolve.ts          fusion registre + surcharges admin (base de données)
   lib/weather/provider.ts   interface abstraite des fournisseurs météo (aucun branché)
@@ -90,11 +90,11 @@ Structure par thème, pensée pour `outils.alertes-meteo.com` :
 | `/humidite/point-de-rosee/` | point de rosée |
 | `/assurance/degats-grele/` · `/assurance/degats-tempete/` · `/assurance/indemnisation/` | assurance |
 | `/btp/intemperies/` | intempéries BTP |
+| `/climat/empreinte-carbone/` | empreinte carbone d'un trajet (facteurs ADEME) |
 
 Chaque outil déclare son `path` (`/<thème>/<page>`) ; `slug` reste l'identifiant interne stable (API, embed, WordPress, admin).
 Les hubs `/pluie/`, `/assurance/`, `/meteo/`… listent les outils (définis dans `src/lib/tools/hubs.ts`) ; un hub sans outil est en `noindex` et hors sitemap.
 Thèmes réservés (ne pas utiliser comme premier segment) : `admin`, `api`, `embed`, `outils`, `confidentialite`, `attestation-meteo` (vérifié par `npm test`).
-`/climat/empreinte-carbone/` n'existe pas encore : l'outil est à créer (facteurs d'émission à sourcer, ex. Base Empreinte ADEME).
 
 ## Déploiement en production (VPS OVH)
 Site : https://outils.alertes-meteo.com (nginx → PM2 `outils-meteo`, port 3001, dossier `/home/ubuntu/outils-meteo`).
