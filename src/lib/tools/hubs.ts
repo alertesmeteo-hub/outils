@@ -10,11 +10,15 @@ import type { ToolDefinition } from './types';
 export type Hub = { slug: string; name: string; icon: string; description: string; kind: 'categorie' | 'theme'; planned: string[] };
 
 export const themes: Hub[] = [
-  { slug: 'pluie', name: 'Pluie', icon: '🌧️', description: 'Convertir et calculer les précipitations : mm, litres, volumes.', kind: 'theme', planned: ['Intensité de pluie', 'Récupération d’eau de pluie', 'Volume d’une citerne'] },
+  { slug: 'pluie', name: 'Pluie', icon: '🌧️', description: 'Convertir et calculer les précipitations : mm, litres, volumes.', kind: 'theme', planned: [] },
   { slug: 'vent', name: 'Vent', icon: '💨', description: 'Vitesses du vent, échelle de Beaufort et effets.', kind: 'theme', planned: [] },
   { slug: 'orages', name: 'Orages', icon: '⛈️', description: 'Distance, foudre et prudence en cas d’orage.', kind: 'theme', planned: [] },
-  { slug: 'temperature', name: 'Température', icon: '🌡️', description: 'Température ressentie, chaleur, froid.', kind: 'theme', planned: ['Humidex', 'Température humide', 'Risque de gel', 'Risque de verglas'] },
-  { slug: 'humidite', name: 'Humidité', icon: '💧', description: 'Point de rosée, condensation, confort de l’air.', kind: 'theme', planned: ['Humidité absolue'] },
+  { slug: 'temperature', name: 'Température', icon: '🌡️', description: 'Température ressentie, chaleur, froid.', kind: 'theme', planned: [] },
+  { slug: 'pression', name: 'Pression', icon: '🧭', description: 'Convertir la pression atmosphérique : hPa, mmHg, inHg, bar.', kind: 'theme', planned: [] },
+  { slug: 'neige', name: 'Neige', icon: '❄️', description: 'Neige en eau et poids de la neige sur une toiture.', kind: 'theme', planned: [] },
+  { slug: 'soleil', name: 'Soleil et UV', icon: '☀️', description: 'Lever et coucher du soleil, durée du jour, indice UV.', kind: 'theme', planned: [] },
+  { slug: 'chauffage', name: 'Chauffage', icon: '🔥', description: 'Degrés-jours et besoin de chauffage.', kind: 'theme', planned: [] },
+  { slug: 'humidite', name: 'Humidité', icon: '💧', description: 'Point de rosée, condensation, confort de l’air.', kind: 'theme', planned: [] },
 ];
 
 export const hubs: Hub[] = [

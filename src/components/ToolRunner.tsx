@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { getTool } from '@/lib/tools/registry';
-import { defaultValues, validate } from '@/lib/tools/engine';
+import { applyToday, defaultValues, validate } from '@/lib/tools/engine';
 import type { ToolResult, Values } from '@/lib/tools/types';
 import ResultView from './ResultView';
 
@@ -24,6 +24,8 @@ const writeHistory = (h: HistoryItem[]) => {
 export default function ToolRunner({ slug }: { slug: string }) {
   const tool = getTool(slug);
   const [values, setValues] = useState<Values>(() => (tool ? defaultValues(tool) : {}));
+  // Champs date « aujourd'hui » : remplis côté client uniquement.
+  useEffect(() => { if (tool) setValues((v) => applyToday(tool, v)); }, [tool]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<ToolResult | null>(null);
@@ -86,7 +88,7 @@ export default function ToolRunner({ slug }: { slug: string }) {
   };
 
   const reset = () => {
-    setValues(defaultValues(tool));
+    setValues(applyToday(tool, defaultValues(tool)));
     setTouched({});
     setSubmitted(false);
     setResult(null);

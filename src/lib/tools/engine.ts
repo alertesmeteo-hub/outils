@@ -8,10 +8,20 @@ export function fmt(n: number, digits = 2): string {
   return f.format(Math.round(n * 10 ** digits) / 10 ** digits);
 }
 
+/** Date du jour à Paris (YYYY-MM-DD). */
+export const todayParis = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Paris' }).format(new Date());
+
+/** Un champ date avec default: 'today' reste vide côté serveur (pas d'écart d'hydratation) : le client le remplit via applyToday. */
+export function applyToday(tool: ToolDefinition, v: Values): Values {
+  const out = { ...v };
+  for (const f of tool.fields) if (f.type === 'date' && f.default === 'today' && !out[f.id]) out[f.id] = todayParis();
+  return out;
+}
+
 export function defaultValues(tool: ToolDefinition): Values {
   const v: Values = {};
   for (const f of tool.fields) {
-    v[f.id] = f.default ?? (f.type === 'checkbox' ? false : f.type === 'select' ? (f.options?.[0]?.value ?? '') : '');
+    v[f.id] = (f.default === 'today' ? '' : f.default) ?? (f.type === 'checkbox' ? false : f.type === 'select' ? (f.options?.[0]?.value ?? '') : '');
   }
   return v;
 }

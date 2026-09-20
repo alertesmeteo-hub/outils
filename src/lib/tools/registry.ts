@@ -10,6 +10,24 @@ import { degatsTempete } from './defs/degats-tempete';
 import { calculIndemnisation } from './defs/calcul-indemnisation-assurance';
 import { intemperiesBtp } from './defs/intemperies-btp';
 import { empreinteCarbone } from './defs/empreinte-carbone';
+import { pressionConvertisseur } from './defs/pression-convertisseur';
+import { humidex } from './defs/humidex';
+import { humiditeAbsolue } from './defs/humidite-absolue';
+import { temperatureHumide } from './defs/temperature-humide';
+import { intensitePluie } from './defs/intensite-pluie';
+import { neigeEnEau } from './defs/neige-en-eau';
+import { chargeNeigeToiture } from './defs/charge-neige-toiture';
+import { risqueGel } from './defs/risque-gel';
+import { risqueVerglas } from './defs/risque-verglas';
+import { indiceUv } from './defs/indice-uv';
+import { leverCoucherSoleil } from './defs/lever-coucher-soleil';
+import { recuperationEauPluie } from './defs/recuperation-eau-pluie';
+import { volumeCiterne } from './defs/volume-citerne';
+import { degresJours } from './defs/degres-jours';
+import { checklistTempete } from './defs/checklist-tempete';
+import { checklistInondation } from './defs/checklist-inondation';
+import { checklistSinistre } from './defs/checklist-sinistre';
+import { kitUrgence } from './defs/kit-urgence';
 
 /**
  * REGISTRE CENTRAL. Pour ajouter un outil :
@@ -19,6 +37,7 @@ import { empreinteCarbone } from './defs/empreinte-carbone';
 export const toolRegistry: ToolDefinition[] = [
   mmPluieLitres, convertisseurVent, distanceOrage, temperatureRessentie, indiceChaleur,
   pointDeRosee, degatsGrele, degatsTempete, calculIndemnisation, intemperiesBtp, empreinteCarbone,
+  pressionConvertisseur, humidex, humiditeAbsolue, temperatureHumide, intensitePluie, neigeEnEau, chargeNeigeToiture, risqueGel, risqueVerglas, indiceUv, leverCoucherSoleil, recuperationEauPluie, volumeCiterne, degresJours, checklistTempete, checklistInondation, checklistSinistre, kitUrgence,
 ];
 
 const bySlug = new Map(toolRegistry.map((t) => [t.slug, t]));

@@ -6,7 +6,7 @@ const eq = (name: string, cond: boolean, info = '') => { if (!cond) { fail++; co
 
 // Chaque outil doit calculer avec ses valeurs par défaut.
 for (const t of toolRegistry) {
-  const o = run(t, { ...defaultValues(t), ...(t.slug === 'intemperies-btp' ? { commune: 'Lyon', date: '2026-01-15' } : {}) } as never);
+  const o = run(t, { ...defaultValues(t), ...(t.slug === 'intemperies-btp' ? { commune: 'Lyon', date: '2026-01-15' } : {}), ...(t.slug === 'lever-coucher-soleil' ? { date: '2026-01-15' } : {}) } as never);
   eq(`${t.slug}: valeurs par défaut valides`, o.ok, JSON.stringify(o));
   eq(`${t.slug}: intro 50-100 mots`, (() => { const n = t.intro.split(/\s+/).length; return n >= 50 && n <= 100; })(), String(t.intro.split(/\s+/).length));
   for (const r of t.related) eq(`${t.slug}: lien ${r} existe`, toolRegistry.some((x) => x.slug === r));
@@ -57,4 +57,33 @@ const cc7: any = get('empreinte-carbone', { mode: 'marche', distance: '5', occup
 eq('marche = 0', cc7.headline.value === '0', cc7.headline.value);
 const cc8: any = get('empreinte-carbone', { mode: 'car_moyenne', distance: '10', occupants: '1,5' });
 eq('occupants non entier rejeté', !!cc8.errors?.occupants);
+
+// --- Lot 2 : nouveaux outils ---
+const A = (s: string, v: Record<string, string | boolean> = {}): any => get(s, v);
+eq('pression 1013,25 hPa = 760 mmHg', A('pression-convertisseur', { valeur: '1013.25', unite: 'hpa' }).shareText.includes('760 mmHg'), A('pression-convertisseur', {}).shareText);
+eq('pression 29,92 inHg ≈ 1013 hPa', /^1\s01[23]/g.test(A('pression-convertisseur', { valeur: '29.92', unite: 'inhg' }).headline.value), A('pression-convertisseur', { valeur: '29.92', unite: 'inhg' }).headline.value);
+console.log('humidex 30/70 :', A('humidex', { temperature: '30', humidite: '70' }).headline.value, '(point de rosée', A('humidex', { temperature: '30', humidite: '70' }).metrics[0].value + ')');
+eq('humidité absolue 20/50 ≈ 8,6', A('humidite-absolue', { temperature: '20', humidite: '50' }).headline.value.startsWith('8,6'), A('humidite-absolue', {}).headline.value);
+eq('humidité absolue 20/100 ≈ 17,3', A('humidite-absolue', { temperature: '20', humidite: '100' }).headline.value.startsWith('17,'), A('humidite-absolue', { temperature: '20', humidite: '100' }).headline.value);
+console.log('température humide 30/50 :', A('temperature-humide', { temperature: '30', humidite: '50' }).headline.value);
+eq('intensité 15 mm / 30 min = 30 mm/h', A('intensite-pluie', { mm: '15', minutes: '30' }).headline.value === '30', A('intensite-pluie', {}).headline.value);
+eq('neige 20 cm à 100 kg/m³ = 20 mm', A('neige-en-eau', { hauteur: '20', densite: '100' }).headline.value === '20', A('neige-en-eau', {}).headline.value);
+eq('charge neige 30 cm à 200 = 60 kg/m²', A('charge-neige-toiture', { hauteur: '30', densite: '200', surface: '100' }).headline.value === '60', A('charge-neige-toiture', {}).headline.value);
+eq('DJU 2/10 base 18 = 12', A('degres-jours', { tn: '2', tx: '10' }).headline.value === '12', A('degres-jours', {}).headline.value);
+eq('DJU tn>=base = 0', A('degres-jours', { tn: '19', tx: '25' }).headline.value === '0', A('degres-jours', { tn: '19', tx: '25' }).headline.value);
+eq('DJU tx<tn rejeté', !!A('degres-jours', { tn: '10', tx: '5' }).errors?.tx);
+eq('récupération eau 57 600 L', A('recuperation-eau-pluie', {}).headline.value.replace(/\s/g, '') === '57600', A('recuperation-eau-pluie', {}).headline.value);
+eq('citerne 150 L × 20 j = 3 000 L', A('volume-citerne', {}).headline.value.replace(/\s/g, '') === '3000', A('volume-citerne', {}).headline.value);
+eq('kit 4 pers × 3 j = 24 L d’eau', A('kit-urgence', {}).headline.value === '24', A('kit-urgence', {}).headline.value);
+eq('UV 7 = élevé', A('indice-uv', { uv: '7' }).level.label.includes('élevé'));
+eq('gel: min 2 °C ciel dégagé calme → sol −1', A('risque-gel', { tmin: '2', ciel: 'degage', vent: 'calme' }).headline.value === '-1' || A('risque-gel', { tmin: '2', ciel: 'degage', vent: 'calme' }).headline.value === '−1', A('risque-gel', { tmin: '2' }).headline.value);
+eq('verglas −1 °C chaussée humide = élevé', A('risque-verglas', { air: '-1', eau: 'humide' }).level.label.includes('élevé'));
+// Soleil : Paris, solstice d'été 2026 (heure d'été) et de décembre (heure d'hiver)
+const s1 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-06-21' });
+console.log('Paris 21/06/2026 :', s1.metrics.map((m: any) => m.value).join(' | '), '– durée', s1.headline.value);
+const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
+console.log('Paris 21/12/2026 :', s2.metrics.map((m: any) => m.value).join(' | '), '– durée', s2.headline.value);
+eq('Paris 21 juin : lever 05 h 4x / coucher 21 h 5x', /^05 h 4/.test(s1.metrics[0].value) && /^21 h 5/.test(s1.metrics[2].value), s1.metrics.map((m: any) => m.value).join());
+eq('Paris 21 juin : durée = 16 h 11', /^16 h 11/.test(s1.headline.value), s1.headline.value);
+eq('Paris 21 déc. : lever 08 h 4x / coucher 16 h 5x', /^08 h 4/.test(s2.metrics[0].value) && /^16 h 5/.test(s2.metrics[2].value), s2.metrics.map((m: any) => m.value).join());
 process.exit(fail ? 1 : 0);
