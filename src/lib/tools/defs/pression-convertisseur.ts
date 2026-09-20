@@ -3,6 +3,8 @@ import { fmt } from '../engine';
 
 // Facteurs vers le pascal (valeurs conventionnelles).
 const TO_PA: Record<string, number> = { hpa: 100, kpa: 1000, pa: 1, bar: 100000, mmhg: 133.322387415, inhg: 3386.38815789, atm: 101325, psi: 6894.757293168 };
+/** Décimales affichées par unité (au-delà, l'écart vient des valeurs conventionnelles). */
+const DIGITS: Record<string, number> = { hpa: 2, kpa: 3, pa: 0, bar: 4, mmhg: 2, inhg: 3, atm: 4, psi: 3 };
 const LABEL: Record<string, string> = { hpa: 'hPa (= mbar)', kpa: 'kPa', pa: 'Pa', bar: 'bar', mmhg: 'mmHg', inhg: 'inHg', atm: 'atm', psi: 'psi' };
 
 export const pressionConvertisseur: ToolDefinition = {
@@ -55,7 +57,7 @@ export const pressionConvertisseur: ToolDefinition = {
     return {
       level: { label, tone },
       headline: { label: 'Pression', value: fmt(hpa, 2), unit: 'hPa' },
-      metrics: Object.keys(TO_PA).filter((u) => u !== 'hpa').map((u) => ({ label: LABEL[u], value: fmt(pa / TO_PA[u], u === 'pa' ? 0 : 4) })),
+      metrics: Object.keys(TO_PA).filter((u) => u !== 'hpa').map((u) => ({ label: LABEL[u], value: fmt(pa / TO_PA[u], DIGITS[u]) })),
       gauge: { value: Math.max(960, Math.min(1060, hpa)), min: 960, max: 1060, caption: 'Pression (hPa)', segments: [{ to: 1000, tone: 'warn' }, { to: 1020, tone: 'ok' }, { to: 1060, tone: 'info' }] },
       notes: ['Repères valables pour une pression réduite au niveau de la mer ; une mesure en altitude est naturellement plus basse.'],
       shareText: `${fmt(p.valeur as number, 2)} ${LABEL[p.unite as string]} = ${fmt(hpa, 2)} hPa = ${fmt(pa / TO_PA.mmhg, 1)} mmHg = ${fmt(pa / TO_PA.inhg, 2)} inHg.`,
