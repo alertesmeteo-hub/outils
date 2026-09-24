@@ -12,6 +12,7 @@ export function Header() {
           {SITE_NAME}
         </Link>
         <div className="flex items-center gap-4 text-sm font-medium">
+          <a href="https://secheresse.alertes-meteo.com/" className="hover:underline">Sécheresse</a>
           <a href="https://alertes-meteo.systeme.io/meteodujour" className="hover:underline">Météo par mail</a>
           <ThemeToggle />
         </div>
