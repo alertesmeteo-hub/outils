@@ -1,3 +1,4 @@
+import NewsletterBrevo from '@/components/NewsletterBrevo';
 import Link from 'next/link';
 import SearchBox from '@/components/SearchBox';
 import { ToolGrid } from '@/components/ToolCard';
@@ -57,6 +58,7 @@ export default async function Home() {
         )}
       </Section>
       <Section title="Derniers outils ajoutés" id="new"><ToolGrid tools={latest} /></Section>
+      <NewsletterBrevo />
     </>
   );
 }
