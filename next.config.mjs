@@ -9,13 +9,14 @@ const securityHeaders = [
 const csp = (frameAncestors) =>
   [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
-    "connect-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://sibforms.com",
+    "style-src 'self' 'unsafe-inline' https://sibforms.com",
+    "font-src 'self' data: https://assets.brevo.com",
+    "img-src 'self' data: https://sibforms.com https://assets.brevo.com",
+    "connect-src 'self' https://*.sibforms.com https://sibforms.com",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    "form-action 'self' https://*.sibforms.com",
     `frame-ancestors ${frameAncestors}`,
   ].join('; ');
 
