@@ -11,7 +11,10 @@ export function Header() {
           <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-white">☁</span>
           {SITE_NAME}
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-4 text-sm font-medium">
+          <a href="https://alertes-meteo.systeme.io/meteodujour" className="hover:underline">Météo par mail</a>
+          <ThemeToggle />
+        </div>
       </div>
       <nav aria-label="Catégories" className="border-t border-border">
         <ul className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 py-1 text-sm font-medium">
