@@ -15,7 +15,12 @@ Webcams météo en direct dans les articles, sans site intermédiaire.
 | `[webcams lat="45.92" lon="6.87" titre="Chamonix"]` | Lieu hors liste (coordonnées) |
 | `[webcam image="https://…/image.jpg" titre="Port de Brest" lien="https://…"]` | Une webcam précise (autorisation de diffusion requise) |
 
-Villes : paris, marseille, lyon, toulouse, nice, nantes, montpellier, strasbourg, bordeaux, lille, rennes, brest, dijon, clermont, ajaccio.
+## Lieux prédéfinis (attribut `ville`)
+- **Grandes villes** (15) : `paris`, `marseille`, `lyon`, `toulouse`, `nice`, `nantes`, `montpellier`, `strasbourg`, `bordeaux`, `lille`, `rennes`, `brest`, `dijon`, `clermont`, `ajaccio`
+- **Montagne et stations de ski** (14) : `chamonix`, `megeve`, `tignes`, `val-thorens`, `la-plagne`, `alpe-d-huez`, `les-deux-alpes`, `serre-chevalier`, `isola-2000`, `font-romeu`, `la-mongie`, `super-lioran`, `gerardmer`, `metabief`
+- **Littoral Manche et Atlantique** (11) : `dunkerque`, `le-havre`, `deauville`, `cherbourg`, `saint-malo`, `quiberon`, `les-sables`, `la-rochelle`, `royan`, `arcachon`, `biarritz`
+- **Littoral méditerranéen et Corse** (7) : `perpignan`, `sete`, `la-grande-motte`, `toulon`, `saint-tropez`, `cannes`, `bastia`
+- **Outre-mer** (8) : `fort-de-france`, `pointe-a-pitre`, `cayenne`, `saint-denis-reunion`, `mamoudzou`, `noumea`, `papeete`, `saint-pierre`
 
 ## Fonctionnement
 - Appel Windy côté serveur (la clé n'est jamais envoyée au navigateur), réponses mises en cache 5 min (transients).

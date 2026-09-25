@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Alertes Météo – Webcams
  * Description: Webcams météo en direct dans vos articles. [webcams ville="brest"] (recherche Windy autour d'une ville) et [webcam image="…"] (votre propre webcam).
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
  * Text Domain: alertes-webcams
@@ -10,27 +10,72 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('AW_VERSION', '0.1.0');
+define('AW_VERSION', '0.2.0');
 define('AW_CACHE_TTL', 5 * MINUTE_IN_SECONDS); // les URLs d'images Windy expirent vers 10 min
 
-/** Villes proposées (coordonnées du centre-ville). */
+/** Lieux proposés, par rubrique : id => array(libellé, lat, lon, rubrique). */
 function aw_villes() {
     return array(
-        'paris'       => array('Paris', 48.8566, 2.3522),
-        'marseille'   => array('Marseille', 43.2965, 5.3698),
-        'lyon'        => array('Lyon', 45.7640, 4.8357),
-        'toulouse'    => array('Toulouse', 43.6047, 1.4442),
-        'nice'        => array('Nice', 43.7102, 7.2620),
-        'nantes'      => array('Nantes', 47.2184, -1.5536),
-        'montpellier' => array('Montpellier', 43.6108, 3.8767),
-        'strasbourg'  => array('Strasbourg', 48.5734, 7.7521),
-        'bordeaux'    => array('Bordeaux', 44.8378, -0.5792),
-        'lille'       => array('Lille', 50.6292, 3.0573),
-        'rennes'      => array('Rennes', 48.1173, -1.6778),
-        'brest'       => array('Brest', 48.3904, -4.4861),
-        'dijon'       => array('Dijon', 47.3220, 5.0415),
-        'clermont'    => array('Clermont-Ferrand', 45.7772, 3.0870),
-        'ajaccio'     => array('Ajaccio', 41.9192, 8.7386),
+        // Grandes villes
+        'paris' => array('Paris', 48.8566, 2.3522, 'Grandes villes'),
+        'marseille' => array('Marseille', 43.2965, 5.3698, 'Grandes villes'),
+        'lyon' => array('Lyon', 45.764, 4.8357, 'Grandes villes'),
+        'toulouse' => array('Toulouse', 43.6047, 1.4442, 'Grandes villes'),
+        'nice' => array('Nice', 43.7102, 7.262, 'Grandes villes'),
+        'nantes' => array('Nantes', 47.2184, -1.5536, 'Grandes villes'),
+        'montpellier' => array('Montpellier', 43.6108, 3.8767, 'Grandes villes'),
+        'strasbourg' => array('Strasbourg', 48.5734, 7.7521, 'Grandes villes'),
+        'bordeaux' => array('Bordeaux', 44.8378, -0.5792, 'Grandes villes'),
+        'lille' => array('Lille', 50.6292, 3.0573, 'Grandes villes'),
+        'rennes' => array('Rennes', 48.1173, -1.6778, 'Grandes villes'),
+        'brest' => array('Brest', 48.3904, -4.4861, 'Grandes villes'),
+        'dijon' => array('Dijon', 47.322, 5.0415, 'Grandes villes'),
+        'clermont' => array('Clermont-Ferrand', 45.7772, 3.087, 'Grandes villes'),
+        'ajaccio' => array('Ajaccio', 41.9192, 8.7386, 'Grandes villes'),
+        // Montagne et stations de ski
+        'chamonix' => array('Chamonix-Mont-Blanc', 45.9237, 6.8694, 'Montagne et stations de ski'),
+        'megeve' => array('Megève', 45.8567, 6.6175, 'Montagne et stations de ski'),
+        'tignes' => array('Tignes', 45.4683, 6.9056, 'Montagne et stations de ski'),
+        'val-thorens' => array('Val Thorens', 45.298, 6.58, 'Montagne et stations de ski'),
+        'la-plagne' => array('La Plagne', 45.507, 6.677, 'Montagne et stations de ski'),
+        'alpe-d-huez' => array('L\'Alpe d\'Huez', 45.092, 6.07, 'Montagne et stations de ski'),
+        'les-deux-alpes' => array('Les Deux Alpes', 45.006, 6.122, 'Montagne et stations de ski'),
+        'serre-chevalier' => array('Serre Chevalier', 44.946, 6.555, 'Montagne et stations de ski'),
+        'isola-2000' => array('Isola 2000', 44.187, 7.157, 'Montagne et stations de ski'),
+        'font-romeu' => array('Font-Romeu', 42.505, 2.04, 'Montagne et stations de ski'),
+        'la-mongie' => array('La Mongie', 42.91, 0.18, 'Montagne et stations de ski'),
+        'super-lioran' => array('Super-Lioran', 45.088, 2.75, 'Montagne et stations de ski'),
+        'gerardmer' => array('Gérardmer', 48.073, 6.878, 'Montagne et stations de ski'),
+        'metabief' => array('Métabief', 46.77, 6.35, 'Montagne et stations de ski'),
+        // Littoral Manche et Atlantique
+        'dunkerque' => array('Dunkerque', 51.0344, 2.3768, 'Littoral Manche et Atlantique'),
+        'le-havre' => array('Le Havre', 49.4944, 0.1079, 'Littoral Manche et Atlantique'),
+        'deauville' => array('Deauville', 49.36, 0.075, 'Littoral Manche et Atlantique'),
+        'cherbourg' => array('Cherbourg', 49.6337, -1.6222, 'Littoral Manche et Atlantique'),
+        'saint-malo' => array('Saint-Malo', 48.6493, -2.0257, 'Littoral Manche et Atlantique'),
+        'quiberon' => array('Quiberon', 47.484, -3.119, 'Littoral Manche et Atlantique'),
+        'les-sables' => array('Les Sables-d\'Olonne', 46.4967, -1.7831, 'Littoral Manche et Atlantique'),
+        'la-rochelle' => array('La Rochelle', 46.1603, -1.1511, 'Littoral Manche et Atlantique'),
+        'royan' => array('Royan', 45.624, -1.029, 'Littoral Manche et Atlantique'),
+        'arcachon' => array('Arcachon', 44.6586, -1.1689, 'Littoral Manche et Atlantique'),
+        'biarritz' => array('Biarritz', 43.4832, -1.5586, 'Littoral Manche et Atlantique'),
+        // Littoral méditerranéen et Corse
+        'perpignan' => array('Perpignan', 42.6887, 2.8948, 'Littoral méditerranéen et Corse'),
+        'sete' => array('Sète', 43.4028, 3.6969, 'Littoral méditerranéen et Corse'),
+        'la-grande-motte' => array('La Grande-Motte', 43.561, 4.085, 'Littoral méditerranéen et Corse'),
+        'toulon' => array('Toulon', 43.1242, 5.928, 'Littoral méditerranéen et Corse'),
+        'saint-tropez' => array('Saint-Tropez', 43.2727, 6.6406, 'Littoral méditerranéen et Corse'),
+        'cannes' => array('Cannes', 43.5528, 7.0174, 'Littoral méditerranéen et Corse'),
+        'bastia' => array('Bastia', 42.697, 9.45, 'Littoral méditerranéen et Corse'),
+        // Outre-mer
+        'fort-de-france' => array('Fort-de-France (Martinique)', 14.6161, -61.0588, 'Outre-mer'),
+        'pointe-a-pitre' => array('Pointe-à-Pitre (Guadeloupe)', 16.2411, -61.5331, 'Outre-mer'),
+        'cayenne' => array('Cayenne (Guyane)', 4.9224, -52.3135, 'Outre-mer'),
+        'saint-denis-reunion' => array('Saint-Denis (La Réunion)', -20.8823, 55.4504, 'Outre-mer'),
+        'mamoudzou' => array('Mamoudzou (Mayotte)', -12.7806, 45.2279, 'Outre-mer'),
+        'noumea' => array('Nouméa (Nouvelle-Calédonie)', -22.2758, 166.458, 'Outre-mer'),
+        'papeete' => array('Papeete (Polynésie)', -17.5516, -149.5585, 'Outre-mer'),
+        'saint-pierre' => array('Saint-Pierre (Saint-Pierre-et-Miquelon)', 46.7811, -56.1764, 'Outre-mer'),
     );
 }
 
@@ -159,7 +204,12 @@ add_shortcode('webcams', function ($atts) {
     if ($a['choix'] === 'oui') {
         $h .= '<div class="aw-choix"><label>Ville <select class="aw-ville">';
         if ($ville === '') $h .= '<option value="" selected>' . esc_html($label) . '</option>';
-        foreach ($villes as $k => $v) $h .= '<option value="' . esc_attr($k) . '"' . selected($k, $ville, false) . '>' . esc_html($v[0]) . '</option>';
+        $groupe = '';
+        foreach ($villes as $k => $v) {
+            if ($v[3] !== $groupe) { $h .= ($groupe ? '</optgroup>' : '') . '<optgroup label="' . esc_attr($v[3]) . '">'; $groupe = $v[3]; }
+            $h .= '<option value="' . esc_attr($k) . '"' . selected($k, $ville, false) . '>' . esc_html($v[0]) . '</option>';
+        }
+        $h .= '</optgroup>';
         $h .= '</select></label> <label>Rayon <select class="aw-rayon">';
         foreach (array(20, 50, 100, 200) as $r) $h .= '<option value="' . $r . '"' . selected($r, $rayon, false) . '>' . $r . ' km</option>';
         $h .= '</select></label></div>';
@@ -208,7 +258,7 @@ add_action('admin_menu', function () {
             <h2>Utilisation</h2>
             <p><code>[webcams ville="brest"]</code> · <code>[webcams ville="nice" rayon="100" nombre="6" choix="oui"]</code> · <code>[webcams lat="45.92" lon="6.87" titre="Chamonix"]</code></p>
             <p><code>[webcam image="https://…/image.jpg" titre="Port de Brest" lien="https://…"]</code> (webcam dont vous avez l'autorisation de diffusion)</p>
-            <p>Villes : <?php echo esc_html(implode(', ', array_keys(aw_villes()))); ?>.</p>
+            <p>Lieux (valeur de <code>ville</code>) : <?php echo esc_html(implode(', ', array_keys(aw_villes()))); ?>.</p>
         </div>
     <?php });
 });
