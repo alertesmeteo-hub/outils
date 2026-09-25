@@ -39,6 +39,8 @@ src/
   components/ToolRunner.tsx moteur d'affichage générique (formulaire, résultat, copie, impression, partage, historique local)
   app/(site)/               accueil, /[thème]/[page]/ (outil), /[thème]/ (hub), /outils/ (liste), admin, pages légales
   app/embed/[slug]/         version intégrable (iframe / WordPress)
+  app/(site)/webcams/       module webcams (sélection + recherche Windy), intégrable via /embed/webcams/
+  lib/webcams/              sélection éditoriale, client API Windy (serveur)
   app/api/calculate/        API de calcul validée côté serveur (rate limit + contrôle d'origine)
 prisma/schema.prisma        ToolOverride (MVP) + User/Calculation/ClaimFile/MonitoredSite (préparés, non utilisés)
 ```

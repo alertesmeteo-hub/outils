@@ -8,10 +8,10 @@
   var base = script ? new URL(script.src).origin : location.origin;
   var frames = [];
 
-  function mount(el, slug) {
+  function mount(el, slug, ville) {
     if (!/^[a-z0-9-]{1,60}$/.test(slug || '')) return;
     var f = document.createElement('iframe');
-    f.src = base + '/embed/' + slug + '/';
+    f.src = base + '/embed/' + slug + '/' + (/^[a-z0-9-]{1,40}$/.test(ville || '') ? '?ville=' + ville : '');
     f.title = 'Outil météo : ' + slug;
     f.loading = 'lazy';
     f.style.cssText = 'width:100%;border:0;min-height:480px;display:block';
@@ -22,12 +22,12 @@
 
   function init() {
     document.querySelectorAll('[data-meteo-outil]').forEach(function (el) {
-      if (!el.firstChild) mount(el, el.getAttribute('data-meteo-outil'));
+      if (!el.firstChild) mount(el, el.getAttribute('data-meteo-outil'), el.getAttribute('data-ville'));
     });
     if (script && script.getAttribute('data-tool')) {
       var d = document.createElement('div');
       script.parentNode.insertBefore(d, script);
-      mount(d, script.getAttribute('data-tool'));
+      mount(d, script.getAttribute('data-tool'), script.getAttribute('data-ville'));
     }
   }
 
