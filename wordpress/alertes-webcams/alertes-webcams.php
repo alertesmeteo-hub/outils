@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Alertes Météo – Webcams
  * Description: Webcams météo en direct dans vos articles. [webcams ville="brest"] (recherche Windy autour d'une ville) et [webcam image="…"] (votre propre webcam).
- * Version: 0.3.0
+ * Version: 0.3.1
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
  * Text Domain: alertes-webcams
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('AW_VERSION', '0.3.0');
+define('AW_VERSION', '0.3.1');
 define('AW_CACHE_TTL', 5 * MINUTE_IN_SECONDS); // les URLs d'images Windy expirent vers 10 min
 
 /** Lieux proposés, par rubrique : id => array(libellé, lat, lon, rubrique). */
@@ -204,7 +204,7 @@ function aw_card($c) {
 function aw_assets() {
     wp_enqueue_style('alertes-webcams', plugins_url('alertes-webcams.css', __FILE__), array(), AW_VERSION);
     wp_enqueue_script('alertes-webcams', plugins_url('alertes-webcams.js', __FILE__), array(), AW_VERSION, true);
-    wp_localize_script('alertes-webcams', 'AW', array('rest' => esc_url_raw(rest_url('alertes-webcams/v1/proches'))));
+    wp_localize_script('alertes-webcams', 'AW', array('rest' => esc_url_raw(rest_url('alertes-webcams/v1/proches')), 'admin' => current_user_can('manage_options') ? 1 : 0));
 }
 
 /**
