@@ -31,7 +31,7 @@ function mo_aliases() {
 }
 
 add_shortcode('outil_meteo', function ($atts) {
-    $a = shortcode_atts(array('type' => '', 'height' => '640', 'ville' => ''), $atts, 'outil_meteo');
+    $a = shortcode_atts(array('type' => '', 'height' => '640'), $atts, 'outil_meteo');
     $base = mo_base_url();
     if (!$base) return '<p><em>Météo Outils : configurez l’URL dans Réglages &gt; Météo Outils.</em></p>';
 
@@ -40,10 +40,7 @@ add_shortcode('outil_meteo', function ($atts) {
     if (isset($aliases[$slug])) $slug = $aliases[$slug];
     if (!preg_match('/^[a-z0-9-]{1,60}$/', $slug)) return '';
 
-    $src    = $base . '/embed/' . $slug . '/';
-    $ville  = sanitize_title($a['ville']);
-    if ($slug === 'webcams' && $ville !== '') $src .= '?ville=' . rawurlencode($ville);
-    $src    = esc_url($src);
+    $src    = esc_url($base . '/embed/' . $slug . '/');
     $height = max(300, min(4000, intval($a['height'])));
 
     // Ajuste la hauteur via postMessage (origine vérifiée).

@@ -5,8 +5,6 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
 ];
-// Images de webcams : Windy + domaines de la sélection éditoriale (WEBCAM_IMG_HOSTS, séparés par des espaces).
-const webcamImgHosts = ['https://*.windy.com', ...(process.env.WEBCAM_IMG_HOSTS?.trim().split(/\s+/).filter(Boolean) ?? [])].join(' ');
 // Next.js a besoin de scripts/styles inline ; à durcir avec des nonces si besoin.
 const csp = (frameAncestors) =>
   [
@@ -14,7 +12,7 @@ const csp = (frameAncestors) =>
     "script-src 'self' 'unsafe-inline' https://sibforms.com",
     "style-src 'self' 'unsafe-inline' https://sibforms.com",
     "font-src 'self' data: https://assets.brevo.com",
-    `img-src 'self' data: https://sibforms.com https://assets.brevo.com ${webcamImgHosts}`,
+    "img-src 'self' data: https://sibforms.com https://assets.brevo.com",
     "connect-src 'self' https://*.sibforms.com https://sibforms.com",
     "object-src 'none'",
     "base-uri 'self'",

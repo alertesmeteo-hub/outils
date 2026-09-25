@@ -2,7 +2,7 @@ import type { ToolDefinition } from '../types';
 import { fmt } from '../engine';
 
 /** Villes proposées (coordonnées géographiques approximatives, en degrés décimaux ; longitude Est positive). */
-export const CITIES: Record<string, { label: string; lat: number; lon: number }> = {
+const CITIES: Record<string, { label: string; lat: number; lon: number }> = {
   paris: { label: 'Paris', lat: 48.8566, lon: 2.3522 },
   marseille: { label: 'Marseille', lat: 43.2965, lon: 5.3698 },
   lyon: { label: 'Lyon', lat: 45.764, lon: 4.8357 },
