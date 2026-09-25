@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Alertes Météo – Webcams
  * Description: Webcams météo en direct dans vos articles. [webcams ville="brest"] (recherche Windy autour d'une ville) et [webcam image="…"] (votre propre webcam).
- * Version: 0.3.1
+ * Version: 0.3.2
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
  * Text Domain: alertes-webcams
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('AW_VERSION', '0.3.1');
+define('AW_VERSION', '0.3.2');
 define('AW_CACHE_TTL', 5 * MINUTE_IN_SECONDS); // les URLs d'images Windy expirent vers 10 min
 
 /** Lieux proposés, par rubrique : id => array(libellé, lat, lon, rubrique). */
@@ -264,6 +264,7 @@ add_shortcode('webcam', function ($atts) {
     if ($a['id'] !== '') {
         aw_assets();
         $id = preg_replace('/\D/', '', $a['id']);
+        if ($id === '') return current_user_can('manage_options') ? '<p><em>Webcam : remplacez « … » par un vrai numéro, par ex. [webcam id="1234567890"] (numéros dans Réglages &gt; Webcams &gt; Lister).</em></p>' : '';
         $c = aw_windy_id($id);
         $h = '<div class="aw-webcams aw-seule" data-id="' . esc_attr($id) . '"><p class="aw-statut" role="status">';
         if (is_wp_error($c)) $h .= current_user_can('manage_options') ? esc_html($c->get_error_message()) : 'Webcam momentanément indisponible.';
