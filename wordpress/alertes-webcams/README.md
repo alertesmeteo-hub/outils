@@ -7,12 +7,16 @@ Webcams météo en direct dans les articles, sans site intermédiaire.
 2. Activer l'extension.
 3. **Réglages > Webcams** : coller la clé gratuite Windy (https://api.windy.com/keys, API « Webcams »).
 
+## Explorateur
+Réglages > Webcams (ou le lien « Réglages » sous le nom de l'extension) : choisir un lieu et un rayon, **Lister** affiche jusqu'à 50 webcams Windy avec miniature, distance et shortcode `[webcam id="…"]` à copier.
+
 ## Shortcodes
 | Shortcode | Effet |
 |---|---|
 | `[webcams ville="brest"]` | 9 webcams les plus proches de Brest (rayon 50 km) |
 | `[webcams ville="nice" rayon="100" nombre="6" choix="oui"]` | Le lecteur peut changer de ville et de rayon |
 | `[webcams lat="45.92" lon="6.87" titre="Chamonix"]` | Lieu hors liste (coordonnées) |
+| `[webcam id="1234567890"]` | Une webcam Windy précise (identifiant copié depuis l'explorateur de Réglages > Webcams) |
 | `[webcam image="https://…/image.jpg" titre="Port de Brest" lien="https://…"]` | Une webcam précise (autorisation de diffusion requise) |
 
 ## Lieux prédéfinis (attribut `ville`)

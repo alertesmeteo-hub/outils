@@ -21,12 +21,14 @@
 
   function charger(bloc) {
     var d = bloc.dataset, p = new URLSearchParams({ rayon: d.rayon, nombre: d.nombre });
-    if (d.ville) p.set('ville', d.ville); else { p.set('lat', d.lat); p.set('lon', d.lon); }
+    if (d.id) p = new URLSearchParams({ id: d.id });
+    else if (d.ville) p.set('ville', d.ville); else { p.set('lat', d.lat); p.set('lon', d.lon); }
     var statut = bloc.querySelector('.aw-statut'), grille = bloc.querySelector('.aw-grille');
     fetch(AW.rest + (AW.rest.indexOf('?') < 0 ? '?' : '&') + p)
       .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
       .then(function (j) {
         grille.replaceChildren.apply(grille, j.webcams.map(carte));
+        if (d.id) { statut.textContent = ''; return; }
         statut.textContent = j.webcams.length
           ? j.webcams.length + ' webcam(s) dans un rayon de ' + d.rayon + ' km autour de ' + d.label + '.'
           : 'Aucune webcam dans un rayon de ' + d.rayon + ' km autour de ' + d.label + '.';

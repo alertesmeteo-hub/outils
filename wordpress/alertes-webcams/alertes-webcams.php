@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Alertes Météo – Webcams
  * Description: Webcams météo en direct dans vos articles. [webcams ville="brest"] (recherche Windy autour d'une ville) et [webcam image="…"] (votre propre webcam).
- * Version: 0.2.0
+ * Version: 0.3.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
  * Text Domain: alertes-webcams
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('AW_VERSION', '0.2.0');
+define('AW_VERSION', '0.3.0');
 define('AW_CACHE_TTL', 5 * MINUTE_IN_SECONDS); // les URLs d'images Windy expirent vers 10 min
 
 /** Lieux proposés, par rubrique : id => array(libellé, lat, lon, rubrique). */
@@ -86,14 +86,57 @@ function aw_distance($lat1, $lon1, $lat2, $lon2) {
     return 6371 * 2 * asin(sqrt($a));
 }
 
+/** Appel à l'API Windy v3 ($chemin : '' pour la liste, '/123' pour une webcam). */
+function aw_windy_get($chemin, $params = array()) {
+    $key = trim((string) get_option('aw_windy_key', ''));
+    if ($key === '') return new WP_Error('aw_no_key', 'Clé API Windy non configurée (Réglages > Webcams).');
+    $url = add_query_arg(array_merge($params, array('include' => 'images,location,urls', 'lang' => 'fr')), 'https://api.windy.com/webcams/api/v3/webcams' . $chemin);
+    $res = wp_remote_get($url, array('timeout' => 8, 'headers' => array('x-windy-api-key' => $key)));
+    if (is_wp_error($res)) return $res;
+    $code = wp_remote_retrieve_response_code($res);
+    if ($code === 401 || $code === 403) return new WP_Error('aw_key', 'Clé Windy refusée : vérifiez qu\'il s\'agit d\'une clé « Webcams API ».');
+    if ($code === 404) return new WP_Error('aw_404', 'Webcam introuvable chez Windy.');
+    if ($code !== 200) return new WP_Error('aw_http', 'Source de webcams indisponible (code ' . intval($code) . ').');
+    return json_decode(wp_remote_retrieve_body($res), true);
+}
+
+/** Webcam Windy (JSON) → tableau affichable ; null si pas d'image. */
+function aw_map_cam($w, $lat = null, $lon = null) {
+    $img = $w['images']['current']['preview'] ?? '';
+    if (!$img) return null;
+    $l = $w['location'] ?? array();
+    return array(
+        'id'       => (string) ($w['webcamId'] ?? ''),
+        'titre'    => (string) ($w['title'] ?? ''),
+        'image'    => (string) $img,
+        'miniature'=> (string) ($w['images']['current']['thumbnail'] ?? $img),
+        'lieu'     => implode(', ', array_filter(array($l['city'] ?? '', $l['region'] ?? ''))),
+        'lien'     => (string) ($w['urls']['detail'] ?? ''),
+        'distance' => $lat !== null && isset($l['latitude'], $l['longitude']) ? (int) round(aw_distance($lat, $lon, $l['latitude'], $l['longitude'])) : null,
+        'source'   => 'Windy',
+    );
+}
+
+/** Une webcam Windy par son identifiant (cache 5 min). */
+function aw_windy_id($id) {
+    $id = preg_replace('/\D/', '', (string) $id);
+    if ($id === '') return new WP_Error('aw_id', 'Identifiant de webcam invalide.');
+    $cache_key = 'aw_id_' . $id;
+    $cached = get_transient($cache_key);
+    if (is_array($cached)) return $cached;
+    $w = aw_windy_get('/' . $id);
+    if (is_wp_error($w)) return $w;
+    $c = aw_map_cam($w);
+    if (!$c) return new WP_Error('aw_img', 'Cette webcam n\'a pas d\'image disponible.');
+    set_transient($cache_key, $c, AW_CACHE_TTL);
+    return $c;
+}
+
 /**
  * Webcams Windy autour d'un point (API v3, clé côté serveur uniquement).
  * @return array|WP_Error
  */
 function aw_windy_nearby($lat, $lon, $rayon, $nombre) {
-    $key = trim((string) get_option('aw_windy_key', ''));
-    if ($key === '') return new WP_Error('aw_no_key', 'Clé API Windy non configurée (Réglages > Webcams).');
-
     $lat = round($lat, 2); $lon = round($lon, 2);
     $rayon = max(5, min(250, intval($rayon)));
     $nombre = max(1, min(50, intval($nombre)));
@@ -101,30 +144,12 @@ function aw_windy_nearby($lat, $lon, $rayon, $nombre) {
     $cached = get_transient($cache_key);
     if (is_array($cached)) return $cached;
 
-    $url = add_query_arg(array(
-        'nearby'  => "$lat,$lon,$rayon",
-        'limit'   => $nombre,
-        'include' => 'images,location,urls',
-        'lang'    => 'fr',
-    ), 'https://api.windy.com/webcams/api/v3/webcams');
-    $res = wp_remote_get($url, array('timeout' => 8, 'headers' => array('x-windy-api-key' => $key)));
-    if (is_wp_error($res)) return $res;
-    if (wp_remote_retrieve_response_code($res) !== 200) return new WP_Error('aw_http', 'Source de webcams indisponible.');
-
-    $data = json_decode(wp_remote_retrieve_body($res), true);
+    $data = aw_windy_get('', array('nearby' => "$lat,$lon,$rayon", 'limit' => $nombre));
+    if (is_wp_error($data)) return $data;
     $cams = array();
     foreach ((array) ($data['webcams'] ?? array()) as $w) {
-        $img = $w['images']['current']['preview'] ?? '';
-        if (!$img) continue;
-        $l = $w['location'] ?? array();
-        $cams[] = array(
-            'titre'    => (string) ($w['title'] ?? ''),
-            'image'    => (string) $img,
-            'lieu'     => implode(', ', array_filter(array($l['city'] ?? '', $l['region'] ?? ''))),
-            'lien'     => (string) ($w['urls']['detail'] ?? ''),
-            'distance' => isset($l['latitude'], $l['longitude']) ? (int) round(aw_distance($lat, $lon, $l['latitude'], $l['longitude'])) : null,
-            'source'   => 'Windy',
-        );
+        $c = aw_map_cam($w, $lat, $lon);
+        if ($c) $cams[] = $c;
     }
     usort($cams, function ($a, $b) { return ($a['distance'] ?? 1e9) <=> ($b['distance'] ?? 1e9); });
     set_transient($cache_key, $cams, AW_CACHE_TTL);
@@ -137,6 +162,7 @@ add_action('rest_api_init', function () {
         'methods'             => 'GET',
         'permission_callback' => '__return_true',
         'args'                => array(
+            'id'     => array('sanitize_callback' => 'absint'),
             'ville'  => array('sanitize_callback' => 'sanitize_key'),
             'lat'    => array('sanitize_callback' => 'floatval'),
             'lon'    => array('sanitize_callback' => 'floatval'),
@@ -144,6 +170,11 @@ add_action('rest_api_init', function () {
             'nombre' => array('sanitize_callback' => 'absint', 'default' => 9),
         ),
         'callback' => function (WP_REST_Request $r) {
+            if ($r['id']) {
+                $c = aw_windy_id($r['id']);
+                if (is_wp_error($c)) return new WP_Error($c->get_error_code(), $c->get_error_message(), array('status' => 503));
+                return rest_ensure_response(array('webcams' => array($c)));
+            }
             $villes = aw_villes();
             $v = $r['ville'];
             if ($v && isset($villes[$v])) { $lat = $villes[$v][1]; $lon = $villes[$v][2]; }
@@ -229,13 +260,58 @@ add_shortcode('webcams', function ($atts) {
  * Votre propre webcam (ou une webcam dont vous avez l'autorisation de diffusion). Rechargée toutes les 5 min.
  */
 add_shortcode('webcam', function ($atts) {
-    $a = shortcode_atts(array('image' => '', 'titre' => 'Webcam', 'lieu' => '', 'lien' => '', 'source' => 'source'), $atts, 'webcam');
+    $a = shortcode_atts(array('id' => '', 'image' => '', 'titre' => 'Webcam', 'lieu' => '', 'lien' => '', 'source' => 'source'), $atts, 'webcam');
+    if ($a['id'] !== '') {
+        aw_assets();
+        $id = preg_replace('/\D/', '', $a['id']);
+        $c = aw_windy_id($id);
+        $h = '<div class="aw-webcams aw-seule" data-id="' . esc_attr($id) . '"><p class="aw-statut" role="status">';
+        if (is_wp_error($c)) $h .= current_user_can('manage_options') ? esc_html($c->get_error_message()) : 'Webcam momentanément indisponible.';
+        $h .= '</p><div class="aw-grille">' . (is_wp_error($c) ? '' : aw_card($c)) . '</div>';
+        return $h . '<p class="aw-credit"><a href="https://www.windy.com/webcams" target="_blank" rel="noopener">Webcams by Windy</a></p></div>';
+    }
     if (!wp_http_validate_url($a['image']) || stripos($a['image'], 'https://') !== 0) return '<p><em>Webcam : attribut image manquant ou non https.</em></p>';
     aw_assets();
     return '<div class="aw-grille aw-seule">' . aw_card(array(
         'titre' => $a['titre'], 'image' => $a['image'], 'lieu' => $a['lieu'], 'lien' => $a['lien'], 'source' => $a['source'], 'perso' => true,
     )) . '</div>';
 });
+
+/** Lien « Réglages » sous le nom de l'extension. */
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), function ($liens) {
+    array_unshift($liens, '<a href="' . esc_url(admin_url('options-general.php?page=alertes-webcams')) . '">Réglages</a>');
+    return $liens;
+});
+
+/** Explorateur admin : liste des webcams Windy autour d'un lieu, avec le shortcode à copier. */
+function aw_explorateur() {
+    $villes = aw_villes();
+    $ville = isset($_GET['aw_ville']) ? sanitize_key(wp_unslash($_GET['aw_ville'])) : '';
+    $rayon = isset($_GET['aw_rayon']) ? max(5, min(250, absint($_GET['aw_rayon']))) : 50;
+    echo '<h2>Explorer les webcams Windy</h2><form method="get"><input type="hidden" name="page" value="alertes-webcams">';
+    echo '<select name="aw_ville">';
+    $groupe = '';
+    foreach ($villes as $k => $v) {
+        if ($v[3] !== $groupe) { echo ($groupe ? '</optgroup>' : '') . '<optgroup label="' . esc_attr($v[3]) . '">'; $groupe = $v[3]; }
+        echo '<option value="' . esc_attr($k) . '"' . selected($k, $ville, false) . '>' . esc_html($v[0]) . '</option>';
+    }
+    echo '</optgroup></select> <select name="aw_rayon">';
+    foreach (array(20, 50, 100, 200) as $r) echo '<option value="' . $r . '"' . selected($r, $rayon, false) . '>' . $r . ' km</option>';
+    echo '</select> '; submit_button('Lister', 'secondary', '', false); echo '</form>';
+    if (!$ville || !isset($villes[$ville])) return;
+
+    $cams = aw_windy_nearby($villes[$ville][1], $villes[$ville][2], $rayon, 50);
+    if (is_wp_error($cams)) { echo '<div class="notice notice-error inline"><p>' . esc_html($cams->get_error_message()) . '</p></div>'; return; }
+    echo '<p>' . count($cams) . ' webcam(s) dans un rayon de ' . $rayon . ' km autour de ' . esc_html($villes[$ville][0]) . ' (50 maximum). Copiez le shortcode d\'une webcam pour l\'afficher seule dans un article.</p>';
+    echo '<table class="widefat striped"><thead><tr><th style="width:130px">Image</th><th>Webcam</th><th>Distance</th><th>Shortcode</th></tr></thead><tbody>';
+    foreach ($cams as $c) {
+        echo '<tr><td><img src="' . esc_url($c['miniature']) . '" alt="" style="width:120px;height:auto" loading="lazy"></td>';
+        echo '<td><strong>' . esc_html($c['titre']) . '</strong><br>' . esc_html($c['lieu']) . ($c['lien'] ? '<br><a href="' . esc_url($c['lien']) . '" target="_blank" rel="noopener">Voir sur Windy</a>' : '') . '</td>';
+        echo '<td>' . ($c['distance'] !== null ? intval($c['distance']) . ' km' : '') . '</td>';
+        echo '<td><input type="text" readonly value="' . esc_attr('[webcam id="' . $c['id'] . '"]') . '" onclick="this.select()" class="regular-text" style="width:15em"></td></tr>';
+    }
+    echo '</tbody></table>';
+}
 
 /** Réglages > Webcams */
 add_action('admin_init', function () {
@@ -257,8 +333,10 @@ add_action('admin_menu', function () {
             </form>
             <h2>Utilisation</h2>
             <p><code>[webcams ville="brest"]</code> · <code>[webcams ville="nice" rayon="100" nombre="6" choix="oui"]</code> · <code>[webcams lat="45.92" lon="6.87" titre="Chamonix"]</code></p>
+            <p><code>[webcam id="1234567890"]</code> (une webcam Windy précise : identifiant donné par l'explorateur ci-dessous)</p>
             <p><code>[webcam image="https://…/image.jpg" titre="Port de Brest" lien="https://…"]</code> (webcam dont vous avez l'autorisation de diffusion)</p>
             <p>Lieux (valeur de <code>ville</code>) : <?php echo esc_html(implode(', ', array_keys(aw_villes()))); ?>.</p>
+            <?php if (get_option('aw_windy_key')) aw_explorateur(); ?>
         </div>
     <?php });
 });
