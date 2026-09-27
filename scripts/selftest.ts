@@ -171,7 +171,6 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   const nowSix = Date.now();
   const sixList = [0, 1, 2, 12].map((k) => ({ time: new Date(nowSix - k * 360_000).toISOString(), t: 18 + k, raf: 20 + k * 3 })).reverse();
   const r6 = (id: string, extra = {}) => R.buildRanking(R.getRanking(id), [st('C', '62', 5)], {}, nowSix, { secondaires: false, amateurs: false, byDept: false }, {}, extra)[0];
-  eq('rafales 6 min = dernier relevé', r6('raf6', { six: { C: sixList } })?.value === 20);
   eq('rafales 1 h = max des relevés de l’heure (le relevé d’il y a 72 min exclu)', r6('raf1', { six: { C: sixList } })?.value === 26);
   eq('température du moment = relevé 6 min', r6('t', { six: { C: sixList } })?.value === 18);
   eq('rafales 24 h depuis le cumul horaire 6 min', r6('raf24', { rafH: { C: { [new Date(nowSix - 3600_000).toISOString()]: 88, [new Date(nowSix - 30 * 3600_000).toISOString()]: 120 } } })?.value === 88);

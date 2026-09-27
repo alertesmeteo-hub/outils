@@ -225,8 +225,8 @@ function Scale({ title, rows }: { title: string; rows: (Band & { range: string }
 function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: RankRow[]; sort?: Sort; sortHref: (k: Sort['key']) => string; embed: boolean; opt: { showAlt: boolean; byDept: boolean; byRegion: boolean; evo: boolean; records: boolean; debut: boolean } }) {
   const unit = r.unit ? ` (${r.unit})` : '';
   const arrow = (k: Sort['key']) => (sort?.key === k ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
-  const SortTh = ({ k, children, right, narrow }: { k: Sort['key']; children: React.ReactNode; right?: boolean; narrow?: boolean }) => (
-    <th className={`${th} ${right ? 'text-right' : ''} ${narrow ? 'w-px' : ''}`} aria-sort={sort?.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+  const SortTh = ({ k, children, right, center, narrow }: { k: Sort['key']; children: React.ReactNode; right?: boolean; center?: boolean; narrow?: boolean }) => (
+    <th className={`${th} ${right ? 'text-right' : ''} ${center ? 'text-center' : ''} ${narrow ? 'w-px' : ''}`} aria-sort={sort?.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
       <Link href={sortHref(k)} className="hover:underline" title="Trier">{children}{arrow(k)}</Link>
     </th>
   );
@@ -237,7 +237,7 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
   if (!rows.length) return <Notice>Aucune station ne correspond à ces critères pour cette période.</Notice>;
   return (
     <div className="mt-4 max-w-full overflow-x-auto">
-      <table className="mx-auto w-auto rounded-xl border border-border bg-surface text-sm">
+      <table className="ml-0 w-auto rounded-xl sm:ml-10 border border-border bg-surface text-sm">
         <thead className="border-b border-border bg-bg">
           <tr>
             {opt.byRegion && <th className={th}>Région</th>}
@@ -246,7 +246,7 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
             <SortTh k="val" right>{head}</SortTh>
             {r.showPmer && <th className={`${th} text-right`}>Pression (hPa)</th>}
             {opt.evo && <><th className={`${th} text-right`}>Évol. 1 h</th><th className={`${th} text-right`}>Évol. 24 h</th></>}
-            {r.feels && <><SortTh k="wc" right>Windchill - Ressenti</SortTh><SortTh k="hx" right>Humidex</SortTh></>}
+            {r.feels && <><SortTh k="wc" center>Windchill - Ressenti</SortTh><SortTh k="hx" center>Humidex</SortTh></>}
             {(r.id === 'humidex' || r.id === 'windchill') && <th className={th}>Niveau</th>}
             {opt.showAlt && <th className={`${th} text-right`}>Altitude (m)</th>}
             {opt.records && r.record && <>
@@ -278,8 +278,8 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
                   <td className={`${td} text-right tabular-nums`}>{fmtS(x.evo24)}</td>
                 </>}
                 {r.feels && <>
-                  <td className={`${td} text-right tabular-nums`} style={x.windchill != null ? bandStyle(windchillBand(x.windchill)) : undefined} title={x.windchill != null ? windchillBand(x.windchill).label : undefined}>{fmtV(x.windchill)}</td>
-                  <td className={`${td} text-right tabular-nums`} style={x.humidex != null ? bandStyle(humidexBand(x.humidex)) : undefined} title={x.humidex != null ? humidexBand(x.humidex).label : undefined}>{fmtV(x.humidex, 0)}</td>
+                  <td className={`${td} text-center tabular-nums`} style={x.windchill != null ? bandStyle(windchillBand(x.windchill)) : undefined} title={x.windchill != null ? windchillBand(x.windchill).label : undefined}>{fmtV(x.windchill)}</td>
+                  <td className={`${td} text-center tabular-nums`} style={x.humidex != null ? bandStyle(humidexBand(x.humidex)) : undefined} title={x.humidex != null ? humidexBand(x.humidex).label : undefined}>{fmtV(x.humidex, 0)}</td>
                 </>}
                 {band && <td className={td}><Pill b={band} /></td>}
                 {opt.showAlt && <td className={`${td} text-right tabular-nums`}>{x.station.alt ?? '—'}</td>}

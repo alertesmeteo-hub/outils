@@ -173,7 +173,7 @@ export type RankingId =
   | 't' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records'
   | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin'
   | 'rr1' | 'rr24' | 'rr6' | 'rr48' | 'rr72'
-  | 'ff' | 'fxi' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf6' | 'raf1' | 'raf24' | 'raf48' | 'raf72'
+  | 'ff' | 'fxi' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf24' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
   | 'td' | 'windchill' | 'humidex' | 'sol10' | 'sol20' | 'sol50' | 'sol100'
   | 'n-tx' | 'n-tn' | 'n-tx24' | 'n-tn24' | 'e-recm-tx' | 'e-recm-tn' | 'e-reca-tx' | 'e-reca-tn';
@@ -303,17 +303,17 @@ export const RANKINGS: Ranking[] = [
   { id: 'rr48', short: 'Pluie 48 h', label: 'Classement de la pluie sur 48 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(48) },
   { id: 'rr72', short: 'Pluie 72 h', label: 'Classement de la pluie sur 72 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(72) },
 
-  { id: 'ff', short: 'Vent moyen', label: 'Classement du vent moyen (dernière observation)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: cur('ff') },
-  { id: 'fxi', short: 'Vent max. 1 h', label: 'Classement du vent maximal de la dernière heure (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: windNow },
-  { id: 'fxi24', short: 'Vent max. 24 h', label: 'Classement du vent maximal sur 24 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(24) },
-  { id: 'fxi48', short: 'Vent max. 48 h', label: 'Classement du vent maximal sur 48 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(48) },
-  { id: 'fxi72', short: 'Vent max. 72 h', label: 'Classement du vent maximal sur 72 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(72) },
 
-  { id: 'raf6', short: 'Rafales 6 min', label: 'Classement des rafales du dernier relevé (rafale max. sur 10 min, pas de 6 min)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: rafRecent(6) },
-  { id: 'raf1', short: 'Rafales 1 h', label: 'Classement des rafales maximales sur la dernière heure (relevés 6 min)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: rafRecent(60) },
+
+  { id: 'raf1', short: 'Rafales', label: 'Classement des rafales maximales sur la dernière heure (relevés 6 min)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: rafRecent(60) },
   { id: 'raf24', short: 'Rafales 24 h', label: 'Classement des rafales maximales sur 24 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(24) },
   { id: 'raf48', short: 'Rafales 48 h', label: 'Classement des rafales maximales sur 48 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(48) },
   { id: 'raf72', short: 'Rafales 72 h', label: 'Classement des rafales maximales sur 72 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(72) },
+  { id: 'ff', short: 'Vent moy', label: 'Classement du vent moyen (dernière observation)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: cur('ff') },
+  { id: 'fxi', short: 'Vent moy 1 h', label: 'Classement du vent maximal de la dernière heure (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: windNow },
+  { id: 'fxi24', short: 'Vent moy 24 h', label: 'Classement du vent maximal sur 24 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(24) },
+  { id: 'fxi48', short: 'Vent moy 48 h', label: 'Classement du vent maximal sur 48 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(48) },
+  { id: 'fxi72', short: 'Vent moy 72 h', label: 'Classement du vent maximal sur 72 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(72) },
 
   { id: 'pmer', short: 'Pression mer', label: 'Classement de la pression au niveau de la mer', group: C, unit: 'hPa', digits: 1, order: 'desc', instant: true, value: cur('pmer') },
   { id: 'dp3', short: 'Variation 3 h', label: 'Classement de la variation de pression sur 3 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 3) },
