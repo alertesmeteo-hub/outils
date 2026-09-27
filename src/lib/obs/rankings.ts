@@ -202,6 +202,8 @@ export type Ranking = {
   temp?: boolean;
   /** Rafales SYNOP : période comptée depuis le dernier message SYNOP. */
   synop?: boolean;
+  /** Ajoute la colonne « pression actuelle » (variations de pression). */
+  showPmer?: boolean;
   /** Valeur instantanée : pas de colonne « heures ». */
   instant?: boolean;
   window?: (w: ReturnType<typeof windows>) => Window;
@@ -275,7 +277,7 @@ export const RANKINGS: Ranking[] = [
   { id: 'tn-records', short: 'Records prov. TN', label: 'Classement records provisoires des températures minimales', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnProv, value: (o, w, n) => aggMin(o, w.tnProv, n) },
 
   { id: 'rr1', short: 'Pluie 1 h', label: 'Classement de la pluie en 1 heure (dernière heure)', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(1) },
-  { id: 'rr6', short: 'Pluie 6 h', label: 'Classement de la pluie depuis 6 h UTC, avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.since6, value: (o, w, n) => aggSum(o, w.since6, 'rr1', n) },
+  { id: 'rr6', short: 'Pluie 6 h', label: 'Classement de la pluie depuis 6 h UTC', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.since6, value: (o, w, n) => aggSum(o, w.since6, 'rr1', n) },
   { id: 'rr24', short: 'Pluie 24 h', label: 'Classement de la pluie sur 24 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', value: slide(24) },
   { id: 'rr48', short: 'Pluie 48 h', label: 'Classement de la pluie sur 48 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(48) },
   { id: 'rr72', short: 'Pluie 72 h', label: 'Classement de la pluie sur 72 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(72) },
@@ -291,9 +293,9 @@ export const RANKINGS: Ranking[] = [
   { id: 'raf72', short: 'Rafales 72 h', label: 'Classement des rafales maximales sur 72 heures (messages SYNOP, stations principales)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(72) },
 
   { id: 'pmer', short: 'Pression mer', label: 'Classement de la pression au niveau de la mer', group: C, unit: 'hPa', digits: 1, order: 'desc', instant: true, value: cur('pmer') },
-  { id: 'dp3', short: 'Variation 3 h', label: 'Classement de la variation de pression sur 3 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, value: variation('pmer', 3) },
-  { id: 'dp12', short: 'Variation 12 h', label: 'Classement de la variation de pression sur 12 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, value: variation('pmer', 12) },
-  { id: 'dp24', short: 'Variation 24 h', label: 'Classement de la variation de pression sur 24 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, value: variation('pmer', 24) },
+  { id: 'dp3', short: 'Variation 3 h', label: 'Classement de la variation de pression sur 3 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 3) },
+  { id: 'dp12', short: 'Variation 12 h', label: 'Classement de la variation de pression sur 12 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 12) },
+  { id: 'dp24', short: 'Variation 24 h', label: 'Classement de la variation de pression sur 24 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 24) },
   { id: 'u', short: 'Humidité', label: 'Classement de l’humidité relative', group: C, unit: '%', digits: 0, order: 'desc', instant: true, value: cur('u') },
   { id: 'vv', short: 'Visibilité', label: 'Classement de la visibilité (les plus faibles en tête)', group: C, unit: 'km', digits: 1, order: 'asc', instant: true, value: (o, w, n) => { const a = cur('vv')(o, w, n); return a && { ...a, value: a.value / 1000 }; } },
   { id: 'snow', short: 'Hauteur de neige', label: 'Classement de la hauteur de neige au sol', group: C, unit: 'cm', digits: 0, order: 'desc', instant: true, value: (o, w, n) => { const a = cur('snow')(o, w, n); return a && a.value > 0 ? a : null; } },
@@ -349,6 +351,7 @@ export type RankRow = {
   humidex?: number;
   evo1?: number;
   evo24?: number;
+  pmer?: number;
   recMonth?: { v: number; d: string };
   recAbs?: { v: number; d: string };
   /** 'abs' = record absolu égalé ou battu, 'month' = record mensuel. */
@@ -384,6 +387,7 @@ export function buildRanking(
       row.windchill = windchillOf(l?.t, l?.ff);
       row.humidex = humidexFrom(l?.t, l?.td);
     }
+    if (r.showPmer) row.pmer = latest(o, now)?.pmer;
     if (f.evo && r.temp) {
       row.evo1 = delta(o, 't', 1, now);
       row.evo24 = delta(o, 't', 24, now);

@@ -138,7 +138,7 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   const one = (id: string, f = {}) => R.buildRanking(R.getRanking(id), [st('A', '13', 5)], d2, now, { secondaires: false, amateurs: false, byDept: false, ...f }, { A: { normals: { '7': { tx: 30, tn: 18 } }, monthly: { '7': { tx: { v: 40, d: '2019-07-12' } } } } })[0];
   eq('vent max 24 h = 90 km/h', one('fxi24')?.value === 90);
   eq('vent max repli sur fxy', R.buildRanking(R.getRanking('fxi'), [st('A', '13', 5)], { A: [{ time: new Date(now).toISOString(), fxy: 55 }] }, now, { secondaires: false, amateurs: false, byDept: false })[0]?.value === 55);
-  eq('variation de pression 3 h = +3 hPa', one('dp3')?.value === 3 && one('dp24')?.value === 24);
+  eq('variation de pression 3 h = +3 hPa, pression actuelle 1024', one('dp3')?.value === 3 && one('dp24')?.value === 24 && one('dp3')?.pmer === 1024);
   eq('visibilité en km', one('vv')?.value === 3);
   eq('neige nulle non classée', one('snow') === undefined);
   const ev = one('tx-prov', { evo: true });

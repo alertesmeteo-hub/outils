@@ -244,6 +244,7 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
             <SortTh k="dept" narrow>Dépt</SortTh>
             <SortTh k="station">Station</SortTh>
             <SortTh k="val" right>{head}</SortTh>
+            {r.showPmer && <th className={`${th} text-right`}>Pression (hPa)</th>}
             {opt.evo && <><th className={`${th} text-right`}>Évol. 1 h</th><th className={`${th} text-right`}>Évol. 24 h</th></>}
             {r.feels && <><SortTh k="wc" right>Windchill - Ressenti</SortTh><SortTh k="hx" right>Humidex</SortTh></>}
             {(r.id === 'humidex' || r.id === 'windchill') && <th className={th}>Niveau</th>}
@@ -271,6 +272,7 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
                   {x.beaten && <span className="ml-2 rounded bg-danger px-1.5 py-0.5 text-xs font-bold text-white">{x.beaten === 'abs' ? 'Record absolu' : 'Record mensuel'}</span>}
                 </td>
                 <td className={`${td} text-right font-semibold tabular-nums`} style={band ? bandStyle(band) : undefined} title={x.at ? `à ${hour(x.at)}` : undefined}>{fv(x.value)}</td>
+                {r.showPmer && <td className={`${td} text-right tabular-nums`}>{fmtV(x.pmer)}</td>}
                 {opt.evo && <>
                   <td className={`${td} text-right tabular-nums`}>{fmtS(x.evo1)}</td>
                   <td className={`${td} text-right tabular-nums`}>{fmtS(x.evo24)}</td>
