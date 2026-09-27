@@ -84,6 +84,7 @@ async function refresh() {
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   if (key) {
+    console.log('[obs] collecte Météo-France : début');
     const deptOf = new Map<string, string>();
     const official = d.stations.filter((s) => s.kind !== 'amateur');
     for (const s of official) deptOf.set(s.id, s.dept);
@@ -97,7 +98,11 @@ async function refresh() {
           merge(d.obs, p.id, p.obs);
         }
       } catch (e) {
-        errors.push(`Département ${dept} : ${(e as Error).message}`);
+        const msg = (e as Error).message;
+        errors.push(`Département ${dept} : ${msg}`);
+        console.error(`[obs] département ${dept} : ${msg}`);
+        // Clé refusée ou mauvaise adresse : inutile d'interroger les autres départements.
+        if (/^(401|403|404)\b/.test(msg)) break;
       }
       await sleep(PAUSE_MS);
     }
@@ -111,6 +116,7 @@ async function refresh() {
         }
       } catch (e) {
         errors.push(`Liste des stations : ${(e as Error).message}`);
+        console.error(`[obs] liste des stations : ${(e as Error).message}`);
       }
     }
   }
@@ -126,6 +132,7 @@ async function refresh() {
   prune(d.obs);
   d.updatedAt = new Date().toISOString();
   d.errors = errors;
+  console.log(`[obs] collecte terminée : ${Object.keys(d.obs).length} stations, ${errors.length} erreur(s)`);
   mem = d;
   await save(d).catch((e) => console.error('[obs] écriture du cache impossible', e));
 }

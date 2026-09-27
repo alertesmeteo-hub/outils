@@ -116,7 +116,9 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
           portail-api.meteofrance.fr, API « Observations » et « Paquet Observations ») côté serveur. Aucune donnée n’est inventée.
         </Notice>
       ) : !now ? (
-        <Notice>Premier chargement des observations en cours (environ 2 minutes pour l’ensemble des départements). Rechargez la page ensuite.</Notice>
+        snap.errors.length > 0 ? (
+          <Notice>Échec de la collecte Météo-France : {snap.errors[0]}. {/\b40[13]\b/.test(snap.errors[0]) ? 'Vérifiez la clé et la souscription aux API.' : /\b404\b/.test(snap.errors[0]) ? 'Vérifiez l’adresse (version) de l’API.' : 'Nouvel essai au prochain rafraîchissement.'}</Notice>
+        ) : <Notice>Premier chargement des observations en cours (environ 2 minutes pour l’ensemble des départements). Rechargez la page ensuite.</Notice>
       ) : (
         w && !w.final && w.start >= now
           ? <Notice>La période vient de commencer : le classement se remplira avec la prochaine observation horaire.</Notice>
