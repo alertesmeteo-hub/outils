@@ -205,8 +205,8 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
   const unit = r.unit ? ` (${r.unit})` : '';
   const partial = !r.instant && !r.temp;
   const arrow = (k: Sort['key']) => (sort?.key === k ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
-  const SortTh = ({ k, children, right }: { k: Sort['key']; children: React.ReactNode; right?: boolean }) => (
-    <th className={`${th} ${right ? 'text-right' : ''}`} aria-sort={sort?.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+  const SortTh = ({ k, children, right, narrow }: { k: Sort['key']; children: React.ReactNode; right?: boolean; narrow?: boolean }) => (
+    <th className={`${th} ${right ? 'text-right' : ''} ${narrow ? 'w-px' : ''}`} aria-sort={sort?.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
       <Link href={sortHref(k)} className="hover:underline" title="Trier">{children}{arrow(k)}</Link>
     </th>
   );
@@ -220,9 +220,9 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
       <table className="w-full text-sm">
         <thead className="border-b border-border bg-bg">
           <tr>
-            <SortTh k="station">Station</SortTh>
             {opt.byRegion && <th className={th}>Région</th>}
-            <SortTh k="dept">Dépt</SortTh>
+            <SortTh k="dept" narrow>Dépt</SortTh>
+            <SortTh k="station">Station</SortTh>
             {opt.showAlt && <th className={`${th} text-right`}>Altitude (m)</th>}
             <SortTh k="val" right>{head}</SortTh>
             {opt.evo && <><th className={`${th} text-right`}>Évol. 1 h</th><th className={`${th} text-right`}>Évol. 24 h</th></>}
@@ -241,6 +241,8 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
             const newDept = sort ? false : opt.byRegion ? i === 0 || rows[i - 1].region !== x.region : opt.byDept && (i === 0 || rows[i - 1].station.dept !== x.station.dept);
             return (
               <tr key={x.station.id} className={`border-b border-border last:border-0 ${newDept ? 'border-t-2 border-t-primary' : ''} ${x.beaten ? 'tone-bg' : ''}`} style={x.beaten ? tone('danger') : undefined}>
+                {opt.byRegion && <td className={td}>{x.region ?? '—'}</td>}
+                <td className={`${td} w-px text-center tabular-nums`}>{x.station.dept}</td>
                 <td className={td}>
                   {x.station.kind === 'amateur' ? x.station.name : (
                     <a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} target={embed ? '_top' : undefined} className="text-primary hover:underline">{x.station.name}</a>
@@ -248,8 +250,6 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
                   {x.station.kind !== 'principale' && <span className="ml-1 text-xs text-muted">({x.station.kind})</span>}
                   {x.beaten && <span className="ml-2 rounded bg-danger px-1.5 py-0.5 text-xs font-bold text-white">{x.beaten === 'abs' ? 'Record absolu' : 'Record mensuel'}</span>}
                 </td>
-                {opt.byRegion && <td className={td}>{x.region ?? '—'}</td>}
-                <td className={td}>{x.station.dept === '20' ? 'Corse' : x.station.dept}</td>
                 {opt.showAlt && <td className={`${td} text-right tabular-nums`}>{x.station.alt ?? '—'}</td>}
                 <td className={`${td} text-right font-semibold tabular-nums`} title={x.at ? `à ${hour(x.at)}` : undefined}>{fv(x.value)}</td>
                 {opt.evo && <>
