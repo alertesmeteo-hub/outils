@@ -7,13 +7,15 @@ import {
 } from '@/lib/obs/rankings';
 import { SITE_NAME, SITE_URL } from '@/lib/config';
 import { REGIONS } from '@/lib/obs/regions';
+import { DEPARTEMENTS } from '@/lib/obs/meteofrance';
+import AutoSubmit from '@/components/AutoSubmit';
 import { getRecords, getSnapshot, obsConfigured } from '@/lib/obs/store';
 
 /** Altitudes maximales proposées (m). */
 const ALTS = [300, 400, 500, 800, 1000, 1500];
 /** Lien vers la fiche climatologique d'une station ({id} = identifiant Météo-France). */
 const STATION_URL = process.env.STATION_URL_TEMPLATE || 'https://alertes-meteo.com/climatologie/climato_meteo/?station={id}';
-export type Sort = { key: 'val' | 'station' | 'dept'; dir: 'asc' | 'desc' };
+export type Sort = { key: 'val' | 'station' | 'dept' | 'wc' | 'hx'; dir: 'asc' | 'desc' };
 
 export type SP = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -26,9 +28,10 @@ const fmtDate = (s?: string) => (s ? new Intl.DateTimeFormat('fr-FR', { day: '2-
 const fmtTime = (ms: number) => new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'full', timeStyle: 'short' }).format(new Date(ms));
 const hour = (iso?: string) => (iso ? new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) : '');
 
-const VAR: Record<Band['tone'], string> = { ok: 'var(--ok)', info: 'var(--primary)', warn: 'var(--warn)', danger: 'var(--danger)', extreme: 'var(--extreme)' };
-const tone = (t: Band['tone']) => ({ '--tone': VAR[t] }) as CSSProperties;
-const Pill = ({ b }: { b: Band }) => <span style={tone(b.tone)} className="tone-bg tone-fg inline-block rounded border px-2 py-0.5 text-xs font-semibold">{b.label}</span>;
+const VAR = { warn: 'var(--warn)', danger: 'var(--danger)' } as const;
+const tone = (t: keyof typeof VAR) => ({ '--tone': VAR[t] }) as CSSProperties;
+const bandStyle = (b: Band): CSSProperties => ({ background: b.bg, color: b.fg });
+const Pill = ({ b }: { b: Band }) => <span style={bandStyle(b)} className="inline-block rounded px-2 py-0.5 text-xs font-semibold">{b.label}</span>;
 
 /**
  * Classements des stations. `base` : chemin de la page (site ou /embed/classements/).
@@ -47,26 +50,37 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   };
   const regRaw = one(sp.reg);
   const region = REGIONS.some((x) => x.code === regRaw) ? regRaw : undefined;
+  const deptRaw = one(sp.dpt);
+  const dept = deptRaw && DEPARTEMENTS.includes(deptRaw) ? deptRaw : undefined;
   const limitRaw = one(sp.n);
   const limit = limitRaw === 'tout' ? Infinity : [50, 100, 200, 500].includes(Number(limitRaw)) ? Number(limitRaw) : 100;
 
   const [snap, records] = await Promise.all([getSnapshot(), getRecords()]);
   let now = 0;
   for (const list of Object.values(snap.obs)) { const t = Date.parse(list[list.length - 1]?.time ?? ''); if (t > now) now = t; }
-  const rows = now ? buildRanking(r, snap.stations, snap.obs, now, { maxAlt, secondaires: opt.secondaires, amateurs: opt.amateurs, byDept: opt.byDept, region, byRegion: opt.byRegion, evo: opt.evo }, records) : [];
+  const rows = now ? buildRanking(r, snap.stations, snap.obs, now, { maxAlt, secondaires: opt.secondaires, amateurs: opt.amateurs, byDept: opt.byDept, region, dept, byRegion: opt.byRegion, evo: opt.evo }, records) : [];
   // Tri choisi par le visiteur (clic sur l'en-tête) ; par défaut, l'ordre du classement.
   const triRaw = one(sp.tri);
-  const sort: Sort | undefined = triRaw === 'station' || triRaw === 'dept' || triRaw === 'val'
-    ? { key: triRaw, dir: one(sp.sens) === 'desc' ? 'desc' : 'asc' } : undefined;
+  const sort: Sort | undefined = (['station', 'dept', 'val', 'wc', 'hx'] as const).includes(triRaw as never)
+    ? { key: triRaw as Sort['key'], dir: one(sp.sens) === 'desc' ? 'desc' : 'asc' } : undefined;
   if (sort) {
     const d = sort.dir === 'asc' ? 1 : -1;
-    const key = (x: RankRow) => (sort.key === 'station' ? x.station.name : x.station.dept.padStart(3, '0'));
-    rows.sort((a, b) => d * (sort.key === 'val' ? a.value - b.value : key(a).localeCompare(key(b), 'fr')) || a.station.name.localeCompare(b.station.name, 'fr'));
+    const num = (x: RankRow) => (sort.key === 'wc' ? x.windchill : sort.key === 'hx' ? x.humidex : x.value);
+    const txt = (x: RankRow) => (sort.key === 'station' ? x.station.name : x.station.dept.padStart(3, '0'));
+    const numeric = sort.key === 'val' || sort.key === 'wc' || sort.key === 'hx';
+    rows.sort((a, b) => {
+      if (numeric) {
+        const va = num(a), vb = num(b);
+        if (va == null || vb == null) return va == null ? (vb == null ? 0 : 1) : -1; // valeurs manquantes en fin de liste
+        return d * (va - vb) || a.station.name.localeCompare(b.station.name, 'fr');
+      }
+      return d * txt(a).localeCompare(txt(b), 'fr') || a.station.name.localeCompare(b.station.name, 'fr');
+    });
   }
   const shown = rows.slice(0, limit);
   /** Lien d'en-tête : premier clic = ordre naturel, clic suivant = inverse. */
   const sortHref = (k: Sort['key']) => {
-    const natural = k === 'val' ? (r.order === 'asc' ? 'asc' : 'desc') : 'asc';
+    const natural = k === 'val' ? (r.order === 'asc' ? 'asc' : 'desc') : k === 'wc' ? 'asc' : k === 'hx' ? 'desc' : 'asc';
     const dir = sort?.key === k ? (sort.dir === 'asc' ? 'desc' : 'asc') : natural;
     return keep({ tri: k, sens: dir });
   };
@@ -128,18 +142,25 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
             {REGIONS.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
           </select>
         </label>
+        <label className="flex flex-col gap-1">Département
+          <select name="dpt" defaultValue={dept ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
+            <option value="">tous</option>
+            {DEPARTEMENTS.map((d) => <option key={d} value={d}>{d === '20' ? '20 (Corse)' : d}</option>)}
+          </select>
+        </label>
         <label className="flex flex-col gap-1">Lignes
           <select name="n" defaultValue={limitRaw ?? '100'} className="rounded-md border border-border bg-bg px-2 py-1.5">
             {['50', '100', '200', '500', 'tout'].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
-        <button className="rounded-md bg-primary px-4 py-2 font-semibold text-white">Afficher</button>
+        <noscript><button className="rounded-md bg-primary px-4 py-2 font-semibold text-white">Afficher</button></noscript>
+        <AutoSubmit />
       </form>}
 
       <h2 className={`${showMenu || showForm ? 'mt-8' : ''} text-xl font-bold`}>{r.label}</h2>
       {now > 0 && (
         <p className="mt-1 text-sm text-muted">
-          {r.synop ? <>{synopEnd(snap.obs) ? <>Dernier message SYNOP : {fmtTime(synopEnd(snap.obs))} (publié par Météo-France avec environ un jour de décalage).</> : <>Rafales SYNOP pas encore chargées (fichier téléchargé toutes les 3 heures).</>}</> : <>Dernière observation : {fmtTime(now)}.</>}{w && <> Période : {w.label}{w.final ? '' : ' (en cours)'}.</>} {rows.length} stations classées{region ? ` en ${REGIONS.find((x) => x.code === region)!.name}` : ''}.
+          {r.synop ? <>{synopEnd(snap.obs) ? <>Dernier message SYNOP : {fmtTime(synopEnd(snap.obs))} (publié par Météo-France avec environ un jour de décalage).</> : <>Rafales SYNOP pas encore chargées (fichier téléchargé toutes les 3 heures).</>}</> : <>Dernière observation : {fmtTime(now)}.</>}{w && <> Période : {w.label}{w.final ? '' : ' (en cours)'}.</>} {rows.length} stations classées{dept ? ` dans le département ${dept}` : region ? ` en ${REGIONS.find((x) => x.code === region)!.name}` : ''}.
         </p>
       )}
 
@@ -177,7 +198,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
         <h2 className="text-base font-bold text-text">Méthode</h2>
         <p>TX provisoire : maximum des températures horaires de 8 h à 8 h locales (journée en cours). TX finale : même période, la veille, close. TN provisoire : minimum de 20 h à 8 h locales. Les fenêtres 06-18 UTC et 18-06 UTC sont les dernières commencées.</p>
         <p>Pluie : cumul des précipitations horaires sur 1 h, depuis 6 h UTC, ou sur 24, 48 et 72 heures glissantes. La colonne « heures » indique le nombre d’heures reçues sur le nombre attendu : un cumul incomplet est un minimum.</p>
-        <p>Windchill : formule d’Environnement Canada (T ≤ 10 °C et vent &gt; 4,8 km/h). Humidex : Environnement Canada, à partir de 20 °C. Pression ramenée au niveau de la mer.</p>
+        <p>Windchill - Ressenti : formule d’Environnement Canada, calculée dès que le vent dépasse 4,8 km/h et plafonnée à la température de l’air (vent faible : ressenti = température). Humidex : Environnement Canada, à partir de la température et du point de rosée. Pression ramenée au niveau de la mer.</p>
         <p>Vent : vent moyen de la dernière observation ; vent maximal = vent moyen sur 10 minutes le plus fort de l’heure (le paquet horaire de Météo-France ne fournit pas les rafales instantanées), puis son maximum sur 24, 48 et 72 heures. Rafales : rafale maximale des messages SYNOP des stations principales (archive OMM de Météo-France), comptée sur 24, 48 ou 72 heures jusqu’au dernier message publié. Variations de pression : différence entre la dernière pression et celle observée 3, 12 ou 24 heures plus tôt, classées par ampleur (hausse ou baisse). Évolution de la température : écart avec la température relevée 1 heure et 24 heures plus tôt.</p>
         <p>Normales : écart de la TX (8 h → 8 h) ou TN (20 h → 8 h) finale, ou des extrêmes des 24 dernières heures, à la moyenne mensuelle des TX ou TN de la station. Écarts aux records : TX ou TN finale moins le record mensuel ou absolu de la station (valeur positive pour la TX ou négative pour la TN = record battu).</p>
         <p>Source : Météo-France, API Observations (licence Etalab 2.0). Records : fichier fourni par l’éditeur du site. Stations amateurs : flux déclaré par l’éditeur, non contrôlé par Météo-France.</p>
@@ -216,19 +237,19 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
   const td = 'px-2 py-1.5 whitespace-nowrap';
   if (!rows.length) return <Notice>Aucune station ne correspond à ces critères pour cette période.</Notice>;
   return (
-    <div className="mt-4 overflow-x-auto rounded-xl border border-border bg-surface">
-      <table className="w-full text-sm">
+    <div className="mt-4 max-w-full overflow-x-auto">
+      <table className="w-auto rounded-xl border border-border bg-surface text-sm">
         <thead className="border-b border-border bg-bg">
           <tr>
             {opt.byRegion && <th className={th}>Région</th>}
             <SortTh k="dept" narrow>Dépt</SortTh>
             <SortTh k="station">Station</SortTh>
-            {opt.showAlt && <th className={`${th} text-right`}>Altitude (m)</th>}
             <SortTh k="val" right>{head}</SortTh>
             {opt.evo && <><th className={`${th} text-right`}>Évol. 1 h</th><th className={`${th} text-right`}>Évol. 24 h</th></>}
+            {r.feels && <><SortTh k="wc" right>Windchill - Ressenti</SortTh><SortTh k="hx" right>Humidex</SortTh></>}
             {(r.id === 'humidex' || r.id === 'windchill') && <th className={th}>Niveau</th>}
-            {r.feels && <><th className={`${th} text-right`}>Windchill - Ressenti</th><th className={`${th} text-right`}>Humidex</th></>}
             {partial && <th className={`${th} text-right`}>Heures</th>}
+            {opt.showAlt && <th className={`${th} text-right`}>Altitude (m)</th>}
             {opt.records && r.record && <>
               <th className={`${th} text-right`}>Record mensuel</th><th className={th}>Date record</th>
               <th className={`${th} text-right`}>Record absolu</th><th className={th}>Date record abs.</th>
@@ -239,6 +260,7 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
         <tbody>
           {rows.map((x, i) => {
             const newDept = sort ? false : opt.byRegion ? i === 0 || rows[i - 1].region !== x.region : opt.byDept && (i === 0 || rows[i - 1].station.dept !== x.station.dept);
+            const band = r.id === 'humidex' ? humidexBand(x.value) : r.id === 'windchill' ? windchillBand(x.value) : undefined;
             return (
               <tr key={x.station.id} className={`border-b border-border last:border-0 ${newDept ? 'border-t-2 border-t-primary' : ''} ${x.beaten ? 'tone-bg' : ''}`} style={x.beaten ? tone('danger') : undefined}>
                 {opt.byRegion && <td className={td}>{x.region ?? '—'}</td>}
@@ -250,19 +272,18 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
                   {x.station.kind !== 'principale' && <span className="ml-1 text-xs text-muted">({x.station.kind})</span>}
                   {x.beaten && <span className="ml-2 rounded bg-danger px-1.5 py-0.5 text-xs font-bold text-white">{x.beaten === 'abs' ? 'Record absolu' : 'Record mensuel'}</span>}
                 </td>
-                {opt.showAlt && <td className={`${td} text-right tabular-nums`}>{x.station.alt ?? '—'}</td>}
-                <td className={`${td} text-right font-semibold tabular-nums`} title={x.at ? `à ${hour(x.at)}` : undefined}>{fv(x.value)}</td>
+                <td className={`${td} text-right font-semibold tabular-nums`} style={band ? bandStyle(band) : undefined} title={x.at ? `à ${hour(x.at)}` : undefined}>{fv(x.value)}</td>
                 {opt.evo && <>
                   <td className={`${td} text-right tabular-nums`}>{fmtS(x.evo1)}</td>
                   <td className={`${td} text-right tabular-nums`}>{fmtS(x.evo24)}</td>
                 </>}
-                {r.id === 'humidex' && <td className={td}><Pill b={humidexBand(x.value)} /></td>}
-                {r.id === 'windchill' && <td className={td}><Pill b={windchillBand(x.value)} /></td>}
                 {r.feels && <>
-                  <td className={`${td} text-right tabular-nums`}>{fmtV(x.windchill)}</td>
-                  <td className={`${td} text-right tabular-nums`}>{fmtV(x.humidex, 0)}</td>
+                  <td className={`${td} text-right tabular-nums`} style={x.windchill != null ? bandStyle(windchillBand(x.windchill)) : undefined} title={x.windchill != null ? windchillBand(x.windchill).label : undefined}>{fmtV(x.windchill)}</td>
+                  <td className={`${td} text-right tabular-nums`} style={x.humidex != null ? bandStyle(humidexBand(x.humidex)) : undefined} title={x.humidex != null ? humidexBand(x.humidex).label : undefined}>{fmtV(x.humidex, 0)}</td>
                 </>}
+                {band && <td className={td}><Pill b={band} /></td>}
                 {partial && <td className={`${td} text-right tabular-nums ${x.n < x.expected ? 'text-warn' : 'text-muted'}`}>{x.n}/{x.expected}</td>}
+                {opt.showAlt && <td className={`${td} text-right tabular-nums`}>{x.station.alt ?? '—'}</td>}
                 {opt.records && r.record && <>
                   <td className={`${td} text-right tabular-nums`}>{fmtV(x.recMonth?.v, r.digits)}</td><td className={td}>{fmtDate(x.recMonth?.d)}</td>
                   <td className={`${td} text-right tabular-nums`}>{fmtV(x.recAbs?.v, r.digits)}</td><td className={td}>{fmtDate(x.recAbs?.d)}</td>

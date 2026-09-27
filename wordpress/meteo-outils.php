@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Météo Outils – Intégration
  * Description: Shortcodes [outil_meteo type="distance-orage"] (calculateurs) et [classement_meteo type="tx-prov"] (classements des stations) intégrés via iframe.
- * Version: 0.3.0
+ * Version: 0.4.0
  * License: GPL-2.0-or-later
  */
 
@@ -66,7 +66,7 @@ function mo_classements() {
         'rr1', 'rr24', 'rr6', 'rr48', 'rr72',
         'ff', 'fxi', 'fxi24', 'fxi48', 'fxi72', 'raf24', 'raf48', 'raf72',
         'pmer', 'dp3', 'dp12', 'dp24', 'u', 'vv', 'snow', 'insol24',
-        'td', 'windchill', 'humidex',
+        'td', 'windchill', 'humidex', 'sol10', 'sol20', 'sol50', 'sol100',
         'n-tx', 'n-tn', 'n-tx24', 'n-tn24', 'e-recm-tx', 'e-recm-tn', 'e-reca-tx', 'e-reca-tn',
     );
 }
@@ -87,12 +87,12 @@ function mo_classement_aliases() {
 /**
  * [classement_meteo type="tx-prov" altitude_max="800" secondaires="oui" amateurs="non" altitude="oui"
  *   departement="non" records="oui" debut="non" lignes="50" menu="oui" filtres="oui" height="900"
- *   region="bre" par_region="non" evolution="non"]
+ *   region="bre" dep="29" par_region="non" evolution="non"]
  */
 add_shortcode('classement_meteo', function ($atts) {
     $a = shortcode_atts(array(
         'type' => 'tx-prov', 'altitude_max' => '', 'secondaires' => 'non', 'amateurs' => 'non', 'altitude' => 'non',
-        'departement' => 'non', 'region' => '', 'par_region' => 'non', 'evolution' => 'non', 'records' => 'non', 'debut' => 'non', 'lignes' => '50', 'menu' => 'oui', 'filtres' => 'oui',
+        'departement' => 'non', 'dep' => '', 'region' => '', 'par_region' => 'non', 'evolution' => 'non', 'records' => 'non', 'debut' => 'non', 'lignes' => '50', 'menu' => 'oui', 'filtres' => 'oui',
         'height' => '900',
     ), $atts, 'classement_meteo');
     $base = mo_base_url();
@@ -113,6 +113,8 @@ add_shortcode('classement_meteo', function ($atts) {
     $regions = array('ara', 'bfc', 'bre', 'cvl', 'cor', 'ges', 'hdf', 'idf', 'nor', 'naq', 'occ', 'pdl', 'pac');
     $region = strtolower(trim((string) $a['region']));
     if (in_array($region, $regions, true)) $q['reg'] = $region;
+    $dep = trim((string) $a['dep']);
+    if (preg_match('/^\d{1,2}$/', $dep) && intval($dep) >= 1 && intval($dep) <= 95) $q['dpt'] = str_pad($dep, 2, '0', STR_PAD_LEFT);
     $lignes = strtolower(trim((string) $a['lignes']));
     if (in_array($lignes, array('50', '100', '200', '500', 'tout'), true)) $q['n'] = $lignes;
     if (!$yes($a['menu'])) $q['menu'] = '0';

@@ -42,6 +42,7 @@ export function parsePaquetRow(x: Record<string, unknown>): { id: string; obs: H
       t: k2c(x.t), td: k2c(x.td), tx: k2c(x.tx), tn: k2c(x.tn),
       u: num(x.u), ff: ms2kmh(x.ff), fxi: ms2kmh(x.fxi), fxy: ms2kmh(x.fxy),
       rr1: num(x.rr1), insol: num(x.insolh), pmer: pa2hpa(x.pmer),
+      t10: k2c(x.t_10), t20: k2c(x.t_20), t50: k2c(x.t_50), t100: k2c(x.t_100),
       vv: num(x.vv), snow: (() => { const n = num(x.sss); return n == null ? undefined : Math.round(n * 100); })(),
     },
   };

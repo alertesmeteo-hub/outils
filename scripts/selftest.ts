@@ -116,7 +116,8 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   eq('pluie 72 h incomplète signalée (30/72 h)', rr72.value === 30 && rr72.n === 30 && rr72.expected === 72);
   eq('humidex classes', R.humidexBand(25).label === 'Sensation de bien-être' && R.humidexBand(46).label === 'Danger' && R.humidexBand(54).label === 'Coup de chaleur imminent');
   eq('windchill classes', R.windchillBand(-30).label.includes('modéré') && R.windchillBand(-56).label.includes('extrême') && R.windchillBand(-5).label === 'Faible risque de gelures');
-  eq('windchill non applicable au-dessus de 10 °C', R.windchillOf(12, 30) === undefined && Math.round(R.windchillOf(-5, 30)!) === -13);
+  eq('windchill : −5 °C / 30 km/h ≈ −13 ; vent faible = température ; plafonné à la température', Math.round(R.windchillOf(-5, 30)!) === -13 && R.windchillOf(15, 3) === 15 && R.windchillOf(25, 20)! <= 25);
+  eq('couleurs : humidex 42 orange, windchill −45 bleu', R.humidexBand(42).bg === '#ff8c00' && R.windchillBand(-45).bg === '#0000ff');
 
   const st = (id: string, dept: string, alt: number, kind: 'principale' | 'secondaire' = 'principale') => ({ id, name: id, dept, alt, kind });
   const stations = [st('A', '13', 5), st('B', '84', 900), st('C', '13', 50, 'secondaire')];
@@ -142,6 +143,7 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   eq('neige nulle non classée', one('snow') === undefined);
   const ev = one('tx-prov', { evo: true });
   eq('évolution T 1 h = +1, 24 h = +24', ev?.evo1 === 1 && ev?.evo24 === 24, JSON.stringify(ev));
+  eq('filtre département', one('ff', { dept: '13' })?.station.id === 'A' && one('ff', { dept: '29' }) === undefined);
   eq('région PACA pour les Bouches-du-Rhône', one('ff')?.region === 'Provence-Alpes-Côte d’Azur' && one('ff', { region: 'bre' }) === undefined);
   eq('écart à la normale TX 24 h glissantes = 34 − 30', one('n-tx24')?.value === 4);
   eq('écart au record mensuel TX (TX finale 27 − 40)', one('e-recm-tx')?.value === -13, String(one('e-recm-tx')?.value));
@@ -162,8 +164,8 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   const rafRow = R.buildRanking(R.getRanking('raf24'), [st('B', '29', 94)], { B: [{ time: '2026-09-26T18:00:00.000Z', gust: 76 }, { time: '2026-09-26T21:00:00.000Z', gust: 32 }] }, sEndT + 86400_000, { secondaires: false, amateurs: false, byDept: false })[0];
   eq('rafales 24 h comptées depuis le dernier message SYNOP', rafRow?.value === 76);
 
-  const p = MF.parsePaquetRow({ geo_id_insee: '13054001', validity_time: '2026-07-15T13:00:00Z', t: 308.15, td: 290.15, tx: 309.05, tn: 307.15, ff: 5, pmer: 101520, rr1: 0.4, insolh: 60 })!;
-  eq('paquet MF : K → °C, m/s → km/h, Pa → hPa', p.obs.t === 35 && p.obs.tx === 35.9 && p.obs.ff === 18 && p.obs.pmer === 1015.2 && p.obs.insol === 60, JSON.stringify(p));
+  const p = MF.parsePaquetRow({ geo_id_insee: '13054001', validity_time: '2026-07-15T13:00:00Z', t_10: 295.15, t_100: 291.65, t: 308.15, td: 290.15, tx: 309.05, tn: 307.15, ff: 5, pmer: 101520, rr1: 0.4, insolh: 60 })!;
+  eq('paquet MF : K → °C, m/s → km/h, Pa → hPa', p.obs.t === 35 && p.obs.tx === 35.9 && p.obs.ff === 18 && p.obs.pmer === 1015.2 && p.obs.insol === 60 && p.obs.t10 === 22 && p.obs.t100 === 18.5, JSON.stringify(p));
   eq('id-departement sans zéro initial, Corse = 20', MF.deptParam('01') === '1' && MF.deptParam('20') === '20' && MF.DEPARTEMENTS.length === 95 && MF.DEPARTEMENTS.includes('20'));
   const csv = 'Id_station;Id_omm;Nom_usuel;Latitude;Longitude;Altitude;Date_ouverture;Pack\n13054001;07650;MARIGNANE;43.44;5.22;9;1920-01-01;RADOME\n13001009;;AIX;43.5;5.4;173;1990-05-01;ETENDU\n99999999;;HORS;0;0;0;;RADOME';
   const sl = MF.parseStationsCsv(csv, (id) => (id.startsWith('13') ? '13' : undefined));

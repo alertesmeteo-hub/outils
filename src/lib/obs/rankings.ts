@@ -129,34 +129,40 @@ export const latest = (obs: HourlyObs[], now: number, maxAgeH = 2) => {
 /* ---------- Indices ---------- */
 
 /** Refroidissement éolien, applicable si T ≤ 10 °C et vent > 4,8 km/h. */
-export const windchillOf = (t?: number, ff?: number) => (t != null && ff != null && t <= 10 && ff > 4.8 ? windChill(t, ff) : undefined);
-/** Humidex, retenu à partir de T ≥ 20 °C. */
-export const humidexFrom = (t?: number, td?: number) => (t != null && td != null && t >= 20 ? humidexOf(t, td) : undefined);
+/**
+ * Température ressentie (refroidissement éolien, Environnement Canada) : calculée dès que le vent
+ * dépasse 4,8 km/h, plafonnée à la température de l'air ; par vent faible, elle vaut la température.
+ */
+export const windchillOf = (t?: number, ff?: number) =>
+  t == null ? undefined : ff != null && ff > 4.8 ? Math.min(t, windChill(t, ff)) : t;
+/** Humidex (Environnement Canada), calculé pour toute observation avec température et point de rosée. */
+export const humidexFrom = (t?: number, td?: number) => (t != null && td != null ? humidexOf(t, td) : undefined);
 
-export type Band = { label: string; tone: 'ok' | 'info' | 'warn' | 'danger' | 'extreme' };
+/** Niveau d'un indice : libellé et couleurs d'affichage (fond, texte). */
+export type Band = { label: string; bg: string; fg: string };
 
 /** Échelle humidex (Environnement Canada). */
 export function humidexBand(h: number): Band {
-  if (h < 30) return { label: 'Sensation de bien-être', tone: 'ok' };
-  if (h < 40) return { label: 'Un certain inconfort', tone: 'info' };
-  if (h < 46) return { label: 'Beaucoup d’inconfort ; évitez les efforts', tone: 'warn' };
-  if (h < 54) return { label: 'Danger', tone: 'danger' };
-  return { label: 'Coup de chaleur imminent', tone: 'extreme' };
+  if (h < 30) return { label: 'Sensation de bien-être', bg: '#00ff00', fg: '#000000' };
+  if (h < 40) return { label: 'Un certain inconfort', bg: '#ffff00', fg: '#000000' };
+  if (h < 46) return { label: 'Beaucoup d’inconfort ; évitez les efforts', bg: '#ff8c00', fg: '#000000' };
+  if (h < 54) return { label: 'Danger', bg: '#ff0000', fg: '#4b0082' };
+  return { label: 'Coup de chaleur imminent', bg: '#800000', fg: '#ffffff' };
 }
 export const HUMIDEX_SCALE = ['< 30', '30 à 39', '40 à 45', '46 à 53', '≥ 54'].map((r, i) => ({ range: r, ...humidexBand([25, 35, 42, 50, 55][i]) }));
 
 /** Échelle du refroidissement éolien (Environnement Canada). */
-export function windchillBand(wc: number, t?: number): Band {
-  if (wc > 0) return { label: t != null && wc < t ? 'Température ressentie inférieure sous l’effet du vent' : 'Sans risque particulier', tone: 'ok' };
-  if (wc > -10) return { label: 'Faible risque de gelures', tone: 'info' };
-  if (wc > -28) return { label: 'Faible risque de gelures / hypothermie', tone: 'info' };
-  if (wc > -40) return { label: 'Risque modéré de gelures (10-30 min)', tone: 'warn' };
-  if (wc > -48) return { label: 'Risque élevé de gelures (5-10 min)', tone: 'danger' };
-  if (wc > -55) return { label: 'Risque très élevé de gelures (2-5 min)', tone: 'extreme' };
-  return { label: 'Risque extrême de gelures (moins de 2 min)', tone: 'extreme' };
+export function windchillBand(wc: number): Band {
+  if (wc > 0) return { label: 'Température ressentie inférieure sous l’effet du vent', bg: '#87dcff', fg: '#000080' };
+  if (wc > -10) return { label: 'Faible risque de gelures', bg: '#1e90ff', fg: '#000080' };
+  if (wc > -28) return { label: 'Faible risque de gelures / hypothermie', bg: '#1e90ff', fg: '#000080' };
+  if (wc > -40) return { label: 'Risque modéré de gelures (10-30 min)', bg: '#1a73e8', fg: '#ffffff' };
+  if (wc > -48) return { label: 'Risque élevé de gelures (5-10 min)', bg: '#0000ff', fg: '#ffffff' };
+  if (wc > -55) return { label: 'Risque très élevé de gelures (2-5 min)', bg: '#9400d3', fg: '#ffffff' };
+  return { label: 'Risque extrême de gelures (2 min)', bg: '#4b0082', fg: '#ffffff' };
 }
 export const WINDCHILL_SCALE = [
-  { range: '> 0', ...windchillBand(5, 8) }, { range: '0 à −9', ...windchillBand(-5) }, { range: '−10 à −27', ...windchillBand(-20) },
+  { range: '> 0', ...windchillBand(5) }, { range: '0 à −9', ...windchillBand(-5) }, { range: '−10 à −27', ...windchillBand(-20) },
   { range: '−28 à −39', ...windchillBand(-30) }, { range: '−40 à −47', ...windchillBand(-45) }, { range: '−48 à −54', ...windchillBand(-50) },
   { range: '≤ −55', ...windchillBand(-60) },
 ];
@@ -169,10 +175,10 @@ export type RankingId =
   | 'rr1' | 'rr24' | 'rr6' | 'rr48' | 'rr72'
   | 'ff' | 'fxi' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf24' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
-  | 'td' | 'windchill' | 'humidex'
+  | 'td' | 'windchill' | 'humidex' | 'sol10' | 'sol20' | 'sol50' | 'sol100'
   | 'n-tx' | 'n-tn' | 'n-tx24' | 'n-tn24' | 'e-recm-tx' | 'e-recm-tn' | 'e-reca-tx' | 'e-reca-tn';
 
-export type Group = 'Températures du moment' | 'Températures maximales' | 'Températures minimales' | 'Précipitations' | 'Vent' | 'Conditions atmosphériques' | 'Humidité et ressenti' | 'Normales et records';
+export type Group = 'Températures du moment' | 'Températures maximales' | 'Températures minimales' | 'Précipitations' | 'Vent' | 'Conditions atmosphériques' | 'Humidité et ressenti' | 'Sol' | 'Normales et records';
 
 /** Contexte propre à une station : records / normales et mois de référence. */
 export type Ctx = { rec?: StationRecords; month: string; synopEnd?: number };
@@ -202,7 +208,7 @@ export type Ranking = {
   value: (obs: HourlyObs[], w: ReturnType<typeof windows>, now: number, ctx: Ctx) => Agg | null;
 };
 
-type Key = 'pmer' | 'td' | 'ff' | 'fxi' | 'fxy' | 'u' | 'vv' | 'snow' | 't';
+type Key = 't10' | 't20' | 't50' | 't100' | 'pmer' | 'td' | 'ff' | 'fxi' | 'fxy' | 'u' | 'vv' | 'snow' | 't';
 const at = (obs: HourlyObs[], ms: number) => obs.find((o) => Date.parse(o.time) === ms);
 const cur = (key: Key) => (obs: HourlyObs[], _w: unknown, now: number): Agg | null => {
   const o = latest(obs, now);
@@ -297,6 +303,11 @@ export const RANKINGS: Ranking[] = [
   { id: 'windchill', short: 'Windchill', label: 'Classement windchill : température ressentie par le froid et le vent', group: R, ...T, order: 'asc', instant: true, value: (obs, _w, now) => { const o = latest(obs, now); const v = windchillOf(o?.t, o?.ff); return v == null ? null : { value: v, n: 1, expected: 1, at: o!.time }; } },
   { id: 'humidex', short: 'Humidex', label: 'Classement humidex : chaleur ressentie', group: R, unit: '', digits: 0, order: 'desc', instant: true, value: (obs, _w, now) => { const o = latest(obs, now); const v = humidexFrom(o?.t, o?.td); return v == null ? null : { value: v, n: 1, expected: 1, at: o!.time }; } },
 
+  { id: 'sol10', short: 'Température à 10 cm', label: 'Classement de la température du sol à 10 cm', group: 'Sol', ...T, order: 'desc', instant: true, value: cur('t10') },
+  { id: 'sol20', short: 'Température à 20 cm', label: 'Classement de la température du sol à 20 cm', group: 'Sol', ...T, order: 'desc', instant: true, value: cur('t20') },
+  { id: 'sol50', short: 'Température à 50 cm', label: 'Classement de la température du sol à 50 cm', group: 'Sol', ...T, order: 'desc', instant: true, value: cur('t50') },
+  { id: 'sol100', short: 'Température à 100 cm', label: 'Classement de la température du sol à 100 cm', group: 'Sol', ...T, order: 'desc', instant: true, value: cur('t100') },
+
   { id: 'n-tx', short: 'Écart TX moy. (climato)', label: 'Écart de la TX finale à la température maximale moyenne du mois (normale)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.txFin, value: (o, w, n, c) => gap(txFin(o, w, n), c.rec?.normals?.[c.month]?.tx) },
   { id: 'n-tn', short: 'Écart TN moy. (climato)', label: 'Écart de la TN finale à la température minimale moyenne du mois (normale)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.tnFin, value: (o, w, n, c) => gap(tnFin(o, w, n), c.rec?.normals?.[c.month]?.tn) },
   { id: 'n-tx24', short: 'Écart TX moy. (24 h gliss.)', label: 'Écart de la température maximale des 24 dernières heures à la TX moyenne du mois', group: N, ...T, order: 'desc', signed: true, value: (o, w, n, c) => gap(tx24(o, w, n), c.rec?.normals?.[c.month]?.tx) },
@@ -316,6 +327,8 @@ export type Filters = {
   secondaires: boolean;
   amateurs: boolean;
   byDept: boolean;
+  /** Département (01…95) : ne garde que ses stations. */
+  dept?: string;
   /** Code de région (voir regions.ts) : ne garde que ses stations. */
   region?: string;
   /** Tri et rang par région. */
@@ -360,6 +373,7 @@ export function buildRanking(
     if (f.maxAlt != null && (s.alt == null || s.alt > f.maxAlt)) continue;
     const reg = regionOf(s.dept);
     if (f.region && reg?.code !== f.region) continue;
+    if (f.dept && s.dept !== f.dept) continue;
     const o = obs[s.id];
     if (!o?.length) continue;
     const a = r.value(o, w, now, { rec: records[s.id], month, synopEnd: sEnd });

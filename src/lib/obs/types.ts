@@ -33,6 +33,7 @@ export type HourlyObs = {
   pmer?: number; // hPa
   vv?: number; // m, visibilité
   snow?: number; // cm, hauteur de neige au sol
+  t10?: number; t20?: number; t50?: number; t100?: number; // °C, température du sol à 10, 20, 50 et 100 cm
 };
 
 export type ObsSnapshot = {
