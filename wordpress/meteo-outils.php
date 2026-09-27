@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Météo Outils – Intégration
- * Description: Shortcode [outil_meteo type="distance-orage"] qui intègre un calculateur Météo Outils via iframe.
- * Version: 0.1.0
+ * Description: Shortcodes [outil_meteo type="distance-orage"] (calculateurs) et [classement_meteo type="tx-prov"] (classements des stations) intégrés via iframe.
+ * Version: 0.2.0
  * License: GPL-2.0-or-later
  */
 
@@ -30,6 +30,16 @@ function mo_aliases() {
     );
 }
 
+/** Script (une seule fois par page) qui ajuste la hauteur des iframes via postMessage (origine vérifiée). */
+function mo_resize_script($base) {
+    static $done = false;
+    if ($done) return '';
+    $done = true;
+    $port = wp_parse_url($base, PHP_URL_PORT);
+    $origin = wp_json_encode(wp_parse_url($base, PHP_URL_SCHEME) . '://' . wp_parse_url($base, PHP_URL_HOST) . ($port ? ':' . $port : ''));
+    return '<script>window.addEventListener("message",function(e){if(e.origin!==' . $origin . '||!e.data||e.data.type!=="meteo-outils:height")return;document.querySelectorAll("iframe.mo-embed").forEach(function(f){if(f.contentWindow===e.source)f.style.height=Math.min(Math.max(Number(e.data.height)||0,300),8000)+"px"})});</script>';
+}
+
 add_shortcode('outil_meteo', function ($atts) {
     $a = shortcode_atts(array('type' => '', 'height' => '640'), $atts, 'outil_meteo');
     $base = mo_base_url();
@@ -43,16 +53,63 @@ add_shortcode('outil_meteo', function ($atts) {
     $src    = esc_url($base . '/embed/' . $slug . '/');
     $height = max(300, min(4000, intval($a['height'])));
 
-    // Ajuste la hauteur via postMessage (origine vérifiée).
-    static $script_done = false;
-    $script = '';
-    if (!$script_done) {
-        $script_done = true;
-        $origin = wp_json_encode(wp_parse_url($base, PHP_URL_SCHEME) . '://' . wp_parse_url($base, PHP_URL_HOST) . (wp_parse_url($base, PHP_URL_PORT) ? ':' . wp_parse_url($base, PHP_URL_PORT) : ''));
-        $script = '<script>window.addEventListener("message",function(e){if(e.origin!==' . $origin . '||!e.data||e.data.type!=="meteo-outils:height")return;document.querySelectorAll("iframe.mo-embed").forEach(function(f){if(f.contentWindow===e.source)f.style.height=Math.min(Math.max(Number(e.data.height)||0,300),4000)+"px"})});</script>';
-    }
+    $script = mo_resize_script($base);
 
     return '<iframe class="mo-embed" src="' . $src . '" title="' . esc_attr('Outil météo : ' . $slug) . '" loading="lazy" style="width:100%;border:0;min-height:' . $height . 'px" referrerpolicy="strict-origin-when-cross-origin"></iframe>' . $script;
+});
+
+/** Classements disponibles (identifiants de /classements/) et alias courts. */
+function mo_classements() {
+    return array(
+        'tx-prov', 'tx-0618', 'tx-1806', 'tx-fin', 'tx-records',
+        'tn-prov', 'tn-0618', 'tn-1806', 'tn-fin',
+        'insol', 'rr1', 'rr24', 'rr6', 'rr48', 'rr72',
+        'pmer', 'td', 'windchill', 'humidex',
+    );
+}
+function mo_classement_aliases() {
+    return array(
+        'tx' => 'tx-prov', 'tn' => 'tn-prov', 'records' => 'tx-records', 'record-tx' => 'tx-records',
+        'soleil' => 'insol', 'ensoleillement' => 'insol',
+        'pluie1h' => 'rr1', 'pluie-1h' => 'rr1', 'pluie24h' => 'rr24', 'pluie-24h' => 'rr24',
+        'pluie6h' => 'rr6', 'pluie-6h' => 'rr6', 'pluie48h' => 'rr48', 'pluie-48h' => 'rr48', 'pluie72h' => 'rr72', 'pluie-72h' => 'rr72',
+        'pression' => 'pmer', 'rosee' => 'td', 'point-de-rosee' => 'td', 'ressenti' => 'windchill',
+    );
+}
+
+/**
+ * [classement_meteo type="tx-prov" altitude_max="800" secondaires="oui" amateurs="non" altitude="oui"
+ *   departement="non" records="oui" debut="non" lignes="50" menu="oui" filtres="oui" height="900"]
+ */
+add_shortcode('classement_meteo', function ($atts) {
+    $a = shortcode_atts(array(
+        'type' => 'tx-prov', 'altitude_max' => '', 'secondaires' => 'non', 'amateurs' => 'non', 'altitude' => 'non',
+        'departement' => 'non', 'records' => 'non', 'debut' => 'non', 'lignes' => '50', 'menu' => 'oui', 'filtres' => 'oui',
+        'height' => '900',
+    ), $atts, 'classement_meteo');
+    $base = mo_base_url();
+    if (!$base) return '<p><em>Météo Outils : configurez l’URL dans Réglages &gt; Météo Outils.</em></p>';
+
+    $type = sanitize_title($a['type']);
+    $aliases = mo_classement_aliases();
+    if (isset($aliases[$type])) $type = $aliases[$type];
+    if (!in_array($type, mo_classements(), true)) $type = 'tx-prov';
+
+    $yes = function ($v) { return in_array(strtolower(trim((string) $v)), array('1', 'oui', 'yes', 'true', 'on'), true); };
+    $q = array('c' => $type);
+    $alt = trim((string) $a['altitude_max']);
+    if ($alt !== '' && ctype_digit($alt) && intval($alt) <= 4810) $q['alt'] = intval($alt);
+    foreach (array('secondaires' => 'sec', 'amateurs' => 'am', 'altitude' => 'altv', 'departement' => 'dep', 'records' => 'rec', 'debut' => 'deb') as $att => $param) {
+        if ($yes($a[$att])) $q[$param] = '1';
+    }
+    $lignes = strtolower(trim((string) $a['lignes']));
+    if (in_array($lignes, array('50', '100', '200', '500', 'tout'), true)) $q['n'] = $lignes;
+    if (!$yes($a['menu'])) $q['menu'] = '0';
+    if (!$yes($a['filtres'])) $q['filtres'] = '0';
+
+    $src    = esc_url($base . '/embed/classements/?' . http_build_query($q, '', '&'));
+    $height = max(300, min(8000, intval($a['height'])));
+    return '<iframe class="mo-embed" src="' . $src . '" title="' . esc_attr('Classement des stations météo') . '" loading="lazy" style="width:100%;border:0;min-height:' . $height . 'px" referrerpolicy="strict-origin-when-cross-origin"></iframe>' . mo_resize_script($base);
 });
 
 add_action('admin_menu', function () {

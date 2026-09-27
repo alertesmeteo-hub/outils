@@ -12,6 +12,30 @@ Trois méthodes, du plus simple au plus léger. Remplacez `https://outils.exampl
 ```
 `type` accepte un slug complet (`mm-pluie-litres`, `intemperies-btp`…) ou un alias : `pluie-litres`, `vent`, `orage`, `ressentie`, `chaleur`, `rosee`, `grele`, `tempete`, `indemnisation`, `btp`.
 
+### Classements des stations : `[classement_meteo]`
+Même extension, deuxième shortcode (version intégrable de `/classements/`, page `/embed/classements/`) :
+```
+[classement_meteo type="tx-prov"]
+[classement_meteo type="pluie24h" altitude_max="800" secondaires="oui" records="oui" menu="non"]
+[classement_meteo type="humidex" filtres="non" menu="non" lignes="50"]
+```
+
+| Attribut | Valeurs | Défaut |
+|---|---|---|
+| `type` | `tx-prov`, `tx-0618`, `tx-1806`, `tx-fin`, `tx-records`, `tn-prov`, `tn-0618`, `tn-1806`, `tn-fin`, `insol`, `rr1`, `rr6`, `rr24`, `rr48`, `rr72`, `pmer`, `td`, `windchill`, `humidex` | `tx-prov` |
+| alias de `type` | `tx`, `tn`, `records`, `soleil`, `pluie1h`, `pluie6h`, `pluie24h`, `pluie48h`, `pluie72h`, `pression`, `rosee`, `ressenti` | |
+| `altitude_max` | mètres (0 à 4810) | toutes |
+| `secondaires`, `amateurs` | inclure ces stations : `oui` / `non` | `non` |
+| `altitude`, `debut` | afficher l'altitude, la date de début des mesures | `non` |
+| `departement` | trier par département | `non` |
+| `records` | colonnes record mensuel / absolu | `non` |
+| `lignes` | `50`, `100`, `200`, `500`, `tout` | `50` |
+| `menu` | onglets des 19 classements dans le cadre | `oui` |
+| `filtres` | formulaire de filtres dans le cadre | `oui` |
+| `height` | hauteur initiale en px (ajustée automatiquement) | `900` |
+
+Le visiteur peut changer de classement et de filtres dans le cadre ; `menu="non" filtres="non"` fige un tableau unique (idéal dans un article de bilan).
+
 ## 2. Script d'intégration
 ```html
 <div data-meteo-outil="distance-orage"></div>

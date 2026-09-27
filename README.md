@@ -121,6 +121,7 @@ Tableaux en direct des stations Météo-France (métropole + Corse), rendus côt
 
 Filtres : altitude max., stations secondaires (Pack ETENDU), stations amateurs, affichage de l'altitude, tri par département, records mensuels et absolus, date de début des mesures.
 
+WordPress : shortcode `[classement_meteo type="tx-prov"]` (voir docs/WORDPRESS.md), servi par `/embed/classements/`.
 Configuration (serveur) : `METEOFRANCE_API_KEY` (portail-api.meteofrance.fr, API « Observations » et « Paquet Observations »). Le cache (`.cache/obs`) garde 96 h : le paquet horaire ne couvre que 24 h, les cumuls 48 h et 72 h se complètent après 2 à 3 jours de fonctionnement (colonne « heures »). Records : `data/records.json` (modèle `data/records.example.json`), à remplir avec des valeurs vérifiées. Amateurs : flux JSON `AMATEUR_OBS_URL`. Sans clé, la page l'indique et n'affiche aucune donnée.
 Code : `src/lib/obs/` (calculs purs testés dans `rankings.ts`, source `meteofrance.ts`, cache `store.ts`).
 
