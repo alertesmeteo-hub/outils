@@ -61,8 +61,8 @@ add_shortcode('outil_meteo', function ($atts) {
 /** Classements disponibles (identifiants de /classements/) et alias courts. */
 function mo_classements() {
     return array(
-        'tx-prov', 'tx-0618', 'tx-1806', 'tx-fin', 'tx-records',
-        'tn-prov', 'tn-0618', 'tn-1806', 'tn-fin',
+        't', 'tx-prov', 'tx-0618', 'tx-1806', 'tx-fin', 'tx-records',
+        'tn-prov', 'tn-0618', 'tn-1806', 'tn-fin', 'tn-records',
         'rr1', 'rr24', 'rr6', 'rr48', 'rr72',
         'ff', 'fxi', 'fxi24', 'fxi48', 'fxi72',
         'pmer', 'dp3', 'dp12', 'dp24', 'u', 'vv', 'snow', 'insol', 'insol24',
@@ -72,7 +72,7 @@ function mo_classements() {
 }
 function mo_classement_aliases() {
     return array(
-        'tx' => 'tx-prov', 'tn' => 'tn-prov', 'records' => 'tx-records', 'record-tx' => 'tx-records',
+        'tx' => 'tx-prov', 'tn' => 'tn-prov', 'records' => 'tx-records', 'record-tx' => 'tx-records', 'records-tn' => 'tn-records', 'record-tn' => 'tn-records', 'moment' => 't', 'temperature' => 't',
         'soleil' => 'insol', 'ensoleillement' => 'insol',
         'pluie1h' => 'rr1', 'pluie-1h' => 'rr1', 'pluie24h' => 'rr24', 'pluie-24h' => 'rr24',
         'pluie6h' => 'rr6', 'pluie-6h' => 'rr6', 'pluie48h' => 'rr48', 'pluie-48h' => 'rr48', 'pluie72h' => 'rr72', 'pluie-72h' => 'rr72',
@@ -106,7 +106,7 @@ add_shortcode('classement_meteo', function ($atts) {
     $yes = function ($v) { return in_array(strtolower(trim((string) $v)), array('1', 'oui', 'yes', 'true', 'on'), true); };
     $q = array('c' => $type);
     $alt = trim((string) $a['altitude_max']);
-    if ($alt !== '' && ctype_digit($alt) && intval($alt) <= 4810) $q['alt'] = intval($alt);
+    if (in_array($alt, array('300', '400', '500', '800', '1000', '1500'), true)) $q['alt'] = intval($alt);
     foreach (array('secondaires' => 'sec', 'amateurs' => 'am', 'altitude' => 'altv', 'departement' => 'dep', 'par_region' => 'regt', 'evolution' => 'evo', 'records' => 'rec', 'debut' => 'deb') as $att => $param) {
         if ($yes($a[$att])) $q[$param] = '1';
     }

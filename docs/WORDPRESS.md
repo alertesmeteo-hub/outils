@@ -22,9 +22,9 @@ Même extension, deuxième shortcode (version intégrable de `/classements/`, pa
 
 | Attribut | Valeurs | Défaut |
 |---|---|---|
-| `type` | Températures : `tx-prov`, `tx-0618`, `tx-1806`, `tx-fin`, `tx-records`, `tn-prov`, `tn-0618`, `tn-1806`, `tn-fin` · Pluie : `rr1`, `rr6`, `rr24`, `rr48`, `rr72` · Vent : `ff`, `fxi`, `fxi24`, `fxi48`, `fxi72` · Conditions : `pmer`, `dp3`, `dp12`, `dp24`, `u`, `vv`, `snow`, `insol`, `insol24` · Ressenti : `td`, `windchill`, `humidex` · Normales : `n-tx`, `n-tn`, `n-tx24`, `n-tn24`, `e-recm-tx`, `e-recm-tn`, `e-reca-tx`, `e-reca-tn` | `tx-prov` |
-| alias de `type` | `tx`, `tn`, `records`, `soleil`, `soleil24h`, `pluie1h`, `pluie6h`, `pluie24h`, `pluie48h`, `pluie72h`, `vent`, `rafales`, `rafales24h`, `rafales48h`, `rafales72h`, `pression`, `pression3h`, `pression12h`, `pression24h`, `humidite`, `visibilite`, `neige`, `rosee`, `ressenti`, `normale-tx`, `normale-tn`, `normale-tx24h`, `normale-tn24h`, `ecart-record-mensuel-tx`… | |
-| `altitude_max` | mètres (0 à 4810) | toutes |
+| `type` | Températures : `t` (du moment, avec humidex et windchill), `tn-records`, `tx-prov`, `tx-0618`, `tx-1806`, `tx-fin`, `tx-records`, `tn-prov`, `tn-0618`, `tn-1806`, `tn-fin` · Pluie : `rr1`, `rr6`, `rr24`, `rr48`, `rr72` · Vent : `ff`, `fxi`, `fxi24`, `fxi48`, `fxi72` · Conditions : `pmer`, `dp3`, `dp12`, `dp24`, `u`, `vv`, `snow`, `insol`, `insol24` · Ressenti : `td`, `windchill`, `humidex` · Normales : `n-tx`, `n-tn`, `n-tx24`, `n-tn24`, `e-recm-tx`, `e-recm-tn`, `e-reca-tx`, `e-reca-tn` | `tx-prov` |
+| alias de `type` | `moment`, `tx`, `tn`, `records`, `records-tn`, `soleil`, `soleil24h`, `pluie1h`, `pluie6h`, `pluie24h`, `pluie48h`, `pluie72h`, `vent`, `rafales`, `rafales24h`, `rafales48h`, `rafales72h`, `pression`, `pression3h`, `pression12h`, `pression24h`, `humidite`, `visibilite`, `neige`, `rosee`, `ressenti`, `normale-tx`, `normale-tn`, `normale-tx24h`, `normale-tn24h`, `ecart-record-mensuel-tx`… | |
+| `altitude_max` | `300`, `400`, `500`, `800`, `1000`, `1500` | toutes |
 | `secondaires`, `amateurs` | inclure ces stations : `oui` / `non` | `non` |
 | `altitude`, `debut` | afficher l'altitude, la date de début des mesures | `non` |
 | `departement` | trier par département | `non` |

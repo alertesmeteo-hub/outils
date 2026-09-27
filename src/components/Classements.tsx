@@ -2,12 +2,18 @@ import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
-  HUMIDEX_SCALE, RANKINGS, WINDCHILL_SCALE, buildRanking, getRanking, humidexBand, windchillBand, windows,
+  HUMIDEX_SCALE, RANKINGS, WINDCHILL_SCALE, buildRanking, getRanking, isRecordRanking, humidexBand, windchillBand, windows,
   type Band, type RankRow, type Ranking,
 } from '@/lib/obs/rankings';
 import { SITE_NAME, SITE_URL } from '@/lib/config';
 import { REGIONS } from '@/lib/obs/regions';
 import { getRecords, getSnapshot, obsConfigured } from '@/lib/obs/store';
+
+/** Altitudes maximales proposées (m). */
+const ALTS = [300, 400, 500, 800, 1000, 1500];
+/** Lien vers la fiche climatologique d'une station ({id} = identifiant Météo-France). */
+const STATION_URL = process.env.STATION_URL_TEMPLATE || 'https://alertes-meteo.com/climatologie/climato_meteo/?station={id}';
+export type Sort = { key: 'val' | 'station' | 'dept'; dir: 'asc' | 'desc' };
 
 export type SP = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -33,10 +39,10 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   const showForm = !embed || one(sp.filtres) !== '0';
   const r = getRanking(one(sp.c));
   const altRaw = one(sp.alt);
-  const maxAlt = altRaw && /^\d{1,4}$/.test(altRaw) ? Number(altRaw) : undefined;
+  const maxAlt = altRaw && ALTS.includes(Number(altRaw)) ? Number(altRaw) : undefined;
   const opt = {
     secondaires: one(sp.sec) === '1', amateurs: one(sp.am) === '1', showAlt: one(sp.altv) === '1', byDept: one(sp.dep) === '1',
-    records: one(sp.rec) === '1' || r.id === 'tx-records' || r.id === 'rr6', debut: one(sp.deb) === '1' || r.id === 'tx-records',
+    records: (one(sp.rec) === '1' && !r.temp) || isRecordRanking(r) || r.id === 'rr6', debut: one(sp.deb) === '1' || isRecordRanking(r),
     byRegion: one(sp.regt) === '1', evo: one(sp.evo) === '1' && !!r.temp,
   };
   const regRaw = one(sp.reg);
@@ -48,7 +54,22 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   let now = 0;
   for (const list of Object.values(snap.obs)) { const t = Date.parse(list[list.length - 1]?.time ?? ''); if (t > now) now = t; }
   const rows = now ? buildRanking(r, snap.stations, snap.obs, now, { maxAlt, secondaires: opt.secondaires, amateurs: opt.amateurs, byDept: opt.byDept, region, byRegion: opt.byRegion, evo: opt.evo }, records) : [];
+  // Tri choisi par le visiteur (clic sur l'en-tête) ; par défaut, l'ordre du classement.
+  const triRaw = one(sp.tri);
+  const sort: Sort | undefined = triRaw === 'station' || triRaw === 'dept' || triRaw === 'val'
+    ? { key: triRaw, dir: one(sp.sens) === 'desc' ? 'desc' : 'asc' } : undefined;
+  if (sort) {
+    const d = sort.dir === 'asc' ? 1 : -1;
+    const key = (x: RankRow) => (sort.key === 'station' ? x.station.name : x.station.dept.padStart(3, '0'));
+    rows.sort((a, b) => d * (sort.key === 'val' ? a.value - b.value : key(a).localeCompare(key(b), 'fr')) || a.station.name.localeCompare(b.station.name, 'fr'));
+  }
   const shown = rows.slice(0, limit);
+  /** Lien d'en-tête : premier clic = ordre naturel, clic suivant = inverse. */
+  const sortHref = (k: Sort['key']) => {
+    const natural = k === 'val' ? (r.order === 'asc' ? 'asc' : 'desc') : 'asc';
+    const dir = sort?.key === k ? (sort.dir === 'asc' ? 'desc' : 'asc') : natural;
+    return keep({ tri: k, sens: dir });
+  };
   const w = now && r.window ? r.window(windows(now)) : undefined;
 
   const keep = (extra: Record<string, string>) => {
@@ -89,7 +110,10 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
         <input type="hidden" name="c" value={r.id} />
         {embed && one(sp.menu) === '0' && <input type="hidden" name="menu" value="0" />}
         <label className="flex flex-col gap-1">Altitude max. (m)
-          <input name="alt" type="number" min={0} max={4810} step={1} defaultValue={maxAlt ?? ''} placeholder="toutes" className="w-28 rounded-md border border-border bg-bg px-2 py-1.5" />
+          <select name="alt" defaultValue={maxAlt ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
+            <option value="">toutes</option>
+            {ALTS.map((a) => <option key={a} value={a}>{a} m</option>)}
+          </select>
         </label>
         {([
           ['sec', 'Inclure les stations secondaires', opt.secondaires],
@@ -136,7 +160,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
       ) : (
         w && !w.final && w.start >= now
           ? <Notice>La période vient de commencer : le classement se remplira avec la prochaine observation horaire.</Notice>
-          : <RankTable r={r} rows={shown} opt={opt} />
+          : <RankTable r={r} rows={shown} opt={opt} sort={sort} sortHref={sortHref} embed={embed} />
       )}
       {opt.records && r.record && !hasRec && now > 0 && (
         <p className="mt-2 text-sm text-muted">Aucun fichier de records chargé (<code>data/records.json</code>) : les colonnes de records restent vides.</p>
@@ -182,9 +206,15 @@ function Scale({ title, rows }: { title: string; rows: (Band & { range: string }
   );
 }
 
-function RankTable({ r, rows, opt }: { r: Ranking; rows: RankRow[]; opt: { showAlt: boolean; byDept: boolean; byRegion: boolean; evo: boolean; records: boolean; debut: boolean } }) {
+function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: RankRow[]; sort?: Sort; sortHref: (k: Sort['key']) => string; embed: boolean; opt: { showAlt: boolean; byDept: boolean; byRegion: boolean; evo: boolean; records: boolean; debut: boolean } }) {
   const unit = r.unit ? ` (${r.unit})` : '';
-  const partial = !r.instant;
+  const partial = !r.instant && !r.temp;
+  const arrow = (k: Sort['key']) => (sort?.key === k ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+  const SortTh = ({ k, children, right }: { k: Sort['key']; children: React.ReactNode; right?: boolean }) => (
+    <th className={`${th} ${right ? 'text-right' : ''}`} aria-sort={sort?.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+      <Link href={sortHref(k)} className="hover:underline" title="Trier">{children}{arrow(k)}</Link>
+    </th>
+  );
   const fv = (v: number | undefined) => (r.signed ? fmtS(v, r.digits) : fmtV(v, r.digits));
   const head = r.id === 'humidex' ? 'Humidex' : r.id === 'windchill' ? 'Ressenti (°C)' : r.signed ? `${r.group === 'Normales et records' ? 'Écart' : 'Variation'}${unit}` : r.unit === '°C' ? `Température${unit}` : `Valeur${unit}`;
   const th = 'px-2 py-2 text-left font-semibold whitespace-nowrap';
@@ -195,12 +225,11 @@ function RankTable({ r, rows, opt }: { r: Ranking; rows: RankRow[]; opt: { showA
       <table className="w-full text-sm">
         <thead className="border-b border-border bg-bg">
           <tr>
-            <th className={th}>Rang</th>
-            <th className={th}>Station</th>
+            <SortTh k="station">Station</SortTh>
             {opt.byRegion && <th className={th}>Région</th>}
-            <th className={th}>Dépt</th>
+            <SortTh k="dept">Dépt</SortTh>
             {opt.showAlt && <th className={`${th} text-right`}>Altitude (m)</th>}
-            <th className={`${th} text-right`}>{head}</th>
+            <SortTh k="val" right>{head}</SortTh>
             {opt.evo && <><th className={`${th} text-right`}>Évol. 1 h</th><th className={`${th} text-right`}>Évol. 24 h</th></>}
             {(r.id === 'humidex' || r.id === 'windchill') && <th className={th}>Niveau</th>}
             {r.feels && <><th className={`${th} text-right`}>Windchill - Ressenti</th><th className={`${th} text-right`}>Humidex</th></>}
@@ -214,12 +243,13 @@ function RankTable({ r, rows, opt }: { r: Ranking; rows: RankRow[]; opt: { showA
         </thead>
         <tbody>
           {rows.map((x, i) => {
-            const newDept = opt.byRegion ? i === 0 || rows[i - 1].region !== x.region : opt.byDept && (i === 0 || rows[i - 1].station.dept !== x.station.dept);
+            const newDept = sort ? false : opt.byRegion ? i === 0 || rows[i - 1].region !== x.region : opt.byDept && (i === 0 || rows[i - 1].station.dept !== x.station.dept);
             return (
               <tr key={x.station.id} className={`border-b border-border last:border-0 ${newDept ? 'border-t-2 border-t-primary' : ''} ${x.beaten ? 'tone-bg' : ''}`} style={x.beaten ? tone('danger') : undefined}>
-                <td className={`${td} tabular-nums`}>{x.rank}</td>
                 <td className={td}>
-                  {x.station.name}
+                  {x.station.kind === 'amateur' ? x.station.name : (
+                    <a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} target={embed ? '_top' : undefined} className="text-primary hover:underline">{x.station.name}</a>
+                  )}
                   {x.station.kind !== 'principale' && <span className="ml-1 text-xs text-muted">({x.station.kind})</span>}
                   {x.beaten && <span className="ml-2 rounded bg-danger px-1.5 py-0.5 text-xs font-bold text-white">{x.beaten === 'abs' ? 'Record absolu' : 'Record mensuel'}</span>}
                 </td>

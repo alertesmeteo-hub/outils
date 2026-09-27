@@ -164,7 +164,7 @@ export const WINDCHILL_SCALE = [
 /* ---------- Définitions des classements ---------- */
 
 export type RankingId =
-  | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records'
+  | 't' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records'
   | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin'
   | 'rr1' | 'rr24' | 'rr6' | 'rr48' | 'rr72'
   | 'ff' | 'fxi' | 'fxi24' | 'fxi48' | 'fxi72'
@@ -172,7 +172,7 @@ export type RankingId =
   | 'td' | 'windchill' | 'humidex'
   | 'n-tx' | 'n-tn' | 'n-tx24' | 'n-tn24' | 'e-recm-tx' | 'e-recm-tn' | 'e-reca-tx' | 'e-reca-tn';
 
-export type Group = 'Températures maximales' | 'Températures minimales' | 'Précipitations' | 'Vent' | 'Conditions atmosphériques' | 'Humidité et ressenti' | 'Normales et records';
+export type Group = 'Températures du moment' | 'Températures maximales' | 'Températures minimales' | 'Précipitations' | 'Vent' | 'Conditions atmosphériques' | 'Humidité et ressenti' | 'Normales et records';
 
 /** Contexte propre à une station : records / normales et mois de référence. */
 export type Ctx = { rec?: StationRecords; month: string };
@@ -232,21 +232,23 @@ const tn24 = (o: HourlyObs[], _w: unknown, n: number) => aggMin(o, { start: n - 
 const insolH = (a: Agg | null) => a && { ...a, value: a.value / 60 };
 
 const T = { unit: '°C', digits: 1 } as const;
-const TX = 'Températures maximales', TN = 'Températures minimales', P = 'Précipitations', V = 'Vent', C = 'Conditions atmosphériques', R = 'Humidité et ressenti', N = 'Normales et records';
+const TM = 'Températures du moment', TX = 'Températures maximales', TN = 'Températures minimales', P = 'Précipitations', V = 'Vent', C = 'Conditions atmosphériques', R = 'Humidité et ressenti', N = 'Normales et records';
 
 export const RANKINGS: Ranking[] = [
-  { id: 'tx-prov', short: 'Class. TX prov.', label: 'Classement des températures maximales provisoires (8 h → 8 h locales)', group: TX, ...T, order: 'desc', record: 'tx', feels: true, temp: true, window: (w) => w.txProv, value: (o, w, n) => aggMax(o, w.txProv, n) },
-  { id: 'tx-0618', short: 'Class. TX 06-18 UTC', label: 'Classement des températures maximales de 06 à 18 UTC', group: TX, ...T, order: 'desc', record: 'tx', feels: true, temp: true, window: (w) => w.day, value: (o, w, n) => aggMax(o, w.day, n) },
-  { id: 'tx-1806', short: 'Class. TX 18-06 UTC', label: 'Classement des températures maximales de 18 à 06 UTC', group: TX, ...T, order: 'desc', record: 'tx', feels: true, temp: true, window: (w) => w.night, value: (o, w, n) => aggMax(o, w.night, n) },
+  { id: 't', short: 'Températures du moment', label: 'Classement des températures du moment, avec humidex et windchill', group: TM, ...T, order: 'desc', feels: true, temp: true, instant: true, value: cur('t') },
+  { id: 'tx-prov', short: 'Class. TX prov.', label: 'Classement des températures maximales provisoires (8 h → 8 h locales)', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.txProv, value: (o, w, n) => aggMax(o, w.txProv, n) },
+  { id: 'tx-0618', short: 'Class. TX 06-18 UTC', label: 'Classement des températures maximales de 06 à 18 UTC', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.day, value: (o, w, n) => aggMax(o, w.day, n) },
+  { id: 'tx-1806', short: 'Class. TX 18-06 UTC', label: 'Classement des températures maximales de 18 à 06 UTC', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.night, value: (o, w, n) => aggMax(o, w.night, n) },
   { id: 'tx-fin', short: 'Class. TX finales', label: 'Classement des températures maximales finales (8 h → 8 h locales, veille)', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.txFin, value: (o, w, n) => txFin(o, w, n) },
   { id: 'tx-records', short: 'Records prov. TX', label: 'Classement records provisoires des températures maximales', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.txProv, value: (o, w, n) => aggMax(o, w.txProv, n) },
-  { id: 'tn-prov', short: 'Class. TN prov.', label: 'Classement des températures minimales provisoires (20 h → 8 h locales)', group: TN, ...T, order: 'asc', record: 'tn', feels: true, temp: true, window: (w) => w.tnProv, value: (o, w, n) => aggMin(o, w.tnProv, n) },
-  { id: 'tn-0618', short: 'Class. TN 06-18 UTC', label: 'Classement des températures minimales de 06 à 18 UTC', group: TN, ...T, order: 'asc', record: 'tn', feels: true, temp: true, window: (w) => w.day, value: (o, w, n) => aggMin(o, w.day, n) },
-  { id: 'tn-1806', short: 'Class. TN 18-06 UTC', label: 'Classement des températures minimales de 18 à 06 UTC', group: TN, ...T, order: 'asc', record: 'tn', feels: true, temp: true, window: (w) => w.night, value: (o, w, n) => aggMin(o, w.night, n) },
+  { id: 'tn-prov', short: 'Class. TN prov.', label: 'Classement des températures minimales provisoires (20 h → 8 h locales)', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnProv, value: (o, w, n) => aggMin(o, w.tnProv, n) },
+  { id: 'tn-0618', short: 'Class. TN 06-18 UTC', label: 'Classement des températures minimales de 06 à 18 UTC', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.day, value: (o, w, n) => aggMin(o, w.day, n) },
+  { id: 'tn-1806', short: 'Class. TN 18-06 UTC', label: 'Classement des températures minimales de 18 à 06 UTC', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.night, value: (o, w, n) => aggMin(o, w.night, n) },
   { id: 'tn-fin', short: 'Class. TN finales', label: 'Classement des températures minimales finales (20 h → 8 h locales)', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnFin, value: (o, w, n) => tnFin(o, w, n) },
+  { id: 'tn-records', short: 'Records prov. TN', label: 'Classement records provisoires des températures minimales', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnProv, value: (o, w, n) => aggMin(o, w.tnProv, n) },
 
   { id: 'rr1', short: 'Pluie 1 h', label: 'Classement de la pluie en 1 heure (dernière heure)', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(1) },
-  { id: 'rr6', short: 'Pluie depuis 6 h UTC', label: 'Classement de la pluie depuis 6 h UTC, avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.since6, value: (o, w, n) => aggSum(o, w.since6, 'rr1', n) },
+  { id: 'rr6', short: 'Pluie 6 h', label: 'Classement de la pluie depuis 6 h UTC, avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.since6, value: (o, w, n) => aggSum(o, w.since6, 'rr1', n) },
   { id: 'rr24', short: 'Pluie 24 h', label: 'Classement de la pluie sur 24 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', value: slide(24) },
   { id: 'rr48', short: 'Pluie 48 h', label: 'Classement de la pluie sur 48 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(48) },
   { id: 'rr72', short: 'Pluie 72 h', label: 'Classement de la pluie sur 72 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(72) },
@@ -280,6 +282,7 @@ export const RANKINGS: Ranking[] = [
   { id: 'e-reca-tx', short: 'Écart record absolu TX', label: 'Écart de la TX finale au record absolu de température maximale (les plus proches en tête)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.txFin, value: (o, w, n, c) => gap(txFin(o, w, n), c.rec?.absolute?.tx?.v) },
   { id: 'e-reca-tn', short: 'Écart record absolu TN', label: 'Écart de la TN finale au record absolu de température minimale (les plus proches en tête)', group: N, ...T, order: 'asc', signed: true, window: (w) => w.tnFin, value: (o, w, n, c) => gap(tnFin(o, w, n), c.rec?.absolute?.tn?.v) },
 ];
+export const isRecordRanking = (r: Ranking) => r.id === 'tx-records' || r.id === 'tn-records';
 export const getRanking = (id: string | undefined) => RANKINGS.find((r) => r.id === id) ?? RANKINGS[0];
 
 /* ---------- Construction du tableau ---------- */
@@ -357,10 +360,11 @@ export function buildRanking(
   }
   const cmp = r.order === 'abs' ? (a: RankRow, b: RankRow) => Math.abs(b.value) - Math.abs(a.value)
     : r.order === 'asc' ? (a: RankRow, b: RankRow) => a.value - b.value : (a: RankRow, b: RankRow) => b.value - a.value;
-  if (r.id === 'tx-records') {
-    // Stations dotées d'un record mensuel, triées par écart au record.
+  if (isRecordRanking(r)) {
+    // Stations dotées d'un record mensuel, triées par écart au record (les plus proches en tête).
     const withRec = rows.filter((x) => x.recMonth);
-    withRec.sort((a, b) => (b.value - b.recMonth!.v) - (a.value - a.recMonth!.v));
+    const d = r.order === 'asc' ? -1 : 1;
+    withRec.sort((a, b) => d * ((b.value - b.recMonth!.v) - (a.value - a.recMonth!.v)));
     rows.length = 0;
     rows.push(...withRec);
   } else {
@@ -374,7 +378,7 @@ export function buildRanking(
   for (const row of rows) {
     if (prev && groupOf(prev) !== groupOf(row)) { i = 0; prev = undefined; }
     i++;
-    row.rank = prev && prev.value === row.value && r.id !== 'tx-records' ? prev.rank : i;
+    row.rank = prev && prev.value === row.value && !isRecordRanking(r) ? prev.rank : i;
     prev = row;
   }
   return rows;
