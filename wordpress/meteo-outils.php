@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Météo Outils – Intégration
  * Description: Shortcodes [outil_meteo type="distance-orage"] (calculateurs) et [classement_meteo type="tx-prov"] (classements des stations) intégrés via iframe.
- * Version: 0.2.0
+ * Version: 0.3.0
  * License: GPL-2.0-or-later
  */
 
