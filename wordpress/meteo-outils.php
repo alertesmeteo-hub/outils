@@ -63,8 +63,11 @@ function mo_classements() {
     return array(
         'tx-prov', 'tx-0618', 'tx-1806', 'tx-fin', 'tx-records',
         'tn-prov', 'tn-0618', 'tn-1806', 'tn-fin',
-        'insol', 'rr1', 'rr24', 'rr6', 'rr48', 'rr72',
-        'pmer', 'td', 'windchill', 'humidex',
+        'rr1', 'rr24', 'rr6', 'rr48', 'rr72',
+        'ff', 'fxi', 'fxi24', 'fxi48', 'fxi72',
+        'pmer', 'dp3', 'dp12', 'dp24', 'u', 'vv', 'snow', 'insol', 'insol24',
+        'td', 'windchill', 'humidex',
+        'n-tx', 'n-tn', 'n-tx24', 'n-tn24', 'e-recm-tx', 'e-recm-tn', 'e-reca-tx', 'e-reca-tn',
     );
 }
 function mo_classement_aliases() {
@@ -74,17 +77,22 @@ function mo_classement_aliases() {
         'pluie1h' => 'rr1', 'pluie-1h' => 'rr1', 'pluie24h' => 'rr24', 'pluie-24h' => 'rr24',
         'pluie6h' => 'rr6', 'pluie-6h' => 'rr6', 'pluie48h' => 'rr48', 'pluie-48h' => 'rr48', 'pluie72h' => 'rr72', 'pluie-72h' => 'rr72',
         'pression' => 'pmer', 'rosee' => 'td', 'point-de-rosee' => 'td', 'ressenti' => 'windchill',
+        'soleil24h' => 'insol24', 'vent' => 'ff', 'vent-moyen' => 'ff', 'rafales' => 'fxi', 'rafales24h' => 'fxi24', 'rafales48h' => 'fxi48', 'rafales72h' => 'fxi72',
+        'pression3h' => 'dp3', 'pression12h' => 'dp12', 'pression24h' => 'dp24', 'humidite' => 'u', 'visibilite' => 'vv', 'neige' => 'snow',
+        'normale-tx' => 'n-tx', 'normale-tn' => 'n-tn', 'normale-tx24h' => 'n-tx24', 'normale-tn24h' => 'n-tn24',
+        'ecart-record-mensuel-tx' => 'e-recm-tx', 'ecart-record-mensuel-tn' => 'e-recm-tn', 'ecart-record-absolu-tx' => 'e-reca-tx', 'ecart-record-absolu-tn' => 'e-reca-tn',
     );
 }
 
 /**
  * [classement_meteo type="tx-prov" altitude_max="800" secondaires="oui" amateurs="non" altitude="oui"
- *   departement="non" records="oui" debut="non" lignes="50" menu="oui" filtres="oui" height="900"]
+ *   departement="non" records="oui" debut="non" lignes="50" menu="oui" filtres="oui" height="900"
+ *   region="bre" par_region="non" evolution="non"]
  */
 add_shortcode('classement_meteo', function ($atts) {
     $a = shortcode_atts(array(
         'type' => 'tx-prov', 'altitude_max' => '', 'secondaires' => 'non', 'amateurs' => 'non', 'altitude' => 'non',
-        'departement' => 'non', 'records' => 'non', 'debut' => 'non', 'lignes' => '50', 'menu' => 'oui', 'filtres' => 'oui',
+        'departement' => 'non', 'region' => '', 'par_region' => 'non', 'evolution' => 'non', 'records' => 'non', 'debut' => 'non', 'lignes' => '50', 'menu' => 'oui', 'filtres' => 'oui',
         'height' => '900',
     ), $atts, 'classement_meteo');
     $base = mo_base_url();
@@ -99,9 +107,12 @@ add_shortcode('classement_meteo', function ($atts) {
     $q = array('c' => $type);
     $alt = trim((string) $a['altitude_max']);
     if ($alt !== '' && ctype_digit($alt) && intval($alt) <= 4810) $q['alt'] = intval($alt);
-    foreach (array('secondaires' => 'sec', 'amateurs' => 'am', 'altitude' => 'altv', 'departement' => 'dep', 'records' => 'rec', 'debut' => 'deb') as $att => $param) {
+    foreach (array('secondaires' => 'sec', 'amateurs' => 'am', 'altitude' => 'altv', 'departement' => 'dep', 'par_region' => 'regt', 'evolution' => 'evo', 'records' => 'rec', 'debut' => 'deb') as $att => $param) {
         if ($yes($a[$att])) $q[$param] = '1';
     }
+    $regions = array('ara', 'bfc', 'bre', 'cvl', 'cor', 'ges', 'hdf', 'idf', 'nor', 'naq', 'occ', 'pdl', 'pac');
+    $region = strtolower(trim((string) $a['region']));
+    if (in_array($region, $regions, true)) $q['reg'] = $region;
     $lignes = strtolower(trim((string) $a['lignes']));
     if (in_array($lignes, array('50', '100', '200', '500', 'tout'), true)) $q['n'] = $lignes;
     if (!$yes($a['menu'])) $q['menu'] = '0';

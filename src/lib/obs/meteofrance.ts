@@ -3,7 +3,8 @@
  *  - liste des stations : GET {OBS_API_BASE}/liste-stations (CSV ; Pack RADOME = principale, ETENDU = secondaire)
  *  - paquet horaire par département : GET {PAQUET_API_BASE}/paquet/horaire?id-departement=XX&format=json (24 dernières heures)
  * Authentification : en-tête `apikey` (METEOFRANCE_API_KEY, côté serveur uniquement).
- * Unités de l'API : températures en kelvins, pression en pascals, vent en m/s, ensoleillement en minutes.
+ * Unités de l'API : températures en kelvins, pression en pascals, vent en m/s, ensoleillement en minutes,
+ * visibilité en mètres, hauteur de neige (sss) en mètres.
  */
 import type { HourlyObs, Station } from './types';
 
@@ -41,6 +42,7 @@ export function parsePaquetRow(x: Record<string, unknown>): { id: string; obs: H
       t: k2c(x.t), td: k2c(x.td), tx: k2c(x.tx), tn: k2c(x.tn),
       u: num(x.u), ff: ms2kmh(x.ff), fxi: ms2kmh(x.fxi),
       rr1: num(x.rr1), insol: num(x.insolh), pmer: pa2hpa(x.pmer),
+      vv: num(x.vv), snow: (() => { const n = num(x.sss); return n == null ? undefined : Math.round(n * 100); })(),
     },
   };
 }

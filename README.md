@@ -117,9 +117,12 @@ Tableaux en direct des stations Météo-France (métropole + Corse), rendus côt
 - **TX** provisoires (8 h → 8 h locales), 06-18 UTC, 18-06 UTC, finales, et classement des records provisoires de TX ;
 - **TN** provisoires (20 h → 8 h locales), 06-18 UTC, 18-06 UTC, finales ; colonnes windchill et humidex ;
 - **ensoleillement**, **pluie** 1 h, depuis 6 h UTC (avec records), 24 h, 48 h et 72 h glissantes ;
-- **pression**, **point de rosée**, **windchill** et **humidex** avec leurs échelles de risque.
+- **vent** moyen, rafales, rafale max. sur 24, 48 et 72 h ;
+- **conditions atmosphériques** : pression mer et variations sur 3, 12, 24 h, humidité, visibilité, hauteur de neige, ensoleillement depuis minuit et sur 24 h ;
+- **point de rosée**, **windchill** et **humidex** avec leurs échelles de risque ;
+- **normales et records** : écarts aux TX/TN moyennes du mois (finales ou 24 h glissantes) et aux records mensuels et absolus (données `normals`, `monthly`, `absolute` de `data/records.json`).
 
-Filtres : altitude max., stations secondaires (Pack ETENDU), stations amateurs, affichage de l'altitude, tri par département, records mensuels et absolus, date de début des mesures.
+Filtres : région (ou classement par région), évolution de la T° sur 1 h et 24 h, altitude max., stations secondaires (Pack ETENDU), stations amateurs, affichage de l'altitude, tri par département, records mensuels et absolus, date de début des mesures.
 
 WordPress : shortcode `[classement_meteo type="tx-prov"]` (voir docs/WORDPRESS.md), servi par `/embed/classements/`.
 Configuration (serveur) : `METEOFRANCE_API_KEY` (portail-api.meteofrance.fr : souscrire les API « Observations » et « Paquet Observations » dans la même application, une seule clé suffit ; sinon `METEOFRANCE_PAQUET_API_KEY` et `METEOFRANCE_OBS_API_KEY`). Le cache (`.cache/obs`) garde 96 h : le paquet horaire ne couvre que 24 h, les cumuls 48 h et 72 h se complètent après 2 à 3 jours de fonctionnement (colonne « heures »). Records : `data/records.json` (modèle `data/records.example.json`), à remplir avec des valeurs vérifiées. Amateurs : flux JSON `AMATEUR_OBS_URL`. Sans clé, la page l'indique et n'affiche aucune donnée.

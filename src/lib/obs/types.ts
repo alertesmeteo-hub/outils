@@ -29,6 +29,8 @@ export type HourlyObs = {
   rr1?: number; // mm
   insol?: number; // minutes d'ensoleillement dans l'heure
   pmer?: number; // hPa
+  vv?: number; // m, visibilité
+  snow?: number; // cm, hauteur de neige au sol
 };
 
 export type ObsSnapshot = {
@@ -44,4 +46,6 @@ export type ObsSnapshot = {
 export type RecordValue = { v: number; d: string };
 export type RecordSet = { tx?: RecordValue; tn?: RecordValue; rr24?: RecordValue };
 /** Records d'une station : mensuels (clé "1"…"12") et absolus. */
-export type StationRecords = { monthly?: Record<string, RecordSet>; absolute?: RecordSet };
+/** Normales mensuelles (moyennes climatologiques des TX et TN, °C). */
+export type Normals = { tx?: number; tn?: number };
+export type StationRecords = { monthly?: Record<string, RecordSet>; absolute?: RecordSet; normals?: Record<string, Normals> };

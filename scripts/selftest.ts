@@ -128,6 +128,20 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   eq('tri par département, rang par département', R.buildRanking(tx, stations, data, now, { secondaires: true, amateurs: false, byDept: true }).map((r) => `${r.station.dept}:${r.rank}`).join() === '13:1,13:2,84:1');
   eq('TN : tri croissant', R.buildRanking(R.getRanking('tn-0618'), stations, data, now, { secondaires: true, amateurs: false, byDept: false })[0].station.id === 'A');
 
+  // Vent, pression, évolution, régions, normales
+  const ob2 = Array.from({ length: 25 }, (_, i) => ({ time: new Date(now - (24 - i) * 3600_000).toISOString(), t: 10 + i, fxi: i === 5 ? 90 : 20, ff: 15, pmer: 1000 + i, u: 80, vv: 3000, snow: 0 }));
+  const d2 = { A: ob2 };
+  const one = (id: string, f = {}) => R.buildRanking(R.getRanking(id), [st('A', '13', 5)], d2, now, { secondaires: false, amateurs: false, byDept: false, ...f }, { A: { normals: { '7': { tx: 30, tn: 18 } }, monthly: { '7': { tx: { v: 40, d: '2019-07-12' } } } } })[0];
+  eq('rafale max 24 h = 90 km/h', one('fxi24')?.value === 90);
+  eq('variation de pression 3 h = +3 hPa', one('dp3')?.value === 3 && one('dp24')?.value === 24);
+  eq('visibilité en km', one('vv')?.value === 3);
+  eq('neige nulle non classée', one('snow') === undefined);
+  const ev = one('tx-prov', { evo: true });
+  eq('évolution T 1 h = +1, 24 h = +24', ev?.evo1 === 1 && ev?.evo24 === 24, JSON.stringify(ev));
+  eq('région PACA pour les Bouches-du-Rhône', one('ff')?.region === 'Provence-Alpes-Côte d’Azur' && one('ff', { region: 'bre' }) === undefined);
+  eq('écart à la normale TX 24 h glissantes = 34 − 30', one('n-tx24')?.value === 4);
+  eq('écart au record mensuel TX (TX finale 27 − 40)', one('e-recm-tx')?.value === -13, String(one('e-recm-tx')?.value));
+
   const p = MF.parsePaquetRow({ geo_id_insee: '13054001', validity_time: '2026-07-15T13:00:00Z', t: 308.15, td: 290.15, tx: 309.05, tn: 307.15, ff: 5, pmer: 101520, rr1: 0.4, insolh: 60 })!;
   eq('paquet MF : K → °C, m/s → km/h, Pa → hPa', p.obs.t === 35 && p.obs.tx === 35.9 && p.obs.ff === 18 && p.obs.pmer === 1015.2 && p.obs.insol === 60, JSON.stringify(p));
   eq('id-departement sans zéro initial, Corse = 20', MF.deptParam('01') === '1' && MF.deptParam('20') === '20' && MF.DEPARTEMENTS.length === 95 && MF.DEPARTEMENTS.includes('20'));
