@@ -118,7 +118,7 @@ Tableaux en direct des stations Météo-France (métropole + Corse), rendus côt
 - **TN** provisoires (20 h → 8 h locales), 06-18 UTC, 18-06 UTC, finales ; colonnes windchill et humidex ;
 - **ensoleillement**, **pluie** 1 h, depuis 6 h UTC (avec records), 24 h, 48 h et 72 h glissantes ;
 - **vent** moyen et vent max. (vent moyen 10 min le plus fort, le paquet horaire ne fournit pas les rafales) sur 1, 24, 48 et 72 h ;
-- **conditions atmosphériques** : pression mer et variations sur 3, 12, 24 h, humidité, visibilité, hauteur de neige, ensoleillement depuis minuit et sur 24 h ;
+- **conditions atmosphériques** : pression mer et variations sur 3, 12, 24 h, humidité, visibilité, hauteur de neige, ensoleillement sur 24 h ;
 - **point de rosée**, **windchill** et **humidex** avec leurs échelles de risque ;
 - **normales et records** : écarts aux TX/TN moyennes du mois (finales ou 24 h glissantes) et aux records mensuels et absolus (données `normals`, `monthly`, `absolute` de `data/records.json`).
 

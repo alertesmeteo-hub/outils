@@ -168,7 +168,7 @@ export type RankingId =
   | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin'
   | 'rr1' | 'rr24' | 'rr6' | 'rr48' | 'rr72'
   | 'ff' | 'fxi' | 'fxi24' | 'fxi48' | 'fxi72'
-  | 'pmer' | 'dp3' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol' | 'insol24'
+  | 'pmer' | 'dp3' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
   | 'td' | 'windchill' | 'humidex'
   | 'n-tx' | 'n-tn' | 'n-tx24' | 'n-tn24' | 'e-recm-tx' | 'e-recm-tn' | 'e-reca-tx' | 'e-reca-tn';
 
@@ -273,7 +273,6 @@ export const RANKINGS: Ranking[] = [
   { id: 'u', short: 'Humidité', label: 'Classement de l’humidité relative', group: C, unit: '%', digits: 0, order: 'desc', instant: true, value: cur('u') },
   { id: 'vv', short: 'Visibilité', label: 'Classement de la visibilité (les plus faibles en tête)', group: C, unit: 'km', digits: 1, order: 'asc', instant: true, value: (o, w, n) => { const a = cur('vv')(o, w, n); return a && { ...a, value: a.value / 1000 }; } },
   { id: 'snow', short: 'Hauteur de neige', label: 'Classement de la hauteur de neige au sol', group: C, unit: 'cm', digits: 0, order: 'desc', instant: true, value: (o, w, n) => { const a = cur('snow')(o, w, n); return a && a.value > 0 ? a : null; } },
-  { id: 'insol', short: 'Soleil depuis minuit', label: 'Classement de l’ensoleillement depuis minuit (heure de Paris)', group: C, unit: 'h', digits: 1, order: 'desc', window: (w) => w.sinceMidnight, value: (o, w, n) => insolH(aggSum(o, w.sinceMidnight, 'insol', n)) },
   { id: 'insol24', short: 'Soleil 24 h', label: 'Classement de l’ensoleillement sur les dernières 24 heures', group: C, unit: 'h', digits: 1, order: 'desc', value: (o, _w, n) => insolH(aggSum(o, { start: n - 24 * H, end: n }, 'insol', n)) },
 
   { id: 'td', short: 'Point de rosée', label: 'Classement des points de rosée', group: R, ...T, order: 'desc', instant: true, value: cur('td') },

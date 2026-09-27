@@ -65,7 +65,7 @@ function mo_classements() {
         'tn-prov', 'tn-0618', 'tn-1806', 'tn-fin', 'tn-records',
         'rr1', 'rr24', 'rr6', 'rr48', 'rr72',
         'ff', 'fxi', 'fxi24', 'fxi48', 'fxi72',
-        'pmer', 'dp3', 'dp12', 'dp24', 'u', 'vv', 'snow', 'insol', 'insol24',
+        'pmer', 'dp3', 'dp12', 'dp24', 'u', 'vv', 'snow', 'insol24',
         'td', 'windchill', 'humidex',
         'n-tx', 'n-tn', 'n-tx24', 'n-tn24', 'e-recm-tx', 'e-recm-tn', 'e-reca-tx', 'e-reca-tn',
     );
@@ -73,7 +73,7 @@ function mo_classements() {
 function mo_classement_aliases() {
     return array(
         'tx' => 'tx-prov', 'tn' => 'tn-prov', 'records' => 'tx-records', 'record-tx' => 'tx-records', 'records-tn' => 'tn-records', 'record-tn' => 'tn-records', 'moment' => 't', 'temperature' => 't',
-        'soleil' => 'insol', 'ensoleillement' => 'insol',
+        'soleil' => 'insol24', 'ensoleillement' => 'insol24',
         'pluie1h' => 'rr1', 'pluie-1h' => 'rr1', 'pluie24h' => 'rr24', 'pluie-24h' => 'rr24',
         'pluie6h' => 'rr6', 'pluie-6h' => 'rr6', 'pluie48h' => 'rr48', 'pluie-48h' => 'rr48', 'pluie72h' => 'rr72', 'pluie-72h' => 'rr72',
         'pression' => 'pmer', 'rosee' => 'td', 'point-de-rosee' => 'td', 'ressenti' => 'windchill',
