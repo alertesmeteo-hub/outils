@@ -2,7 +2,7 @@
  * Classements de stations : fenêtres temporelles, agrégations et indices.
  * Fonctions pures (aucun réseau) : testées par scripts/selftest.ts.
  */
-import type { HourlyObs, RecordSet, Station, StationRecords } from './types';
+import type { SixObs, HourlyObs, RecordSet, Station, StationRecords } from './types';
 import { humidexOf } from '../tools/defs/humidex';
 import { windChill } from '../tools/defs/temperature-ressentie';
 import { regionOf } from './regions';
@@ -173,7 +173,7 @@ export type RankingId =
   | 't' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records'
   | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin'
   | 'rr1' | 'rr24' | 'rr6' | 'rr48' | 'rr72'
-  | 'ff' | 'fxi' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf24' | 'raf48' | 'raf72'
+  | 'ff' | 'fxi' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf6' | 'raf1' | 'raf24' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
   | 'td' | 'windchill' | 'humidex' | 'sol10' | 'sol20' | 'sol50' | 'sol100'
   | 'n-tx' | 'n-tn' | 'n-tx24' | 'n-tn24' | 'e-recm-tx' | 'e-recm-tn' | 'e-reca-tx' | 'e-reca-tn';
@@ -181,7 +181,7 @@ export type RankingId =
 export type Group = 'Températures du moment' | 'Températures maximales' | 'Températures minimales' | 'Précipitations' | 'Vent' | 'Conditions atmosphériques' | 'Humidité et ressenti' | 'Sol' | 'Normales et records';
 
 /** Contexte propre à une station : records / normales et mois de référence. */
-export type Ctx = { rec?: StationRecords; month: string; synopEnd?: number };
+export type Ctx = { rec?: StationRecords; month: string; synopEnd?: number; six?: SixObs[]; rafH?: Record<string, number> };
 
 export type Ranking = {
   id: RankingId;
@@ -242,11 +242,32 @@ export const synopEnd = (obs: Record<string, HourlyObs[]>) => {
   for (const l of Object.values(obs)) for (let k = l.length - 1; k >= 0; k--) if (l[k].gust != null) { t = Math.max(t, Date.parse(l[k].time)); break; }
   return t;
 };
-const synopGust = (h: number) => (obs: HourlyObs[], _w: unknown, _now: number, c: Ctx): Agg | null => {
+/**
+ * Rafales max. sur h heures : rafales 6 min (raf10, temps réel) si la station en a,
+ * sinon messages SYNOP comptés depuis le dernier message publié (~1 jour de décalage).
+ */
+const synopGust = (h: number) => (obs: HourlyObs[], _w: unknown, now: number, c: Ctx): Agg | null => {
+  if (c.rafH) {
+    const from = new Date(now - h * H).toISOString();
+    let best: [string, number] | undefined;
+    for (const [t, v] of Object.entries(c.rafH)) if (t > from && (!best || v > best[1])) best = [t, v];
+    if (best) return { value: best[1], n: 1, expected: 1, at: best[0] };
+  }
   if (!c.synopEnd) return null;
   let best: HourlyObs | undefined;
   for (const o of inWindow(obs, { start: c.synopEnd - h * H, end: c.synopEnd })) if (o.gust != null && (!best || o.gust > best.gust!)) best = o;
   return best ? { value: best.gust!, n: 1, expected: 1, at: best.time } : null;
+};
+/** Dernier relevé 6 min (≤ 30 min). */
+const last6 = (c: Ctx) => { const x = c.six?.[c.six.length - 1]; return x && Date.now() - Date.parse(x.time) <= 30 * 60_000 ? x : undefined; };
+/** Rafale max. sur les `min` dernières minutes (relevés 6 min). */
+const rafRecent = (min: number) => (_o: HourlyObs[], _w: unknown, _n: number, c: Ctx): Agg | null => {
+  const l = last6(c);
+  if (!l) return null;
+  const from = Date.parse(l.time) - min * 60_000;
+  let best: SixObs | undefined;
+  for (const x of c.six!) if (Date.parse(x.time) > from && x.raf != null && (!best || x.raf > best.raf!)) best = x;
+  return best ? { value: best.raf!, n: 1, expected: 1, at: best.time } : null;
 };
 const windNow = (obs: HourlyObs[], _w: unknown, now: number): Agg | null => {
   const o = latest(obs, now);
@@ -264,7 +285,7 @@ const T = { unit: '°C', digits: 1 } as const;
 const TM = 'Températures du moment', TX = 'Températures maximales', TN = 'Températures minimales', P = 'Précipitations', V = 'Vent', C = 'Conditions atmosphériques', R = 'Humidité et ressenti', N = 'Normales et records';
 
 export const RANKINGS: Ranking[] = [
-  { id: 't', short: 'Températures du moment', label: 'Classement des températures du moment, avec humidex et windchill', group: TM, ...T, order: 'desc', feels: true, temp: true, instant: true, value: cur('t') },
+  { id: 't', short: 'Températures du moment', label: 'Classement des températures du moment, avec humidex et windchill', group: TM, ...T, order: 'desc', feels: true, temp: true, instant: true, value: (o, w, n, c) => { const l = last6(c); return l?.t != null ? { value: l.t, n: 1, expected: 1, at: l.time } : cur('t')(o, w, n); } },
   { id: 'tx-prov', short: 'Class. TX prov.', label: 'Classement des températures maximales provisoires (8 h → 8 h locales)', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.txProv, value: (o, w, n) => aggMax(o, w.txProv, n) },
   { id: 'tx-0618', short: 'Class. TX 06-18 UTC', label: 'Classement des températures maximales de 06 à 18 UTC', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.day, value: (o, w, n) => aggMax(o, w.day, n) },
   { id: 'tx-1806', short: 'Class. TX 18-06 UTC', label: 'Classement des températures maximales de 18 à 06 UTC', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.night, value: (o, w, n) => aggMax(o, w.night, n) },
@@ -288,9 +309,11 @@ export const RANKINGS: Ranking[] = [
   { id: 'fxi48', short: 'Vent max. 48 h', label: 'Classement du vent maximal sur 48 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(48) },
   { id: 'fxi72', short: 'Vent max. 72 h', label: 'Classement du vent maximal sur 72 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(72) },
 
-  { id: 'raf24', short: 'Rafales 24 h', label: 'Classement des rafales maximales sur 24 heures (messages SYNOP, stations principales)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(24) },
-  { id: 'raf48', short: 'Rafales 48 h', label: 'Classement des rafales maximales sur 48 heures (messages SYNOP, stations principales)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(48) },
-  { id: 'raf72', short: 'Rafales 72 h', label: 'Classement des rafales maximales sur 72 heures (messages SYNOP, stations principales)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(72) },
+  { id: 'raf6', short: 'Rafales 6 min', label: 'Classement des rafales du dernier relevé (rafale max. sur 10 min, pas de 6 min)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: rafRecent(6) },
+  { id: 'raf1', short: 'Rafales 1 h', label: 'Classement des rafales maximales sur la dernière heure (relevés 6 min)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: rafRecent(60) },
+  { id: 'raf24', short: 'Rafales 24 h', label: 'Classement des rafales maximales sur 24 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(24) },
+  { id: 'raf48', short: 'Rafales 48 h', label: 'Classement des rafales maximales sur 48 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(48) },
+  { id: 'raf72', short: 'Rafales 72 h', label: 'Classement des rafales maximales sur 72 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(72) },
 
   { id: 'pmer', short: 'Pression mer', label: 'Classement de la pression au niveau de la mer', group: C, unit: 'hPa', digits: 1, order: 'desc', instant: true, value: cur('pmer') },
   { id: 'dp3', short: 'Variation 3 h', label: 'Classement de la variation de pression sur 3 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 3) },
@@ -365,6 +388,7 @@ export function buildRanking(
   now: number,
   f: Filters,
   records: Record<string, StationRecords> = {},
+  extra: { six?: Record<string, SixObs[]>; rafH?: Record<string, Record<string, number>> } = {},
 ): RankRow[] {
   const w = windows(now);
   const month = String(parisDate(r.window ? r.window(w).start + H : now).m);
@@ -378,19 +402,21 @@ export function buildRanking(
     if (f.region && reg?.code !== f.region) continue;
     if (f.dept && s.dept !== f.dept) continue;
     const o = obs[s.id];
-    if (!o?.length) continue;
-    const a = r.value(o, w, now, { rec: records[s.id], month, synopEnd: sEnd });
+    const six = extra.six?.[s.id];
+    if (!o?.length && !six?.length && !extra.rafH?.[s.id]) continue;
+    const ctx: Ctx = { rec: records[s.id], month, synopEnd: sEnd, six, rafH: extra.rafH?.[s.id] };
+    const a = r.value(o ?? [], w, now, ctx);
     if (!a) continue;
     const row: RankRow = { rank: 0, station: s, region: reg?.name, value: a.value, n: a.n, expected: a.expected, at: a.at };
     if (r.feels) {
-      const l = latest(o, now);
+      const l = last6(ctx) ?? latest(o ?? [], now);
       row.windchill = windchillOf(l?.t, l?.ff);
       row.humidex = humidexFrom(l?.t, l?.td);
     }
-    if (r.showPmer) row.pmer = latest(o, now)?.pmer;
+    if (r.showPmer) row.pmer = latest(o ?? [], now)?.pmer;
     if (f.evo && r.temp) {
-      row.evo1 = delta(o, 't', 1, now);
-      row.evo24 = delta(o, 't', 24, now);
+      row.evo1 = delta(o ?? [], 't', 1, now);
+      row.evo24 = delta(o ?? [], 't', 24, now);
     }
     if (r.record) {
       const rec = records[s.id];

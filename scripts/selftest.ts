@@ -164,6 +164,18 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   const rafRow = R.buildRanking(R.getRanking('raf24'), [st('B', '29', 94)], { B: [{ time: '2026-09-26T18:00:00.000Z', gust: 76 }, { time: '2026-09-26T21:00:00.000Z', gust: 32 }] }, sEndT + 86400_000, { secondaires: false, amateurs: false, byDept: false })[0];
   eq('rafales 24 h comptées depuis le dernier message SYNOP', rafRow?.value === 76);
 
+  // Paquet 6 min v2 : rafales raf10 (extrait réel de Boulogne-sur-Mer, 27/09/2026)
+  const s6 = MF.parseSixRow({ geo_id_insee: '62160001', validity_time: '2026-09-27T20:18:00Z', t: 291.85, td: 289.45, u: 86, ff: 5.2, raf10: 8.3, pmer: 101610 })!;
+  eq('paquet 6 min v2 : raf10 8,3 m/s = 29,9 km/h, T 18,7 °C', s6.obs.raf === 29.9 && s6.obs.t === 18.7 && s6.obs.pmer === 1016.1, JSON.stringify(s6));
+  eq('échéance 6 min au format API', MF.sixDate(Date.parse('2026-09-27T20:21:30Z')) === '2026-09-27T20:18:00Z');
+  const nowSix = Date.now();
+  const sixList = [0, 1, 2, 12].map((k) => ({ time: new Date(nowSix - k * 360_000).toISOString(), t: 18 + k, raf: 20 + k * 3 })).reverse();
+  const r6 = (id: string, extra = {}) => R.buildRanking(R.getRanking(id), [st('C', '62', 5)], {}, nowSix, { secondaires: false, amateurs: false, byDept: false }, {}, extra)[0];
+  eq('rafales 6 min = dernier relevé', r6('raf6', { six: { C: sixList } })?.value === 20);
+  eq('rafales 1 h = max des relevés de l’heure (le relevé d’il y a 72 min exclu)', r6('raf1', { six: { C: sixList } })?.value === 26);
+  eq('température du moment = relevé 6 min', r6('t', { six: { C: sixList } })?.value === 18);
+  eq('rafales 24 h depuis le cumul horaire 6 min', r6('raf24', { rafH: { C: { [new Date(nowSix - 3600_000).toISOString()]: 88, [new Date(nowSix - 30 * 3600_000).toISOString()]: 120 } } })?.value === 88);
+
   const p = MF.parsePaquetRow({ geo_id_insee: '13054001', validity_time: '2026-07-15T13:00:00Z', t_10: 295.15, t_100: 291.65, t: 308.15, td: 290.15, tx: 309.05, tn: 307.15, ff: 5, pmer: 101520, rr1: 0.4, insolh: 60 })!;
   eq('paquet MF : K → °C, m/s → km/h, Pa → hPa', p.obs.t === 35 && p.obs.tx === 35.9 && p.obs.ff === 18 && p.obs.pmer === 1015.2 && p.obs.insol === 60 && p.obs.t10 === 22 && p.obs.t100 === 18.5, JSON.stringify(p));
   eq('id-departement sans zéro initial, Corse = 20', MF.deptParam('01') === '1' && MF.deptParam('20') === '20' && MF.DEPARTEMENTS.length === 95 && MF.DEPARTEMENTS.includes('20'));

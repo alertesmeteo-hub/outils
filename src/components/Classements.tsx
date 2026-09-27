@@ -9,7 +9,7 @@ import { SITE_NAME, SITE_URL } from '@/lib/config';
 import { REGIONS } from '@/lib/obs/regions';
 import { DEPARTEMENTS } from '@/lib/obs/meteofrance';
 import AutoSubmit from '@/components/AutoSubmit';
-import { getRecords, getSnapshot, obsConfigured } from '@/lib/obs/store';
+import { getRecords, getSix, getSnapshot, obsConfigured } from '@/lib/obs/store';
 
 /** Altitudes maximales proposées (m). */
 const ALTS = [300, 400, 500, 800, 1000, 1500];
@@ -58,7 +58,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   const [snap, records] = await Promise.all([getSnapshot(), getRecords()]);
   let now = 0;
   for (const list of Object.values(snap.obs)) { const t = Date.parse(list[list.length - 1]?.time ?? ''); if (t > now) now = t; }
-  const rows = now ? buildRanking(r, snap.stations, snap.obs, now, { maxAlt, secondaires: opt.secondaires, amateurs: opt.amateurs, byDept: opt.byDept, region, dept, byRegion: opt.byRegion, evo: opt.evo }, records) : [];
+  const rows = now ? buildRanking(r, snap.stations, snap.obs, now, { maxAlt, secondaires: opt.secondaires, amateurs: opt.amateurs, byDept: opt.byDept, region, dept, byRegion: opt.byRegion, evo: opt.evo }, records, { six: getSix(), rafH: snap.rafH }) : [];
   // Tri choisi par le visiteur (clic sur l'en-tête) ; par défaut, l'ordre du classement.
   const triRaw = one(sp.tri);
   const sort: Sort | undefined = (['station', 'dept', 'val', 'wc', 'hx'] as const).includes(triRaw as never)
@@ -160,7 +160,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
       <h2 className={`${showMenu || showForm ? 'mt-8' : ''} text-xl font-bold`}>{r.label}</h2>
       {now > 0 && (
         <p className="mt-1 text-sm text-muted">
-          {r.synop ? <>{synopEnd(snap.obs) ? <>Dernier message SYNOP : {fmtTime(synopEnd(snap.obs))} (publié par Météo-France avec environ un jour de décalage).</> : <>Rafales SYNOP pas encore chargées (fichier téléchargé toutes les 3 heures).</>}</> : <>Dernière observation : {fmtTime(now)}.</>}{w && <> Période : {w.label}{w.final ? '' : ' (en cours)'}.</>} {rows.length} stations classées{dept ? ` dans le département ${dept}` : region ? ` en ${REGIONS.find((x) => x.code === region)!.name}` : ''}.
+          {r.synop && !Object.keys(snap.rafH ?? {}).length ? <>{synopEnd(snap.obs) ? <>Dernier message SYNOP : {fmtTime(synopEnd(snap.obs))} (publié par Météo-France avec environ un jour de décalage).</> : <>Rafales SYNOP pas encore chargées (fichier téléchargé toutes les 3 heures).</>}</> : <>Dernière observation : {fmtTime(now)}.</>}{w && <> Période : {w.label}{w.final ? '' : ' (en cours)'}.</>} {rows.length} stations classées{dept ? ` dans le département ${dept}` : region ? ` en ${REGIONS.find((x) => x.code === region)!.name}` : ''}.
         </p>
       )}
 
@@ -199,7 +199,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
         <p>TX provisoire : maximum des températures horaires de 8 h à 8 h locales (journée en cours). TX finale : même période, la veille, close. TN provisoire : minimum de 20 h à 8 h locales. Les fenêtres 06-18 UTC et 18-06 UTC sont les dernières commencées.</p>
         <p>Pluie : cumul des précipitations horaires sur 1 h, depuis 6 h UTC, ou sur 24, 48 et 72 heures glissantes. Tant que l’historique collecté ne couvre pas toute la période (48 h ou 72 h au démarrage), le cumul est un minimum.</p>
         <p>Windchill - Ressenti : formule d’Environnement Canada, calculée dès que le vent dépasse 4,8 km/h et plafonnée à la température de l’air (vent faible : ressenti = température). Humidex : Environnement Canada, à partir de la température et du point de rosée. Pression ramenée au niveau de la mer.</p>
-        <p>Vent : vent moyen de la dernière observation ; vent maximal = vent moyen sur 10 minutes le plus fort de l’heure (le paquet horaire de Météo-France ne fournit pas les rafales instantanées), puis son maximum sur 24, 48 et 72 heures. Rafales : rafale maximale des messages SYNOP des stations principales (archive OMM de Météo-France), comptée sur 24, 48 ou 72 heures jusqu’au dernier message publié. Variations de pression : différence entre la dernière pression et celle observée 3, 12 ou 24 heures plus tôt, classées par ampleur (hausse ou baisse). Évolution de la température : écart avec la température relevée 1 heure et 24 heures plus tôt.</p>
+        <p>Vent : vent moyen de la dernière observation ; vent maximal = vent moyen sur 10 minutes le plus fort de l’heure (le paquet horaire de Météo-France ne fournit pas les rafales instantanées), puis son maximum sur 24, 48 et 72 heures. Rafales : rafale maximale sur 10 minutes (raf10) des relevés au pas de 6 minutes de Météo-France (paquet v2, quasi-temps réel), sur le dernier relevé, la dernière heure ou 24, 48 et 72 heures ; à défaut (historique en cours de constitution), rafales des messages SYNOP, publiées avec environ un jour de décalage. Températures du moment : dernier relevé au pas de 6 minutes quand il existe. Variations de pression : différence entre la dernière pression et celle observée 3, 12 ou 24 heures plus tôt, classées par ampleur (hausse ou baisse). Évolution de la température : écart avec la température relevée 1 heure et 24 heures plus tôt.</p>
         <p>Normales : écart de la TX (8 h → 8 h) ou TN (20 h → 8 h) finale, ou des extrêmes des 24 dernières heures, à la moyenne mensuelle des TX ou TN de la station. Écarts aux records : TX ou TN finale moins le record mensuel ou absolu de la station (valeur positive pour la TX ou négative pour la TN = record battu).</p>
         <p>Source : Météo-France, API Observations (licence Etalab 2.0). Records : fichier fourni par l’éditeur du site. Stations amateurs : flux déclaré par l’éditeur, non contrôlé par Météo-France.</p>
       </section>}

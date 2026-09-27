@@ -4,8 +4,8 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { createInterface } from 'node:readline';
 import { createGunzip } from 'node:zlib';
-import { DEPARTEMENTS, fetchDeptHourly, fetchStationList, parsePaquetRow, parseStationsCsv } from './meteofrance';
-import type { HourlyObs, ObsSnapshot, Station, StationRecords } from './types';
+import { fetchSix, parseSixRow, DEPARTEMENTS, fetchDeptHourly, fetchStationList, parsePaquetRow, parseStationsCsv } from './meteofrance';
+import type { HourlyObs, ObsSnapshot, SixObs, Station, StationRecords } from './types';
 import { fromClimato } from './climato';
 import { SYNOP_URL, matchStations, synopLineReader, type SynopGust } from './synop';
 
@@ -54,7 +54,7 @@ function merge(target: Record<string, HourlyObs[]>, id: string, o: HourlyObs) {
   const list = (target[id] ??= []);
   const i = list.findIndex((x) => x.time === o.time);
   // Fusion : les rafales SYNOP et les observations horaires partagent la même heure.
-  if (i >= 0) list[i] = { ...list[i], ...o }; else list.push(o);
+  if (i >= 0) list[i] = { ...list[i], ...o }; else { list.push(o); list.sort((a, b) => a.time.localeCompare(b.time)); }
 }
 
 function prune(obs: Record<string, HourlyObs[]>) {
@@ -172,8 +172,71 @@ async function refresh() {
  * Renvoie le dernier instantané et relance un rafraîchissement en arrière-plan s'il est périmé
  * (jamais bloquant pour le visiteur : un seul rafraîchissement à la fois).
  */
+/**
+ * Paquet 6 minutes v2 (1 requête toutes les 6 min pour toute la France) : températures du moment
+ * et rafales (raf10). Les 2 dernières heures restent en mémoire ; la rafale max. de chaque heure est
+ * reportée dans les observations horaires (champ raf) pour les classements 24/48/72 h.
+ */
+const SIX_ON = process.env.OBS_6MIN !== '0';
+const six: Record<string, SixObs[]> = {};
+let sixLast = 0;
+let sixTimer: ReturnType<typeof setInterval> | null = null;
+let sixRunning = false;
+const STEP = 360_000;
+
+async function refreshSix() {
+  const key = paquetKey();
+  if (!key || sixRunning) return;
+  sixRunning = true;
+  try {
+    const d = await load();
+    // Échéances publiées (≈ 3 à 9 min de délai) : on rattrape au plus les 10 dernières.
+    const newest = Math.floor((Date.now() - 9 * 60_000) / STEP) * STEP;
+    let t = Math.max(sixLast + STEP, newest - 9 * STEP);
+    let n = 0;
+    for (; t <= newest; t += STEP) {
+      try {
+        for (const row of await fetchSix(key, t)) {
+          const p = parseSixRow(row);
+          if (!p) continue;
+          const list = (six[p.id] ??= []);
+          if (!list.some((x) => x.time === p.obs.time)) list.push(p.obs);
+          if (p.obs.raf != null) {
+            // Rafale max. de l'heure : l'échéance 20:18 appartient à l'heure qui se termine à 21:00.
+            const hourEnd = new Date(Math.ceil(Date.parse(p.obs.time) / 3600_000) * 3600_000).toISOString();
+            const h = ((d.rafH ??= {})[p.id] ??= {});
+            if (h[hourEnd] == null || p.obs.raf > h[hourEnd]) h[hourEnd] = p.obs.raf;
+          }
+        }
+        sixLast = t;
+        n++;
+      } catch (e) {
+        console.error('[obs] 6 min :', (e as Error).message);
+        break;
+      }
+    }
+    const keepRaf = new Date(Date.now() - KEEP_H * 3600_000).toISOString();
+    for (const h of Object.values(d.rafH ?? {})) for (const k of Object.keys(h)) if (k < keepRaf) delete h[k];
+    const limit = Date.now() - 2 * 3600_000;
+    for (const id of Object.keys(six)) {
+      six[id] = six[id].filter((x) => Date.parse(x.time) >= limit).sort((a, b) => a.time.localeCompare(b.time));
+      if (!six[id].length) delete six[id];
+    }
+    if (n) console.log(`[obs] 6 min : ${n} échéance(s), dernière ${new Date(sixLast).toISOString()}, ${Object.keys(six).length} stations`);
+  } finally {
+    sixRunning = false;
+  }
+}
+
+/** Observations au pas de 6 minutes (2 dernières heures). */
+export const getSix = () => six;
+
 export async function getSnapshot(): Promise<ObsSnapshot> {
   const d = await load();
+  if (SIX_ON && !sixTimer && paquetKey()) {
+    sixTimer = setInterval(() => { refreshSix().catch(() => {}); }, STEP);
+    refreshSix().catch(() => {});
+  }
   const stale = !d.updatedAt || Date.now() - Date.parse(d.updatedAt) > REFRESH_MIN * 60_000;
   if (stale && obsConfigured() && !running) {
     running = refresh().catch((e) => console.error('[obs] rafraîchissement', e)).finally(() => { running = null; });

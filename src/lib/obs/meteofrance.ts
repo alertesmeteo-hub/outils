@@ -6,7 +6,7 @@
  * Unités de l'API : températures en kelvins, pression en pascals, vent en m/s, ensoleillement en minutes,
  * visibilité en mètres, hauteur de neige (sss) en mètres.
  */
-import type { HourlyObs, Station } from './types';
+import type { HourlyObs, SixObs, Station } from './types';
 
 export const OBS_API_BASE = process.env.METEOFRANCE_OBS_BASE || 'https://public-api.meteofrance.fr/public/DPObs/v1';
 export const PAQUET_API_BASE = process.env.METEOFRANCE_PAQUET_BASE || 'https://public-api.meteofrance.fr/public/DPPaquetObs/v1';
@@ -91,6 +91,32 @@ export async function fetchStationList(key: string): Promise<string> {
 
 export async function fetchDeptHourly(key: string, dept: string): Promise<Record<string, unknown>[]> {
   const res = await get(`${PAQUET_API_BASE}/paquet/horaire?id-departement=${deptParam(dept)}&format=json`, key, 'application/json');
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+/** Paquet 6 minutes v2 : toutes les stations en une requête, avec la rafale sur 10 min (raf10). */
+export const PAQUET6_BASE = process.env.METEOFRANCE_PAQUET6_BASE || 'https://public-api.meteofrance.fr/public/DPPaquetObs/v2';
+
+export function parseSixRow(x: Record<string, unknown>): { id: string; obs: SixObs } | null {
+  const id = String(x.geo_id_insee ?? '').trim();
+  const time = String(x.validity_time ?? '');
+  if (!id || Number.isNaN(Date.parse(time))) return null;
+  return {
+    id,
+    obs: {
+      time: new Date(Date.parse(time)).toISOString(),
+      t: k2c(x.t), td: k2c(x.td), u: num(x.u), ff: ms2kmh(x.ff),
+      raf: ms2kmh(x.raf10 ?? x.fxi10), pmer: pa2hpa(x.pmer),
+    },
+  };
+}
+
+/** Échéance 6 min (UTC) au format attendu par l'API. */
+export const sixDate = (ms: number) => new Date(Math.floor(ms / 360_000) * 360_000).toISOString().replace('.000Z', 'Z');
+
+export async function fetchSix(key: string, ms: number): Promise<Record<string, unknown>[]> {
+  const res = await get(`${PAQUET6_BASE}/paquet/stations/infrahoraire-6m?date=${sixDate(ms)}&format=json`, key, 'application/json');
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }

@@ -42,6 +42,8 @@ export type ObsSnapshot = {
   stations: Station[];
   /** Observations horaires par station, triées par heure croissante. */
   obs: Record<string, HourlyObs[]>;
+  /** Rafale max. par heure (km/h), issue du paquet 6 min v2 : { [station]: { [finDHeureISO]: km/h } }. */
+  rafH?: Record<string, Record<string, number>>;
   errors: string[];
 };
 
@@ -52,3 +54,6 @@ export type RecordSet = { tx?: RecordValue; tn?: RecordValue; rr24?: RecordValue
 /** Normales mensuelles (moyennes climatologiques des TX et TN, °C). */
 export type Normals = { tx?: number; tn?: number };
 export type StationRecords = { monthly?: Record<string, RecordSet>; absolute?: RecordSet; normals?: Record<string, Normals> };
+
+/** Observation au pas de 6 minutes (paquet v2). */
+export type SixObs = { time: string; t?: number; td?: number; u?: number; ff?: number; raf?: number; pmer?: number };
