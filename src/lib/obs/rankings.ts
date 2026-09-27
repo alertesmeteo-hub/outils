@@ -200,7 +200,7 @@ export type Ranking = {
   value: (obs: HourlyObs[], w: ReturnType<typeof windows>, now: number, ctx: Ctx) => Agg | null;
 };
 
-type Key = 'pmer' | 'td' | 'ff' | 'fxi' | 'u' | 'vv' | 'snow' | 't';
+type Key = 'pmer' | 'td' | 'ff' | 'fxi' | 'fxy' | 'u' | 'vv' | 'snow' | 't';
 const at = (obs: HourlyObs[], ms: number) => obs.find((o) => Date.parse(o.time) === ms);
 const cur = (key: Key) => (obs: HourlyObs[], _w: unknown, now: number): Agg | null => {
   const o = latest(obs, now);
@@ -218,11 +218,18 @@ const variation = (key: Key, h: number) => (obs: HourlyObs[], _w: unknown, now: 
   return v == null ? null : { value: v, n: 1, expected: 1, at: latest(obs, now)!.time };
 };
 const slide = (h: number) => (obs: HourlyObs[], _w: unknown, now: number) => aggSum(obs, { start: now - h * H, end: now }, 'rr1', now);
+/** Vent maximal de l'heure : rafale (fxi) si l'API la fournit, sinon vent moyen 10 min maximal (fxy). */
+const windMax = (o: HourlyObs) => o.fxi ?? o.fxy;
 const gustMax = (h: number) => (obs: HourlyObs[], _w: unknown, now: number): Agg | null => {
   const hours = inWindow(obs, { start: now - h * H, end: now });
   let best: HourlyObs | undefined;
-  for (const o of hours) if (o.fxi != null && (!best || o.fxi > best.fxi!)) best = o;
-  return best ? { value: best.fxi!, n: hours.length, expected: h, at: best.time } : null;
+  for (const o of hours) { const v = windMax(o); if (v != null && (!best || v > windMax(best)!)) best = o; }
+  return best ? { value: windMax(best)!, n: hours.length, expected: h, at: best.time } : null;
+};
+const windNow = (obs: HourlyObs[], _w: unknown, now: number): Agg | null => {
+  const o = latest(obs, now);
+  const v = o && windMax(o);
+  return v == null ? null : { value: v, n: 1, expected: 1, at: o!.time };
 };
 const gap = (a: Agg | null, ref?: number): Agg | null => (a && ref != null ? { ...a, value: Math.round((a.value - ref) * 10) / 10 } : null);
 const txFin = (o: HourlyObs[], w: ReturnType<typeof windows>, n: number) => aggMax(o, w.txFin, n);
@@ -254,10 +261,10 @@ export const RANKINGS: Ranking[] = [
   { id: 'rr72', short: 'Pluie 72 h', label: 'Classement de la pluie sur 72 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(72) },
 
   { id: 'ff', short: 'Vent moyen', label: 'Classement du vent moyen (dernière observation)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: cur('ff') },
-  { id: 'fxi', short: 'Rafales', label: 'Classement des rafales (maximum de la dernière heure)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: cur('fxi') },
-  { id: 'fxi24', short: 'Rafale max. 24 h', label: 'Classement des rafales maximales sur 24 heures glissantes', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(24) },
-  { id: 'fxi48', short: 'Rafale max. 48 h', label: 'Classement des rafales maximales sur 48 heures glissantes', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(48) },
-  { id: 'fxi72', short: 'Rafale max. 72 h', label: 'Classement des rafales maximales sur 72 heures glissantes', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(72) },
+  { id: 'fxi', short: 'Vent max. 1 h', label: 'Classement du vent maximal de la dernière heure (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: windNow },
+  { id: 'fxi24', short: 'Vent max. 24 h', label: 'Classement du vent maximal sur 24 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(24) },
+  { id: 'fxi48', short: 'Vent max. 48 h', label: 'Classement du vent maximal sur 48 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(48) },
+  { id: 'fxi72', short: 'Vent max. 72 h', label: 'Classement du vent maximal sur 72 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(72) },
 
   { id: 'pmer', short: 'Pression mer', label: 'Classement de la pression au niveau de la mer', group: C, unit: 'hPa', digits: 1, order: 'desc', instant: true, value: cur('pmer') },
   { id: 'dp3', short: 'Variation 3 h', label: 'Classement de la variation de pression sur 3 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, value: variation('pmer', 3) },
