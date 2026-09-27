@@ -40,7 +40,7 @@ export function parsePaquetRow(x: Record<string, unknown>): { id: string; obs: H
     obs: {
       time: new Date(Date.parse(time)).toISOString(),
       t: k2c(x.t), td: k2c(x.td), tx: k2c(x.tx), tn: k2c(x.tn),
-      u: num(x.u), ff: ms2kmh(x.ff), fxi: ms2kmh(x.fxi),
+      u: num(x.u), ff: ms2kmh(x.ff), fxi: ms2kmh(x.fxi ?? x.fxi10 ?? x.fxi3s),
       rr1: num(x.rr1), insol: num(x.insolh), pmer: pa2hpa(x.pmer),
       vv: num(x.vv), snow: (() => { const n = num(x.sss); return n == null ? undefined : Math.round(n * 100); })(),
     },

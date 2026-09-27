@@ -84,12 +84,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   return (
     <>
       {!embed && <>
-        <nav aria-label="Fil d’Ariane" className="text-sm text-muted"><Link href="/" className="hover:underline">Accueil</Link> › Classements</nav>
-        <h1 className="mt-2 text-3xl font-extrabold">Classements des stations météo</h1>
-        <p className="mt-2 max-w-3xl text-muted">
-          Classements calculés à partir des observations horaires des stations Météo-France (France métropolitaine et Corse). Les valeurs du jour
-          sont <strong>provisoires</strong> : elles ne sont ni validées ni corrigées par Météo-France.
-        </p>
+        <h1 className="text-3xl font-extrabold">Classements des stations météo</h1>
       </>}
 
       {showMenu && <div className={`${embed ? '' : 'mt-6 '}space-y-3`}>
