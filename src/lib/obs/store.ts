@@ -23,7 +23,10 @@ type Disk = ObsSnapshot & { stationsAt?: string };
 let mem: Disk | null = null;
 let running: Promise<void> | null = null;
 
-export const obsConfigured = () => !!process.env.METEOFRANCE_API_KEY || !!process.env.AMATEUR_OBS_URL;
+/** Une seule clé suffit si les deux API sont souscrites dans la même application du portail ; sinon, une clé par API. */
+const paquetKey = () => process.env.METEOFRANCE_PAQUET_API_KEY || process.env.METEOFRANCE_API_KEY;
+const stationsKey = () => process.env.METEOFRANCE_OBS_API_KEY || process.env.METEOFRANCE_API_KEY;
+export const obsConfigured = () => !!paquetKey() || !!process.env.AMATEUR_OBS_URL;
 
 async function load(): Promise<Disk> {
   if (mem) return mem;
@@ -76,7 +79,7 @@ async function fetchAmateur(): Promise<{ stations: Station[]; obs: Record<string
 
 async function refresh() {
   const d = await load();
-  const key = process.env.METEOFRANCE_API_KEY;
+  const key = paquetKey();
   const errors: string[] = [];
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -101,7 +104,7 @@ async function refresh() {
     const stale = !d.stationsAt || Date.now() - Date.parse(d.stationsAt) > STATIONS_REFRESH_H * 3600_000;
     if (stale || seen.size > official.length) {
       try {
-        const list = parseStationsCsv(await fetchStationList(key), (id) => seen.get(id) ?? deptOf.get(id));
+        const list = parseStationsCsv(await fetchStationList(stationsKey() || key), (id) => seen.get(id) ?? deptOf.get(id));
         if (list.length) {
           d.stations = [...list, ...d.stations.filter((s) => s.kind === 'amateur')];
           d.stationsAt = new Date().toISOString();
