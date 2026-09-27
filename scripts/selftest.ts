@@ -2,6 +2,8 @@ import { toolRegistry } from '../src/lib/tools/registry';
 import { defaultValues, run } from '../src/lib/tools/engine';
 import * as R from '../src/lib/obs/rankings';
 import * as MF from '../src/lib/obs/meteofrance';
+import { fromClimato } from '../src/lib/obs/climato';
+import marignane from './fixtures/normales-13054001.json';
 
 let fail = 0;
 const eq = (name: string, cond: boolean, info = '') => { if (!cond) { fail++; console.error('✗', name, info); } else console.log('✓', name); };
@@ -141,6 +143,12 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   eq('région PACA pour les Bouches-du-Rhône', one('ff')?.region === 'Provence-Alpes-Côte d’Azur' && one('ff', { region: 'bre' }) === undefined);
   eq('écart à la normale TX 24 h glissantes = 34 − 30', one('n-tx24')?.value === 4);
   eq('écart au record mensuel TX (TX finale 27 − 40)', one('e-recm-tx')?.value === -13, String(one('e-recm-tx')?.value));
+
+  // Normales et records du dépôt climato (fiche Météo-France de Marignane)
+  const cl = fromClimato(marignane as never)!;
+  eq('climato : normale TX janvier Marignane = 11,8 °C', cl.normals?.['1']?.tx === 11.8);
+  eq('climato : record TX janvier 19,9 °C le 2024-01-24', cl.monthly?.['1']?.tx?.v === 19.9 && cl.monthly?.['1']?.tx?.d === '2024-01-24');
+  eq('climato : record absolu TX = 40,5 °C, TN = −16,8 °C (1956)', cl.absolute?.tx?.v === 40.5 && cl.absolute?.tn?.v === -16.8 && cl.absolute?.tn?.d.startsWith('1956'), JSON.stringify(cl.absolute));
 
   const p = MF.parsePaquetRow({ geo_id_insee: '13054001', validity_time: '2026-07-15T13:00:00Z', t: 308.15, td: 290.15, tx: 309.05, tn: 307.15, ff: 5, pmer: 101520, rr1: 0.4, insolh: 60 })!;
   eq('paquet MF : K → °C, m/s → km/h, Pa → hPa', p.obs.t === 35 && p.obs.tx === 35.9 && p.obs.ff === 18 && p.obs.pmer === 1015.2 && p.obs.insol === 60, JSON.stringify(p));

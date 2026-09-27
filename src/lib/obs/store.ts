@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { DEPARTEMENTS, fetchDeptHourly, fetchStationList, parsePaquetRow, parseStationsCsv } from './meteofrance';
 import type { HourlyObs, ObsSnapshot, Station, StationRecords } from './types';
+import { fromClimato } from './climato';
 
 /**
  * Cache des observations : mémoire + disque (OBS_CACHE_DIR, défaut .cache/obs).
@@ -150,13 +151,66 @@ export async function getSnapshot(): Promise<ObsSnapshot> {
   return d;
 }
 
-/** Records facultatifs (RECORDS_FILE, défaut data/records.json) : { [idStation]: StationRecords }. */
-let recCache: { at: number; data: Record<string, StationRecords> } | null = null;
+/**
+ * Records et normales : 1) dépôt climato (CLIMATO_DATA_URL, défaut GitHub « data » ; vide = désactivé),
+ * téléchargés en arrière-plan pour les stations classées et mis en cache 7 jours ;
+ * 2) fichier manuel (RECORDS_FILE, défaut data/records.json), prioritaire station par station.
+ */
+const CLIMATO_URL = (process.env.CLIMATO_DATA_URL ?? 'https://raw.githubusercontent.com/alertesmeteo-hub/climato/data').replace(/\/$/, '');
+const CLIMATO_FILE = path.join(DIR, 'climato-records.json');
+const CLIMATO_TTL = 7 * 24 * 3600_000;
+let climato: { at: string; data: Record<string, StationRecords> } | null = null;
+let climatoRunning: Promise<void> | null = null;
+
+async function refreshClimato() {
+  console.log('[obs] normales et records (climato) : début');
+  const res = await fetch(`${CLIMATO_URL}/stations.json.gz`, { cache: 'no-store', signal: AbortSignal.timeout(60_000) });
+  if (!res.ok) throw new Error(`catalogue climato : ${res.status}`);
+  const { gunzipSync } = await import('node:zlib');
+  const cat = JSON.parse(gunzipSync(Buffer.from(await res.arrayBuffer())).toString('utf8')) as { stations: { num_poste: string; has_normales?: boolean }[] };
+  const snap = await load();
+  const wanted = new Set(snap.stations.map((s) => s.id));
+  const ids = cat.stations.filter((s) => s.has_normales && wanted.has(s.num_poste)).map((s) => s.num_poste);
+  const data: Record<string, StationRecords> = {};
+  let i = 0;
+  const worker = async () => {
+    while (i < ids.length) {
+      const id = ids[i++];
+      try {
+        const r = await fetch(`${CLIMATO_URL}/stations/${id}/normales.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) });
+        if (!r.ok) continue;
+        const rec = fromClimato(await r.json());
+        if (rec) data[id] = rec;
+      } catch { /* station ignorée, reprise au prochain cycle */ }
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
+  climato = { at: new Date().toISOString(), data };
+  await mkdir(DIR, { recursive: true });
+  await writeFile(CLIMATO_FILE, JSON.stringify(climato));
+  console.log(`[obs] normales et records (climato) : ${Object.keys(data).length} stations`);
+}
+
+async function getClimato(): Promise<Record<string, StationRecords>> {
+  if (!CLIMATO_URL) return {};
+  if (!climato) {
+    try { climato = JSON.parse(await readFile(CLIMATO_FILE, 'utf8')); } catch { /* premier lancement */ }
+  }
+  const stale = !climato || Date.now() - Date.parse(climato.at) > CLIMATO_TTL;
+  // Attendre que la liste des stations soit connue pour ne télécharger que les stations utiles.
+  if (stale && !climatoRunning && (await load()).stations.length) {
+    climatoRunning = refreshClimato().catch((e) => console.error('[obs] climato :', (e as Error).message)).finally(() => { climatoRunning = null; });
+  }
+  return climato?.data ?? {};
+}
+
+let manual: { at: number; data: Record<string, StationRecords> } | null = null;
 export async function getRecords(): Promise<Record<string, StationRecords>> {
-  if (recCache && Date.now() - recCache.at < 3600_000) return recCache.data;
-  const file = process.env.RECORDS_FILE || path.join(process.cwd(), 'data', 'records.json');
-  let data: Record<string, StationRecords> = {};
-  try { data = JSON.parse(await readFile(file, 'utf8')); } catch { /* aucun fichier : colonnes vides */ }
-  recCache = { at: Date.now(), data };
-  return data;
+  if (!manual || Date.now() - manual.at > 3600_000) {
+    const file = process.env.RECORDS_FILE || path.join(process.cwd(), 'data', 'records.json');
+    let data: Record<string, StationRecords> = {};
+    try { data = JSON.parse(await readFile(file, 'utf8')); } catch { /* pas de fichier manuel */ }
+    manual = { at: Date.now(), data };
+  }
+  return { ...(await getClimato()), ...manual.data };
 }
