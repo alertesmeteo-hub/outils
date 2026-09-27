@@ -10,11 +10,14 @@ import type { HourlyObs, Station } from './types';
 export const OBS_API_BASE = process.env.METEOFRANCE_OBS_BASE || 'https://public-api.meteofrance.fr/public/DPObs/v1';
 export const PAQUET_API_BASE = process.env.METEOFRANCE_PAQUET_BASE || 'https://public-api.meteofrance.fr/public/DPPaquetObs/v1';
 
-/** Départements de France métropolitaine (l'heure locale des classements est celle de Paris). */
-export const DEPARTEMENTS = [
-  ...Array.from({ length: 95 }, (_, i) => String(i + 1).padStart(2, '0')).filter((d) => d !== '20'),
-  '2A', '2B',
-];
+/**
+ * Départements de France métropolitaine (l'heure locale des classements est celle de Paris).
+ * La Corse est interrogée d'un bloc (« 20 ») : l'API refuse 2A et 2B.
+ */
+export const DEPARTEMENTS = Array.from({ length: 95 }, (_, i) => String(i + 1).padStart(2, '0'));
+
+/** Paramètre id-departement attendu par l'API : entier sans zéro initial (1, 2… 95 ; Corse = 20). */
+export const deptParam = (dept: string) => String(Number(dept));
 
 const num = (v: unknown): number | undefined => {
   if (v == null || v === '') return undefined;
@@ -84,7 +87,7 @@ export async function fetchStationList(key: string): Promise<string> {
 }
 
 export async function fetchDeptHourly(key: string, dept: string): Promise<Record<string, unknown>[]> {
-  const res = await get(`${PAQUET_API_BASE}/paquet/horaire?id-departement=${encodeURIComponent(dept)}&format=json`, key, 'application/json');
+  const res = await get(`${PAQUET_API_BASE}/paquet/horaire?id-departement=${deptParam(dept)}&format=json`, key, 'application/json');
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }

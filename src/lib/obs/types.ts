@@ -5,7 +5,7 @@ export type StationKind = 'principale' | 'secondaire' | 'amateur';
 export type Station = {
   id: string;
   name: string;
-  /** Département (01…95, 2A, 2B). */
+  /** Département (01…95 ; 20 = Corse). */
   dept: string;
   lat?: number;
   lon?: number;

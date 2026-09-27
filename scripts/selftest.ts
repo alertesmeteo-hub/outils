@@ -130,6 +130,7 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
 
   const p = MF.parsePaquetRow({ geo_id_insee: '13054001', validity_time: '2026-07-15T13:00:00Z', t: 308.15, td: 290.15, tx: 309.05, tn: 307.15, ff: 5, pmer: 101520, rr1: 0.4, insolh: 60 })!;
   eq('paquet MF : K → °C, m/s → km/h, Pa → hPa', p.obs.t === 35 && p.obs.tx === 35.9 && p.obs.ff === 18 && p.obs.pmer === 1015.2 && p.obs.insol === 60, JSON.stringify(p));
+  eq('id-departement sans zéro initial, Corse = 20', MF.deptParam('01') === '1' && MF.deptParam('20') === '20' && MF.DEPARTEMENTS.length === 95 && MF.DEPARTEMENTS.includes('20'));
   const csv = 'Id_station;Id_omm;Nom_usuel;Latitude;Longitude;Altitude;Date_ouverture;Pack\n13054001;07650;MARIGNANE;43.44;5.22;9;1920-01-01;RADOME\n13001009;;AIX;43.5;5.4;173;1990-05-01;ETENDU\n99999999;;HORS;0;0;0;;RADOME';
   const sl = MF.parseStationsCsv(csv, (id) => (id.startsWith('13') ? '13' : undefined));
   eq('liste stations : Pack ETENDU = secondaire, date d’ouverture', sl.length === 2 && sl[1].kind === 'secondaire' && sl[0].opened === '1920-01-01' && sl[0].alt === 9);
