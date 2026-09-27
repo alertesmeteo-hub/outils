@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
-  HUMIDEX_SCALE, RANKINGS, WINDCHILL_SCALE, buildRanking, getRanking, isRecordRanking, humidexBand, windchillBand, windows,
+  HUMIDEX_SCALE, RANKINGS, WINDCHILL_SCALE, buildRanking, getRanking, isRecordRanking, synopEnd, humidexBand, windchillBand, windows,
   type Band, type RankRow, type Ranking,
 } from '@/lib/obs/rankings';
 import { SITE_NAME, SITE_URL } from '@/lib/config';
@@ -139,7 +139,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
       <h2 className={`${showMenu || showForm ? 'mt-8' : ''} text-xl font-bold`}>{r.label}</h2>
       {now > 0 && (
         <p className="mt-1 text-sm text-muted">
-          Dernière observation : {fmtTime(now)}.{w && <> Période : {w.label}{w.final ? '' : ' (en cours)'}.</>} {rows.length} stations classées{region ? ` en ${REGIONS.find((x) => x.code === region)!.name}` : ''}.
+          {r.synop ? <>{synopEnd(snap.obs) ? <>Dernier message SYNOP : {fmtTime(synopEnd(snap.obs))} (publié par Météo-France avec environ un jour de décalage).</> : <>Rafales SYNOP pas encore chargées (fichier téléchargé toutes les 3 heures).</>}</> : <>Dernière observation : {fmtTime(now)}.</>}{w && <> Période : {w.label}{w.final ? '' : ' (en cours)'}.</>} {rows.length} stations classées{region ? ` en ${REGIONS.find((x) => x.code === region)!.name}` : ''}.
         </p>
       )}
 
@@ -178,7 +178,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
         <p>TX provisoire : maximum des températures horaires de 8 h à 8 h locales (journée en cours). TX finale : même période, la veille, close. TN provisoire : minimum de 20 h à 8 h locales. Les fenêtres 06-18 UTC et 18-06 UTC sont les dernières commencées.</p>
         <p>Pluie : cumul des précipitations horaires sur 1 h, depuis 6 h UTC, ou sur 24, 48 et 72 heures glissantes. La colonne « heures » indique le nombre d’heures reçues sur le nombre attendu : un cumul incomplet est un minimum.</p>
         <p>Windchill : formule d’Environnement Canada (T ≤ 10 °C et vent &gt; 4,8 km/h). Humidex : Environnement Canada, à partir de 20 °C. Pression ramenée au niveau de la mer.</p>
-        <p>Vent : vent moyen de la dernière observation ; vent maximal = vent moyen sur 10 minutes le plus fort de l’heure (le paquet horaire de Météo-France ne fournit pas les rafales instantanées), puis son maximum sur 24, 48 et 72 heures. Variations de pression : différence entre la dernière pression et celle observée 3, 12 ou 24 heures plus tôt, classées par ampleur (hausse ou baisse). Évolution de la température : écart avec la température relevée 1 heure et 24 heures plus tôt.</p>
+        <p>Vent : vent moyen de la dernière observation ; vent maximal = vent moyen sur 10 minutes le plus fort de l’heure (le paquet horaire de Météo-France ne fournit pas les rafales instantanées), puis son maximum sur 24, 48 et 72 heures. Rafales : rafale maximale des messages SYNOP des stations principales (archive OMM de Météo-France), comptée sur 24, 48 ou 72 heures jusqu’au dernier message publié. Variations de pression : différence entre la dernière pression et celle observée 3, 12 ou 24 heures plus tôt, classées par ampleur (hausse ou baisse). Évolution de la température : écart avec la température relevée 1 heure et 24 heures plus tôt.</p>
         <p>Normales : écart de la TX (8 h → 8 h) ou TN (20 h → 8 h) finale, ou des extrêmes des 24 dernières heures, à la moyenne mensuelle des TX ou TN de la station. Écarts aux records : TX ou TN finale moins le record mensuel ou absolu de la station (valeur positive pour la TX ou négative pour la TN = record battu).</p>
         <p>Source : Météo-France, API Observations (licence Etalab 2.0). Records : fichier fourni par l’éditeur du site. Stations amateurs : flux déclaré par l’éditeur, non contrôlé par Météo-France.</p>
       </section>}

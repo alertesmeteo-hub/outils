@@ -3,6 +3,7 @@ import { defaultValues, run } from '../src/lib/tools/engine';
 import * as R from '../src/lib/obs/rankings';
 import * as MF from '../src/lib/obs/meteofrance';
 import { fromClimato } from '../src/lib/obs/climato';
+import { matchStations, parseSynop } from '../src/lib/obs/synop';
 import marignane from './fixtures/normales-13054001.json';
 
 let fail = 0;
@@ -150,6 +151,16 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   eq('climato : normale TX janvier Marignane = 11,8 °C', cl.normals?.['1']?.tx === 11.8);
   eq('climato : record TX janvier 19,9 °C le 2024-01-24', cl.monthly?.['1']?.tx?.v === 19.9 && cl.monthly?.['1']?.tx?.d === '2024-01-24');
   eq('climato : record absolu TX = 40,5 °C, TN = −16,8 °C (1956)', cl.absolute?.tx?.v === 40.5 && cl.absolute?.tn?.v === -16.8 && cl.absolute?.tn?.d.startsWith('1956'), JSON.stringify(cl.absolute));
+
+  // Rafales SYNOP (extrait réel des colonnes de l'archive OMM)
+  const csvS = 'lat;lon;geo_id_wmo;validity_time;ff;raf10;rafper;per\n48.444;-4.412;7110;2026-09-26T18:00:00Z;8;15.2;21.0;-360\n48.444;-4.412;7110;2026-09-26T21:00:00Z;6;9.0;;-10\n48.444;-4.412;7110;2026-09-20T21:00:00Z;6;30;30;-10';
+  const gs = parseSynop(csvS, Date.parse('2026-09-24T00:00:00Z'));
+  eq('SYNOP : rafper 21 m/s = 76 km/h, raf10 seul pris en compte, vieux message ignoré', gs.length === 2 && gs[0].gust === 76 && gs[1].gust === 32 && gs[0].wmo === '07110', JSON.stringify(gs));
+  const mt = matchStations(gs, [{ id: '29075001', name: 'BREST-GUIPAVAS', dept: '29', lat: 48.4445, lon: -4.4118, kind: 'principale' }, { id: '29000000', name: 'LOIN', dept: '29', lat: 48.6, lon: -4.4, kind: 'principale' }]);
+  eq('SYNOP : rattachement à la station Météo-France la plus proche (≤ 3 km)', mt.get('07110') === '29075001' && mt.size === 1);
+  const sEndT = Date.parse('2026-09-26T21:00:00Z');
+  const rafRow = R.buildRanking(R.getRanking('raf24'), [st('B', '29', 94)], { B: [{ time: '2026-09-26T18:00:00.000Z', gust: 76 }, { time: '2026-09-26T21:00:00.000Z', gust: 32 }] }, sEndT + 86400_000, { secondaires: false, amateurs: false, byDept: false })[0];
+  eq('rafales 24 h comptées depuis le dernier message SYNOP', rafRow?.value === 76);
 
   const p = MF.parsePaquetRow({ geo_id_insee: '13054001', validity_time: '2026-07-15T13:00:00Z', t: 308.15, td: 290.15, tx: 309.05, tn: 307.15, ff: 5, pmer: 101520, rr1: 0.4, insolh: 60 })!;
   eq('paquet MF : K → °C, m/s → km/h, Pa → hPa', p.obs.t === 35 && p.obs.tx === 35.9 && p.obs.ff === 18 && p.obs.pmer === 1015.2 && p.obs.insol === 60, JSON.stringify(p));

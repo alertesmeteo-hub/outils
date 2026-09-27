@@ -167,7 +167,7 @@ export type RankingId =
   | 't' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records'
   | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin'
   | 'rr1' | 'rr24' | 'rr6' | 'rr48' | 'rr72'
-  | 'ff' | 'fxi' | 'fxi24' | 'fxi48' | 'fxi72'
+  | 'ff' | 'fxi' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf24' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
   | 'td' | 'windchill' | 'humidex'
   | 'n-tx' | 'n-tn' | 'n-tx24' | 'n-tn24' | 'e-recm-tx' | 'e-recm-tn' | 'e-reca-tx' | 'e-reca-tn';
@@ -175,7 +175,7 @@ export type RankingId =
 export type Group = 'Températures du moment' | 'Températures maximales' | 'Températures minimales' | 'Précipitations' | 'Vent' | 'Conditions atmosphériques' | 'Humidité et ressenti' | 'Normales et records';
 
 /** Contexte propre à une station : records / normales et mois de référence. */
-export type Ctx = { rec?: StationRecords; month: string };
+export type Ctx = { rec?: StationRecords; month: string; synopEnd?: number };
 
 export type Ranking = {
   id: RankingId;
@@ -194,6 +194,8 @@ export type Ranking = {
   feels?: boolean;
   /** Classement de températures : l'option « évolution 1 h / 24 h » s'applique. */
   temp?: boolean;
+  /** Rafales SYNOP : période comptée depuis le dernier message SYNOP. */
+  synop?: boolean;
   /** Valeur instantanée : pas de colonne « heures ». */
   instant?: boolean;
   window?: (w: ReturnType<typeof windows>) => Window;
@@ -225,6 +227,18 @@ const gustMax = (h: number) => (obs: HourlyObs[], _w: unknown, now: number): Agg
   let best: HourlyObs | undefined;
   for (const o of hours) { const v = windMax(o); if (v != null && (!best || v > windMax(best)!)) best = o; }
   return best ? { value: windMax(best)!, n: hours.length, expected: h, at: best.time } : null;
+};
+/** Rafale SYNOP max. sur h heures, comptées depuis le dernier message SYNOP (décalé d'environ un jour). */
+export const synopEnd = (obs: Record<string, HourlyObs[]>) => {
+  let t = 0;
+  for (const l of Object.values(obs)) for (let k = l.length - 1; k >= 0; k--) if (l[k].gust != null) { t = Math.max(t, Date.parse(l[k].time)); break; }
+  return t;
+};
+const synopGust = (h: number) => (obs: HourlyObs[], _w: unknown, _now: number, c: Ctx): Agg | null => {
+  if (!c.synopEnd) return null;
+  let best: HourlyObs | undefined;
+  for (const o of inWindow(obs, { start: c.synopEnd - h * H, end: c.synopEnd })) if (o.gust != null && (!best || o.gust > best.gust!)) best = o;
+  return best ? { value: best.gust!, n: 1, expected: 1, at: best.time } : null;
 };
 const windNow = (obs: HourlyObs[], _w: unknown, now: number): Agg | null => {
   const o = latest(obs, now);
@@ -265,6 +279,10 @@ export const RANKINGS: Ranking[] = [
   { id: 'fxi24', short: 'Vent max. 24 h', label: 'Classement du vent maximal sur 24 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(24) },
   { id: 'fxi48', short: 'Vent max. 48 h', label: 'Classement du vent maximal sur 48 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(48) },
   { id: 'fxi72', short: 'Vent max. 72 h', label: 'Classement du vent maximal sur 72 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(72) },
+
+  { id: 'raf24', short: 'Rafales 24 h', label: 'Classement des rafales maximales sur 24 heures (messages SYNOP, stations principales)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(24) },
+  { id: 'raf48', short: 'Rafales 48 h', label: 'Classement des rafales maximales sur 48 heures (messages SYNOP, stations principales)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(48) },
+  { id: 'raf72', short: 'Rafales 72 h', label: 'Classement des rafales maximales sur 72 heures (messages SYNOP, stations principales)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(72) },
 
   { id: 'pmer', short: 'Pression mer', label: 'Classement de la pression au niveau de la mer', group: C, unit: 'hPa', digits: 1, order: 'desc', instant: true, value: cur('pmer') },
   { id: 'dp3', short: 'Variation 3 h', label: 'Classement de la variation de pression sur 3 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, value: variation('pmer', 3) },
@@ -334,6 +352,7 @@ export function buildRanking(
 ): RankRow[] {
   const w = windows(now);
   const month = String(parisDate(r.window ? r.window(w).start + H : now).m);
+  const sEnd = r.synop ? synopEnd(obs) : undefined;
   const rows: RankRow[] = [];
   for (const s of stations) {
     if (s.kind === 'secondaire' && !f.secondaires) continue;
@@ -343,7 +362,7 @@ export function buildRanking(
     if (f.region && reg?.code !== f.region) continue;
     const o = obs[s.id];
     if (!o?.length) continue;
-    const a = r.value(o, w, now, { rec: records[s.id], month });
+    const a = r.value(o, w, now, { rec: records[s.id], month, synopEnd: sEnd });
     if (!a) continue;
     const row: RankRow = { rank: 0, station: s, region: reg?.name, value: a.value, n: a.n, expected: a.expected, at: a.at };
     if (r.feels) {

@@ -27,6 +27,7 @@ export type HourlyObs = {
   ff?: number; // km/h, vent moyen
   fxi?: number; // km/h, rafale max (non fournie par le paquet horaire à ce jour)
   fxy?: number; // km/h, vent moyen sur 10 min maximal dans l'heure
+  gust?: number; // km/h, rafale max. du message SYNOP (stations principales, décalage ~1 jour)
   rr1?: number; // mm
   insol?: number; // minutes d'ensoleillement dans l'heure
   pmer?: number; // hPa

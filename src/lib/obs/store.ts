@@ -1,9 +1,13 @@
 import 'server-only';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { Readable } from 'node:stream';
+import { createInterface } from 'node:readline';
+import { createGunzip } from 'node:zlib';
 import { DEPARTEMENTS, fetchDeptHourly, fetchStationList, parsePaquetRow, parseStationsCsv } from './meteofrance';
 import type { HourlyObs, ObsSnapshot, Station, StationRecords } from './types';
 import { fromClimato } from './climato';
+import { SYNOP_URL, matchStations, synopLineReader, type SynopGust } from './synop';
 
 /**
  * Cache des observations : mémoire + disque (OBS_CACHE_DIR, défaut .cache/obs).
@@ -49,7 +53,8 @@ async function save(d: Disk) {
 function merge(target: Record<string, HourlyObs[]>, id: string, o: HourlyObs) {
   const list = (target[id] ??= []);
   const i = list.findIndex((x) => x.time === o.time);
-  if (i >= 0) list[i] = o; else list.push(o);
+  // Fusion : les rafales SYNOP et les observations horaires partagent la même heure.
+  if (i >= 0) list[i] = { ...list[i], ...o }; else list.push(o);
 }
 
 function prune(obs: Record<string, HourlyObs[]>) {
@@ -76,6 +81,30 @@ async function fetchAmateur(): Promise<{ stations: Station[]; obs: Record<string
     if (Array.isArray(list)) obs[s.id] = list.filter((o: HourlyObs) => o && !Number.isNaN(Date.parse(o.time)));
   }
   return { stations, obs };
+}
+
+/** Rafales SYNOP : fichier annuel (~25 Mo), téléchargé au plus toutes les 3 heures. */
+let synopAt = 0;
+async function addSynop(d: Disk) {
+  if (process.env.SYNOP_DISABLED === '1' || Date.now() - synopAt < 3 * 3600_000 || !d.stations.length) return;
+  synopAt = Date.now();
+  const res = await fetch(SYNOP_URL(new Date().getUTCFullYear()), { cache: 'no-store', signal: AbortSignal.timeout(180_000) });
+  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.body) throw new Error('réponse vide');
+  // Lecture en flux (≈ 100 Mo décompressés) : seules les lignes récentes sont gardées.
+  const read = synopLineReader(Date.now() - KEEP_H * 3600_000);
+  const gusts: SynopGust[] = [];
+  const lines = createInterface({ input: Readable.fromWeb(res.body as never).pipe(createGunzip()), crlfDelay: Infinity });
+  for await (const line of lines) { const g = read(line); if (g) gusts.push(g); }
+  const ids = matchStations(gusts, d.stations);
+  let n = 0;
+  for (const g of gusts) {
+    const id = ids.get(g.wmo);
+    if (!id) continue;
+    merge(d.obs, id, { time: g.time, gust: g.gust });
+    n++;
+  }
+  console.log(`[obs] rafales SYNOP : ${ids.size} stations, ${n} messages`);
 }
 
 async function refresh() {
@@ -130,6 +159,7 @@ async function refresh() {
   } catch (e) {
     errors.push((e as Error).message);
   }
+  await addSynop(d).catch((e) => { errors.push(`SYNOP : ${(e as Error).message}`); console.error('[obs] SYNOP :', (e as Error).message); });
   prune(d.obs);
   d.updatedAt = new Date().toISOString();
   d.errors = errors;
