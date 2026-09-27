@@ -197,7 +197,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
       ) : <section className="mt-10 max-w-3xl space-y-2 text-sm text-muted">
         <h2 className="text-base font-bold text-text">Méthode</h2>
         <p>TX provisoire : maximum des températures horaires de 8 h à 8 h locales (journée en cours). TX finale : même période, la veille, close. TN provisoire : minimum de 20 h à 8 h locales. Les fenêtres 06-18 UTC et 18-06 UTC sont les dernières commencées.</p>
-        <p>Pluie : cumul des précipitations horaires sur 1 h, depuis 6 h UTC, ou sur 24, 48 et 72 heures glissantes. La colonne « heures » indique le nombre d’heures reçues sur le nombre attendu : un cumul incomplet est un minimum.</p>
+        <p>Pluie : cumul des précipitations horaires sur 1 h, depuis 6 h UTC, ou sur 24, 48 et 72 heures glissantes. Tant que l’historique collecté ne couvre pas toute la période (48 h ou 72 h au démarrage), le cumul est un minimum.</p>
         <p>Windchill - Ressenti : formule d’Environnement Canada, calculée dès que le vent dépasse 4,8 km/h et plafonnée à la température de l’air (vent faible : ressenti = température). Humidex : Environnement Canada, à partir de la température et du point de rosée. Pression ramenée au niveau de la mer.</p>
         <p>Vent : vent moyen de la dernière observation ; vent maximal = vent moyen sur 10 minutes le plus fort de l’heure (le paquet horaire de Météo-France ne fournit pas les rafales instantanées), puis son maximum sur 24, 48 et 72 heures. Rafales : rafale maximale des messages SYNOP des stations principales (archive OMM de Météo-France), comptée sur 24, 48 ou 72 heures jusqu’au dernier message publié. Variations de pression : différence entre la dernière pression et celle observée 3, 12 ou 24 heures plus tôt, classées par ampleur (hausse ou baisse). Évolution de la température : écart avec la température relevée 1 heure et 24 heures plus tôt.</p>
         <p>Normales : écart de la TX (8 h → 8 h) ou TN (20 h → 8 h) finale, ou des extrêmes des 24 dernières heures, à la moyenne mensuelle des TX ou TN de la station. Écarts aux records : TX ou TN finale moins le record mensuel ou absolu de la station (valeur positive pour la TX ou négative pour la TN = record battu).</p>
@@ -224,7 +224,6 @@ function Scale({ title, rows }: { title: string; rows: (Band & { range: string }
 
 function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: RankRow[]; sort?: Sort; sortHref: (k: Sort['key']) => string; embed: boolean; opt: { showAlt: boolean; byDept: boolean; byRegion: boolean; evo: boolean; records: boolean; debut: boolean } }) {
   const unit = r.unit ? ` (${r.unit})` : '';
-  const partial = !r.instant && !r.temp;
   const arrow = (k: Sort['key']) => (sort?.key === k ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
   const SortTh = ({ k, children, right, narrow }: { k: Sort['key']; children: React.ReactNode; right?: boolean; narrow?: boolean }) => (
     <th className={`${th} ${right ? 'text-right' : ''} ${narrow ? 'w-px' : ''}`} aria-sort={sort?.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
@@ -238,7 +237,7 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
   if (!rows.length) return <Notice>Aucune station ne correspond à ces critères pour cette période.</Notice>;
   return (
     <div className="mt-4 max-w-full overflow-x-auto">
-      <table className="w-auto rounded-xl border border-border bg-surface text-sm">
+      <table className="mx-auto w-auto rounded-xl border border-border bg-surface text-sm">
         <thead className="border-b border-border bg-bg">
           <tr>
             {opt.byRegion && <th className={th}>Région</th>}
@@ -248,7 +247,6 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
             {opt.evo && <><th className={`${th} text-right`}>Évol. 1 h</th><th className={`${th} text-right`}>Évol. 24 h</th></>}
             {r.feels && <><SortTh k="wc" right>Windchill - Ressenti</SortTh><SortTh k="hx" right>Humidex</SortTh></>}
             {(r.id === 'humidex' || r.id === 'windchill') && <th className={th}>Niveau</th>}
-            {partial && <th className={`${th} text-right`}>Heures</th>}
             {opt.showAlt && <th className={`${th} text-right`}>Altitude (m)</th>}
             {opt.records && r.record && <>
               <th className={`${th} text-right`}>Record mensuel</th><th className={th}>Date record</th>
@@ -282,7 +280,6 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
                   <td className={`${td} text-right tabular-nums`} style={x.humidex != null ? bandStyle(humidexBand(x.humidex)) : undefined} title={x.humidex != null ? humidexBand(x.humidex).label : undefined}>{fmtV(x.humidex, 0)}</td>
                 </>}
                 {band && <td className={td}><Pill b={band} /></td>}
-                {partial && <td className={`${td} text-right tabular-nums ${x.n < x.expected ? 'text-warn' : 'text-muted'}`}>{x.n}/{x.expected}</td>}
                 {opt.showAlt && <td className={`${td} text-right tabular-nums`}>{x.station.alt ?? '—'}</td>}
                 {opt.records && r.record && <>
                   <td className={`${td} text-right tabular-nums`}>{fmtV(x.recMonth?.v, r.digits)}</td><td className={td}>{fmtDate(x.recMonth?.d)}</td>
