@@ -1,0 +1,47 @@
+/** Observations de stations (couche 2 : données météo par API). Unités normalisées. */
+
+export type StationKind = 'principale' | 'secondaire' | 'amateur';
+
+export type Station = {
+  id: string;
+  name: string;
+  /** Département (01…95, 2A, 2B). */
+  dept: string;
+  lat?: number;
+  lon?: number;
+  /** Altitude en mètres. */
+  alt?: number;
+  /** Date de début des mesures (YYYY-MM-DD). */
+  opened?: string;
+  kind: StationKind;
+};
+
+/** Observation horaire : valeurs sur l'heure qui se termine à `time` (UTC, ISO). */
+export type HourlyObs = {
+  time: string;
+  t?: number; // °C
+  td?: number; // °C
+  tx?: number; // °C, max de l'heure
+  tn?: number; // °C, min de l'heure
+  u?: number; // %
+  ff?: number; // km/h, vent moyen
+  fxi?: number; // km/h, rafale max
+  rr1?: number; // mm
+  insol?: number; // minutes d'ensoleillement dans l'heure
+  pmer?: number; // hPa
+};
+
+export type ObsSnapshot = {
+  updatedAt: string | null;
+  source: string;
+  stations: Station[];
+  /** Observations horaires par station, triées par heure croissante. */
+  obs: Record<string, HourlyObs[]>;
+  errors: string[];
+};
+
+/** Record : valeur et date (YYYY-MM-DD). */
+export type RecordValue = { v: number; d: string };
+export type RecordSet = { tx?: RecordValue; tn?: RecordValue; rr24?: RecordValue };
+/** Records d'une station : mensuels (clé "1"…"12") et absolus. */
+export type StationRecords = { monthly?: Record<string, RecordSet>; absolute?: RecordSet };

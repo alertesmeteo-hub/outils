@@ -20,6 +20,7 @@ export function Header() {
       <nav aria-label="Catégories" className="border-t border-border">
         <ul className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 py-1 text-sm font-medium">
           <li><Link href="/outils/" className="block whitespace-nowrap rounded-md px-3 py-2 hover:bg-bg">Tous les outils</Link></li>
+          <li><Link href="/classements/" className="block whitespace-nowrap rounded-md px-3 py-2 hover:bg-bg">Classements</Link></li>
           {categories.map((c) => (
             <li key={c.slug}><Link href={`/${c.slug}/`} className="block whitespace-nowrap rounded-md px-3 py-2 hover:bg-bg">{c.name}</Link></li>
           ))}

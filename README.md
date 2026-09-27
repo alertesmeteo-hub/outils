@@ -112,5 +112,17 @@ pm2 restart outils-meteo --update-env
 ```
 Puis ouvrir https://outils.alertes-meteo.com/admin/ (identifiant `admin`, authentification HTTP Basic). Sauvegarde de la base : `sudo -u postgres pg_dump outils > outils.sql`.
 
+## Classements des stations (`/classements/`)
+Tableaux en direct des stations Météo-France (métropole + Corse), rendus côté serveur :
+- **TX** provisoires (8 h → 8 h locales), 06-18 UTC, 18-06 UTC, finales, et classement des records provisoires de TX ;
+- **TN** provisoires (20 h → 8 h locales), 06-18 UTC, 18-06 UTC, finales ; colonnes windchill et humidex ;
+- **ensoleillement**, **pluie** 1 h, depuis 6 h UTC (avec records), 24 h, 48 h et 72 h glissantes ;
+- **pression**, **point de rosée**, **windchill** et **humidex** avec leurs échelles de risque.
+
+Filtres : altitude max., stations secondaires (Pack ETENDU), stations amateurs, affichage de l'altitude, tri par département, records mensuels et absolus, date de début des mesures.
+
+Configuration (serveur) : `METEOFRANCE_API_KEY` (portail-api.meteofrance.fr, API « Observations » et « Paquet Observations »). Le cache (`.cache/obs`) garde 96 h : le paquet horaire ne couvre que 24 h, les cumuls 48 h et 72 h se complètent après 2 à 3 jours de fonctionnement (colonne « heures »). Records : `data/records.json` (modèle `data/records.example.json`), à remplir avec des valeurs vérifiées. Amateurs : flux JSON `AMATEUR_OBS_URL`. Sans clé, la page l'indique et n'affiche aucune donnée.
+Code : `src/lib/obs/` (calculs purs testés dans `rankings.ts`, source `meteofrance.ts`, cache `store.ts`).
+
 ## Sources des données
 Les facteurs d'émission de l'outil `/climat/empreinte-carbone/` sont extraits de l'API publique ADEME (Base Empreinte®, data.ademe.fr) et stockés dans `src/lib/tools/data/ademe-transport.ts`, avec l'identifiant ADEME de chaque facteur. Ils sont datés de l'export (2026-09-19) : à régénérer périodiquement, la base étant révisée régulièrement.

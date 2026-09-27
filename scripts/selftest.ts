@@ -1,5 +1,7 @@
 import { toolRegistry } from '../src/lib/tools/registry';
 import { defaultValues, run } from '../src/lib/tools/engine';
+import * as R from '../src/lib/obs/rankings';
+import * as MF from '../src/lib/obs/meteofrance';
 
 let fail = 0;
 const eq = (name: string, cond: boolean, info = '') => { if (!cond) { fail++; console.error('✗', name, info); } else console.log('✓', name); };
@@ -38,7 +40,7 @@ eq('valeur négative rejetée', !!bad2.errors?.mm);
 const paths = toolRegistry.map((t) => t.path);
 eq('paths uniques', new Set(paths).size === paths.length);
 eq('paths de la forme /thème/page', paths.every((p) => /^\/[a-z0-9-]+\/[a-z0-9-]+$/.test(p)), paths.join(','));
-const RESERVED = ['admin', 'api', 'embed', 'outils', 'confidentialite', 'attestation-meteo', 'sitemap.xml', 'robots.txt'];
+const RESERVED = ['admin', 'api', 'embed', 'outils', 'classements', 'confidentialite', 'attestation-meteo', 'sitemap.xml', 'robots.txt'];
 eq('thèmes non réservés', paths.every((p) => !RESERVED.includes(p.split('/')[1])));
 
 const cc: any = get('empreinte-carbone', { mode: 'car_moyenne', distance: '100', occupants: '1' });
@@ -82,6 +84,57 @@ eq('verglas −1 °C chaussée humide = élevé', A('risque-verglas', { air: '-1
 const s1 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-06-21' });
 console.log('Paris 21/06/2026 :', s1.metrics.map((m: any) => m.value).join(' | '), '– durée', s1.headline.value);
 const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
+// ---------- Classements de stations ----------
+{
+  const iso = (s: string) => new Date(s).toISOString();
+  // Été (UTC+2) : 8 h locales = 06 UTC ; hiver (UTC+1) : 07 UTC.
+  eq('8 h Paris en été = 06 UTC', new Date(R.parisToUtc(2026, 7, 15, 8)).toISOString() === '2026-07-15T06:00:00.000Z');
+  eq('8 h Paris en hiver = 07 UTC', new Date(R.parisToUtc(2026, 1, 15, 8)).toISOString() === '2026-01-15T07:00:00.000Z');
+  const now = Date.parse('2026-07-15T13:00:00Z'); // 15 h locales
+  const w = R.windows(now);
+  eq('TX prov. : 15/07 06 UTC → 16/07 06 UTC', new Date(w.txProv.start).toISOString() === '2026-07-15T06:00:00.000Z' && new Date(w.txProv.end).toISOString() === '2026-07-16T06:00:00.000Z' && !w.txProv.final);
+  eq('TX finale : veille, close', new Date(w.txFin.start).toISOString() === '2026-07-14T06:00:00.000Z' && w.txFin.final);
+  eq('TN prov. à 15 h : nuit 14/07 20 h → 15/07 8 h (close)', new Date(w.tnProv.start).toISOString() === '2026-07-14T18:00:00.000Z' && new Date(w.tnProv.end).toISOString() === '2026-07-15T06:00:00.000Z' && w.tnProv.final);
+  const w2 = R.windows(Date.parse('2026-07-15T21:00:00Z')); // 23 h locales
+  eq('TN prov. à 23 h : nuit en cours', new Date(w2.tnProv.start).toISOString() === '2026-07-15T18:00:00.000Z' && !w2.tnProv.final);
+  eq('TN finale à 23 h : nuit précédente', new Date(w2.tnFin.start).toISOString() === '2026-07-14T18:00:00.000Z');
+  const w3 = R.windows(Date.parse('2026-10-25T12:00:00Z')); // jour du passage à l'heure d'hiver
+  eq('TX finale sur 25 h le jour du changement d’heure', w3.txFin.end - w3.txFin.start === 25 * 3600_000 && w3.txProv.end - w3.txProv.start === 24 * 3600_000);
+
+  const obs = Array.from({ length: 30 }, (_, i) => {
+    const t = Date.parse('2026-07-14T08:00:00Z') + i * 3600_000;
+    return { time: iso(new Date(t).toISOString()), t: 20 + i / 2, tx: 20.5 + i / 2, tn: 19.5 + i / 2, rr1: 1, td: 18, ff: 10 };
+  });
+  const mx = R.aggMax(obs, w.txProv, now)!;
+  eq('TX = max des tx horaires de la fenêtre (13 UTC → 20,5 + 29/2 = 35)', mx.value === 35 && mx.n === 7 && mx.expected === 7, JSON.stringify(mx));
+  const rr = R.aggSum(obs, { start: now - 24 * 3600_000, end: now }, 'rr1', now)!;
+  eq('pluie 24 h = 24 mm', rr.value === 24 && rr.n === 24);
+  const rr72 = R.aggSum(obs, { start: now - 72 * 3600_000, end: now }, 'rr1', now)!;
+  eq('pluie 72 h incomplète signalée (30/72 h)', rr72.value === 30 && rr72.n === 30 && rr72.expected === 72);
+  eq('humidex classes', R.humidexBand(25).label === 'Sensation de bien-être' && R.humidexBand(46).label === 'Danger' && R.humidexBand(54).label === 'Coup de chaleur imminent');
+  eq('windchill classes', R.windchillBand(-30).label.includes('modéré') && R.windchillBand(-56).label.includes('extrême') && R.windchillBand(-5).label === 'Faible risque de gelures');
+  eq('windchill non applicable au-dessus de 10 °C', R.windchillOf(12, 30) === undefined && Math.round(R.windchillOf(-5, 30)!) === -13);
+
+  const st = (id: string, dept: string, alt: number, kind: 'principale' | 'secondaire' = 'principale') => ({ id, name: id, dept, alt, kind });
+  const stations = [st('A', '13', 5), st('B', '84', 900), st('C', '13', 50, 'secondaire')];
+  const o = (v: number) => [{ time: '2026-07-15T12:00:00.000Z', tx: v, t: v }, { time: '2026-07-15T13:00:00.000Z', tx: v, t: v }];
+  const data = { A: o(38), B: o(40), C: o(41) };
+  const rec = { A: { monthly: { '7': { tx: { v: 37.9, d: '2019-07-12' } } }, absolute: { tx: { v: 44, d: '2019-06-28' } } } };
+  const tx = R.getRanking('tx-prov');
+  const rows = R.buildRanking(tx, stations, data, now, { secondaires: false, amateurs: false, byDept: false }, rec);
+  eq('classement TX : secondaires exclues, tri décroissant', rows.map((r) => r.station.id).join() === 'B,A');
+  eq('record mensuel battu détecté', rows[1].beaten === 'month');
+  eq('altitude max. filtre', R.buildRanking(tx, stations, data, now, { maxAlt: 500, secondaires: true, amateurs: false, byDept: false }).map((r) => r.station.id).join() === 'C,A');
+  eq('tri par département, rang par département', R.buildRanking(tx, stations, data, now, { secondaires: true, amateurs: false, byDept: true }).map((r) => `${r.station.dept}:${r.rank}`).join() === '13:1,13:2,84:1');
+  eq('TN : tri croissant', R.buildRanking(R.getRanking('tn-0618'), stations, data, now, { secondaires: true, amateurs: false, byDept: false })[0].station.id === 'A');
+
+  const p = MF.parsePaquetRow({ geo_id_insee: '13054001', validity_time: '2026-07-15T13:00:00Z', t: 308.15, td: 290.15, tx: 309.05, tn: 307.15, ff: 5, pmer: 101520, rr1: 0.4, insolh: 60 })!;
+  eq('paquet MF : K → °C, m/s → km/h, Pa → hPa', p.obs.t === 35 && p.obs.tx === 35.9 && p.obs.ff === 18 && p.obs.pmer === 1015.2 && p.obs.insol === 60, JSON.stringify(p));
+  const csv = 'Id_station;Id_omm;Nom_usuel;Latitude;Longitude;Altitude;Date_ouverture;Pack\n13054001;07650;MARIGNANE;43.44;5.22;9;1920-01-01;RADOME\n13001009;;AIX;43.5;5.4;173;1990-05-01;ETENDU\n99999999;;HORS;0;0;0;;RADOME';
+  const sl = MF.parseStationsCsv(csv, (id) => (id.startsWith('13') ? '13' : undefined));
+  eq('liste stations : Pack ETENDU = secondaire, date d’ouverture', sl.length === 2 && sl[1].kind === 'secondaire' && sl[0].opened === '1920-01-01' && sl[0].alt === 9);
+}
+
 console.log('Paris 21/12/2026 :', s2.metrics.map((m: any) => m.value).join(' | '), '– durée', s2.headline.value);
 eq('Paris 21 juin : lever 05 h 4x / coucher 21 h 5x', /^05 h 4/.test(s1.metrics[0].value) && /^21 h 5/.test(s1.metrics[2].value), s1.metrics.map((m: any) => m.value).join());
 eq('Paris 21 juin : durée = 16 h 11', /^16 h 11/.test(s1.headline.value), s1.headline.value);
