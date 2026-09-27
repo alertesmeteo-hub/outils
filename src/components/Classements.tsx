@@ -45,7 +45,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   const maxAlt = altRaw && ALTS.includes(Number(altRaw)) ? Number(altRaw) : undefined;
   const opt = {
     secondaires: one(sp.sec) === '1', amateurs: one(sp.am) === '1', showAlt: one(sp.altv) === '1', byDept: one(sp.dep) === '1',
-    records: (one(sp.rec) === '1' && !r.temp) || isRecordRanking(r) || r.id === 'rr6', debut: one(sp.deb) === '1' || isRecordRanking(r),
+    records: (one(sp.rec) === '1' && !r.temp) || isRecordRanking(r), debut: one(sp.deb) === '1' || isRecordRanking(r),
     byRegion: one(sp.regt) === '1', evo: one(sp.evo) === '1' && !!r.temp,
   };
   const regRaw = one(sp.reg);
