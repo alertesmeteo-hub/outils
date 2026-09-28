@@ -7,6 +7,7 @@ import { createGunzip } from 'node:zlib';
 import { fetchSix, parseSixRow, DEPARTEMENTS, fetchDeptHourly, fetchStationList, parsePaquetRow, parseStationsCsv } from './meteofrance';
 import type { HourlyObs, ObsSnapshot, SixObs, Station, StationRecords } from './types';
 import { fromClimato } from './climato';
+import { fetchInfoclimat } from './infoclimat';
 import { SYNOP_URL, matchStations, synopLineReader, type SynopGust } from './synop';
 
 /**
@@ -155,11 +156,23 @@ async function refresh() {
   try {
     const am = await fetchAmateur();
     if (am) {
-      d.stations = [...d.stations.filter((s) => s.kind !== 'amateur'), ...am.stations];
+      d.stations = [...d.stations.filter((s) => s.kind !== 'amateur' || s.id.startsWith('ic:')), ...am.stations];
       for (const [id, list] of Object.entries(am.obs)) for (const o of list) merge(d.obs, id, o);
     }
   } catch (e) {
     errors.push((e as Error).message);
+  }
+  try {
+    const ic = await fetchInfoclimat(d.stations);
+    if (ic) {
+      d.stations = [...d.stations.filter((s) => !s.id.startsWith('ic:')), ...ic.stations];
+      for (const [id, list] of Object.entries(ic.obs)) for (const o of list) merge(d.obs, id, o);
+      for (const [id, h] of Object.entries(ic.gusts)) Object.assign(((d.rafH ??= {})[id] ??= {}), h);
+      console.log(`[obs] Infoclimat : ${ic.stations.length} stations amateurs`);
+    }
+  } catch (e) {
+    errors.push((e as Error).message);
+    console.error('[obs] Infoclimat :', (e as Error).message);
   }
   await addSynop(d).catch((e) => { errors.push(`SYNOP : ${(e as Error).message}`); console.error('[obs] SYNOP :', (e as Error).message); });
   prune(d.obs);

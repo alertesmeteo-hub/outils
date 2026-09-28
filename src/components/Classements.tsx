@@ -217,7 +217,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
 
       {embed ? (
         <p className="mt-4 text-xs text-muted">
-          Valeurs provisoires, non validées. Source : Météo-France (licence Etalab 2.0). Propulsé par{' '}
+          Valeurs provisoires, non validées. Source : Météo-France (licence Etalab 2.0){opt.amateurs ? <>, stations amateurs Infoclimat (StatIC)</> : null}. Propulsé par{' '}
           <a className="underline" href={`${SITE_URL}/classements/?c=${r.id}`} target="_blank" rel="noopener">{SITE_NAME}</a>
         </p>
       ) : <section className="mt-10 max-w-3xl space-y-2 text-sm text-muted">
@@ -227,7 +227,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
         <p>Windchill - Ressenti : formule d’Environnement Canada, calculée dès que le vent dépasse 4,8 km/h et plafonnée à la température de l’air (vent faible : ressenti = température). Humidex : Environnement Canada, à partir de la température et du point de rosée. Pression ramenée au niveau de la mer.</p>
         <p>Vent : vent moyen de la dernière observation ; vent maximal = vent moyen sur 10 minutes le plus fort de l’heure (le paquet horaire de Météo-France ne fournit pas les rafales instantanées), puis son maximum sur 24, 48 et 72 heures. Rafales : rafale maximale sur 10 minutes (raf10) des relevés au pas de 6 minutes de Météo-France (paquet v2, quasi-temps réel), sur le dernier relevé, la dernière heure ou 24, 48 et 72 heures ; à défaut (historique en cours de constitution), rafales des messages SYNOP, publiées avec environ un jour de décalage. Températures du moment : dernier relevé au pas de 6 minutes quand il existe. Variations de pression : différence entre la dernière pression et celle observée 3, 12 ou 24 heures plus tôt, classées par ampleur (hausse ou baisse). Évolution de la température : écart avec la température relevée 1 heure et 24 heures plus tôt.</p>
         <p>Normales : écart de la TX (8 h → 8 h) ou TN (20 h → 8 h) finale, ou des extrêmes des 24 dernières heures, à la moyenne mensuelle des TX ou TN de la station. Écarts aux records : TX ou TN finale moins le record mensuel ou absolu de la station (valeur positive pour la TX ou négative pour la TN = record battu).</p>
-        <p>Source : Météo-France, API Observations (licence Etalab 2.0). Records : fichier fourni par l’éditeur du site. Stations amateurs : flux déclaré par l’éditeur, non contrôlé par Météo-France.</p>
+        <p>Source : Météo-France, API Observations (licence Etalab 2.0). Records : fichier fourni par l’éditeur du site. Stations amateurs : réseau StatIC d’Infoclimat (infoclimat.fr, usage non commercial), non contrôlées par Météo-France.</p>
       </section>}
     </>
   );
