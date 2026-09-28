@@ -63,7 +63,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   const filters = { maxAlt, secondaires: opt.secondaires, amateurs: opt.amateurs, byDept: opt.byDept, region, dept, byRegion: opt.byRegion, evo: opt.evo };
   const extra = { six: getSix(), rafH: snap.rafH };
   const rows = now ? buildRanking(r, snap.stations, snap.obs, now, filters, records, extra) : [];
-  const top = (id: string) => (now ? buildRanking(getRanking(id), snap.stations, snap.obs, now, { ...filters, byDept: false, byRegion: false, evo: false }, records, extra).slice(0, 30) : []);
+  const top = (id: string, n = 30) => (now ? buildRanking(getRanking(id), snap.stations, snap.obs, now, { ...filters, byDept: false, byRegion: false, evo: false }, records, extra).slice(0, n) : []);
   // Tri choisi par le visiteur (clic sur l'en-tête) ; par défaut, l'ordre du classement.
   const triRaw = one(sp.tri);
   const sort: Sort | undefined = (['station', 'dept', 'val', 'wc', 'hx'] as const).includes(triRaw as never)
@@ -110,6 +110,9 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <TopTable title="Top 30 Minima" sub="TN provisoires (20 h → 8 h)" color="#1d4ed8" rows={top('tn-prov')} href={keep({ c: 'tn-prov' })} />
           <TopTable title="Top 30 Maxima" sub="TX provisoires (8 h → 8 h)" color="#dc2626" rows={top('tx-prov')} href={keep({ c: 'tx-prov' })} />
+          <div className="md:col-span-2">
+            <TopTable title="Top 25 Précipitations" sub="cumul sur 24 heures glissantes" color="#0891b2" unit="mm" rows={top('rr24', 25).filter((x) => (x.value ?? 0) > 0)} href={keep({ c: 'rr24' })} />
+          </div>
         </div>
       )}
 
@@ -226,7 +229,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   );
 }
 
-function TopTable({ title, sub, color, rows, href }: { title: string; sub: string; color: string; rows: RankRow[]; href: string }) {
+function TopTable({ title, sub, color, rows, href, unit = '°C' }: { title: string; sub: string; color: string; rows: RankRow[]; href: string; unit?: string }) {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-surface">
       <h2 style={{ background: color }} className="px-3 py-2 text-lg font-bold text-white">
@@ -239,11 +242,11 @@ function TopTable({ title, sub, color, rows, href }: { title: string; sub: strin
               <td className="w-px px-2 py-1 text-right tabular-nums text-muted">{i + 1}</td>
               <td className="w-px px-2 py-1 text-center tabular-nums">{x.station.dept}</td>
               <td className="px-2 py-1"><a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} className="hover:underline">{prettyStationName(x.station.name)}</a></td>
-              <td style={{ color }} className="px-2 py-1 text-right font-semibold tabular-nums">{fmtV(x.value)} °C</td>
+              <td style={{ color }} className="px-2 py-1 text-right font-semibold tabular-nums">{fmtV(x.value)} {unit}</td>
             </tr>
           ))}</tbody>
         </table>
-      ) : <p className="p-3 text-sm text-muted">Pas encore de données sur cette période.</p>}
+      ) : <p className="p-3 text-sm text-muted">Aucune donnée (ou aucune pluie) sur cette période.</p>}
     </section>
   );
 }
