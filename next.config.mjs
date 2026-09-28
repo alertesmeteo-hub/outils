@@ -12,8 +12,10 @@ const csp = (frameAncestors) =>
     "script-src 'self' 'unsafe-inline' https://sibforms.com",
     "style-src 'self' 'unsafe-inline' https://sibforms.com",
     "font-src 'self' data: https://assets.brevo.com",
-    "img-src 'self' data: https://sibforms.com https://assets.brevo.com",
-    "connect-src 'self' https://*.sibforms.com https://sibforms.com",
+    "img-src 'self' data: blob: https://sibforms.com https://assets.brevo.com https://s3.amazonaws.com https://*.basemaps.cartocdn.com",
+    "connect-src 'self' https://*.sibforms.com https://sibforms.com https://s3.amazonaws.com https://*.basemaps.cartocdn.com",
+    // MapLibre (carte des relevés) exécute ses workers depuis un blob.
+    "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self' https://*.sibforms.com",
