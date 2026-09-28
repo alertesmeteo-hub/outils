@@ -34,7 +34,8 @@ export function parseInfoclimat(j: any, ref: Station[]): InfoclimatData {
   const gusts: Record<string, Record<string, number>> = {};
   for (const s of Array.isArray(j?.stations) ? j.stations : []) {
     const lat = num(s.latitude), lon = num(s.longitude);
-    const dept = lat != null && lon != null ? nearestDept(lat, lon, ref) : undefined;
+    const dep = String(s.departement ?? '');
+    const dept = /^\d{2}$/.test(dep) ? dep : /^2[AB]$/.test(dep) ? '20' : lat != null && lon != null ? nearestDept(lat, lon, ref) : undefined;
     if (!s.id || !dept) continue;
     const id = `ic:${s.id}`;
     stations.push({ id, name: String(s.name ?? s.id), dept, lat, lon, alt: num(s.elevation), kind: 'amateur' });
@@ -57,14 +58,47 @@ export function parseInfoclimat(j: any, ref: Station[]): InfoclimatData {
   return { stations, obs, gusts };
 }
 
+/** Liste publique des stations Open Data (StatIC) : identifiant, nom, département, position, dernier relevé. */
+export const INFOCLIMAT_LIST = process.env.INFOCLIMAT_LIST_URL || 'https://www.infoclimat.fr/opendata/stations_xhr.php';
+type ListItem = { id: string; libelle?: string; departement?: string; latitude?: number; longitude?: number; altitude?: number; pays?: string; genre?: string; last_report?: string };
+
+/** Stations StatIC de France métropolitaine ayant émis dans les 48 dernières heures. */
+export function activeStatic(list: ListItem[], now = Date.now()): ListItem[] {
+  const since = new Date(now - 48 * 3600_000).toISOString().replace('T', ' ').slice(0, 19);
+  return list.filter((x) => x?.id && x.genre === 'static' && x.pays === 'FR' && (x.last_report ?? '') >= since && /^(\d{2}|2A|2B)$/.test(x.departement ?? ''));
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export async function fetchInfoclimat(ref: Station[]): Promise<InfoclimatData | null> {
   const token = process.env.INFOCLIMAT_TOKEN;
-  const ids = (process.env.INFOCLIMAT_STATIONS || '').split(/[\s,;]+/).filter(Boolean);
-  if (!token || !ids.length) return null;
+  if (!token) return null;
+  // Sans liste (INFOCLIMAT_STATIONS vide ou « auto ») : toutes les stations StatIC actives.
+  const want = (process.env.INFOCLIMAT_STATIONS || '').split(/[\s,;]+/).filter((x) => x && x !== 'auto');
+  const lres = await fetch(INFOCLIMAT_LIST, { cache: 'no-store', signal: AbortSignal.timeout(60_000) });
+  if (!lres.ok) throw new Error(`Infoclimat (liste) : ${lres.status}`);
+  const list = (await lres.json()) as ListItem[];
+  const meta = new Map(list.map((x) => [x.id, x]));
+  const ids = want.length ? want : activeStatic(list).map((x) => x.id);
   const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-  const q = new URLSearchParams({ method: 'get', format: 'json', start: day(Date.now() - 3 * 86_400_000), end: day(Date.now() + 86_400_000), token });
-  for (const id of ids) q.append('stations[]', id);
-  const res = await fetch(`${INFOCLIMAT_URL}?${q}`, { cache: 'no-store', signal: AbortSignal.timeout(60_000) });
-  if (!res.ok) throw new Error(`Infoclimat : ${res.status}`);
-  return parseInfoclimat(await res.json(), ref);
+  const out: InfoclimatData = { stations: [], obs: {}, gusts: {} };
+  for (let i = 0; i < ids.length; i += 40) {
+    const q = new URLSearchParams({ method: 'get', format: 'json', start: day(Date.now() - 3 * 86_400_000), end: day(Date.now() + 86_400_000), token });
+    for (const id of ids.slice(i, i + 40)) q.append('stations[]', id);
+    const res = await fetch(`${INFOCLIMAT_URL}?${q}`, { cache: 'no-store', signal: AbortSignal.timeout(60_000) });
+    if (res.status === 401 || res.status === 403) throw new Error(`Infoclimat : ${res.status} (jeton refusé)`);
+    if (!res.ok) throw new Error(`Infoclimat : ${res.status}`);
+    const j = await res.json();
+    // Nom et département de la liste officielle quand la réponse ne les donne pas.
+    for (const s of Array.isArray(j?.stations) ? j.stations : []) {
+      const m = meta.get(s.id);
+      if (m) { s.name ??= m.libelle; s.latitude ??= m.latitude; s.longitude ??= m.longitude; s.elevation ??= m.altitude; s.departement ??= m.departement; }
+    }
+    const part = parseInfoclimat(j, ref);
+    out.stations.push(...part.stations);
+    Object.assign(out.obs, part.obs);
+    Object.assign(out.gusts, part.gusts);
+    await sleep(1000);
+  }
+  return out;
 }
