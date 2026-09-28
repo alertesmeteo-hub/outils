@@ -80,6 +80,7 @@ export function windows(now: number) {
     day: win(u6, u6 + 12 * H, now), // 06-18 UTC (en cours ou dernière)
     night: win(u18, u18 + 12 * H, now), // 18-06 UTC
     since6: win(u6, now, now),
+    clim: win(u6 - 24 * H, u6, now), // journée climatologique 06 → 06 UTC, dernière close
     sinceMidnight: win(lastLocalHour(now, 0), now, now),
   };
 }
@@ -172,7 +173,7 @@ export const WINDCHILL_SCALE = [
 export type RankingId =
   | 't' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records'
   | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin'
-  | 'rr1' | 'rr24' | 'rr6' | 'rr48' | 'rr72'
+  | 'rr1' | 'rr3' | 'rr12' | 'rr24' | 'rr6' | 'rr24c' | 'rr48' | 'rr72'
   | 'ff' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf24' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
   | 'td' | 'windchill' | 'humidex' | 'sol10' | 'sol20' | 'sol50' | 'sol100'
@@ -298,8 +299,11 @@ export const RANKINGS: Ranking[] = [
   { id: 'tn-records', short: 'Records prov. TN', label: 'Classement records provisoires des températures minimales', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnProv, value: (o, w, n) => aggMin(o, w.tnProv, n) },
 
   { id: 'rr1', short: 'Pluie 1 h', label: 'Classement de la pluie en 1 heure (dernière heure)', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(1) },
-  { id: 'rr6', short: 'Pluie 6 h', label: 'Classement de la pluie depuis 6 h UTC', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.since6, value: (o, w, n) => aggSum(o, w.since6, 'rr1', n) },
+  { id: 'rr3', short: 'Pluie 3 h', label: 'Classement de la pluie sur 3 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(3) },
+  { id: 'rr6', short: 'Pluie depuis 6 h UTC', label: 'Classement de la pluie depuis 6 h UTC, avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.since6, value: (o, w, n) => aggSum(o, w.since6, 'rr1', n) },
+  { id: 'rr12', short: 'Pluie 12 h', label: 'Classement de la pluie sur 12 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(12) },
   { id: 'rr24', short: 'Pluie 24 h', label: 'Classement de la pluie sur 24 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', value: slide(24) },
+  { id: 'rr24c', short: 'Pluie 24 h climato', label: 'Classement de la pluie de la journée climatologique (6 h UTC → 6 h UTC le lendemain), avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.clim, value: (o, w, n) => aggSum(o, w.clim, 'rr1', n) },
   { id: 'rr48', short: 'Pluie 48 h', label: 'Classement de la pluie sur 48 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(48) },
   { id: 'rr72', short: 'Pluie 72 h', label: 'Classement de la pluie sur 72 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(72) },
 
@@ -332,16 +336,18 @@ export const RANKINGS: Ranking[] = [
   { id: 'sol50', short: 'Température à 50 cm', label: 'Classement de la température du sol à 50 cm', group: 'Sol', ...T, order: 'desc', instant: true, value: cur('t50') },
   { id: 'sol100', short: 'Température à 100 cm', label: 'Classement de la température du sol à 100 cm', group: 'Sol', ...T, order: 'desc', instant: true, value: cur('t100') },
 
-  { id: 'n-tx', short: 'Écart TX moy. (climato)', label: 'Écart de la TX finale à la température maximale moyenne du mois (normale)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.txFin, value: (o, w, n, c) => gap(txFin(o, w, n), c.rec?.normals?.[c.month]?.tx) },
-  { id: 'n-tn', short: 'Écart TN moy. (climato)', label: 'Écart de la TN finale à la température minimale moyenne du mois (normale)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.tnFin, value: (o, w, n, c) => gap(tnFin(o, w, n), c.rec?.normals?.[c.month]?.tn) },
-  { id: 'n-tx24', short: 'Écart TX moy. (24 h gliss.)', label: 'Écart de la température maximale des 24 dernières heures à la TX moyenne du mois', group: N, ...T, order: 'desc', signed: true, value: (o, w, n, c) => gap(tx24(o, w, n), c.rec?.normals?.[c.month]?.tx) },
-  { id: 'n-tn24', short: 'Écart TN moy. (24 h gliss.)', label: 'Écart de la température minimale des 24 dernières heures à la TN moyenne du mois', group: N, ...T, order: 'desc', signed: true, value: (o, w, n, c) => gap(tn24(o, w, n), c.rec?.normals?.[c.month]?.tn) },
-  { id: 'e-recm-tx', short: 'Écart record mensuel TX', label: 'Écart de la TX finale au record mensuel de température maximale (les plus proches en tête)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.txFin, value: (o, w, n, c) => gap(txFin(o, w, n), c.rec?.monthly?.[c.month]?.tx?.v) },
-  { id: 'e-recm-tn', short: 'Écart record mensuel TN', label: 'Écart de la TN finale au record mensuel de température minimale (les plus proches en tête)', group: N, ...T, order: 'asc', signed: true, window: (w) => w.tnFin, value: (o, w, n, c) => gap(tnFin(o, w, n), c.rec?.monthly?.[c.month]?.tn?.v) },
-  { id: 'e-reca-tx', short: 'Écart record absolu TX', label: 'Écart de la TX finale au record absolu de température maximale (les plus proches en tête)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.txFin, value: (o, w, n, c) => gap(txFin(o, w, n), c.rec?.absolute?.tx?.v) },
-  { id: 'e-reca-tn', short: 'Écart record absolu TN', label: 'Écart de la TN finale au record absolu de température minimale (les plus proches en tête)', group: N, ...T, order: 'asc', signed: true, window: (w) => w.tnFin, value: (o, w, n, c) => gap(tnFin(o, w, n), c.rec?.absolute?.tn?.v) },
+  { id: 'n-tx', short: 'Écart TX moy.', label: 'Écart de la TX finale à la température maximale moyenne du mois (normale)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.txFin, value: (o, w, n, c) => gap(txFin(o, w, n), c.rec?.normals?.[c.month]?.tx) },
+  { id: 'n-tn', short: 'Écart TN moy.', label: 'Écart de la TN finale à la température minimale moyenne du mois (normale)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.tnFin, value: (o, w, n, c) => gap(tnFin(o, w, n), c.rec?.normals?.[c.month]?.tn) },
+  { id: 'n-tx24', short: 'Écart TX 24 h', label: 'Écart de la température maximale des 24 dernières heures à la TX moyenne du mois', group: N, ...T, order: 'desc', signed: true, value: (o, w, n, c) => gap(tx24(o, w, n), c.rec?.normals?.[c.month]?.tx) },
+  { id: 'n-tn24', short: 'Écart TN 24 h', label: 'Écart de la température minimale des 24 dernières heures à la TN moyenne du mois', group: N, ...T, order: 'desc', signed: true, value: (o, w, n, c) => gap(tn24(o, w, n), c.rec?.normals?.[c.month]?.tn) },
+  { id: 'e-recm-tx', short: 'Rec. mens. TX', label: 'Écart de la TX finale au record mensuel de température maximale (les plus proches en tête)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.txFin, value: (o, w, n, c) => gap(txFin(o, w, n), c.rec?.monthly?.[c.month]?.tx?.v) },
+  { id: 'e-recm-tn', short: 'Rec. mens. TN', label: 'Écart de la TN finale au record mensuel de température minimale (les plus proches en tête)', group: N, ...T, order: 'asc', signed: true, window: (w) => w.tnFin, value: (o, w, n, c) => gap(tnFin(o, w, n), c.rec?.monthly?.[c.month]?.tn?.v) },
+  { id: 'e-reca-tx', short: 'Rec. abs. TX', label: 'Écart de la TX finale au record absolu de température maximale (les plus proches en tête)', group: N, ...T, order: 'desc', signed: true, window: (w) => w.txFin, value: (o, w, n, c) => gap(txFin(o, w, n), c.rec?.absolute?.tx?.v) },
+  { id: 'e-reca-tn', short: 'Rec. abs. TN', label: 'Écart de la TN finale au record absolu de température minimale (les plus proches en tête)', group: N, ...T, order: 'asc', signed: true, window: (w) => w.tnFin, value: (o, w, n, c) => gap(tnFin(o, w, n), c.rec?.absolute?.tn?.v) },
 ];
 export const isRecordRanking = (r: Ranking) => r.id === 'tx-records' || r.id === 'tn-records';
+/** Classements dont les colonnes de records sont toujours affichées. */
+export const alwaysRecords = (r: Ranking) => isRecordRanking(r) || r.id === 'rr6' || r.id === 'rr24c';
 export const getRanking = (id: string | undefined) => RANKINGS.find((r) => r.id === id) ?? RANKINGS[0];
 
 /* ---------- Construction du tableau ---------- */

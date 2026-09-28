@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
-  HUMIDEX_SCALE, RANKINGS, WINDCHILL_SCALE, buildRanking, getRanking, isRecordRanking, synopEnd, humidexBand, windchillBand, windows,
+  HUMIDEX_SCALE, RANKINGS, WINDCHILL_SCALE, alwaysRecords, buildRanking, getRanking, isRecordRanking, synopEnd, humidexBand, windchillBand, windows,
   type Band, type RankRow, type Ranking,
 } from '@/lib/obs/rankings';
 import { SITE_NAME, SITE_URL } from '@/lib/config';
@@ -40,12 +40,14 @@ const Pill = ({ b }: { b: Band }) => <span style={bandStyle(b)} className="inlin
 export default async function ClassementsView({ sp, base = '/classements/', embed = false }: { sp: SP; base?: string; embed?: boolean }) {
   const showMenu = !embed || one(sp.menu) !== '0';
   const showForm = !embed || one(sp.filtres) !== '0';
+  /** Page d'accueil (sans classement choisi) : Top 30 minima et maxima côte à côte. */
+  const home = !embed && !one(sp.c);
   const r = getRanking(one(sp.c));
   const altRaw = one(sp.alt);
   const maxAlt = altRaw && ALTS.includes(Number(altRaw)) ? Number(altRaw) : undefined;
   const opt = {
     secondaires: one(sp.sec) === '1', amateurs: one(sp.am) === '1', showAlt: one(sp.altv) === '1', byDept: one(sp.dep) === '1',
-    records: (one(sp.rec) === '1' && !r.temp) || isRecordRanking(r), debut: one(sp.deb) === '1' || isRecordRanking(r),
+    records: (one(sp.rec) === '1' && !r.temp) || alwaysRecords(r), debut: one(sp.deb) === '1' || isRecordRanking(r),
     byRegion: one(sp.regt) === '1', evo: one(sp.evo) === '1' && !!r.temp,
   };
   const regRaw = one(sp.reg);
@@ -58,7 +60,10 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   const [snap, records] = await Promise.all([getSnapshot(), getRecords()]);
   let now = 0;
   for (const list of Object.values(snap.obs)) { const t = Date.parse(list[list.length - 1]?.time ?? ''); if (t > now) now = t; }
-  const rows = now ? buildRanking(r, snap.stations, snap.obs, now, { maxAlt, secondaires: opt.secondaires, amateurs: opt.amateurs, byDept: opt.byDept, region, dept, byRegion: opt.byRegion, evo: opt.evo }, records, { six: getSix(), rafH: snap.rafH }) : [];
+  const filters = { maxAlt, secondaires: opt.secondaires, amateurs: opt.amateurs, byDept: opt.byDept, region, dept, byRegion: opt.byRegion, evo: opt.evo };
+  const extra = { six: getSix(), rafH: snap.rafH };
+  const rows = now ? buildRanking(r, snap.stations, snap.obs, now, filters, records, extra) : [];
+  const top = (id: string) => (now ? buildRanking(getRanking(id), snap.stations, snap.obs, now, { ...filters, byDept: false, byRegion: false, evo: false }, records, extra).slice(0, 30) : []);
   // Tri choisi par le visiteur (clic sur l'en-tête) ; par défaut, l'ordre du classement.
   const triRaw = one(sp.tri);
   const sort: Sort | undefined = (['station', 'dept', 'val', 'wc', 'hx'] as const).includes(triRaw as never)
@@ -101,13 +106,20 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
         <h1 className="text-3xl font-extrabold">Classements des stations météo</h1>
       </>}
 
-      {showMenu && <div className={`${embed ? '' : 'mt-6 '}space-y-3`}>
+      {home && now > 0 && (
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <TopTable title="Top 30 Minima" sub="TN provisoires (20 h → 8 h)" color="#1d4ed8" rows={top('tn-prov')} href={keep({ c: 'tn-prov' })} />
+          <TopTable title="Top 30 Maxima" sub="TX provisoires (8 h → 8 h)" color="#dc2626" rows={top('tx-prov')} href={keep({ c: 'tx-prov' })} />
+        </div>
+      )}
+
+      {showMenu && <div className={`${embed ? '' : 'mt-8 '}space-y-3`}>
         {groups.map((g) => (
-          <div key={g} className="flex flex-wrap items-center gap-2 text-sm">
+          <div key={g} className={`flex items-center gap-2 text-sm ${g === 'Normales et records' ? 'flex-wrap lg:flex-nowrap' : 'flex-wrap'}`}>
             <span className="w-full font-semibold sm:w-auto sm:min-w-56">{g}</span>
             {RANKINGS.filter((x) => x.group === g).map((x) => (
-              <Link key={x.id} href={keep({ c: x.id })} aria-current={x.id === r.id ? 'page' : undefined}
-                className={`rounded-md border px-3 py-1.5 ${x.id === r.id ? 'border-primary bg-primary text-white' : 'border-border bg-surface hover:border-primary'}`}>
+              <Link key={x.id} href={keep({ c: x.id })} aria-current={!home && x.id === r.id ? 'page' : undefined}
+                className={`whitespace-nowrap rounded-md border px-3 py-1.5 ${!home && x.id === r.id ? 'border-primary bg-primary text-white' : 'border-border bg-surface hover:border-primary'}`}>
                 {x.short}
               </Link>
             ))}
@@ -116,14 +128,8 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
       </div>}
 
       {showForm && <form method="get" action={base} className={`${showMenu || !embed ? 'mt-6 ' : ''}flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4 text-sm`}>
-        <input type="hidden" name="c" value={r.id} />
+        {!home && <input type="hidden" name="c" value={r.id} />}
         {embed && one(sp.menu) === '0' && <input type="hidden" name="menu" value="0" />}
-        <label className="flex flex-col gap-1">Altitude max. (m)
-          <select name="alt" defaultValue={maxAlt ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
-            <option value="">toutes</option>
-            {ALTS.map((a) => <option key={a} value={a}>{a} m</option>)}
-          </select>
-        </label>
         {([
           ['sec', 'Inclure les stations secondaires', opt.secondaires],
           ['am', 'Inclure les stations amateurs', opt.amateurs],
@@ -136,27 +142,36 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
         ] as const).map(([name, label, on]) => (
           <label key={name} className="flex items-center gap-2"><input type="checkbox" name={name} value="1" defaultChecked={on} className="h-4 w-4" />{label}</label>
         ))}
-        <label className="flex flex-col gap-1">Région
-          <select name="reg" defaultValue={region ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
-            <option value="">France entière</option>
-            {REGIONS.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">Département
-          <select name="dpt" defaultValue={dept ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
-            <option value="">tous</option>
-            {DEPARTEMENTS.map((d) => <option key={d} value={d}>{d === '20' ? '20 (Corse)' : d}</option>)}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">Lignes
-          <select name="n" defaultValue={limitRaw ?? '100'} className="rounded-md border border-border bg-bg px-2 py-1.5">
-            {['50', '100', '200', '500', 'tout'].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </label>
+        <div className="flex w-full flex-wrap items-end gap-x-6 gap-y-3">
+          <label className="flex flex-col gap-1">Altitude max. (m)
+            <select name="alt" defaultValue={maxAlt ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
+              <option value="">toutes</option>
+              {ALTS.map((a) => <option key={a} value={a}>{a} m</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">Région
+            <select name="reg" defaultValue={region ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
+              <option value="">France entière</option>
+              {REGIONS.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">Département
+            <select name="dpt" defaultValue={dept ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
+              <option value="">tous</option>
+              {DEPARTEMENTS.map((d) => <option key={d} value={d}>{d === '20' ? '20 (Corse)' : d}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">Lignes
+            <select name="n" defaultValue={limitRaw ?? '100'} className="rounded-md border border-border bg-bg px-2 py-1.5">
+              {['50', '100', '200', '500', 'tout'].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        </div>
         <noscript><button className="rounded-md bg-primary px-4 py-2 font-semibold text-white">Afficher</button></noscript>
         <AutoSubmit />
       </form>}
 
+      {!home && <>
       <h2 className={`${showMenu || showForm ? 'mt-8' : ''} text-xl font-bold`}>{r.label}</h2>
       {now > 0 && (
         <p className="mt-1 text-sm text-muted">
@@ -186,8 +201,12 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
       )}
       {rows.length > shown.length && <p className="mt-2 text-sm"><Link href={keep({ n: 'tout' })} className="text-primary underline">Afficher les {rows.length} stations</Link></p>}
 
-      {(r.id === 'humidex' || r.feels) && <Scale title="Échelle de l’humidex" rows={HUMIDEX_SCALE} />}
-      {(r.id === 'windchill' || r.feels) && <Scale title="Échelle du windchill (refroidissement éolien)" rows={WINDCHILL_SCALE} />}
+      </>}
+      {home && !obsConfigured() && <Notice>Aucune source d’observations n’est configurée.</Notice>}
+      {home && obsConfigured() && !now && <Notice>Premier chargement des observations en cours. Rechargez la page dans quelques minutes.</Notice>}
+
+      {!home && (r.id === 'humidex' || r.feels) && <Scale title="Échelle de l’humidex" rows={HUMIDEX_SCALE} />}
+      {!home && (r.id === 'windchill' || r.feels) && <Scale title="Échelle du windchill (refroidissement éolien)" rows={WINDCHILL_SCALE} />}
 
       {embed ? (
         <p className="mt-4 text-xs text-muted">
@@ -204,6 +223,28 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
         <p>Source : Météo-France, API Observations (licence Etalab 2.0). Records : fichier fourni par l’éditeur du site. Stations amateurs : flux déclaré par l’éditeur, non contrôlé par Météo-France.</p>
       </section>}
     </>
+  );
+}
+
+function TopTable({ title, sub, color, rows, href }: { title: string; sub: string; color: string; rows: RankRow[]; href: string }) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-surface">
+      <h2 style={{ background: color }} className="px-3 py-2 text-lg font-bold text-white">
+        <Link href={href} className="hover:underline">{title}</Link> <span className="text-sm font-normal opacity-90">· {sub}</span>
+      </h2>
+      {rows.length ? (
+        <table className="w-full text-sm">
+          <tbody>{rows.map((x, i) => (
+            <tr key={x.station.id} className="border-b border-border last:border-0">
+              <td className="w-px px-2 py-1 text-right tabular-nums text-muted">{i + 1}</td>
+              <td className="w-px px-2 py-1 text-center tabular-nums">{x.station.dept}</td>
+              <td className="px-2 py-1"><a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} className="hover:underline">{x.station.name}</a></td>
+              <td style={{ color }} className="px-2 py-1 text-right font-semibold tabular-nums">{fmtV(x.value)} °C</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      ) : <p className="p-3 text-sm text-muted">Pas encore de données sur cette période.</p>}
+    </section>
   );
 }
 
