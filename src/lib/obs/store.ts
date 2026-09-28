@@ -137,9 +137,11 @@ async function refresh() {
       await sleep(PAUSE_MS);
     }
     const stale = !d.stationsAt || Date.now() - Date.parse(d.stationsAt) > STATIONS_REFRESH_H * 3600_000;
-    if (stale || seen.size > official.length) {
+    // Stations présentes seulement dans le paquet 6 min (≈ 200 de plus que le paquet horaire) : liste à compléter.
+    const sixOnly = Object.keys(six).some((id) => !deptOf.has(id) && !seen.has(id) && idDept(id));
+    if (stale || sixOnly || seen.size > official.length) {
       try {
-        const list = parseStationsCsv(await fetchStationList(stationsKey() || key), (id) => seen.get(id) ?? deptOf.get(id));
+        const list = parseStationsCsv(await fetchStationList(stationsKey() || key), (id) => seen.get(id) ?? deptOf.get(id) ?? (six[id] ? idDept(id) : undefined));
         if (list.length) {
           d.stations = [...list, ...d.stations.filter((s) => s.kind === 'amateur')];
           d.stationsAt = new Date().toISOString();
@@ -177,6 +179,13 @@ async function refresh() {
  * et rafales (raf10). Les 2 dernières heures restent en mémoire ; la rafale max. de chaque heure est
  * reportée dans les observations horaires (champ raf) pour les classements 24/48/72 h.
  */
+/** Département d'un identifiant Météo-France à 8 chiffres (métropole ; Corse 2A/2B = 20). */
+function idDept(id: string): string | undefined {
+  if (!/^\d{8}$/.test(id)) return undefined;
+  const d = id.slice(0, 2);
+  return DEPARTEMENTS.includes(d) ? d : undefined;
+}
+
 const SIX_ON = process.env.OBS_6MIN !== '0';
 const six: Record<string, SixObs[]> = {};
 let sixLast = 0;
