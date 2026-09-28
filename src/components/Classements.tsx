@@ -133,18 +133,20 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
       {showForm && <form method="get" action={base} className={`${showMenu || !embed ? 'mt-6 ' : ''}flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4 text-sm`}>
         <input type="hidden" name="c" value={home ? 'accueil' : r.id} />
         {embed && one(sp.menu) === '0' && <input type="hidden" name="menu" value="0" />}
+        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 xl:flex-nowrap">
         {([
-          ['sec', 'Inclure les stations secondaires', opt.secondaires],
-          ['am', 'Inclure les stations amateurs', opt.amateurs],
-          ['altv', 'Afficher l’altitude', opt.showAlt],
-          ['dep', 'Trier par département', opt.byDept],
-          ['regt', 'Classement par région', opt.byRegion],
-          ['evo', 'Évolution de la T° sur 1 h et 24 h', one(sp.evo) === '1'],
-          ['rec', 'Afficher les records mensuels et annuels', one(sp.rec) === '1'],
-          ['deb', 'Afficher la date de début des mesures', one(sp.deb) === '1'],
+          ['sec', 'Stations secondaires', opt.secondaires],
+          ['am', 'Stations amateurs', opt.amateurs],
+          ['altv', 'Altitude', opt.showAlt],
+          ['dep', 'Tri par département', opt.byDept],
+          ['regt', 'Par région', opt.byRegion],
+          ['evo', 'Évol. T° 1 h / 24 h', one(sp.evo) === '1'],
+          ['rec', 'Records mensuels et annuels', one(sp.rec) === '1'],
+          ['deb', 'Début des mesures', one(sp.deb) === '1'],
         ] as const).map(([name, label, on]) => (
-          <label key={name} className="flex items-center gap-2"><input type="checkbox" name={name} value="1" defaultChecked={on} className="h-4 w-4" />{label}</label>
+          <label key={name} className="flex items-center gap-1.5 whitespace-nowrap"><input type="checkbox" name={name} value="1" defaultChecked={on} className="h-4 w-4" />{label}</label>
         ))}
+        </div>
         <div className="flex w-full flex-wrap items-end gap-x-6 gap-y-3">
           <label className="flex flex-col gap-1">Altitude max. (m)
             <select name="alt" defaultValue={maxAlt ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
