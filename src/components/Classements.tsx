@@ -244,7 +244,7 @@ function TopTable({ title, sub, color, rows, href, unit = '°C' }: { title: stri
           <tbody>{rows.map((x) => (
             <tr key={x.station.id} className="border-b border-border last:border-0">
               <td className="w-px px-1.5 py-0.5 text-center tabular-nums">{x.station.dept}</td>
-              <td className="px-1.5 py-0.5"><a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} className="hover:underline">{prettyStationName(x.station.name)}</a></td>
+              <td className="px-1.5 py-0.5"><a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} className={`hover:underline ${x.station.kind === 'secondaire' ? 'italic' : ''}`}>{prettyStationName(x.station.name)}</a></td>
               <td style={{ color }} className="px-1.5 py-0.5 text-right font-semibold tabular-nums">{fmtV(x.value)} {unit}</td>
             </tr>
           ))}</tbody>
@@ -313,9 +313,9 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
                 <td className={`${td} w-px text-center tabular-nums`}>{x.station.dept}</td>
                 <td className={td}>
                   {x.station.kind === 'amateur' ? prettyStationName(x.station.name) : (
-                    <a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} target={embed ? '_top' : undefined} className="text-primary hover:underline">{prettyStationName(x.station.name)}</a>
+                    <a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} target={embed ? '_top' : undefined} className={`text-primary hover:underline ${x.station.kind === 'secondaire' ? 'italic' : ''}`}>{prettyStationName(x.station.name)}</a>
                   )}
-                  {x.station.kind !== 'principale' && <span className="ml-1 text-xs text-muted">({x.station.kind})</span>}
+                  {x.station.kind === 'amateur' && <span className="ml-1 text-xs text-muted">(amateur)</span>}
                   {x.beaten && <span className="ml-2 rounded bg-danger px-1.5 py-0.5 text-xs font-bold text-white">{x.beaten === 'abs' ? 'Record absolu' : 'Record mensuel'}</span>}
                 </td>
                 <td className={`${td} text-right font-semibold tabular-nums`} style={band ? bandStyle(band) : undefined} title={x.at ? `à ${hour(x.at)}` : undefined}>{fv(x.value)}</td>
