@@ -7,7 +7,7 @@ import {
 } from '@/lib/obs/rankings';
 import { SITE_NAME, SITE_URL } from '@/lib/config';
 import { REGIONS } from '@/lib/obs/regions';
-import { DEPARTEMENTS } from '@/lib/obs/meteofrance';
+import { DEPARTEMENTS, prettyStationName } from '@/lib/obs/meteofrance';
 import AutoSubmit from '@/components/AutoSubmit';
 import { getRecords, getSix, getSnapshot, obsConfigured } from '@/lib/obs/store';
 
@@ -238,7 +238,7 @@ function TopTable({ title, sub, color, rows, href }: { title: string; sub: strin
             <tr key={x.station.id} className="border-b border-border last:border-0">
               <td className="w-px px-2 py-1 text-right tabular-nums text-muted">{i + 1}</td>
               <td className="w-px px-2 py-1 text-center tabular-nums">{x.station.dept}</td>
-              <td className="px-2 py-1"><a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} className="hover:underline">{x.station.name}</a></td>
+              <td className="px-2 py-1"><a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} className="hover:underline">{prettyStationName(x.station.name)}</a></td>
               <td style={{ color }} className="px-2 py-1 text-right font-semibold tabular-nums">{fmtV(x.value)} °C</td>
             </tr>
           ))}</tbody>
@@ -306,8 +306,8 @@ function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: 
                 {opt.byRegion && <td className={td}>{x.region ?? '—'}</td>}
                 <td className={`${td} w-px text-center tabular-nums`}>{x.station.dept}</td>
                 <td className={td}>
-                  {x.station.kind === 'amateur' ? x.station.name : (
-                    <a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} target={embed ? '_top' : undefined} className="text-primary hover:underline">{x.station.name}</a>
+                  {x.station.kind === 'amateur' ? prettyStationName(x.station.name) : (
+                    <a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} target={embed ? '_top' : undefined} className="text-primary hover:underline">{prettyStationName(x.station.name)}</a>
                   )}
                   {x.station.kind !== 'principale' && <span className="ml-1 text-xs text-muted">({x.station.kind})</span>}
                   {x.beaten && <span className="ml-2 rounded bg-danger px-1.5 py-0.5 text-xs font-bold text-white">{x.beaten === 'abs' ? 'Record absolu' : 'Record mensuel'}</span>}

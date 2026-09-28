@@ -120,3 +120,27 @@ export async function fetchSix(key: string, ms: number): Promise<Record<string, 
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
+
+/** Abréviations des noms de stations Météo-France (en majuscules). */
+const ABBR: Record<string, string> = {
+  'CLERMONT-FD': 'Clermont-Ferrand', FD: 'Ferrand', ST: 'Saint', STE: 'Sainte', STES: 'Saintes', STS: 'Saints', MT: 'Mont', AEROP: 'Aéroport', AERO: 'Aéroport',
+};
+const SMALL = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'sur', 'sous', 'en', 'et', 'au', 'aux', 'lès', 'les']);
+const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+
+/** « CLERMONT-FD » → « Clermont-Ferrand », « ST GIRONS » → « Saint Girons », « L'ILE D'YEU » → « L'Ile d'Yeu ». */
+export function prettyStationName(raw: string): string {
+  const s = raw.trim();
+  if (ABBR[s.toUpperCase()]) return ABBR[s.toUpperCase()];
+  return s.split(/(\s+|-|\/)/).map((part, i) => {
+    if (/^(\s+|-|\/)$/.test(part) || !part) return part;
+    const up = part.toUpperCase();
+    if (ABBR[up]) return ABBR[up];
+    if (/^[IVX]+$/.test(up) && up.length > 1) return up; // chiffres romains
+    if (/\d/.test(part) && /^[A-Z0-9]+$/.test(up) && up.length <= 4) return up;
+    const low = part.toLowerCase();
+    const el = low.match(/^([ld])['’](.+)$/);
+    if (el) return `${i === 0 ? cap(el[1]) : el[1]}'${cap(el[2])}`;
+    return i > 0 && SMALL.has(low) ? low : cap(low);
+  }).join('');
+}
