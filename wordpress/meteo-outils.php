@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Météo Outils – Intégration
  * Description: Shortcodes [outil_meteo type="distance-orage"] (calculateurs) et [classement_meteo type="tx-prov"] (classements des stations) intégrés via iframe.
- * Version: 0.4.0
+ * Version: 0.5.0
  * License: GPL-2.0-or-later
  */
 
@@ -91,7 +91,7 @@ function mo_classement_aliases() {
  */
 add_shortcode('classement_meteo', function ($atts) {
     $a = shortcode_atts(array(
-        'type' => 'tx-prov', 'altitude_max' => '', 'secondaires' => 'non', 'amateurs' => 'non', 'altitude' => 'non',
+        'type' => 'accueil', 'altitude_max' => '', 'secondaires' => 'non', 'amateurs' => 'non', 'altitude' => 'non',
         'departement' => 'non', 'dep' => '', 'region' => '', 'par_region' => 'non', 'evolution' => 'non', 'records' => 'non', 'debut' => 'non', 'lignes' => '50', 'menu' => 'oui', 'filtres' => 'oui',
         'height' => '900',
     ), $atts, 'classement_meteo');
@@ -101,7 +101,7 @@ add_shortcode('classement_meteo', function ($atts) {
     $type = sanitize_title($a['type']);
     $aliases = mo_classement_aliases();
     if (isset($aliases[$type])) $type = $aliases[$type];
-    if (!in_array($type, mo_classements(), true)) $type = 'tx-prov';
+    if ($type !== 'accueil' && !in_array($type, mo_classements(), true)) $type = 'accueil';
 
     $yes = function ($v) { return in_array(strtolower(trim((string) $v)), array('1', 'oui', 'yes', 'true', 'on'), true); };
     $q = array('c' => $type);

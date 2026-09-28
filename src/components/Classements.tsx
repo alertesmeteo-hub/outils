@@ -41,7 +41,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
   const showMenu = !embed || one(sp.menu) !== '0';
   const showForm = !embed || one(sp.filtres) !== '0';
   /** Page d'accueil (sans classement choisi) : Top 30 minima et maxima côte à côte. */
-  const home = !embed && !one(sp.c);
+  const home = !one(sp.c) || one(sp.c) === 'accueil';
   const r = getRanking(one(sp.c));
   const altRaw = one(sp.alt);
   const maxAlt = altRaw && ALTS.includes(Number(altRaw)) ? Number(altRaw) : undefined;
@@ -131,7 +131,7 @@ export default async function ClassementsView({ sp, base = '/classements/', embe
       </div>}
 
       {showForm && <form method="get" action={base} className={`${showMenu || !embed ? 'mt-6 ' : ''}flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4 text-sm`}>
-        {!home && <input type="hidden" name="c" value={r.id} />}
+        <input type="hidden" name="c" value={home ? 'accueil' : r.id} />
         {embed && one(sp.menu) === '0' && <input type="hidden" name="menu" value="0" />}
         {([
           ['sec', 'Inclure les stations secondaires', opt.secondaires],
