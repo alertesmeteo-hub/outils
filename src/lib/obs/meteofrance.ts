@@ -125,12 +125,18 @@ export async function fetchSix(key: string, ms: number): Promise<Record<string, 
 const ABBR: Record<string, string> = {
   'CLERMONT-FD': 'Clermont-Ferrand', FD: 'Ferrand', ST: 'Saint', STE: 'Sainte', STES: 'Saintes', STS: 'Saints', MT: 'Mont', AEROP: 'Aéroport', AERO: 'Aéroport',
 };
+/** Mots courants que Météo-France écrit sans accent. */
+const ACCENTS: Record<string, string> = {
+  ECOLE: 'École', ETIENNE: 'Étienne', EGLISE: 'Église', ETANG: 'Étang', ILE: 'Île', AEROPORT: 'Aéroport', CHATEAU: 'Château', MERIGNAC: 'Mérignac',
+  NIMES: 'Nîmes', ORLEANS: 'Orléans', GRENOBLE: 'Grenoble', BEZIERS: 'Béziers', PERIGUEUX: 'Périgueux', EVREUX: 'Évreux', SETE: 'Sète', ANGERS: 'Angers',
+};
 const SMALL = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'sur', 'sous', 'en', 'et', 'au', 'aux', 'lès', 'les']);
 const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 /** « CLERMONT-FD » → « Clermont-Ferrand », « ST GIRONS » → « Saint Girons », « L'ILE D'YEU » → « L'Ile d'Yeu ». */
 export function prettyStationName(raw: string): string {
-  const s = raw.trim();
+  // Suffixe technique (« _SAPC », « _AUTO »…) et élision écrite avec un tiret (« L-ECOLE » → « L'ECOLE »).
+  const s = raw.trim().replace(/_[A-Za-z0-9]+$/, '').replace(/(^|[\s-])([LD])-(?=[A-Za-z])/gi, "$1$2'");
   if (ABBR[s.toUpperCase()]) return ABBR[s.toUpperCase()];
   return s.split(/(\s+|-|\/)/).map((part, i) => {
     if (/^(\s+|-|\/)$/.test(part) || !part) return part;
@@ -140,7 +146,8 @@ export function prettyStationName(raw: string): string {
     if (/\d/.test(part) && /^[A-Z0-9]+$/.test(up) && up.length <= 4) return up;
     const low = part.toLowerCase();
     const el = low.match(/^([ld])['’](.+)$/);
-    if (el) return `${i === 0 ? cap(el[1]) : el[1]}'${cap(el[2])}`;
+    if (el) return `${i === 0 ? cap(el[1]) : el[1]}'${ACCENTS[el[2].toUpperCase()] ?? cap(el[2])}`;
+    if (ACCENTS[up]) return ACCENTS[up];
     return i > 0 && SMALL.has(low) ? low : cap(low);
   }).join('');
 }
