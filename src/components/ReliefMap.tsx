@@ -121,7 +121,7 @@ export default function ReliefMap() {
     ctx.font = `${10 * ratio}px system-ui, sans-serif`;
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(255,255,255,.9)';
-    ctx.fillText('© OpenStreetMap © CARTO · Relief Mapzen', out.width - 6 * ratio, out.height - 8 * ratio);
+    ctx.fillText('OpenFreeMap © OpenStreetMap · Relief Mapzen', out.width - 6 * ratio, out.height - 8 * ratio);
     const a = document.createElement('a');
     a.download = 'carte-releves.png';
     a.href = out.toDataURL('image/png');
@@ -154,7 +154,7 @@ export default function ReliefMap() {
           <button type="button" onClick={() => setText(EXAMPLE)} className="rounded-lg border border-border px-3 py-2 font-medium hover:bg-bg">Charger l’exemple</button>
           <button type="button" onClick={exportPng} disabled={!ready} className="rounded-lg bg-primary px-3 py-2 font-medium text-white disabled:opacity-50">Télécharger en PNG</button>
         </div>
-        <p className="text-xs text-muted">Les données saisies restent dans votre navigateur. Fond : relief Mapzen (AWS Open Data), libellés © OpenStreetMap / CARTO.</p>
+        <p className="text-xs text-muted">Les données saisies restent dans votre navigateur. Fond : relief Mapzen (AWS Open Data), libellés OpenFreeMap © contributeurs OpenStreetMap.</p>
       </div>
     </div>
   );

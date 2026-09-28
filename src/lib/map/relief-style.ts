@@ -2,25 +2,27 @@ import type { StyleSpecification } from 'maplibre-gl';
 
 /**
  * Fond « relief » : teintes hypsométriques (vert en plaine → gris en montagne),
- * ombrage du relief et libellés clairs cerclés de sombre. Sans clé API.
- * MNT : tuiles Terrarium (Mapzen / AWS Open Data). Libellés : CARTO (données OpenStreetMap).
+ * ombrage du relief et libellés clairs cerclés de sombre. Sans clé API, usage commercial autorisé.
+ * MNT : tuiles Terrarium (Mapzen / AWS Open Data). Libellés : OpenFreeMap (données OpenStreetMap, ODbL).
  */
 export const DEM_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
-export const LABEL_TILES = ['a', 'b', 'c'].map((s) => `https://${s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}@2x.png`);
-export const TILE_HOSTS = ['https://s3.amazonaws.com', 'https://*.basemaps.cartocdn.com'];
+export const TILE_HOSTS = ['https://s3.amazonaws.com', 'https://tiles.openfreemap.org'];
 
 const dem = { type: 'raster-dem' as const, tiles: [DEM_TILES], encoding: 'terrarium' as const, tileSize: 256, maxzoom: 14 };
 
+const halo = { 'text-color': '#ffffff', 'text-halo-color': 'rgba(20,30,20,0.85)', 'text-halo-width': 1.4 };
+const name = ['coalesce', ['get', 'name:fr'], ['get', 'name']] as const;
+
 export const reliefStyle: StyleSpecification = {
   version: 8,
+  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
   sources: {
     'dem-color': dem,
     'dem-shade': dem,
-    labels: {
-      type: 'raster',
-      tiles: LABEL_TILES,
-      tileSize: 256,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a> · Relief © Mapzen, AWS Open Data',
+    osm: {
+      type: 'vector',
+      url: 'https://tiles.openfreemap.org/planet',
+      attribution: '<a href="https://openfreemap.org">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a> · Relief © Mapzen, AWS Open Data',
     },
   },
   layers: [
@@ -45,6 +47,32 @@ export const reliefStyle: StyleSpecification = {
       source: 'dem-shade',
       paint: { 'hillshade-exaggeration': 0.55, 'hillshade-shadow-color': '#16261a', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#2c3b2c' },
     },
-    { id: 'libelles', type: 'raster', source: 'labels' },
+    { id: 'eau', type: 'fill', source: 'osm', 'source-layer': 'water', paint: { 'fill-color': '#4fb3d9', 'fill-opacity': 0.85 } },
+    { id: 'routes', type: 'line', source: 'osm', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary']]], paint: { 'line-color': 'rgba(255,255,255,0.45)', 'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 12, 2] } },
+    { id: 'frontieres', type: 'line', source: 'osm', 'source-layer': 'boundary', filter: ['<=', ['get', 'admin_level'], 6], paint: { 'line-color': 'rgba(60,60,60,0.6)', 'line-width': 0.8 } },
+    {
+      id: 'sommets',
+      type: 'symbol',
+      source: 'osm',
+      'source-layer': 'mountain_peak',
+      minzoom: 8,
+      filter: ['>=', ['coalesce', ['get', 'ele'], 0], 1200],
+      layout: { 'text-field': ['format', name, {}, '\n', {}, ['concat', ['to-string', ['get', 'ele']], ' m'], { 'font-scale': 0.85 }], 'text-font': ['Noto Sans Italic'], 'text-size': 11, 'text-anchor': 'top', 'text-offset': [0, 0.4] },
+      paint: { 'text-color': '#1e1e1e', 'text-halo-color': 'rgba(255,255,255,0.6)', 'text-halo-width': 1 },
+    },
+    {
+      id: 'localites',
+      type: 'symbol',
+      source: 'osm',
+      'source-layer': 'place',
+      filter: ['in', ['get', 'class'], ['literal', ['city', 'town', 'village']]],
+      layout: {
+        'text-field': name,
+        'text-font': ['Noto Sans Bold'],
+        'text-size': ['match', ['get', 'class'], 'city', 15, 'town', 13, 11],
+        'symbol-sort-key': ['match', ['get', 'class'], 'city', 0, 'town', 1, 2],
+      },
+      paint: halo,
+    },
   ],
 };
