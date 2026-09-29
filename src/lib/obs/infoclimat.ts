@@ -88,7 +88,10 @@ export async function fetchInfoclimat(ref: Station[]): Promise<InfoclimatData | 
     const res = await fetch(`${INFOCLIMAT_URL}?${q}`, { cache: 'no-store', signal: AbortSignal.timeout(60_000) });
     if (res.status === 401 || res.status === 403) throw new Error(`Infoclimat : ${res.status} (jeton refusé)`);
     if (!res.ok) throw new Error(`Infoclimat : ${res.status}`);
-    const j = await res.json();
+    const text = await res.text();
+    if (/wrong ip/i.test(text)) throw new Error('Infoclimat : jeton lié à une autre adresse IP (régénérer le jeton avec l’IP du serveur)');
+    let j: any;
+    try { j = JSON.parse(text); } catch { throw new Error(`Infoclimat : réponse inattendue « ${text.slice(0, 80)} »`); }
     // Nom et département de la liste officielle quand la réponse ne les donne pas.
     for (const s of Array.isArray(j?.stations) ? j.stations : []) {
       const m = meta.get(s.id);
