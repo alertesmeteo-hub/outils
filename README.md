@@ -112,5 +112,21 @@ pm2 restart outils-meteo --update-env
 ```
 Puis ouvrir https://outils.alertes-meteo.com/admin/ (identifiant `admin`, authentification HTTP Basic). Sauvegarde de la base : `sudo -u postgres pg_dump outils > outils.sql`.
 
+## Classements des stations (`/classements/`)
+Tableaux en direct des stations Météo-France (métropole + Corse), rendus côté serveur :
+- **TX** provisoires (8 h → 8 h locales), 06-18 UTC, 18-06 UTC, finales, et classement des records provisoires de TX ;
+- **TN** provisoires (20 h → 8 h locales), 06-18 UTC, 18-06 UTC, finales ; colonnes windchill et humidex ;
+- **ensoleillement**, **pluie** 1 h, depuis 6 h UTC (avec records), 24 h, 48 h et 72 h glissantes ;
+- **vent** moyen et vent max. (vent moyen 10 min le plus fort, le paquet horaire ne fournit pas les rafales) sur 1, 24, 48 et 72 h, et **rafales** (raf10 du paquet 6 min v2 : dernier relevé, 1 h, 24/48/72 h ; repli SYNOP) ;
+- **conditions atmosphériques** : pression mer et variations sur 3, 12, 24 h, humidité, visibilité, hauteur de neige, ensoleillement sur 24 h ;
+- **point de rosée**, **windchill** et **humidex** avec leurs échelles de risque ;
+- **normales et records** : écarts aux TX/TN moyennes du mois (finales ou 24 h glissantes) et aux records mensuels et absolus (données `normals`, `monthly`, `absolute` de `data/records.json`).
+
+Filtres : région (ou classement par région), évolution de la T° sur 1 h et 24 h, altitude max., stations secondaires (Pack ETENDU), stations amateurs, affichage de l'altitude, tri par département, records mensuels et absolus, date de début des mesures.
+
+WordPress : shortcode `[classement_meteo type="tx-prov"]` (voir docs/WORDPRESS.md), servi par `/embed/classements/`.
+Configuration (serveur) : `METEOFRANCE_API_KEY` (portail-api.meteofrance.fr : souscrire les API « Observations » et « Paquet Observations » dans la même application, une seule clé suffit ; sinon `METEOFRANCE_PAQUET_API_KEY` et `METEOFRANCE_OBS_API_KEY`). Le cache (`.cache/obs`) garde 96 h : le paquet horaire ne couvre que 24 h, les cumuls 48 h et 72 h se complètent après 2 à 3 jours de fonctionnement (colonne « heures »). Normales 1991-2020 et records : récupérés automatiquement du dépôt climato (fiches climatologiques Météo-France, ~1 455 stations, cache 7 jours, `CLIMATO_DATA_URL`) ; `data/records.json` (modèle `data/records.example.json`) les complète ou les corrige station par station. Amateurs : flux JSON `AMATEUR_OBS_URL`. Sans clé, la page l'indique et n'affiche aucune donnée.
+Code : `src/lib/obs/` (calculs purs testés dans `rankings.ts`, source `meteofrance.ts`, cache `store.ts`).
+
 ## Sources des données
 Les facteurs d'émission de l'outil `/climat/empreinte-carbone/` sont extraits de l'API publique ADEME (Base Empreinte®, data.ademe.fr) et stockés dans `src/lib/tools/data/ademe-transport.ts`, avec l'identifiant ADEME de chaque facteur. Ils sont datés de l'export (2026-09-19) : à régénérer périodiquement, la base étant révisée régulièrement.

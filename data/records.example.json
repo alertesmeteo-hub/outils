@@ -1,0 +1,41 @@
+{
+  "_format": "Copier en data/records.json. Clé = identifiant Météo-France de la station (8 chiffres). monthly : clés 1 à 12. Valeurs en °C (tx, tn) et mm (rr24), dates AAAA-MM-JJ. Ne saisir que des records vérifiés (fiches climatologiques Météo-France). normals : moyenne mensuelle des TX et TN (°C), clés 1 à 12.",
+  "00000000": {
+    "monthly": {
+      "9": {
+        "tx": {
+          "v": 0,
+          "d": "2000-01-01"
+        },
+        "tn": {
+          "v": 0,
+          "d": "2000-01-01"
+        },
+        "rr24": {
+          "v": 0,
+          "d": "2000-01-01"
+        }
+      }
+    },
+    "absolute": {
+      "tx": {
+        "v": 0,
+        "d": "2000-01-01"
+      },
+      "tn": {
+        "v": 0,
+        "d": "2000-01-01"
+      },
+      "rr24": {
+        "v": 0,
+        "d": "2000-01-01"
+      }
+    },
+    "normals": {
+      "9": {
+        "tx": 0,
+        "tn": 0
+      }
+    }
+  }
+}

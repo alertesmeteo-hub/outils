@@ -1,0 +1,345 @@
+import type { CSSProperties } from 'react';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import {
+  HUMIDEX_SCALE, RANKINGS, WINDCHILL_SCALE, alwaysRecords, buildRanking, getRanking, isRecordRanking, synopEnd, humidexBand, windchillBand, windows,
+  type Band, type RankRow, type Ranking,
+} from '@/lib/obs/rankings';
+import { SITE_NAME, SITE_URL } from '@/lib/config';
+import { REGIONS } from '@/lib/obs/regions';
+import { DEPARTEMENTS, prettyStationName } from '@/lib/obs/meteofrance';
+import AutoSubmit from '@/components/AutoSubmit';
+import { getRecords, getSix, getSnapshot, obsConfigured } from '@/lib/obs/store';
+
+/** Altitudes maximales proposées (m). */
+const ALTS = [300, 400, 500, 800, 1000, 1500];
+/** Lien vers la fiche climatologique d'une station ({id} = identifiant Météo-France). */
+const STATION_URL = process.env.STATION_URL_TEMPLATE || 'https://alertes-meteo.com/climatologie/climato_meteo/?station={id}';
+export type Sort = { key: 'val' | 'station' | 'dept' | 'wc' | 'hx'; dir: 'asc' | 'desc' };
+
+export type SP = Record<string, string | string[] | undefined>;
+const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+
+const nf = (d: number) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtV = (v: number | undefined, d = 1) => (v == null ? '—' : nf(d).format(v));
+/** Valeur signée : +1,2 / −0,8. */
+const fmtS = (v: number | undefined, d = 1) => (v == null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${nf(d).format(Math.abs(v))}`);
+const fmtDate = (s?: string) => (s ? new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${s.slice(0, 10)}T00:00:00Z`)) : '—');
+const fmtTime = (ms: number) => new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'full', timeStyle: 'short' }).format(new Date(ms));
+const hour = (iso?: string) => (iso ? new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) : '');
+
+const VAR = { warn: 'var(--warn)', danger: 'var(--danger)' } as const;
+const tone = (t: keyof typeof VAR) => ({ '--tone': VAR[t] }) as CSSProperties;
+const bandStyle = (b: Band): CSSProperties => ({ background: b.bg, color: b.fg });
+const Pill = ({ b }: { b: Band }) => <span style={bandStyle(b)} className="inline-block rounded px-2 py-0.5 text-xs font-semibold">{b.label}</span>;
+
+/**
+ * Classements des stations. `base` : chemin de la page (site ou /embed/classements/).
+ * `embed` : version intégrable (WordPress) sans fil d'Ariane ni méthode détaillée ; `menu=0` masque les onglets.
+ */
+export default async function ClassementsView({ sp, base = '/classements/', embed = false }: { sp: SP; base?: string; embed?: boolean }) {
+  const showMenu = !embed || one(sp.menu) !== '0';
+  const showForm = !embed || one(sp.filtres) !== '0';
+  /** Page d'accueil (sans classement choisi) : Top 30 minima et maxima côte à côte. */
+  const home = !one(sp.c) || one(sp.c) === 'accueil';
+  const r = getRanking(one(sp.c));
+  const altRaw = one(sp.alt);
+  const maxAlt = altRaw && ALTS.includes(Number(altRaw)) ? Number(altRaw) : undefined;
+  const opt = {
+    secondaires: one(sp.sec) === '1', amateurs: one(sp.am) === '1', showAlt: one(sp.altv) === '1', byDept: one(sp.dep) === '1',
+    records: (one(sp.rec) === '1' && !r.temp) || alwaysRecords(r), debut: one(sp.deb) === '1' || isRecordRanking(r),
+    byRegion: one(sp.regt) === '1', evo: one(sp.evo) === '1' && !!r.temp,
+  };
+  const regRaw = one(sp.reg);
+  const region = REGIONS.some((x) => x.code === regRaw) ? regRaw : undefined;
+  const deptRaw = one(sp.dpt);
+  const dept = deptRaw && DEPARTEMENTS.includes(deptRaw) ? deptRaw : undefined;
+  const limitRaw = one(sp.n);
+  const limit = limitRaw === 'tout' ? Infinity : [50, 100, 200, 500].includes(Number(limitRaw)) ? Number(limitRaw) : 100;
+
+  const [snap, records] = await Promise.all([getSnapshot(), getRecords()]);
+  let now = 0;
+  for (const list of Object.values(snap.obs)) { const t = Date.parse(list[list.length - 1]?.time ?? ''); if (t > now) now = t; }
+  const filters = { maxAlt, secondaires: opt.secondaires, amateurs: opt.amateurs, byDept: opt.byDept, region, dept, byRegion: opt.byRegion, evo: opt.evo };
+  const extra = { six: getSix(), rafH: snap.rafH };
+  const rows = now ? buildRanking(r, snap.stations, snap.obs, now, filters, records, extra) : [];
+  const top = (id: string, n = 30) => (now ? buildRanking(getRanking(id), snap.stations, snap.obs, now, { ...filters, byDept: false, byRegion: false, evo: false }, records, extra).slice(0, n) : []);
+  // Tri choisi par le visiteur (clic sur l'en-tête) ; par défaut, l'ordre du classement.
+  const triRaw = one(sp.tri);
+  const sort: Sort | undefined = (['station', 'dept', 'val', 'wc', 'hx'] as const).includes(triRaw as never)
+    ? { key: triRaw as Sort['key'], dir: one(sp.sens) === 'desc' ? 'desc' : 'asc' } : undefined;
+  if (sort) {
+    const d = sort.dir === 'asc' ? 1 : -1;
+    const num = (x: RankRow) => (sort.key === 'wc' ? x.windchill : sort.key === 'hx' ? x.humidex : x.value);
+    const txt = (x: RankRow) => (sort.key === 'station' ? x.station.name : x.station.dept.padStart(3, '0'));
+    const numeric = sort.key === 'val' || sort.key === 'wc' || sort.key === 'hx';
+    rows.sort((a, b) => {
+      if (numeric) {
+        const va = num(a), vb = num(b);
+        if (va == null || vb == null) return va == null ? (vb == null ? 0 : 1) : -1; // valeurs manquantes en fin de liste
+        return d * (va - vb) || a.station.name.localeCompare(b.station.name, 'fr');
+      }
+      return d * txt(a).localeCompare(txt(b), 'fr') || a.station.name.localeCompare(b.station.name, 'fr');
+    });
+  }
+  const shown = rows.slice(0, limit);
+  /** Lien d'en-tête : premier clic = ordre naturel, clic suivant = inverse. */
+  const sortHref = (k: Sort['key']) => {
+    const natural = k === 'val' ? (r.order === 'asc' ? 'asc' : 'desc') : k === 'wc' ? 'asc' : k === 'hx' ? 'desc' : 'asc';
+    const dir = sort?.key === k ? (sort.dir === 'asc' ? 'desc' : 'asc') : natural;
+    return keep({ tri: k, sens: dir });
+  };
+  const w = now && r.window ? r.window(windows(now)) : undefined;
+
+  const keep = (extra: Record<string, string>) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) { const s = one(v); if (s) q.set(k, s); }
+    for (const [k, v] of Object.entries(extra)) q.set(k, v);
+    return `${base}?${q.toString()}`;
+  };
+  const groups = [...new Set(RANKINGS.map((x) => x.group))];
+  const hasRec = Object.keys(records).length > 0;
+
+  return (
+    <>
+      {!embed && <>
+        <h1 className="text-3xl font-extrabold">Classements des stations météo</h1>
+      </>}
+
+
+      {showMenu && <div className={`${embed ? '' : 'mt-8 '}space-y-3`}>
+        {groups.map((g) => (
+          <div key={g} className={`flex items-center gap-2 text-sm ${g === 'Normales et records' ? 'flex-wrap lg:flex-nowrap' : 'flex-wrap'}`}>
+            <span className="w-full font-semibold sm:w-auto sm:min-w-56">{g}</span>
+            {RANKINGS.filter((x) => x.group === g).map((x) => (
+              <Link key={x.id} href={keep({ c: x.id })} aria-current={!home && x.id === r.id ? 'page' : undefined}
+                className={`whitespace-nowrap rounded-md border px-3 py-1.5 ${!home && x.id === r.id ? 'border-primary bg-primary text-white' : 'border-border bg-surface hover:border-primary'}`}>
+                {x.short}
+              </Link>
+            ))}
+          </div>
+        ))}
+      </div>}
+
+      {showForm && <form method="get" action={base} className={`${showMenu || !embed ? 'mt-6 ' : ''}flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4 text-sm`}>
+        <input type="hidden" name="c" value={home ? 'accueil' : r.id} />
+        {embed && one(sp.menu) === '0' && <input type="hidden" name="menu" value="0" />}
+        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 xl:flex-nowrap">
+        {([
+          ['sec', 'Stations secondaires', opt.secondaires],
+          ['am', 'Stations amateurs', opt.amateurs],
+          ['altv', 'Altitude', opt.showAlt],
+          ['dep', 'Tri par département', opt.byDept],
+          ['regt', 'Par région', opt.byRegion],
+          ['evo', 'Évol. T° 1 h / 24 h', one(sp.evo) === '1'],
+          ['rec', 'Records mensuels et annuels', one(sp.rec) === '1'],
+          ['deb', 'Début des mesures', one(sp.deb) === '1'],
+        ] as const).map(([name, label, on]) => (
+          <label key={name} className="flex items-center gap-1.5 whitespace-nowrap"><input type="checkbox" name={name} value="1" defaultChecked={on} className="h-4 w-4" />{label}</label>
+        ))}
+        </div>
+        <div className="flex w-full flex-wrap items-end gap-x-6 gap-y-3">
+          <label className="flex flex-col gap-1">Altitude max. (m)
+            <select name="alt" defaultValue={maxAlt ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
+              <option value="">toutes</option>
+              {ALTS.map((a) => <option key={a} value={a}>{a} m</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">Région
+            <select name="reg" defaultValue={region ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
+              <option value="">France entière</option>
+              {REGIONS.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">Département
+            <select name="dpt" defaultValue={dept ?? ''} className="rounded-md border border-border bg-bg px-2 py-1.5">
+              <option value="">tous</option>
+              {DEPARTEMENTS.map((d) => <option key={d} value={d}>{d === '20' ? '20 (Corse)' : d}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">Lignes
+            <select name="n" defaultValue={limitRaw ?? '100'} className="rounded-md border border-border bg-bg px-2 py-1.5">
+              {['50', '100', '200', '500', 'tout'].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        </div>
+        <noscript><button className="rounded-md bg-primary px-4 py-2 font-semibold text-white">Afficher</button></noscript>
+        <AutoSubmit />
+      </form>}
+
+      {home && now > 0 && (() => {
+        const live = top('t', Infinity).filter((x) => x.value != null);
+        return (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <TopTable title="Top 30 Minima" sub="en direct" color="#1d4ed8" rows={live.slice(-30).reverse()} href={keep({ c: 't', tri: 'val', sens: 'asc' })} />
+            <TopTable title="Top 30 Maxima" sub="en direct" color="#dc2626" rows={live.slice(0, 30)} href={keep({ c: 't' })} />
+            <TopTable title="Top 30 Précipitations" sub="24 h" color="#0891b2" unit="mm" rows={top('rr24', Infinity).filter((x) => (x.value ?? 0) >= 0.05).slice(0, 30)} href={keep({ c: 'rr24' })} />
+          </div>
+        );
+      })()}
+
+      {!home && <>
+      <h2 className={`${showMenu || showForm ? 'mt-8' : ''} text-xl font-bold`}>{r.label}</h2>
+      {now > 0 && (
+        <p className="mt-1 text-sm text-muted">
+          {r.synop && !Object.keys(snap.rafH ?? {}).length ? <>{synopEnd(snap.obs) ? <>Dernier message SYNOP : {fmtTime(synopEnd(snap.obs))} (publié par Météo-France avec environ un jour de décalage).</> : <>Rafales SYNOP pas encore chargées (fichier téléchargé toutes les 3 heures).</>}</> : <>Dernière observation : {fmtTime(now)}.</>}{w && <> Période : {w.label}{w.final ? '' : ' (en cours)'}.</>} {rows.length} stations classées{dept ? ` dans le département ${dept}` : region ? ` en ${REGIONS.find((x) => x.code === region)!.name}` : ''}.
+        </p>
+      )}
+
+      {!obsConfigured() ? (
+        <Notice>
+          Aucune source d’observations n’est configurée : définissez <code>METEOFRANCE_API_KEY</code> (clé gratuite du portail
+          portail-api.meteofrance.fr, API « Observations » et « Paquet Observations ») côté serveur. Aucune donnée n’est inventée.
+        </Notice>
+      ) : !now ? (
+        snap.errors.length > 0 ? (
+          <Notice>Échec de la collecte Météo-France : {snap.errors[0]}. {/\b40[13]\b/.test(snap.errors[0]) ? 'Vérifiez la clé et la souscription aux API.' : /\b404\b/.test(snap.errors[0]) ? 'Vérifiez l’adresse (version) de l’API.' : 'Nouvel essai au prochain rafraîchissement.'}</Notice>
+        ) : <Notice>Premier chargement des observations en cours (environ 2 minutes pour l’ensemble des départements). Rechargez la page ensuite.</Notice>
+      ) : (
+        w && !w.final && w.start >= now
+          ? <Notice>La période vient de commencer : le classement se remplira avec la prochaine observation horaire.</Notice>
+          : <RankTable r={r} rows={shown} opt={opt} sort={sort} sortHref={sortHref} embed={embed} />
+      )}
+      {opt.records && r.record && !hasRec && now > 0 && (
+        <p className="mt-2 text-sm text-muted">Aucun fichier de records chargé (<code>data/records.json</code>) : les colonnes de records restent vides.</p>
+      )}
+      {r.group === 'Normales et records' && now > 0 && rows.length === 0 && (
+        <p className="mt-2 text-sm text-muted">Ces classements demandent les normales et records des stations dans <code>data/records.json</code> (clés <code>normals</code>, <code>monthly</code>, <code>absolute</code>).</p>
+      )}
+      {rows.length > shown.length && <p className="mt-2 text-sm"><Link href={keep({ n: 'tout' })} className="text-primary underline">Afficher les {rows.length} stations</Link></p>}
+
+      </>}
+      {home && !obsConfigured() && <Notice>Aucune source d’observations n’est configurée.</Notice>}
+      {home && obsConfigured() && !now && <Notice>Premier chargement des observations en cours. Rechargez la page dans quelques minutes.</Notice>}
+
+      {!home && (r.id === 'humidex' || r.feels) && <Scale title="Échelle de l’humidex" rows={HUMIDEX_SCALE} />}
+      {!home && (r.id === 'windchill' || r.feels) && <Scale title="Échelle du windchill (refroidissement éolien)" rows={WINDCHILL_SCALE} />}
+
+      {embed ? (
+        <p className="mt-4 text-xs text-muted">
+          Valeurs provisoires, non validées. Source : Météo-France (licence Etalab 2.0){opt.amateurs ? <>, stations amateurs Infoclimat (StatIC)</> : null}. Propulsé par{' '}
+          <a className="underline" href={`${SITE_URL}/classements/?c=${r.id}`} target="_blank" rel="noopener">{SITE_NAME}</a>
+        </p>
+      ) : <section className="mt-10 max-w-3xl space-y-2 text-sm text-muted">
+        <h2 className="text-base font-bold text-text">Méthode</h2>
+        <p>TX provisoire : maximum des températures horaires de 8 h à 8 h locales (journée en cours). TX finale : même période, la veille, close. TN provisoire : minimum de 20 h à 8 h locales. Les fenêtres 06-18 UTC et 18-06 UTC sont les dernières commencées.</p>
+        <p>Pluie : cumul des précipitations horaires sur 1 h, depuis 6 h UTC, ou sur 24, 48 et 72 heures glissantes. Tant que l’historique collecté ne couvre pas toute la période (48 h ou 72 h au démarrage), le cumul est un minimum.</p>
+        <p>Windchill - Ressenti : formule d’Environnement Canada, calculée dès que le vent dépasse 4,8 km/h et plafonnée à la température de l’air (vent faible : ressenti = température). Humidex : Environnement Canada, à partir de la température et du point de rosée. Pression ramenée au niveau de la mer.</p>
+        <p>Vent : vent moyen de la dernière observation ; vent maximal = vent moyen sur 10 minutes le plus fort de l’heure (le paquet horaire de Météo-France ne fournit pas les rafales instantanées), puis son maximum sur 24, 48 et 72 heures. Rafales : rafale maximale sur 10 minutes (raf10) des relevés au pas de 6 minutes de Météo-France (paquet v2, quasi-temps réel), sur le dernier relevé, la dernière heure ou 24, 48 et 72 heures ; à défaut (historique en cours de constitution), rafales des messages SYNOP, publiées avec environ un jour de décalage. Températures du moment : dernier relevé au pas de 6 minutes quand il existe. Variations de pression : différence entre la dernière pression et celle observée 3, 12 ou 24 heures plus tôt, classées par ampleur (hausse ou baisse). Évolution de la température : écart avec la température relevée 1 heure et 24 heures plus tôt.</p>
+        <p>Normales : écart de la TX (8 h → 8 h) ou TN (20 h → 8 h) finale, ou des extrêmes des 24 dernières heures, à la moyenne mensuelle des TX ou TN de la station. Écarts aux records : TX ou TN finale moins le record mensuel ou absolu de la station (valeur positive pour la TX ou négative pour la TN = record battu).</p>
+        <p>Source : Météo-France, API Observations (licence Etalab 2.0). Records : fichier fourni par l’éditeur du site. Stations amateurs : réseau StatIC d’Infoclimat (infoclimat.fr, usage non commercial), non contrôlées par Météo-France.</p>
+      </section>}
+    </>
+  );
+}
+
+function TopTable({ title, sub, color, rows, href, unit = '°C' }: { title: string; sub: string; color: string; rows: RankRow[]; href: string; unit?: string }) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-surface">
+      <h2 style={{ background: color }} className="px-1.5 py-0.5 text-sm font-bold text-white">
+        <Link href={href} className="hover:underline">{title}</Link> <span className="text-xs font-normal opacity-90">· {sub}</span>
+      </h2>
+      {rows.length ? (
+        <table className="w-full text-xs leading-tight">
+          <tbody>{rows.map((x) => (
+            <tr key={x.station.id} className="border-b border-border last:border-0">
+              <td className="w-px px-1.5 py-0.5 text-center tabular-nums">{x.station.dept}</td>
+              <td className="px-1.5 py-0.5"><a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} className={`hover:underline ${x.station.kind === 'secondaire' ? 'italic' : ''}`}>{prettyStationName(x.station.name)}</a></td>
+              <td style={{ color }} className="px-1.5 py-0.5 text-right font-semibold tabular-nums">{fmtV(x.value)} {unit}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      ) : <p className="p-3 text-sm text-muted">Pas de pluie sur 24 h.</p>}
+    </section>
+  );
+}
+
+function Notice({ children }: { children: React.ReactNode }) {
+  return <p style={tone('warn')} className="tone-bg mt-4 rounded-xl border p-4 text-sm">{children}</p>;
+}
+
+function Scale({ title, rows }: { title: string; rows: (Band & { range: string })[] }) {
+  return (
+    <section className="mt-8">
+      <h2 className="text-base font-bold">{title}</h2>
+      <table className="mt-2 text-sm">
+        <tbody>{rows.map((x) => <tr key={x.range}><td className="py-1 pr-4 font-mono">{x.range}</td><td><Pill b={x} /></td></tr>)}</tbody>
+      </table>
+    </section>
+  );
+}
+
+function RankTable({ r, rows, opt, sort, sortHref, embed }: { r: Ranking; rows: RankRow[]; sort?: Sort; sortHref: (k: Sort['key']) => string; embed: boolean; opt: { showAlt: boolean; byDept: boolean; byRegion: boolean; evo: boolean; records: boolean; debut: boolean } }) {
+  const unit = r.unit ? ` (${r.unit})` : '';
+  const arrow = (k: Sort['key']) => (sort?.key === k ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+  const SortTh = ({ k, children, right, center, narrow }: { k: Sort['key']; children: React.ReactNode; right?: boolean; center?: boolean; narrow?: boolean }) => (
+    <th className={`${th} ${right ? 'text-right' : ''} ${center ? 'text-center' : ''} ${narrow ? 'w-px' : ''}`} aria-sort={sort?.key === k ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+      <Link href={sortHref(k)} className="hover:underline" title="Trier">{children}{arrow(k)}</Link>
+    </th>
+  );
+  const fv = (v: number | undefined) => (r.signed ? fmtS(v, r.digits) : fmtV(v, r.digits));
+  const head = r.id === 'humidex' ? 'Humidex' : r.id === 'windchill' ? 'Ressenti (°C)' : r.signed ? `${r.group === 'Normales et records' ? 'Écart' : 'Variation'}${unit}` : r.unit === '°C' ? `Température${unit}` : `Valeur${unit}`;
+  const th = 'px-2 py-2 text-left font-semibold whitespace-nowrap';
+  const td = 'px-2 py-1.5 whitespace-nowrap';
+  if (!rows.length) return <Notice>Aucune station ne correspond à ces critères pour cette période.</Notice>;
+  return (
+    <div className="mt-4 max-w-full overflow-x-auto">
+      <table className="ml-0 w-auto rounded-xl sm:ml-10 border border-border bg-surface text-sm">
+        <thead className="border-b border-border bg-bg">
+          <tr>
+            {opt.byRegion && <th className={th}>Région</th>}
+            <SortTh k="dept" narrow>Dépt</SortTh>
+            <SortTh k="station">Station</SortTh>
+            <SortTh k="val" right>{head}</SortTh>
+            {r.showPmer && <th className={`${th} text-right`}>Pression (hPa)</th>}
+            {opt.evo && <><th className={`${th} text-right`}>Évol. 1 h</th><th className={`${th} text-right`}>Évol. 24 h</th></>}
+            {r.feels && <><SortTh k="wc" center>Windchill - Ressenti</SortTh><SortTh k="hx" center>Humidex</SortTh></>}
+            {(r.id === 'humidex' || r.id === 'windchill') && <th className={th}>Niveau</th>}
+            {opt.showAlt && <th className={`${th} text-right`}>Altitude (m)</th>}
+            {opt.records && r.record && <>
+              <th className={`${th} text-right`}>Record mensuel</th><th className={th}>Date record</th>
+              <th className={`${th} text-right`}>Record absolu</th><th className={th}>Date record abs.</th>
+            </>}
+            {opt.debut && <th className={th}>Début mesures</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((x, i) => {
+            const newDept = sort ? false : opt.byRegion ? i === 0 || rows[i - 1].region !== x.region : opt.byDept && (i === 0 || rows[i - 1].station.dept !== x.station.dept);
+            const band = r.id === 'humidex' ? humidexBand(x.value) : r.id === 'windchill' ? windchillBand(x.value) : undefined;
+            return (
+              <tr key={x.station.id} className={`border-b border-border last:border-0 ${newDept ? 'border-t-2 border-t-primary' : ''} ${x.beaten ? 'tone-bg' : ''}`} style={x.beaten ? tone('danger') : undefined}>
+                {opt.byRegion && <td className={td}>{x.region ?? '—'}</td>}
+                <td className={`${td} w-px text-center tabular-nums`}>{x.station.dept}</td>
+                <td className={td}>
+                  {x.station.kind === 'amateur' ? prettyStationName(x.station.name) : (
+                    <a href={STATION_URL.replace('{id}', encodeURIComponent(x.station.id))} target={embed ? '_top' : undefined} className={`text-primary hover:underline ${x.station.kind === 'secondaire' ? 'italic' : ''}`}>{prettyStationName(x.station.name)}</a>
+                  )}
+                  {x.station.kind === 'amateur' && <span className="ml-1 text-xs text-muted">(amateur)</span>}
+                  {x.beaten && <span className="ml-2 rounded bg-danger px-1.5 py-0.5 text-xs font-bold text-white">{x.beaten === 'abs' ? 'Record absolu' : 'Record mensuel'}</span>}
+                </td>
+                <td className={`${td} text-right font-semibold tabular-nums`} style={band ? bandStyle(band) : undefined} title={x.at ? `à ${hour(x.at)}` : undefined}>{fv(x.value)}</td>
+                {r.showPmer && <td className={`${td} text-right tabular-nums`}>{fmtV(x.pmer)}</td>}
+                {opt.evo && <>
+                  <td className={`${td} text-right tabular-nums`}>{fmtS(x.evo1)}</td>
+                  <td className={`${td} text-right tabular-nums`}>{fmtS(x.evo24)}</td>
+                </>}
+                {r.feels && <>
+                  <td className={`${td} text-center tabular-nums`} style={x.windchill != null ? bandStyle(windchillBand(x.windchill)) : undefined} title={x.windchill != null ? windchillBand(x.windchill).label : undefined}>{fmtV(x.windchill)}</td>
+                  <td className={`${td} text-center tabular-nums`} style={x.humidex != null ? bandStyle(humidexBand(x.humidex)) : undefined} title={x.humidex != null ? humidexBand(x.humidex).label : undefined}>{fmtV(x.humidex, 0)}</td>
+                </>}
+                {band && <td className={td}><Pill b={band} /></td>}
+                {opt.showAlt && <td className={`${td} text-right tabular-nums`}>{x.station.alt ?? '—'}</td>}
+                {opt.records && r.record && <>
+                  <td className={`${td} text-right tabular-nums`}>{fmtV(x.recMonth?.v, r.digits)}</td><td className={td}>{fmtDate(x.recMonth?.d)}</td>
+                  <td className={`${td} text-right tabular-nums`}>{fmtV(x.recAbs?.v, r.digits)}</td><td className={td}>{fmtDate(x.recAbs?.d)}</td>
+                </>}
+                {opt.debut && <td className={td}>{fmtDate(x.station.opened)}</td>}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
