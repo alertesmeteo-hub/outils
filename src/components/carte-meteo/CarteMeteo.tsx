@@ -6,6 +6,7 @@ import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr';
 import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
+import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { pictoDepuisCodeMeteo, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
@@ -341,11 +342,13 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
       }
       return [];
     };
+    const cible = enDepartement ? reglage.villes : Math.max(1, Math.ceil(reglage.part * points.length));
+    // Candidats en réserve : si le placement sans chevauchement écarte un marqueur, le suivant le remplace.
     const ordre = enDepartement
-      ? choisirVilles(reglage.villes)
+      ? choisirVilles(cible + 4)
       : ordreRepartition(points.map((p) => ({ code: p.code, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) })));
-    const n = enDepartement ? ordre.length : Math.max(1, Math.ceil(reglage.part * ordre.length));
-    const gardes = new Set(ordre.slice(0, n));
+    const candidats = ordre.slice(0, enDepartement ? ordre.length : Math.min(ordre.length, Math.ceil(cible * 1.4)));
+    const gardes = new Set(candidats);
     const valeurs = points
       .map((p) => ({ code: p.code, v: valeurPrincipale(p.code) }))
       .filter((x): x is { code: string; v: number } => x.v != null);
@@ -355,17 +358,26 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
     }
     // France et régions : les rafales à signaler sont toujours affichées. Département : seulement parmi les villes choisies.
     if (!enDepartement) codesRafales.forEach((code) => gardes.add(code));
-    return points.filter((p) => gardes.has(p.code));
+    // Triés par priorité (réserve en dernier) : le placement et la coupe au nombre voulu suivent cet ordre.
+    const rang = new Map(candidats.map((c, i) => [c, i]));
+    return points.filter((p) => gardes.has(p.code)).sort((a, b) => (rang.get(a.code) ?? -1) - (rang.get(b.code) ?? -1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points, enDepartement, densite, editions, periode, codesRafales, vue]);
 
+  const nomsVisibles = afficherNoms || enDepartement;
+  const echelleMarqueurs = Math.min(enDepartement ? 1.15 : 1.2, Math.max(0.7, vue.echelle * 1.4));
+
   const marqueurs: Marqueur[] = useMemo(() => {
+    const reglage = DENSITES[densite];
+    const cible = enDepartement ? reglage.villes : Math.max(1, Math.ceil(reglage.part * points.length));
+    // Vue département : plus chaud, plus froid et rafales se jugent parmi les villes visées, pas parmi la réserve.
+    const reference = enDepartement ? pointsAffiches.slice(0, cible) : pointsAffiches;
     const valeurs = pointsAffiches.map((p) => valeurPrincipale(p.code));
-    const numeriques = valeurs.filter((v): v is number => v != null);
+    const numeriques = reference.map((p) => valeurPrincipale(p.code)).filter((v): v is number => v != null);
     const plusChaud = numeriques.length > 1 ? Math.max(...numeriques) : null;
     const plusFroid = numeriques.length > 1 ? Math.min(...numeriques) : null;
-    const rafalesSignalees = enDepartement ? plusFortesRafales(pointsAffiches) : codesRafales;
-    return pointsAffiches.map((p, i) => {
+    const rafalesSignalees = enDepartement ? plusFortesRafales(reference) : codesRafales;
+    const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
       const { x, y } = versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
       const rafale = rafaleDe(p);
@@ -383,8 +395,40 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
         ton: periode === 'apres-midi' && v != null ? (v === plusChaud ? 'chaud' : v === plusFroid ? 'froid' : null) : null,
       };
     });
+
+    // Jamais de chevauchement : un marqueur gênant est décalé au plus près, ou écarté s'il n'y a plus de place.
+    // Le logo, la date et les moyennes sont des obstacles (positions de la mise en page, voir globals.css).
+    const em = 22 * echelleMarqueurs;
+    const obstacles: Rect[] = [
+      { x: 29, y: 21, w: 205, h: 84 },
+      { x: LARGEUR_CARTE - 28 - 420, y: 18, w: 420, h: 86 },
+      ...(enFrance ? [{ x: 29, y: 285, w: 172, h: 150 }] : zone.startsWith('reg:') ? [{ x: 29, y: 285, w: 172, h: 78 }] : []),
+    ];
+    const elements = bruts.map((m) => {
+      // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
+      // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
+      const demiLargeur = (Math.max(4.9 * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
+      const hauteur = (m.mini != null ? 3.4 : 1.8) * em + (m.rafale != null ? 1.0 * em : 0);
+      return {
+        code: m.code,
+        x: m.x,
+        y: m.y,
+        gauche: demiLargeur,
+        droite: demiLargeur,
+        haut: hauteur / 2 + (nomsVisibles ? 0.9 * em : 0),
+        bas: hauteur / 2,
+        priorite: m.rafale != null ? 0 : m.ton != null ? 1 : 2,
+      };
+    });
+    const places = placerSansChevauchement(elements, obstacles, { largeur: LARGEUR_CARTE, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em);
+    // On s'arrête au nombre voulu : les candidats en réserve ne servent qu'à remplacer ceux qui n'ont pas trouvé de place.
+    // France et régions : les extrêmes et les rafales à signaler sont toujours gardés (et comptent dans le total).
+    const placesOk = bruts.filter((m) => places.has(m.code));
+    const imposes = new Set(enDepartement ? [] : placesOk.filter((m) => m.rafale != null || m.ton != null).map((m) => m.code));
+    let restantes = Math.max(0, cible - imposes.size);
+    return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -425,7 +469,6 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
   const titre = titreManuel ?? libelleJour(dateISO);
   const sousTitre = sousTitreManuel ?? (periode === 'apres-midi' ? 'APRÈS-MIDI' : 'JOURNÉE');
   const nomZone = enFrance ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : DEPARTEMENTS_FR[zone.slice(4)];
-  const nomsVisibles = afficherNoms || enDepartement;
 
   function changerModele(m: ModeleMeteo) {
     setModele(m);
@@ -705,7 +748,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
               regions={regionsAffichees}
               selection={selection}
               marqueurs={marqueurs}
-              echelleMarqueurs={Math.min(enDepartement ? 1.15 : 1.2, Math.max(0.7, vue.echelle * 1.4))}
+              echelleMarqueurs={echelleMarqueurs}
               afficherNoms={nomsVisibles}
               titre={titre}
               sousTitre={sousTitre}
