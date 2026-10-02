@@ -40,12 +40,15 @@ interface Edition {
 }
 
 const SEUIL_RAFALES_DEFAUT = 60;
+/** Régions et départements : on laisse libres le haut (logo, date) et la gauche (moyennes). */
 const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
+/** France entière : métropole quasi pleine hauteur, légèrement à gauche du centre (Corse à droite), comme sur le modèle. */
+const ZONE_FRANCE: Zone = { gauche: 0, haut: 14, droite: Math.round(LARGEUR_CARTE * 0.92), bas: HAUTEUR_CARTE - 14 };
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
 const MASQUES_FRANCE = new Set(['92', '93', '94']);
 
-const FRANCE_NO = versMonde(51.1, -5.2);
-const FRANCE_SE = versMonde(41.3, 9.6);
+const FRANCE_NO = versMonde(51.1, -4.8);
+const FRANCE_SE = versMonde(42.3, 8.3);
 const BOITE_FRANCE: Boite = { minX: FRANCE_NO.x, minY: FRANCE_NO.y, maxX: FRANCE_SE.x, maxY: FRANCE_SE.y };
 
 const FICHIERS_CONTOURS: Record<FondContours, string> = {
@@ -219,9 +222,14 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
   const selection = useMemo(() => new Set(codes), [codes]);
 
   const vue = useMemo(() => {
-    const boites = contoursDep.filter((c) => selection.has(c.code)).map((c) => c.boite);
-    return ajusterVue(unirBoites(boites) ?? BOITE_FRANCE, ZONE_UTILE);
-  }, [contoursDep, selection]);
+    // France entière : la Corse ne compte pas dans le cadrage (elle déborde à droite de la métropole).
+    const boites = contoursDep
+      .filter((c) => selection.has(c.code) && !(zone === 'france' && (c.code === '2A' || c.code === '2B')))
+      .map((c) => c.boite);
+    return zone === 'france'
+      ? ajusterVue(unirBoites(boites) ?? BOITE_FRANCE, ZONE_FRANCE, 0.01)
+      : ajusterVue(unirBoites(boites) ?? BOITE_FRANCE, ZONE_UTILE);
+  }, [contoursDep, selection, zone]);
 
   const logoDefaut = useMemo(() => logoParDefaut(codes), [codes]);
   const logoId = logoPresetId ?? logoDefaut.id;
@@ -302,7 +310,6 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
   const titre = titreManuel ?? libelleJour(dateISO);
   const sousTitre = sousTitreManuel ?? (periode === 'apres-midi' ? 'APRÈS-MIDI' : 'JOURNÉE');
   const nomZone = enFrance ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : DEPARTEMENTS_FR[zone.slice(4)];
-  const credit = `${modele === 'harmonie' ? 'Modèle Harmonie (AROME)' : 'Modèle CEP (ECMWF)'} · Fond NASA Blue Marble`;
 
   function changerModele(m: ModeleMeteo) {
     setModele(m);
@@ -541,21 +548,23 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
               regions={fond === 'regions' ? contoursReg : null}
               selection={selection}
               marqueurs={marqueurs}
-              echelleMarqueurs={Math.min(1.15, Math.max(0.62, vue.echelle * 1.5))}
+              echelleMarqueurs={Math.min(1.15, Math.max(0.7, vue.echelle * 1.4))}
               afficherNoms={afficherNoms}
               titre={titre}
               sousTitre={sousTitre}
               logoUrl={logoUrl}
               moyennes={moyennes}
-              credit={credit}
               paletteOuvertePour={paletteOuvertePour}
-              seuilRafales={seuilRafales}
               onBasculerPalette={(code) => setPaletteOuvertePour((c) => (c === code ? null : code))}
               onModifier={modifier}
             />
           </div>
           {chargement && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-4 py-2 text-sm shadow">Chargement des prévisions…</p>}
         </div>
+        <p className="mt-3 text-xs text-muted">
+          Prévisions : modèle {modele === 'harmonie' ? 'Harmonie (AROME, Météo-France)' : 'CEP (ECMWF)'} via Open-Meteo (CC BY 4.0). Fond de carte : NASA Blue Marble.
+          Contours : IGN Admin Express (Licence ouverte Etalab).
+        </p>
       </div>
     </div>
   );

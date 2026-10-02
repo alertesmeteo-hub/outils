@@ -47,9 +47,7 @@ interface Props {
   sousTitre: string;
   logoUrl: string | null;
   moyennes: BoiteMoyenne[];
-  credit: string;
   paletteOuvertePour: string | null;
-  seuilRafales: number;
   onBasculerPalette: (code: string) => void;
   onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto', valeur: string) => void;
 }
@@ -75,14 +73,10 @@ export default function CarteRendu({
   sousTitre,
   logoUrl,
   moyennes,
-  credit,
   paletteOuvertePour,
-  seuilRafales,
   onBasculerPalette,
   onModifier,
 }: Props) {
-  const aDesRafales = marqueurs.some((m) => m.rafale != null);
-
   return (
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur }}>
       <div
@@ -186,8 +180,6 @@ export default function CarteRendu({
           </div>
         ))}
 
-        {aDesRafales && <div className="cmap-legende">Rafales de vent ≥ {seuilRafales} km/h</div>}
-        <div className="cmap-credit">{credit}</div>
       </div>
     </div>
   );
