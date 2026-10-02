@@ -8,7 +8,7 @@ import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
-import { pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { estPictoImage, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import {
   LATITUDE_SEUIL_NORD_SUD,
@@ -65,6 +65,8 @@ const ZONE_DEPARTEMENT: Zone = { gauche: 14, haut: 14, droite: LARGEUR_CARTE - 1
 const MAX_RAFALES = 4;
 /** France entière (Corse comprise) : quasi pleine hauteur, centrée sur la carte. */
 const ZONE_FRANCE: Zone = { gauche: 0, haut: 14, droite: LARGEUR_CARTE, bas: HAUTEUR_CARTE - 14 };
+/** Largeur des pavés « Moyenne » (voir .cmap-moyenne dans globals.css : 162 px + bordures). */
+const LARGEUR_MOYENNES = 172;
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
 const MASQUES_FRANCE = new Set(['92', '93', '94']);
 
@@ -386,6 +388,29 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const nomsVisibles = afficherNoms || enDepartement;
   const echelleMarqueurs = Math.min(enDepartement ? 1.15 : 1.2, Math.max(0.7, vue.echelle * 1.4));
 
+  /**
+   * France entière : le logo et les moyennes sont rapprochés de la carte (au plus près de la côte, avec un petit écart)
+   * au lieu d'être aux coins de l'image ; la date, déjà contre le nord-est de la carte, ne bouge pas.
+   * Les limites viennent des boîtes englobantes des départements métropolitains : l'écart réel est donc un peu plus grand.
+   */
+  const miseEnPageFrance = useMemo(() => {
+    if (zone !== 'france' || contoursDep.length === 0) return null;
+    const metropole = contoursDep.filter((c) => c.code !== '2A' && c.code !== '2B');
+    const bordGauche = (haut: number, bas: number) => {
+      const xs = metropole
+        .filter((c) => c.boite.maxY * vue.echelle + vue.ty >= haut && c.boite.minY * vue.echelle + vue.ty <= bas)
+        .map((c) => c.boite.minX * vue.echelle + vue.tx);
+      return xs.length ? Math.min(...xs) : null;
+    };
+    const ecart = 24;
+    const bordLogo = bordGauche(18, 108);
+    const bordMoyennes = bordGauche(295, 445);
+    return {
+      logoDroite: bordLogo != null ? Math.max(240, Math.round(bordLogo - ecart)) : null,
+      moyennesGauche: bordMoyennes != null ? Math.max(29, Math.round(bordMoyennes - ecart - LARGEUR_MOYENNES)) : null,
+    };
+  }, [zone, contoursDep, vue]);
+
   const marqueurs: Marqueur[] = useMemo(() => {
     const reglage = DENSITES[densite];
     const cible = enDepartement ? reglage.villes : Math.max(1, Math.ceil(reglage.part * points.length));
@@ -418,16 +443,20 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // Jamais de chevauchement : un marqueur gênant est décalé au plus près, ou écarté s'il n'y a plus de place.
     // Le logo, la date et les moyennes sont des obstacles (positions de la mise en page, voir globals.css).
     const em = 22 * echelleMarqueurs;
+    const logoDroite = miseEnPageFrance?.logoDroite ?? 29 + 205;
+    const moyennesGauche = miseEnPageFrance?.moyennesGauche ?? 29;
     const obstacles: Rect[] = [
-      { x: 29, y: 21, w: 205, h: 84 },
+      { x: logoDroite - 205, y: 21, w: 205, h: 84 },
       { x: LARGEUR_CARTE - 28 - 420, y: 18, w: 420, h: 86 },
-      ...(enFrance ? [{ x: 29, y: 285, w: 172, h: 150 }] : zone.startsWith('reg:') ? [{ x: 29, y: 285, w: 172, h: 78 }] : []),
+      ...(enFrance ? [{ x: moyennesGauche, y: 285, w: LARGEUR_MOYENNES, h: 150 }] : zone.startsWith('reg:') ? [{ x: 29, y: 285, w: LARGEUR_MOYENNES, h: 78 }] : []),
     ];
     const elements = bruts.map((m) => {
       // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
       const demiLargeur = (Math.max(4.9 * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
-      const hauteur = (m.mini != null ? 3.4 : 1.8) * em + (m.rafale != null ? 1.0 * em : 0);
+      // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
+      const hautLigne = Math.max(m.mini != null ? 3.4 : 1.8, estPictoImage(m.picto) ? 2.3 : 0);
+      const hauteur = hautLigne * em + (m.rafale != null ? 1.0 * em : 0);
       return {
         code: m.code,
         x: m.x,
@@ -447,7 +476,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, miseEnPageFrance]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -843,6 +872,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               sousTitre={sousTitre}
               logoUrl={logoUrl}
               moyennes={moyennes}
+              logoDroite={miseEnPageFrance?.logoDroite ?? null}
+              moyennesGauche={miseEnPageFrance?.moyennesGauche ?? null}
               paletteOuvertePour={paletteOuvertePour}
               onBasculerPalette={(code) => setPaletteOuvertePour((c) => (c === code ? null : code))}
               onModifier={modifier}

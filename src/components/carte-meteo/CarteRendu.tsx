@@ -47,6 +47,9 @@ interface Props {
   sousTitre: string;
   logoUrl: string | null;
   moyennes: BoiteMoyenne[];
+  /** Position (pixels de la carte) du bord droit du logo et du bord gauche des moyennes, rapprochés du contour de la carte. */
+  logoDroite?: number | null;
+  moyennesGauche?: number | null;
   paletteOuvertePour: string | null;
   onBasculerPalette: (code: string) => void;
   onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto', valeur: string) => void;
@@ -76,6 +79,8 @@ export default function CarteRendu({
   sousTitre,
   logoUrl,
   moyennes,
+  logoDroite = null,
+  moyennesGauche = null,
   paletteOuvertePour,
   onBasculerPalette,
   onModifier,
@@ -112,14 +117,21 @@ export default function CarteRendu({
           </g>
         </svg>
 
-        {logoUrl && <img src={logoUrl} alt="Logo" className="cmap-logo" />}
+        {logoUrl && (
+          <img
+            src={logoUrl}
+            alt="Logo"
+            className="cmap-logo"
+            style={logoDroite != null ? { left: 'auto', right: LARGEUR_CARTE - logoDroite } : undefined}
+          />
+        )}
 
         <div className="cmap-titre">
           <div className="cmap-date">{titre}</div>
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
         </div>
 
-        <div className="cmap-moyennes">
+        <div className="cmap-moyennes" style={moyennesGauche != null ? { left: moyennesGauche } : undefined}>
           {moyennes.map((m) => (
             <div key={m.libelle} className={`cmap-moyenne cmap-moyenne-${m.couleur}`}>
               <span>{m.libelle}</span>
