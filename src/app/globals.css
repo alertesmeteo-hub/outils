@@ -62,125 +62,107 @@ body {
   body { background: #fff; color: #000; }
 }
 
-/* Carte météo (/outils/carte-meteo) — rendu capturé par html-to-image pour l'export JPG. */
+/* Carte météo (/outils/carte-meteo) — rendu 1280 x 720 capturé par html-to-image pour l'export JPG. */
+.cmap-cadre { width: 100%; }
 .cmap-rendu {
   position: relative;
+  overflow: hidden;
   background: #0b2a4a;
   border-radius: 8px;
-  max-width: 100%;
+  transform-origin: top left;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
 }
-
-.cmap-fond { position: absolute; inset: 0; }
-
-.cmap-departement { fill: #a9c8e8; stroke: #0b2a4a; stroke-width: 1; }
+.cmap-fond-img { position: absolute; max-width: none; user-select: none; pointer-events: none; }
+.cmap-svg { position: absolute; left: 0; top: 0; }
 
 .cmap-logo {
   position: absolute;
   top: 16px;
   left: 16px;
-  max-width: 140px;
-  max-height: 80px;
-  z-index: 2;
-}
-
-.cmap-date {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  color: #fff;
-  font-weight: 700;
-  font-size: 1.1rem;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  z-index: 2;
-}
-
-.cmap-moyennes {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 2;
-}
-
-.cmap-moyenne {
-  background: rgba(15, 23, 42, 0.85);
-  color: #fff;
-  border-radius: 8px;
-  padding: 8px 14px;
-  text-align: center;
-  font-size: 0.75rem;
-}
-
-.cmap-moyenne strong { display: block; font-size: 1.3rem; }
-
-.cmap-marqueur {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  height: 92px;
+  width: auto;
+  max-width: 300px;
+  padding: 6px 10px;
+  background: #fff;
+  border-radius: 4px;
+  object-fit: contain;
   z-index: 3;
 }
 
-.cmap-nom {
-  position: absolute;
-  top: -1.6em;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+.cmap-titre { position: absolute; top: 12px; right: 22px; text-align: right; z-index: 3; font-family: Impact, 'Arial Narrow', sans-serif; text-transform: uppercase; }
+.cmap-date {
+  font-size: 46px;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  color: #ffd21a;
+  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 3px 8px rgba(0, 0, 0, 0.6);
 }
+.cmap-sous-titre { font-size: 30px; line-height: 1.1; color: #fff; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 
-.cmap-picto { background: none; border: none; font-size: 1.6rem; line-height: 1; cursor: pointer; padding: 0; }
+.cmap-moyennes { position: absolute; left: 18px; bottom: 22px; display: flex; flex-direction: column; gap: 12px; z-index: 3; }
+.cmap-moyenne { background: rgba(13, 20, 40, 0.92); border: 3px solid #f5c400; border-radius: 12px; padding: 8px 18px 6px; text-align: center; min-width: 168px; }
+.cmap-moyenne-sud { border-color: #ff8c1a; }
+.cmap-moyenne span { display: block; font-size: 13px; font-weight: 800; letter-spacing: 0.06em; color: #f5c400; }
+.cmap-moyenne-sud span { color: #ff8c1a; }
+.cmap-moyenne strong { display: block; font-size: 38px; line-height: 1.1; color: #fff; font-weight: 800; }
+.cmap-moyenne strong em { font-style: normal; font-size: 26px; color: #6bb3ff; }
 
-.cmap-picto-image { width: 1.8em; height: 1.8em; object-fit: contain; display: block; }
+.cmap-marqueur { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; z-index: 4; line-height: 1; }
+.cmap-ligne { display: flex; align-items: center; gap: 0.05em; }
+.cmap-nom { position: absolute; bottom: calc(100% + 0.1em); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 0.55em; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000, 0 0 3px #000; }
+.cmap-picto { background: none; border: none; padding: 0; cursor: pointer; font-size: 1.7em; line-height: 1; }
+.cmap-picto-image { width: 1.9em; height: 1.9em; object-fit: contain; display: block; }
+.cmap-valeurs { display: flex; flex-direction: column; align-items: flex-start; }
+.cmap-valeur {
+  width: 1.75em;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif;
+  font-size: 1.35em;
+  line-height: 1;
+  color: #111;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+}
+.cmap-chaud { color: #e5191e; }
+.cmap-froid { color: #1f6fe0; }
+.cmap-rafale {
+  margin-top: 0.12em;
+  padding: 0.12em 0.4em 0.1em;
+  border-radius: 999px;
+  background: #ff9800;
+  color: #fff;
+  font-size: 0.62em;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.cmap-rafale small { font-size: 0.7em; margin-left: 0.2em; font-weight: 700; }
+.cmap-rafale-forte { background: #d32f2f; }
 
 .cmap-palette {
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  width: 220px;
-  max-height: 260px;
+  width: 232px;
+  max-height: 270px;
   overflow-y: auto;
   background: #fff;
+  color: #111;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 4;
-  color: #111;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  z-index: 8;
+  font-size: 16px;
 }
-
 .cmap-palette-groupe { display: flex; flex-wrap: wrap; gap: 2px; }
+.cmap-palette-separateur { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 2px 2px; }
+.cmap-palette button { background: none; border: none; font-size: 20px; line-height: 1; cursor: pointer; padding: 3px; border-radius: 4px; }
+.cmap-palette button:hover { background: #e2e8f0; }
+.cmap-palette .cmap-picto-image { width: 30px; height: 30px; }
 
-.cmap-palette-separateur {
-  font-size: 0.7rem;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 6px 2px 2px;
-}
-
-.cmap-palette button { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 3px; border-radius: 4px; }
-.cmap-palette button:hover { background: var(--border); }
-.cmap-palette .cmap-picto-image { width: 28px; height: 28px; }
-
-.cmap-valeur {
-  width: 2.2em;
-  text-align: center;
-  font-weight: 700;
-  border: none;
-  background: transparent;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  font-size: 0.95rem;
-}
-
-.cmap-maxi { color: #ef4444; }
-.cmap-mini { color: #3b82f6; }
+.cmap-legende { position: absolute; right: 24px; bottom: 36px; z-index: 3; padding: 4px 12px; border-radius: 999px; background: #ff9800; color: #fff; font-size: 14px; font-weight: 800; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); }
+.cmap-credit { position: absolute; right: 12px; bottom: 8px; z-index: 3; font-size: 11px; color: rgba(255, 255, 255, 0.85); text-shadow: 0 1px 2px #000; }

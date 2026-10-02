@@ -112,6 +112,15 @@ pm2 restart outils-meteo --update-env
 ```
 Puis ouvrir https://outils.alertes-meteo.com/admin/ (identifiant `admin`, authentification HTTP Basic). Sauvegarde de la base : `sudo -u postgres pg_dump outils > outils.sql`.
 
+## Carte météo France (`/outils/carte-meteo/`)
+Générateur de carte des températures et rafales, hors registre d'outils (éditeur interactif avec export d'image, pas un calculateur à formulaire) : page `src/app/(site)/outils/carte-meteo/`, composants `src/components/carte-meteo/`, données et calculs `src/lib/carte-meteo/`.
+- **Affichage immédiat** : la page est rendue à chaque requête avec les prévisions du jour (Harmonie, après-midi) ; le navigateur retente si le chargement serveur a échoué.
+- **Données** : Open-Meteo (CC BY 4.0, sans clé), modèles `meteofrance_arome_france` (Harmonie/AROME, jusqu'à J+2) et `ecmwf_ifs025` (CEP, jusqu'à J+6). Les 96 départements sont demandés en 2 requêtes groupées, mises en cache 30 min côté serveur : tous les visiteurs partagent les mêmes appels. `GET /api/carte-meteo/previsions/?modele=harmonie|cep&date=AAAA-MM-JJ`.
+- **Après-midi** = 12 h-18 h locales : température maximale, rafales maximales (affichées à partir de 60 km/h, réglable), picto du modèle. **Journée** : mini/maxi et rafales du jour.
+- **Zone** : France, région ou département ; seule la zone choisie est en surbrillance et la vue est cadrée dessus (projection Web Mercator, `projection-france.ts`).
+- **Fond** : `public/geo/fond-relief.jpg`, NASA Blue Marble (domaine public, crédit « NASA » inscrit sur l'image), assemblé par `python scripts/fond-relief.py public/geo/fond-relief.jpg`. Contours : IGN Admin Express (Licence ouverte Etalab) via le projet france-geojson.
+- **Export JPG** : 1920 × 1080, côté navigateur (`html-to-image`). Les couleurs des tracés SVG sont des attributs (pas des classes CSS), sinon elles disparaissent à l'export.
+
 ## Classements des stations (`/classements/`)
 Tableaux en direct des stations Météo-France (métropole + Corse), rendus côté serveur :
 - **TX** provisoires (8 h → 8 h locales), 06-18 UTC, 18-06 UTC, finales, et classement des records provisoires de TX ;

@@ -1,0 +1,562 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
+import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
+import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr';
+import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
+import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
+import { pictoDepuisCodeMeteo, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
+import {
+  LATITUDE_SEUIL_NORD_SUD,
+  ajusterVue,
+  moyenne,
+  unirBoites,
+  versEcran,
+  versMonde,
+  type Boite,
+  type Zone,
+} from '@/lib/carte-meteo/projection-france';
+import { CODES_DEPARTEMENTS, ECHEANCE_MAX, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
+import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur } from './CarteRendu';
+
+type Periode = 'apres-midi' | 'journee';
+type NiveauNoms = 'departement' | 'ville';
+type FondContours = 'departements' | 'regions';
+
+export interface DonneesCarte {
+  modele: ModeleMeteo;
+  dateISO: string;
+  points: PointCarte[];
+}
+
+interface Edition {
+  tempAM: string;
+  mini: string;
+  maxi: string;
+  pictoAM: PictoMeteo;
+  pictoJ: PictoMeteo;
+}
+
+const SEUIL_RAFALES_DEFAUT = 60;
+const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
+/** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
+const MASQUES_FRANCE = new Set(['92', '93', '94']);
+
+const FRANCE_NO = versMonde(51.1, -5.2);
+const FRANCE_SE = versMonde(41.3, 9.6);
+const BOITE_FRANCE: Boite = { minX: FRANCE_NO.x, minY: FRANCE_NO.y, maxX: FRANCE_SE.x, maxY: FRANCE_SE.y };
+
+const FICHIERS_CONTOURS: Record<FondContours, string> = {
+  departements: '/geo/departements.geojson',
+  regions: '/geo/regions.geojson',
+};
+
+interface ContourBoite extends Contour {
+  boite: Boite;
+}
+
+type GeoJsonContours = {
+  features: { properties: { code: string }; geometry: { type: string; coordinates: unknown } }[];
+};
+
+function construireContours(geojson: GeoJsonContours): ContourBoite[] {
+  return geojson.features.map((f) => {
+    let d = '';
+    const boite: Boite = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    const polygones = (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates) as [number, number][][][];
+    for (const polygone of polygones) {
+      for (const anneau of polygone) {
+        anneau.forEach(([lon, lat], i) => {
+          const { x, y } = versMonde(lat, lon);
+          boite.minX = Math.min(boite.minX, x);
+          boite.minY = Math.min(boite.minY, y);
+          boite.maxX = Math.max(boite.maxX, x);
+          boite.maxY = Math.max(boite.maxY, y);
+          d += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
+        });
+        d += 'Z';
+      }
+    }
+    return { code: f.properties.code, d, boite };
+  });
+}
+
+const cacheContours = new Map<string, Promise<ContourBoite[]>>();
+
+function chargerContours(fichier: string): Promise<ContourBoite[]> {
+  let promesse = cacheContours.get(fichier);
+  if (!promesse) {
+    promesse = fetch(fichier)
+      .then((r) => r.json())
+      .then(construireContours);
+    promesse.catch(() => cacheContours.delete(fichier));
+    cacheContours.set(fichier, promesse);
+  }
+  return promesse;
+}
+
+function useContours(fichier: string | null): ContourBoite[] {
+  const [etat, setEtat] = useState<{ fichier: string; contours: ContourBoite[] } | null>(null);
+  useEffect(() => {
+    if (!fichier) return;
+    let actif = true;
+    chargerContours(fichier)
+      .then((contours) => actif && setEtat({ fichier, contours }))
+      .catch(() => {});
+    return () => {
+      actif = false;
+    };
+  }, [fichier]);
+  return etat && etat.fichier === fichier ? etat.contours : [];
+}
+
+const texte = (v: number | null) => (v == null ? '' : String(Math.round(v)));
+
+function construireEditions(points: PointCarte[]): Record<string, Edition> {
+  const editions: Record<string, Edition> = {};
+  for (const p of points) {
+    editions[p.code] = {
+      tempAM: texte(p.tempApresMidi),
+      mini: texte(p.mini),
+      maxi: texte(p.maxi),
+      pictoAM: pictoDepuisCodeMeteo(p.codeApresMidi),
+      pictoJ: pictoDepuisCodeMeteo(p.codeJournee),
+    };
+  }
+  return editions;
+}
+
+function codesDeLaZone(zone: string): string[] {
+  if (zone === 'france') return CODES_DEPARTEMENTS;
+  if (zone.startsWith('reg:')) return departementsDeLaRegion(zone.slice(4));
+  return [zone.slice(4)];
+}
+
+const nombre = (s: string): number | null => {
+  const n = Number(s.replace(',', '.'));
+  return s.trim() !== '' && Number.isFinite(n) ? n : null;
+};
+
+function libelleJour(dateISO: string): string {
+  return new Date(`${dateISO}T12:00:00Z`)
+    .toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+    .toUpperCase();
+}
+
+const NOM_ECHEANCE = (n: number) => (n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : `J+${n}`);
+
+const champLabel = 'block text-sm font-medium';
+const champSelect = 'mt-1 w-full rounded-lg border border-border bg-surface p-2 text-sm';
+const champInput = 'mt-1 w-full rounded-lg border border-border bg-surface p-2 text-sm';
+const titreGroupe = 'text-xs font-bold uppercase tracking-wide text-muted';
+
+interface Props {
+  aujourdhui: string;
+  initial: DonneesCarte | null;
+}
+
+export default function CarteMeteo({ aujourdhui, initial }: Props) {
+  const [modele, setModele] = useState<ModeleMeteo>(initial?.modele ?? 'harmonie');
+  const [jour, setJour] = useState(0);
+  const [zone, setZone] = useState('france');
+  const [periode, setPeriode] = useState<Periode>('apres-midi');
+  const [donnees, setDonnees] = useState<DonneesCarte | null>(initial);
+  const [editions, setEditions] = useState<Record<string, Edition>>(() => (initial ? construireEditions(initial.points) : {}));
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  const [fond, setFond] = useState<FondContours>('departements');
+  const [niveauNoms, setNiveauNoms] = useState<NiveauNoms>('departement');
+  const [afficherNoms, setAfficherNoms] = useState(false);
+  const [seuilRafales, setSeuilRafales] = useState(SEUIL_RAFALES_DEFAUT);
+  const [logoPresetId, setLogoPresetId] = useState<string | null>(null);
+  const [logoPersonnalise, setLogoPersonnalise] = useState<string | null>(null);
+  const [titreManuel, setTitreManuel] = useState<string | null>(null);
+  const [sousTitreManuel, setSousTitreManuel] = useState<string | null>(null);
+  const [moyennesManuelles, setMoyennesManuelles] = useState<Record<string, string>>({});
+  const [paletteOuvertePour, setPaletteOuvertePour] = useState<string | null>(null);
+  const [enExport, setEnExport] = useState(false);
+
+  const [facteur, setFacteur] = useState(1);
+  const colonneRef = useRef<HTMLDivElement>(null);
+  const carteRef = useRef<HTMLDivElement>(null);
+
+  const dateISO = ajouterJours(aujourdhui, jour);
+  const aJour = donnees?.modele === modele && donnees.dateISO === dateISO;
+
+  useEffect(() => {
+    if (aJour || erreur) return;
+    const controleur = new AbortController();
+    fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}`, { signal: controleur.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json() as Promise<{ points: PointCarte[] }>;
+      })
+      .then((json) => {
+        setDonnees({ modele, dateISO, points: json.points });
+        setEditions(construireEditions(json.points));
+        setMoyennesManuelles({});
+      })
+      .catch((e: Error) => {
+        if (e.name !== 'AbortError') setErreur('Prévisions momentanément indisponibles.');
+      });
+    return () => controleur.abort();
+  }, [aJour, erreur, modele, dateISO]);
+
+  useEffect(() => {
+    const colonne = colonneRef.current;
+    if (!colonne) return;
+    const observateur = new ResizeObserver(() => setFacteur(Math.min(1, colonne.clientWidth / LARGEUR_CARTE)));
+    observateur.observe(colonne);
+    return () => observateur.disconnect();
+  }, []);
+
+  const contoursDep = useContours(FICHIERS_CONTOURS.departements);
+  const contoursReg = useContours(fond === 'regions' ? FICHIERS_CONTOURS.regions : null);
+
+  const codes = useMemo(() => codesDeLaZone(zone), [zone]);
+  const selection = useMemo(() => new Set(codes), [codes]);
+
+  const vue = useMemo(() => {
+    const boites = contoursDep.filter((c) => selection.has(c.code)).map((c) => c.boite);
+    return ajusterVue(unirBoites(boites) ?? BOITE_FRANCE, ZONE_UTILE);
+  }, [contoursDep, selection]);
+
+  const logoDefaut = useMemo(() => logoParDefaut(codes), [codes]);
+  const logoId = logoPresetId ?? logoDefaut.id;
+  const logoUrl = logoPersonnalise ?? LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier ?? null;
+
+  const enFrance = zone === 'france';
+  const points = useMemo(
+    () => (donnees?.points ?? []).filter((p) => selection.has(p.code) && !(enFrance && MASQUES_FRANCE.has(p.code))),
+    [donnees, selection, enFrance]
+  );
+
+  const valeurPrincipale = (code: string): number | null => {
+    const e = editions[code];
+    return e ? nombre(periode === 'apres-midi' ? e.tempAM : e.maxi) : null;
+  };
+
+  const marqueurs: Marqueur[] = useMemo(() => {
+    const valeurs = points.map((p) => valeurPrincipale(p.code));
+    const numeriques = valeurs.filter((v): v is number => v != null);
+    const plusChaud = numeriques.length > 1 ? Math.max(...numeriques) : null;
+    const plusFroid = numeriques.length > 1 ? Math.min(...numeriques) : null;
+    return points.map((p, i) => {
+      const e = editions[p.code];
+      const { x, y } = versEcran(versMonde(COORDS_DEPARTEMENTS[p.code].lat, COORDS_DEPARTEMENTS[p.code].lon), vue);
+      const rafale = periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee;
+      const v = valeurs[i];
+      return {
+        code: p.code,
+        x,
+        y,
+        nom: niveauNoms === 'ville' ? CHEF_LIEU_PAR_DEPARTEMENT[p.code] ?? p.nom : p.nom,
+        picto: periode === 'apres-midi' ? e?.pictoAM ?? '☀️' : e?.pictoJ ?? '☀️',
+        valeur: e ? (periode === 'apres-midi' ? e.tempAM : e.maxi) : '',
+        mini: periode === 'journee' ? e?.mini ?? '' : null,
+        rafale: rafale != null && rafale >= seuilRafales ? rafale : null,
+        ton: periode === 'apres-midi' && v != null ? (v === plusChaud ? 'chaud' : v === plusFroid ? 'froid' : null) : null,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, editions, vue, periode, niveauNoms, seuilRafales]);
+
+  const moyennesCalculees = useMemo(() => {
+    const groupe = (filtre: (lat: number) => boolean) => {
+      const sel = points.filter((p) => filtre(COORDS_DEPARTEMENTS[p.code].lat));
+      const principales = sel.map((p) => valeurPrincipale(p.code)).filter((v): v is number => v != null);
+      const minis = sel.map((p) => nombre(editions[p.code]?.mini ?? '')).filter((v): v is number => v != null);
+      return { valeur: moyenne(principales), mini: moyenne(minis) };
+    };
+    return {
+      nord: groupe((lat) => lat >= LATITUDE_SEUIL_NORD_SUD),
+      sud: groupe((lat) => lat < LATITUDE_SEUIL_NORD_SUD),
+      zone: groupe(() => true),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, editions, periode]);
+
+  const cleMoyenne = (nom: string) => `${periode}|${zone}|${nom}`;
+  const valeurMoyenne = (nom: 'nord' | 'sud' | 'zone') => {
+    const manuelle = moyennesManuelles[cleMoyenne(nom)];
+    if (manuelle != null) return manuelle;
+    const v = moyennesCalculees[nom].valeur;
+    return v == null ? '—' : String(v);
+  };
+  const miniMoyenne = (nom: 'nord' | 'sud' | 'zone') => {
+    const v = moyennesCalculees[nom].mini;
+    return periode === 'journee' && v != null ? String(v) : undefined;
+  };
+
+  const moyennes: BoiteMoyenne[] = enFrance
+    ? [
+        { libelle: 'MOYENNE NORD', valeur: valeurMoyenne('nord'), mini: miniMoyenne('nord'), couleur: 'nord' },
+        { libelle: 'MOYENNE SUD', valeur: valeurMoyenne('sud'), mini: miniMoyenne('sud'), couleur: 'sud' },
+      ]
+    : zone.startsWith('reg:')
+      ? [{ libelle: 'MOYENNE', valeur: valeurMoyenne('zone'), mini: miniMoyenne('zone'), couleur: 'nord' }]
+      : [];
+
+  const titre = titreManuel ?? libelleJour(dateISO);
+  const sousTitre = sousTitreManuel ?? (periode === 'apres-midi' ? 'APRÈS-MIDI' : 'JOURNÉE');
+  const nomZone = enFrance ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : DEPARTEMENTS_FR[zone.slice(4)];
+  const credit = `${modele === 'harmonie' ? 'Modèle Harmonie (AROME)' : 'Modèle CEP (ECMWF)'} · Fond NASA Blue Marble`;
+
+  function changerModele(m: ModeleMeteo) {
+    setModele(m);
+    setJour((j) => Math.min(j, ECHEANCE_MAX[m]));
+    setErreur(null);
+    setTitreManuel(null);
+  }
+
+  function changerJour(j: number) {
+    setJour(j);
+    setErreur(null);
+    setTitreManuel(null);
+  }
+
+  function modifier(code: string, champ: 'valeur' | 'mini' | 'picto', valeur: string) {
+    setEditions((prev) => {
+      const e = prev[code];
+      if (!e) return prev;
+      if (champ === 'picto') return { ...prev, [code]: periode === 'apres-midi' ? { ...e, pictoAM: valeur as PictoMeteo } : { ...e, pictoJ: valeur as PictoMeteo } };
+      if (champ === 'mini') return { ...prev, [code]: { ...e, mini: valeur } };
+      return { ...prev, [code]: periode === 'apres-midi' ? { ...e, tempAM: valeur } : { ...e, maxi: valeur } };
+    });
+    if (champ === 'picto') setPaletteOuvertePour(null);
+  }
+
+  function surLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const fichier = e.target.files?.[0];
+    if (fichier) setLogoPersonnalise(URL.createObjectURL(fichier));
+  }
+
+  async function exporter() {
+    if (!carteRef.current) return;
+    setPaletteOuvertePour(null);
+    setEnExport(true);
+    try {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const nom = `carte-meteo-${nomZone.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${dateISO}-${periode}`;
+      await exporterEnJpg(carteRef.current, nom, LARGEUR_CARTE, HAUTEUR_CARTE);
+    } finally {
+      setEnExport(false);
+    }
+  }
+
+  const chargement = !aJour && !erreur;
+  const departementsTries = CODES_DEPARTEMENTS.map((code) => ({ code, nom: DEPARTEMENTS_FR[code] }));
+
+  return (
+    <div className="grid items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:order-1">
+        <div>
+          <p className={titreGroupe}>Prévision</p>
+          <fieldset className="mt-1">
+            <legend className="sr-only">Modèle</legend>
+            <label className="mt-1 block text-sm">
+              <input type="radio" name="modele" checked={modele === 'harmonie'} onChange={() => changerModele('harmonie')} className="mr-2" />
+              Harmonie (AROME)
+            </label>
+            <label className="mt-1 block text-sm">
+              <input type="radio" name="modele" checked={modele === 'cep'} onChange={() => changerModele('cep')} className="mr-2" />
+              CEP (ECMWF)
+            </label>
+          </fieldset>
+          <label className={`${champLabel} mt-3`}>
+            Zone
+            <select value={zone} onChange={(e) => setZone(e.target.value)} className={champSelect}>
+              <option value="france">France entière</option>
+              <optgroup label="Régions">
+                {REGIONS_FR.map((r) => (
+                  <option key={r} value={`reg:${r}`}>
+                    {r}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Départements">
+                {departementsTries.map((d) => (
+                  <option key={d.code} value={`dep:${d.code}`}>
+                    {d.code} — {d.nom}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
+          <label className={`${champLabel} mt-3`}>
+            Jour
+            <select value={jour} onChange={(e) => changerJour(Number(e.target.value))} className={champSelect}>
+              {Array.from({ length: ECHEANCE_MAX[modele] + 1 }, (_, n) => (
+                <option key={n} value={n}>
+                  {NOM_ECHEANCE(n)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <fieldset className="mt-3">
+            <legend className="sr-only">Période</legend>
+            <label className="mt-1 block text-sm">
+              <input type="radio" name="periode" checked={periode === 'apres-midi'} onChange={() => { setPeriode('apres-midi'); setTitreManuel(null); setSousTitreManuel(null); }} className="mr-2" />
+              Après-midi (T° et rafales)
+            </label>
+            <label className="mt-1 block text-sm">
+              <input type="radio" name="periode" checked={periode === 'journee'} onChange={() => { setPeriode('journee'); setTitreManuel(null); setSousTitreManuel(null); }} className="mr-2" />
+              Journée (mini / maxi)
+            </label>
+          </fieldset>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <p className={titreGroupe}>Affichage</p>
+          <label className={`${champLabel} mt-2`}>
+            Contours
+            <select value={fond} onChange={(e) => setFond(e.target.value as FondContours)} className={champSelect}>
+              <option value="departements">Départements</option>
+              <option value="regions">Régions</option>
+            </select>
+          </label>
+          <label className={`${champLabel} mt-3`}>
+            Noms
+            <select value={niveauNoms} onChange={(e) => setNiveauNoms(e.target.value as NiveauNoms)} className={champSelect}>
+              <option value="departement">Départements</option>
+              <option value="ville">Villes (chefs-lieux)</option>
+            </select>
+          </label>
+          <label className="mt-2 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={afficherNoms} onChange={(e) => setAfficherNoms(e.target.checked)} />
+            Afficher les noms sur la carte
+          </label>
+          <label className={`${champLabel} mt-3`}>
+            Rafales à partir de (km/h)
+            <input
+              type="number"
+              min={20}
+              max={200}
+              step={5}
+              value={seuilRafales}
+              onChange={(e) => setSeuilRafales(Math.max(20, Number(e.target.value) || SEUIL_RAFALES_DEFAUT))}
+              className={champInput}
+            />
+          </label>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <p className={titreGroupe}>Textes et logo</p>
+          <label className={`${champLabel} mt-2`}>
+            Date
+            <input type="text" value={titre} onChange={(e) => setTitreManuel(e.target.value)} className={champInput} />
+          </label>
+          <label className={`${champLabel} mt-3`}>
+            Sous-titre
+            <input type="text" value={sousTitre} onChange={(e) => setSousTitreManuel(e.target.value)} className={champInput} />
+          </label>
+          {enFrance && (
+            <>
+              <label className={`${champLabel} mt-3`}>
+                Moyenne Nord
+                <input
+                  type="text"
+                  value={valeurMoyenne('nord')}
+                  onChange={(e) => setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('nord')]: e.target.value }))}
+                  className={champInput}
+                />
+              </label>
+              <label className={`${champLabel} mt-3`}>
+                Moyenne Sud
+                <input
+                  type="text"
+                  value={valeurMoyenne('sud')}
+                  onChange={(e) => setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('sud')]: e.target.value }))}
+                  className={champInput}
+                />
+              </label>
+            </>
+          )}
+          <label className={`${champLabel} mt-3`}>
+            Logo
+            <select
+              value={logoPersonnalise ? 'personnalise' : logoId}
+              onChange={(e) => {
+                if (e.target.value === 'personnalise') return;
+                setLogoPersonnalise(null);
+                setLogoPresetId(e.target.value);
+              }}
+              className={champSelect}
+            >
+              {LOGOS_PRESETS.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.nom}
+                  {l.id === logoDefaut.id ? ' (suggéré)' : ''}
+                </option>
+              ))}
+              {logoPersonnalise && <option value="personnalise">Image importée</option>}
+            </select>
+            <input type="file" accept="image/*" onChange={surLogo} className="mt-1.5 text-xs" />
+          </label>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-border pt-4">
+          <button
+            type="button"
+            onClick={exporter}
+            disabled={enExport || !donnees}
+            className="rounded-lg bg-primary px-5 py-2.5 font-medium text-white disabled:opacity-60"
+          >
+            {enExport ? 'Export en cours…' : 'Exporter en JPG'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (donnees) setEditions(construireEditions(donnees.points));
+              setMoyennesManuelles({});
+              setTitreManuel(null);
+              setSousTitreManuel(null);
+            }}
+            className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium"
+          >
+            Rétablir les valeurs du modèle
+          </button>
+          <p className="text-xs text-muted">Clique sur un picto pour le changer ; les températures sont modifiables directement sur la carte.</p>
+        </div>
+      </aside>
+
+      <div className="order-1 min-w-0 lg:order-2" ref={colonneRef}>
+        <div className="relative">
+          {erreur && (
+            <p role="alert" className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-danger">
+              {erreur}
+              <button type="button" onClick={() => setErreur(null)} className="rounded-lg border border-border px-3 py-1 text-sm text-text">
+                Réessayer
+              </button>
+            </p>
+          )}
+          <div className={chargement ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+            <CarteRendu
+              carteRef={carteRef}
+              facteur={facteur}
+              vue={vue}
+              departements={contoursDep}
+              regions={fond === 'regions' ? contoursReg : null}
+              selection={selection}
+              marqueurs={marqueurs}
+              echelleMarqueurs={Math.min(1.15, Math.max(0.62, vue.echelle * 1.5))}
+              afficherNoms={afficherNoms}
+              titre={titre}
+              sousTitre={sousTitre}
+              logoUrl={logoUrl}
+              moyennes={moyennes}
+              credit={credit}
+              paletteOuvertePour={paletteOuvertePour}
+              seuilRafales={seuilRafales}
+              onBasculerPalette={(code) => setPaletteOuvertePour((c) => (c === code ? null : code))}
+              onModifier={modifier}
+            />
+          </div>
+          {chargement && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-4 py-2 text-sm shadow">Chargement des prévisions…</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
