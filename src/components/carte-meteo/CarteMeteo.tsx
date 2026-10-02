@@ -8,7 +8,7 @@ import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
-import { pictoDepuisCodeMeteo, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import {
   LATITUDE_SEUIL_NORD_SUD,
@@ -25,7 +25,7 @@ import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE, type BoiteMoyenne, type Conto
 
 type Periode = 'apres-midi' | 'journee';
 type NiveauNoms = 'departement' | 'ville';
-type FondContours = 'departements' | 'regions';
+type FondContours = 'aucun' | 'departements' | 'regions';
 type Niveau = 'france' | 'region' | 'departement';
 type Densite = 'leger' | 'moyen' | 'eleve';
 
@@ -72,7 +72,7 @@ const FRANCE_NO = versMonde(51.1, -4.8);
 const FRANCE_SE = versMonde(41.3, 9.6);
 const BOITE_FRANCE: Boite = { minX: FRANCE_NO.x, minY: FRANCE_NO.y, maxX: FRANCE_SE.x, maxY: FRANCE_SE.y };
 
-const FICHIERS_CONTOURS: Record<FondContours, string> = {
+const FICHIERS_CONTOURS: Record<'departements' | 'regions', string> = {
   departements: '/geo/departements.geojson',
   regions: '/geo/regions.geojson',
 };
@@ -139,6 +139,14 @@ function useContours(fichier: string | null): ContourBoite[] {
 
 const texte = (v: number | null) => (v == null ? '' : String(Math.round(v)));
 
+/** Pictos de l'après-midi et de la journée d'un point, d'après la nébulosité et les précipitations de la période. */
+function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoAM: PictoMeteo; pictoJ: PictoMeteo } {
+  return {
+    pictoAM: pictoDepuisPrevision({ code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: p.pluieApresMidi, temperature: p.tempApresMidi }, jeu),
+    pictoJ: pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: p.pluieJournee, temperature: p.maxi }, jeu),
+  };
+}
+
 function construireEditions(points: PointCarte[], jeu: JeuPictos = 'emoji'): Record<string, Edition> {
   const editions: Record<string, Edition> = {};
   for (const p of points) {
@@ -146,8 +154,7 @@ function construireEditions(points: PointCarte[], jeu: JeuPictos = 'emoji'): Rec
       tempAM: texte(p.tempApresMidi),
       mini: texte(p.mini),
       maxi: texte(p.maxi),
-      pictoAM: pictoDepuisCodeMeteo(p.codeApresMidi, jeu),
-      pictoJ: pictoDepuisCodeMeteo(p.codeJournee, jeu),
+      ...pictosDuPoint(p, jeu),
     };
   }
   return editions;
@@ -212,7 +219,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }));
   const [erreur, setErreur] = useState<string | null>(null);
 
-  const [fond, setFond] = useState<FondContours>('departements');
+  const [fond, setFond] = useState<FondContours>('aucun');
   const [niveauNoms, setNiveauNoms] = useState<NiveauNoms>('departement');
   const [afficherNoms, setAfficherNoms] = useState(false);
   const [seuilRafales, setSeuilRafales] = useState(SEUIL_RAFALES_DEFAUT);
@@ -290,6 +297,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     [contoursDep, selection, zone]
   );
   const regionsAffichees = useMemo(() => {
+    if (fond === 'aucun') return []; // liste vide : pas de contours (les départements ne sont alors tracés que par leur remplissage)
     if (fond !== 'regions' || enDepartement) return null;
     return niveau === 'france' ? contoursReg : contoursReg.filter((c) => normaliser(c.nom) === normaliser(region));
   }, [fond, enDepartement, niveau, contoursReg, region]);
@@ -513,7 +521,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const suite = { ...prev };
       for (const p of tous) {
         const e = suite[p.code];
-        if (e) suite[p.code] = { ...e, pictoAM: pictoDepuisCodeMeteo(p.codeApresMidi, jeu), pictoJ: pictoDepuisCodeMeteo(p.codeJournee, jeu) };
+        if (e) suite[p.code] = { ...e, ...pictosDuPoint(p, jeu) };
       }
       return suite;
     });
@@ -780,6 +788,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <label className="text-sm font-medium">
               <span className={legendeBarre}>Contours</span>
               <select value={fond} onChange={(e) => setFond(e.target.value as FondContours)} className={selectBarre}>
+                <option value="aucun">Aucun</option>
                 <option value="departements">Départements</option>
                 <option value="regions">Régions</option>
               </select>

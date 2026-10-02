@@ -120,3 +120,45 @@ export function pictoDepuisCodeMeteo(code: number | null | undefined, jeu: JeuPi
   if ([95, 96, 99].includes(code)) return '⛈️';
   return '🌦️';
 }
+
+/** Ce qui détermine le picto d'une période : ciel (%), cumul de pluie (mm), température (°C) et code météo du modèle. */
+export interface EntreePicto {
+  code: number | null;
+  nuages: number | null;
+  pluie: number | null;
+  temperature: number | null;
+}
+
+const CODES_NEIGE = [71, 73, 75, 77, 85, 86];
+
+/**
+ * Picto d'une période d'après la nébulosité moyenne et les précipitations cumulées sur toute la période,
+ * plutôt que le seul code météo d'une heure (trop instable : un picto « nuage » au milieu d'un après-midi dégagé).
+ * Ordre : orage, neige, brouillard, pluie (selon le cumul), puis ciel (selon la nébulosité).
+ * Sans nébulosité (données absentes), on retombe sur le code météo du modèle.
+ */
+export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): PictoMeteo {
+  const { code, nuages, pluie, temperature } = e;
+  const images = jeu === 'images';
+  if (nuages == null && pluie == null) return pictoDepuisCodeMeteo(code, jeu);
+
+  if (code != null && code >= 95) return images ? (code >= 96 ? 'img:26' : 'img:12') : '⛈️';
+  const precipite = (pluie ?? 0) >= 0.3;
+  const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
+  if (neige && precipite) return images ? ((pluie ?? 0) >= 3 ? 'img:16' : 'img:13') : '🌨️';
+  if ((code === 45 || code === 48) && !precipite) return images ? 'img:3' : '🌫️';
+
+  const ciel = nuages ?? 50;
+  if (precipite) {
+    const mm = pluie ?? 0;
+    if (mm >= 8) return images ? 'img:10' : '🌧️';
+    if (mm >= 2) return images ? 'img:6' : '🌧️';
+    // Faibles précipitations : ondées entre éclaircies si le ciel est en partie dégagé, sinon pluie faible.
+    return ciel < 75 ? (images ? 'img:17' : '🌦️') : images ? 'img:4' : '🌧️';
+  }
+
+  if (ciel < 20) return images ? 'img:1' : '☀️';
+  if (ciel < 45) return images ? 'img:1' : '🌤️';
+  if (ciel < 75) return images ? 'img:3' : '⛅';
+  return images ? 'img:2' : '☁️';
+}

@@ -29,6 +29,11 @@ export interface PointCarte {
   rafaleJournee: number | null;
   codeApresMidi: number | null;
   codeJournee: number | null;
+  /** Nébulosité moyenne (%) et cumul de précipitations (mm) : de 12 h à 18 h, puis sur la journée (7 h-20 h pour le ciel). */
+  nuagesApresMidi: number | null;
+  pluieApresMidi: number | null;
+  nuagesJournee: number | null;
+  pluieJournee: number | null;
 }
 
 /** Codes départementaux dans l'ordre officiel (01 … 19, 2A, 2B, 21 … 95) : les clés « 10 », « 11 »… passeraient sinon devant « 01 ». */
@@ -41,6 +46,8 @@ export interface ReponseLieu {
     temperature_2m?: (number | null)[];
     wind_gusts_10m?: (number | null)[];
     weather_code?: (number | null)[];
+    cloud_cover?: (number | null)[];
+    precipitation?: (number | null)[];
   };
   daily?: {
     temperature_2m_max?: (number | null)[];
@@ -71,6 +78,16 @@ const maximum = (valeurs: (number | null | undefined)[]): number | null => {
   return nombres.length ? Math.max(...nombres) : null;
 };
 
+const moyenneNombres = (valeurs: (number | null | undefined)[]): number | null => {
+  const nombres = valeurs.filter((v): v is number => typeof v === 'number');
+  return nombres.length ? nombres.reduce((a, b) => a + b, 0) / nombres.length : null;
+};
+
+const sommeNombres = (valeurs: (number | null | undefined)[]): number | null => {
+  const nombres = valeurs.filter((v): v is number => typeof v === 'number');
+  return nombres.length ? nombres.reduce((a, b) => a + b, 0) : null;
+};
+
 const arrondi = (v: number | null, decimales = 0): number | null => {
   if (v == null) return null;
   const f = 10 ** decimales;
@@ -82,8 +99,12 @@ export function pointDepuisReponse(code: string, nom: string, lieu: ReponseLieu)
   const temps = lieu.hourly?.temperature_2m ?? [];
   const rafales = lieu.hourly?.wind_gusts_10m ?? [];
   const codes = lieu.hourly?.weather_code ?? [];
+  const nuages = lieu.hourly?.cloud_cover ?? [];
+  const pluies = lieu.hourly?.precipitation ?? [];
   // Heures locales 12 h → 17 h : l'après-midi (jusqu'à 18 h).
   const apresMidi = heures.map((t, i) => ({ h: Number(t.slice(11, 13)), i })).filter(({ h }) => h >= 12 && h <= 17);
+  // Journée : ciel de 7 h à 20 h (la nuit ne compte pas pour le picto), précipitations sur 24 h.
+  const jour = heures.map((t, i) => ({ h: Number(t.slice(11, 13)), i })).filter(({ h }) => h >= 7 && h <= 20);
 
   // Code météo de l'après-midi : celui de 15 h, sauf orage dans la plage.
   const codesPlage = apresMidi.map(({ i }) => codes[i]);
@@ -101,6 +122,10 @@ export function pointDepuisReponse(code: string, nom: string, lieu: ReponseLieu)
     rafaleJournee: arrondi(maximum(rafales)),
     codeApresMidi,
     codeJournee: lieu.daily?.weather_code?.[0] ?? null,
+    nuagesApresMidi: arrondi(moyenneNombres(apresMidi.map(({ i }) => nuages[i]))),
+    pluieApresMidi: arrondi(sommeNombres(apresMidi.map(({ i }) => pluies[i])), 1),
+    nuagesJournee: arrondi(moyenneNombres(jour.map(({ i }) => nuages[i]))),
+    pluieJournee: arrondi(sommeNombres(pluies), 1),
   };
 }
 
@@ -109,7 +134,7 @@ export function urlPrevisions(lieux: { lat: number; lon: number }[], modele: Mod
   const params = new URLSearchParams({
     latitude: lieux.map((l) => l.lat.toFixed(3)).join(','),
     longitude: lieux.map((l) => l.lon.toFixed(3)).join(','),
-    hourly: 'temperature_2m,wind_gusts_10m,weather_code',
+    hourly: 'temperature_2m,wind_gusts_10m,weather_code,cloud_cover,precipitation',
     daily: 'temperature_2m_max,temperature_2m_min,weather_code',
     models: MODELE_OPEN_METEO[modele],
     timezone: 'Europe/Paris',

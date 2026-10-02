@@ -58,6 +58,9 @@ const TRAIT_COMMUN = { vectorEffect: 'non-scaling-stroke', strokeLinejoin: 'roun
 const TRAIT_SELECTION = { ...TRAIT_COMMUN, fill: '#8f9ee8', fillOpacity: 0.9, stroke: '#ffffff', strokeOpacity: 0.7, strokeWidth: 0.9 };
 const TRAIT_HORS_SELECTION = { ...TRAIT_COMMUN, fill: '#061428', fillOpacity: 0.38, stroke: '#ffffff', strokeOpacity: 0.25, strokeWidth: 0.6 };
 const TRAIT_REGION = { ...TRAIT_COMMUN, fill: 'none', stroke: '#ffffff', strokeOpacity: 0.95, strokeWidth: 2.2 };
+// Sans contours : remplissage opaque et trait de la même couleur, pour que les départements voisins forment une
+// surface continue (avec la transparence, les jointures apparaîtraient comme de fines lignes claires).
+const TRAIT_UNI = { ...TRAIT_COMMUN, fill: '#919fe6', fillOpacity: 1, stroke: '#919fe6', strokeOpacity: 1, strokeWidth: 0.7 };
 
 export default function CarteRendu({
   carteRef,
@@ -98,9 +101,13 @@ export default function CarteRendu({
 
         <svg className="cmap-svg" viewBox={`0 0 ${LARGEUR_CARTE} ${HAUTEUR_CARTE}`} width={LARGEUR_CARTE} height={HAUTEUR_CARTE}>
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
-            {departements.map((c) => (
-              <path key={c.code} d={c.d} {...(selection.has(c.code) ? TRAIT_SELECTION : TRAIT_HORS_SELECTION)} {...(regions ? { stroke: 'none' } : {})} />
-            ))}
+            {departements.map((c) =>
+              regions && regions.length === 0 && selection.has(c.code) ? (
+                <path key={c.code} d={c.d} {...TRAIT_UNI} />
+              ) : (
+                <path key={c.code} d={c.d} {...(selection.has(c.code) ? TRAIT_SELECTION : TRAIT_HORS_SELECTION)} {...(regions ? { stroke: 'none' } : {})} />
+              )
+            )}
             {regions?.map((c) => <path key={c.code} d={c.d} {...TRAIT_REGION} />)}
           </g>
         </svg>
