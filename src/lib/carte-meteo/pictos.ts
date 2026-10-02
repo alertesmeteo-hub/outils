@@ -78,11 +78,37 @@ export function cheminPictoImage(picto: string): string | undefined {
   return PICTOS_IMAGES.find((p) => p.id === picto)?.fichier;
 }
 
+/** Jeu de pictos appliqué automatiquement à toute la carte : emojis, ou les images fournies (public/pictos). */
+export type JeuPictos = 'emoji' | 'images';
+
 /**
- * Code météo WMO (renvoyé par Open-Meteo dans `weather_code`) → picto emoji suggéré.
+ * Code météo WMO → image du jeu fourni. Le jeu n'a pas de « éclaircies » seul : ciel peu nuageux → soleil,
+ * ciel variable → nuage clair ; le détail des variantes est modifiable picto par picto sur la carte.
+ */
+function pictoImageDepuisCode(code: number | null | undefined): PictoMeteo {
+  if (code == null || code === 0 || code === 1) return 'img:1';
+  if (code === 2) return 'img:3';
+  if (code === 3) return 'img:2';
+  if (code === 45 || code === 48) return 'img:3';
+  if ([51, 53, 55, 56, 57].includes(code)) return 'img:4';
+  if (code === 61 || code === 80) return 'img:5';
+  if (code === 63 || code === 81) return 'img:6';
+  if (code === 65 || code === 82) return 'img:10';
+  if (code === 66 || code === 67) return 'img:14';
+  if (code === 71 || code === 85) return 'img:13';
+  if (code === 73) return 'img:15';
+  if ([75, 77, 86].includes(code)) return 'img:16';
+  if (code === 95) return 'img:12';
+  if (code === 96 || code === 99) return 'img:26';
+  return 'img:6';
+}
+
+/**
+ * Code météo WMO (renvoyé par Open-Meteo dans `weather_code`) → picto suggéré (emoji par défaut).
  * Table volontairement groupée par familles (voir https://open-meteo.com/en/docs — WMO Weather interpretation codes).
  */
-export function pictoDepuisCodeMeteo(code: number | null | undefined): PictoMeteo {
+export function pictoDepuisCodeMeteo(code: number | null | undefined, jeu: JeuPictos = 'emoji'): PictoMeteo {
+  if (jeu === 'images') return pictoImageDepuisCode(code);
   if (code == null) return '☀️';
   if (code === 0) return '☀️';
   if (code === 1) return '🌤️';

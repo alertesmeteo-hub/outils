@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr';
@@ -8,7 +8,7 @@ import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
-import { pictoDepuisCodeMeteo, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { pictoDepuisCodeMeteo, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import {
   LATITUDE_SEUIL_NORD_SUD,
@@ -42,7 +42,7 @@ export interface DonneesCarte {
   points: PointCarte[];
 }
 
-interface DonneesVilles extends DonneesCarte {
+export interface DonneesVilles extends DonneesCarte {
   departement: string;
 }
 
@@ -59,7 +59,7 @@ const SEUIL_RAFALES_DEFAUT = 60;
 const DISTANCE_MIN_VILLES = 105;
 /** Régions et départements : on laisse libres le haut (logo, date) et la gauche (moyennes). */
 const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
-/** France entière : métropole quasi pleine hauteur, légèrement à gauche du centre (Corse à droite), comme sur le modèle. */
+/** France entière (Corse comprise) : quasi pleine hauteur, légèrement à gauche du centre, comme sur le modèle. */
 /** Département : cadré au maximum, centré sur toute la carte. */
 const ZONE_DEPARTEMENT: Zone = { gauche: 14, haut: 14, droite: LARGEUR_CARTE - 14, bas: HAUTEUR_CARTE - 14 };
 /** Nombre maximal de valeurs de rafales affichées sur la carte (les plus fortes). */
@@ -69,7 +69,7 @@ const ZONE_FRANCE: Zone = { gauche: 0, haut: 14, droite: Math.round(LARGEUR_CART
 const MASQUES_FRANCE = new Set(['92', '93', '94']);
 
 const FRANCE_NO = versMonde(51.1, -4.8);
-const FRANCE_SE = versMonde(42.3, 8.3);
+const FRANCE_SE = versMonde(41.3, 9.6);
 const BOITE_FRANCE: Boite = { minX: FRANCE_NO.x, minY: FRANCE_NO.y, maxX: FRANCE_SE.x, maxY: FRANCE_SE.y };
 
 const FICHIERS_CONTOURS: Record<FondContours, string> = {
@@ -139,15 +139,15 @@ function useContours(fichier: string | null): ContourBoite[] {
 
 const texte = (v: number | null) => (v == null ? '' : String(Math.round(v)));
 
-function construireEditions(points: PointCarte[]): Record<string, Edition> {
+function construireEditions(points: PointCarte[], jeu: JeuPictos = 'emoji'): Record<string, Edition> {
   const editions: Record<string, Edition> = {};
   for (const p of points) {
     editions[p.code] = {
       tempAM: texte(p.tempApresMidi),
       mini: texte(p.mini),
       maxi: texte(p.maxi),
-      pictoAM: pictoDepuisCodeMeteo(p.codeApresMidi),
-      pictoJ: pictoDepuisCodeMeteo(p.codeJournee),
+      pictoAM: pictoDepuisCodeMeteo(p.codeApresMidi, jeu),
+      pictoJ: pictoDepuisCodeMeteo(p.codeJournee, jeu),
     };
   }
   return editions;
@@ -185,19 +185,31 @@ const titreGroupe = 'text-xs font-bold uppercase tracking-wide text-muted';
 interface Props {
   aujourdhui: string;
   initial: DonneesCarte | null;
+  /** Prévisions des villes d'un département déjà chargées côté serveur (carte préréglée sur un département). */
+  initialVilles?: DonneesVilles | null;
+  /** Réglages de départ : la carte peut être préréglée (ex. un département, demain). */
+  reglages?: { niveau?: Niveau; departement?: string; jour?: number };
 }
 
-export default function CarteMeteo({ aujourdhui, initial }: Props) {
-  const [modele, setModele] = useState<ModeleMeteo>(initial?.modele ?? 'harmonie');
-  const [jour, setJour] = useState(0);
-  const [niveau, setNiveau] = useState<Niveau>('france');
+export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, reglages }: Props) {
+  const idCarte = useId();
+  const nom = (base: string) => `${base}-${idCarte}`;
+  const [modele, setModele] = useState<ModeleMeteo>(initial?.modele ?? initialVilles?.modele ?? 'harmonie');
+  const [jour, setJour] = useState(reglages?.jour ?? 0);
+  const [niveau, setNiveau] = useState<Niveau>(reglages?.niveau ?? 'france');
   const [region, setRegion] = useState(REGIONS_FR[0]);
-  const [departement, setDepartement] = useState('29');
+  const [departement, setDepartement] = useState(reglages?.departement ?? '29');
   const [densite, setDensite] = useState<Densite>('moyen');
-  const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(null);
+  const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(initialVilles);
+  const [jeuPictos, setJeuPictos] = useState<JeuPictos>('emoji');
+  const jeuRef = useRef<JeuPictos>('emoji');
+  jeuRef.current = jeuPictos;
   const [periode, setPeriode] = useState<Periode>('apres-midi');
   const [donnees, setDonnees] = useState<DonneesCarte | null>(initial);
-  const [editions, setEditions] = useState<Record<string, Edition>>(() => (initial ? construireEditions(initial.points) : {}));
+  const [editions, setEditions] = useState<Record<string, Edition>>(() => ({
+    ...(initial ? construireEditions(initial.points) : {}),
+    ...(initialVilles ? construireEditions(initialVilles.points) : {}),
+  }));
   const [erreur, setErreur] = useState<string | null>(null);
 
   const [fond, setFond] = useState<FondContours>('departements');
@@ -232,7 +244,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
       })
       .then((json) => {
         setDonnees({ modele, dateISO, points: json.points });
-        setEditions(construireEditions(json.points));
+        setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
         setMoyennesManuelles({});
       })
       .catch((e: Error) => {
@@ -251,7 +263,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
       })
       .then((json) => {
         setDonneesVilles({ modele, dateISO, departement, points: json.points });
-        setEditions((prev) => ({ ...prev, ...construireEditions(json.points) }));
+        setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
       })
       .catch((e: Error) => {
         if (e.name !== 'AbortError') setErreur('Prévisions momentanément indisponibles.');
@@ -283,9 +295,8 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
   }, [fond, enDepartement, niveau, contoursReg, region]);
 
   const vue = useMemo(() => {
-    // France entière : la Corse ne compte pas dans le cadrage (elle déborde à droite de la métropole).
     const boites = contoursDep
-      .filter((c) => selection.has(c.code) && !(zone === 'france' && (c.code === '2A' || c.code === '2B')))
+      .filter((c) => selection.has(c.code))
       .map((c) => c.boite);
     const boite = unirBoites(boites) ?? BOITE_FRANCE;
     if (zone === 'france') return ajusterVue(boite, ZONE_FRANCE, 0.01);
@@ -494,6 +505,20 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
     if (champ === 'picto') setPaletteOuvertePour(null);
   }
 
+  /** Applique un jeu de pictos à toute la carte, d'après la prévision (les modifications faites picto par picto sont remplacées). */
+  function changerJeuPictos(jeu: JeuPictos) {
+    setJeuPictos(jeu);
+    const tous = [...(donnees?.points ?? []), ...(donneesVilles?.points ?? [])];
+    setEditions((prev) => {
+      const suite = { ...prev };
+      for (const p of tous) {
+        const e = suite[p.code];
+        if (e) suite[p.code] = { ...e, pictoAM: pictoDepuisCodeMeteo(p.codeApresMidi, jeu), pictoJ: pictoDepuisCodeMeteo(p.codeJournee, jeu) };
+      }
+      return suite;
+    });
+  }
+
   function surLogo(e: React.ChangeEvent<HTMLInputElement>) {
     const fichier = e.target.files?.[0];
     if (fichier) setLogoPersonnalise(URL.createObjectURL(fichier));
@@ -515,138 +540,31 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
   const chargement = !(enDepartement ? villesAJour : aJour) && !erreur;
   const departementsTries = CODES_DEPARTEMENTS.map((code) => ({ code, nom: DEPARTEMENTS_FR[code] }));
 
+  const legendeBarre = 'mb-1 block text-sm font-medium';
+  const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
+
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+    <div className="grid items-start gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
       <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:order-1">
         <div>
-          <p className={titreGroupe}>Prévision</p>
-          <fieldset className="mt-1">
-            <legend className="sr-only">Modèle</legend>
-            <label className="mt-1 block text-sm">
-              <input type="radio" name="modele" checked={modele === 'harmonie'} onChange={() => changerModele('harmonie')} className="mr-2" />
-              Harmonie (AROME)
-            </label>
-            <label className="mt-1 block text-sm">
-              <input type="radio" name="modele" checked={modele === 'cep'} onChange={() => changerModele('cep')} className="mr-2" />
-              CEP (ECMWF)
-            </label>
-          </fieldset>
-          <fieldset className="mt-3">
-            <legend className={`${champLabel} mb-1`}>Zone</legend>
+          <p className={titreGroupe}>Pictos</p>
+          <fieldset className="mt-2">
+            <legend className="sr-only">Jeu de pictos</legend>
             {(
               [
-                ['france', 'France entière'],
-                ['region', 'Par région'],
-                ['departement', 'Par département'],
+                ['emoji', 'Emojis'],
+                ['images', 'Mes pictos (images)'],
               ] as const
             ).map(([valeur, libelle]) => (
               <label key={valeur} className="mt-1 block text-sm">
-                <input
-                  type="radio"
-                  name="niveau"
-                  checked={niveau === valeur}
-                  onChange={() => {
-                    setNiveau(valeur);
-                    setErreur(null);
-                  }}
-                  className="mr-2"
-                />
+                <input type="radio" name={nom('pictos')} checked={jeuPictos === valeur} onChange={() => changerJeuPictos(valeur)} className="mr-2" />
                 {libelle}
               </label>
             ))}
-            {niveau === 'region' && (
-              <select value={region} onChange={(e) => setRegion(e.target.value)} className={champSelect} aria-label="Région">
-                {REGIONS_FR.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            )}
-            {niveau === 'departement' && (
-              <select
-                value={departement}
-                onChange={(e) => {
-                  setDepartement(e.target.value);
-                  setErreur(null);
-                }}
-                className={champSelect}
-                aria-label="Département"
-              >
-                {departementsTries.map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.code} — {d.nom}
-                  </option>
-                ))}
-              </select>
-            )}
           </fieldset>
-          <label className={`${champLabel} mt-3`}>
-            Jour
-            <select value={jour} onChange={(e) => changerJour(Number(e.target.value))} className={champSelect}>
-              {Array.from({ length: ECHEANCE_MAX[modele] + 1 }, (_, n) => (
-                <option key={n} value={n}>
-                  {NOM_ECHEANCE(n)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset className="mt-3">
-            <legend className="sr-only">Période</legend>
-            <label className="mt-1 block text-sm">
-              <input type="radio" name="periode" checked={periode === 'apres-midi'} onChange={() => { setPeriode('apres-midi'); setTitreManuel(null); setSousTitreManuel(null); }} className="mr-2" />
-              Après-midi (T° et rafales)
-            </label>
-            <label className="mt-1 block text-sm">
-              <input type="radio" name="periode" checked={periode === 'journee'} onChange={() => { setPeriode('journee'); setTitreManuel(null); setSousTitreManuel(null); }} className="mr-2" />
-              Journée (mini / maxi)
-            </label>
-          </fieldset>
-        </div>
-
-        <div className="border-t border-border pt-4">
-          <p className={titreGroupe}>Affichage</p>
-          <fieldset className="mt-2">
-            <legend className={`${champLabel} mb-1`}>Nombre de pictos et de T°</legend>
-            <div className="flex gap-4">
-              {(Object.keys(DENSITES) as Densite[]).map((d) => (
-                <label key={d} className="text-sm">
-                  <input type="radio" name="densite" checked={densite === d} onChange={() => setDensite(d)} className="mr-1.5" />
-                  {DENSITES[d].libelle}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <label className={`${champLabel} mt-2`}>
-            Contours
-            <select value={fond} onChange={(e) => setFond(e.target.value as FondContours)} className={champSelect}>
-              <option value="departements">Départements</option>
-              <option value="regions">Régions</option>
-            </select>
-          </label>
-          <label className={`${champLabel} mt-3`}>
-            Noms
-            <select value={niveauNoms} onChange={(e) => setNiveauNoms(e.target.value as NiveauNoms)} className={champSelect}>
-              <option value="departement">Départements</option>
-              <option value="ville">Villes (chefs-lieux)</option>
-            </select>
-          </label>
-          <label className="mt-2 flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={nomsVisibles} disabled={enDepartement} onChange={(e) => setAfficherNoms(e.target.checked)} />
-            Afficher les noms sur la carte{enDepartement ? ' (toujours en vue département)' : ''}
-          </label>
-          <label className={`${champLabel} mt-3`}>
-            Rafales à partir de (km/h, 4 valeurs maxi)
-            <input
-              type="number"
-              min={20}
-              max={200}
-              step={5}
-              value={seuilRafales}
-              onChange={(e) => setSeuilRafales(Math.max(20, Number(e.target.value) || SEUIL_RAFALES_DEFAUT))}
-              className={champInput}
-            />
-          </label>
+          <p className="mt-2 text-xs text-muted">
+            Choisit les pictos de toute la carte d&apos;après la prévision. Pour changer un picto seul, clique dessus sur la carte : emojis et images au choix.
+          </p>
         </div>
 
         <div className="border-t border-border pt-4">
@@ -716,7 +634,10 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
           <button
             type="button"
             onClick={() => {
-              setEditions({ ...(donnees ? construireEditions(donnees.points) : {}), ...(donneesVilles ? construireEditions(donneesVilles.points) : {}) });
+              setEditions({
+                ...(donnees ? construireEditions(donnees.points, jeuPictos) : {}),
+                ...(donneesVilles ? construireEditions(donneesVilles.points, jeuPictos) : {}),
+              });
               setMoyennesManuelles({});
               setTitreManuel(null);
               setSousTitreManuel(null);
@@ -725,11 +646,170 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
           >
             Rétablir les valeurs du modèle
           </button>
-          <p className="text-xs text-muted">Clique sur un picto pour le changer ; les températures sont modifiables directement sur la carte.</p>
+          <p className="text-xs text-muted">Les températures sont modifiables directement sur la carte.</p>
         </div>
       </aside>
 
       <div className="order-1 min-w-0 lg:order-2" ref={colonneRef}>
+        <div className="mb-3 flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+            <p className={`${titreGroupe} w-full`}>Prévision</p>
+            <fieldset>
+              <legend className={legendeBarre}>Modèle</legend>
+              <div className="flex gap-3">
+                <label className="text-sm">
+                  <input type="radio" name={nom('modele')} checked={modele === 'harmonie'} onChange={() => changerModele('harmonie')} className="mr-1.5" />
+                  Harmonie (AROME)
+                </label>
+                <label className="text-sm">
+                  <input type="radio" name={nom('modele')} checked={modele === 'cep'} onChange={() => changerModele('cep')} className="mr-1.5" />
+                  CEP (ECMWF)
+                </label>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className={legendeBarre}>Zone</legend>
+              <div className="flex flex-wrap items-center gap-3">
+                {(
+                  [
+                    ['france', 'France entière'],
+                    ['region', 'Par région'],
+                    ['departement', 'Par département'],
+                  ] as const
+                ).map(([valeur, libelle]) => (
+                  <label key={valeur} className="text-sm">
+                    <input
+                      type="radio"
+                      name={nom('niveau')}
+                      checked={niveau === valeur}
+                      onChange={() => {
+                        setNiveau(valeur);
+                        setErreur(null);
+                      }}
+                      className="mr-1.5"
+                    />
+                    {libelle}
+                  </label>
+                ))}
+                {niveau === 'region' && (
+                  <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectBarre} aria-label="Région">
+                    {REGIONS_FR.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {niveau === 'departement' && (
+                  <select
+                    value={departement}
+                    onChange={(e) => {
+                      setDepartement(e.target.value);
+                      setErreur(null);
+                    }}
+                    className={selectBarre}
+                    aria-label="Département"
+                  >
+                    {departementsTries.map((d) => (
+                      <option key={d.code} value={d.code}>
+                        {d.code} — {d.nom}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </fieldset>
+            <label className="text-sm font-medium">
+              <span className={legendeBarre}>Jour</span>
+              <select value={jour} onChange={(e) => changerJour(Number(e.target.value))} className={selectBarre}>
+                {Array.from({ length: ECHEANCE_MAX[modele] + 1 }, (_, n) => (
+                  <option key={n} value={n}>
+                    {NOM_ECHEANCE(n)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <fieldset>
+              <legend className={legendeBarre}>Période</legend>
+              <div className="flex gap-3">
+                <label className="text-sm">
+                  <input
+                    type="radio"
+                    name={nom('periode')}
+                    checked={periode === 'apres-midi'}
+                    onChange={() => {
+                      setPeriode('apres-midi');
+                      setTitreManuel(null);
+                      setSousTitreManuel(null);
+                    }}
+                    className="mr-1.5"
+                  />
+                  Après-midi (T° et rafales)
+                </label>
+                <label className="text-sm">
+                  <input
+                    type="radio"
+                    name={nom('periode')}
+                    checked={periode === 'journee'}
+                    onChange={() => {
+                      setPeriode('journee');
+                      setTitreManuel(null);
+                      setSousTitreManuel(null);
+                    }}
+                    className="mr-1.5"
+                  />
+                  Journée (mini / maxi)
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3 border-t border-border pt-3">
+            <p className={`${titreGroupe} w-full`}>Affichage</p>
+            <fieldset>
+              <legend className={legendeBarre}>Nombre de pictos et de T°</legend>
+              <div className="flex gap-3">
+                {(Object.keys(DENSITES) as Densite[]).map((d) => (
+                  <label key={d} className="text-sm">
+                    <input type="radio" name={nom('densite')} checked={densite === d} onChange={() => setDensite(d)} className="mr-1.5" />
+                    {DENSITES[d].libelle}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <label className="text-sm font-medium">
+              <span className={legendeBarre}>Contours</span>
+              <select value={fond} onChange={(e) => setFond(e.target.value as FondContours)} className={selectBarre}>
+                <option value="departements">Départements</option>
+                <option value="regions">Régions</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium">
+              <span className={legendeBarre}>Noms</span>
+              <select value={niveauNoms} onChange={(e) => setNiveauNoms(e.target.value as NiveauNoms)} className={selectBarre}>
+                <option value="departement">Départements</option>
+                <option value="ville">Villes (chefs-lieux)</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 pb-1.5 text-sm">
+              <input type="checkbox" checked={nomsVisibles} disabled={enDepartement} onChange={(e) => setAfficherNoms(e.target.checked)} />
+              Afficher les noms sur la carte{enDepartement ? ' (toujours en vue département)' : ''}
+            </label>
+            <label className="text-sm font-medium">
+              <span className={legendeBarre}>Rafales à partir de (km/h, 4 valeurs maxi)</span>
+              <input
+                type="number"
+                min={20}
+                max={200}
+                step={5}
+                value={seuilRafales}
+                onChange={(e) => setSeuilRafales(Math.max(20, Number(e.target.value) || SEUIL_RAFALES_DEFAUT))}
+                className={`${selectBarre} w-24`}
+              />
+            </label>
+          </div>
+        </div>
+
         <div className="relative">
           {erreur && (
             <p role="alert" className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-danger">
