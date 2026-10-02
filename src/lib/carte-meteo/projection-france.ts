@@ -46,8 +46,10 @@ const COTE_MINIMAL = 150;
 
 /** Échelle et translation pour centrer `boite` dans `zone` (pixels écran), avec une marge relative. */
 export function ajusterVue(boite: Boite, zone: Zone, marge = 0.06): Vue {
-  const largeurBoite = Math.max(boite.maxX - boite.minX, COTE_MINIMAL);
-  const hauteurBoite = Math.max(boite.maxY - boite.minY, COTE_MINIMAL);
+  // Le plancher s'applique à la plus grande dimension seulement : un département allongé doit pouvoir remplir la largeur.
+  const facteurMinimal = Math.max(1, COTE_MINIMAL / Math.max(boite.maxX - boite.minX, boite.maxY - boite.minY, 1));
+  const largeurBoite = (boite.maxX - boite.minX) * facteurMinimal;
+  const hauteurBoite = (boite.maxY - boite.minY) * facteurMinimal;
   const largeurZone = zone.droite - zone.gauche;
   const hauteurZone = zone.bas - zone.haut;
   const echelle = Math.min((largeurZone * (1 - 2 * marge)) / largeurBoite, (hauteurZone * (1 - 2 * marge)) / hauteurBoite);

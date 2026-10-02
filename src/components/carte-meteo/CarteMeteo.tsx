@@ -31,8 +31,8 @@ type Densite = 'leger' | 'moyen' | 'eleve';
 /** Nombre de points affichés : part des départements (France, région) ou nombre de villes (vue département). */
 const DENSITES: Record<Densite, { libelle: string; part: number; villes: number }> = {
   leger: { libelle: 'Léger', part: 0.3, villes: 4 },
-  moyen: { libelle: 'Moyen', part: 0.6, villes: 8 },
-  eleve: { libelle: 'Élevé', part: 1, villes: 14 },
+  moyen: { libelle: 'Moyen', part: 0.6, villes: 6 },
+  eleve: { libelle: 'Élevé', part: 1, villes: 10 },
 };
 
 export interface DonneesCarte {
@@ -55,10 +55,14 @@ interface Edition {
 
 const SEUIL_RAFALES_DEFAUT = 60;
 /** Distance minimale (pixels de la carte) entre deux villes affichées en vue département. */
-const DISTANCE_MIN_VILLES = 75;
+const DISTANCE_MIN_VILLES = 105;
 /** Régions et départements : on laisse libres le haut (logo, date) et la gauche (moyennes). */
 const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
 /** France entière : métropole quasi pleine hauteur, légèrement à gauche du centre (Corse à droite), comme sur le modèle. */
+/** Département : cadré au maximum, centré sur toute la carte. */
+const ZONE_DEPARTEMENT: Zone = { gauche: 14, haut: 14, droite: LARGEUR_CARTE - 14, bas: HAUTEUR_CARTE - 14 };
+/** Nombre maximal de valeurs de rafales affichées sur la carte (les plus fortes). */
+const MAX_RAFALES = 4;
 const ZONE_FRANCE: Zone = { gauche: 0, haut: 14, droite: Math.round(LARGEUR_CARTE * 0.92), bas: HAUTEUR_CARTE - 14 };
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
 const MASQUES_FRANCE = new Set(['92', '93', '94']);
@@ -166,7 +170,7 @@ const nombre = (s: string): number | null => {
 
 function libelleJour(dateISO: string): string {
   return new Date(`${dateISO}T12:00:00Z`)
-    .toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+    .toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
     .toUpperCase();
 }
 
@@ -282,9 +286,10 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
     const boites = contoursDep
       .filter((c) => selection.has(c.code) && !(zone === 'france' && (c.code === '2A' || c.code === '2B')))
       .map((c) => c.boite);
-    return zone === 'france'
-      ? ajusterVue(unirBoites(boites) ?? BOITE_FRANCE, ZONE_FRANCE, 0.01)
-      : ajusterVue(unirBoites(boites) ?? BOITE_FRANCE, ZONE_UTILE);
+    const boite = unirBoites(boites) ?? BOITE_FRANCE;
+    if (zone === 'france') return ajusterVue(boite, ZONE_FRANCE, 0.01);
+    if (zone.startsWith('dep:')) return ajusterVue(boite, ZONE_DEPARTEMENT, 0.02);
+    return ajusterVue(boite, ZONE_UTILE);
   }, [contoursDep, selection, zone]);
 
   const logoDefaut = useMemo(() => logoParDefaut(codes), [codes]);
@@ -304,6 +309,19 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
 
   const rafaleDe = (p: PointCarte) => (periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee);
 
+  /** Codes des points dont la rafale est signalée : au plus MAX_RAFALES, les plus fortes à partir du seuil. */
+  const plusFortesRafales = (liste: PointCarte[]) =>
+    new Set(
+      liste
+        .map((p) => ({ code: p.code, r: rafaleDe(p) }))
+        .filter((x): x is { code: string; r: number } => x.r != null && x.r >= seuilRafales)
+        .sort((a, b) => b.r - a.r)
+        .slice(0, MAX_RAFALES)
+        .map((x) => x.code)
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const codesRafales = useMemo(() => plusFortesRafales(points), [points, periode, seuilRafales]);
+
   /** Points affichés : les plus répartis selon la densité, plus toujours les extrêmes et les rafales à signaler. */
   const pointsAffiches = useMemo(() => {
     if (points.length === 0) return points;
@@ -311,7 +329,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
     // Vue département : les plus grandes villes, en écartant celles trop proches d'une ville déjà choisie (leurs
     // pictos se chevaucheraient). On garde la plus grande distance minimale qui permet d'atteindre le nombre voulu.
     const choisirVilles = (nombreVoulu: number): string[] => {
-      for (const seuil of [DISTANCE_MIN_VILLES, 58, 44, 32, 0]) {
+      for (const seuil of [DISTANCE_MIN_VILLES, 90, 75, 60, 45, 0]) {
         const choisies: { code: string; x: number; y: number }[] = [];
         for (const p of points) {
           const m = versMonde(coordsDe(p).lat, coordsDe(p).lon);
@@ -335,19 +353,18 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
       gardes.add(valeurs.reduce((a, b) => (b.v > a.v ? b : a)).code);
       gardes.add(valeurs.reduce((a, b) => (b.v < a.v ? b : a)).code);
     }
-    for (const p of points) {
-      const r = rafaleDe(p);
-      if (r != null && r >= seuilRafales) gardes.add(p.code);
-    }
+    // France et régions : les rafales à signaler sont toujours affichées. Département : seulement parmi les villes choisies.
+    if (!enDepartement) codesRafales.forEach((code) => gardes.add(code));
     return points.filter((p) => gardes.has(p.code));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, enDepartement, densite, editions, periode, seuilRafales, vue]);
+  }, [points, enDepartement, densite, editions, periode, codesRafales, vue]);
 
   const marqueurs: Marqueur[] = useMemo(() => {
     const valeurs = pointsAffiches.map((p) => valeurPrincipale(p.code));
     const numeriques = valeurs.filter((v): v is number => v != null);
     const plusChaud = numeriques.length > 1 ? Math.max(...numeriques) : null;
     const plusFroid = numeriques.length > 1 ? Math.min(...numeriques) : null;
+    const rafalesSignalees = enDepartement ? plusFortesRafales(pointsAffiches) : codesRafales;
     return pointsAffiches.map((p, i) => {
       const e = editions[p.code];
       const { x, y } = versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
@@ -361,12 +378,13 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
         picto: periode === 'apres-midi' ? e?.pictoAM ?? '☀️' : e?.pictoJ ?? '☀️',
         valeur: e ? (periode === 'apres-midi' ? e.tempAM : e.maxi) : '',
         mini: periode === 'journee' ? e?.mini ?? '' : null,
-        rafale: rafale != null && rafale >= seuilRafales ? rafale : null,
+        // Rafale arrondie de 5 en 5 km/h pour l'affichage.
+        rafale: rafalesSignalees.has(p.code) && rafale != null ? Math.round(rafale / 5) * 5 : null,
         ton: periode === 'apres-midi' && v != null ? (v === plusChaud ? 'chaud' : v === plusFroid ? 'froid' : null) : null,
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, editions, vue, periode, niveauNoms, seuilRafales]);
+  }, [pointsAffiches, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -575,7 +593,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
             Afficher les noms sur la carte{enDepartement ? ' (toujours en vue département)' : ''}
           </label>
           <label className={`${champLabel} mt-3`}>
-            Rafales à partir de (km/h)
+            Rafales à partir de (km/h, 4 valeurs maxi)
             <input
               type="number"
               min={20}
@@ -687,7 +705,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
               regions={regionsAffichees}
               selection={selection}
               marqueurs={marqueurs}
-              echelleMarqueurs={Math.min(enDepartement ? 1.35 : 1.2, Math.max(0.7, vue.echelle * 1.4))}
+              echelleMarqueurs={Math.min(enDepartement ? 1.15 : 1.2, Math.max(0.7, vue.echelle * 1.4))}
               afficherNoms={nomsVisibles}
               titre={titre}
               sousTitre={sousTitre}
