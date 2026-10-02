@@ -5,6 +5,7 @@ import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr';
 import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
+import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { pictoDepuisCodeMeteo, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
@@ -24,11 +25,24 @@ import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE, type BoiteMoyenne, type Conto
 type Periode = 'apres-midi' | 'journee';
 type NiveauNoms = 'departement' | 'ville';
 type FondContours = 'departements' | 'regions';
+type Niveau = 'france' | 'region' | 'departement';
+type Densite = 'leger' | 'moyen' | 'eleve';
+
+/** Nombre de points affichés : part des départements (France, région) ou nombre de villes (vue département). */
+const DENSITES: Record<Densite, { libelle: string; part: number; villes: number }> = {
+  leger: { libelle: 'Léger', part: 0.3, villes: 4 },
+  moyen: { libelle: 'Moyen', part: 0.6, villes: 8 },
+  eleve: { libelle: 'Élevé', part: 1, villes: 14 },
+};
 
 export interface DonneesCarte {
   modele: ModeleMeteo;
   dateISO: string;
   points: PointCarte[];
+}
+
+interface DonneesVilles extends DonneesCarte {
+  departement: string;
 }
 
 interface Edition {
@@ -40,6 +54,8 @@ interface Edition {
 }
 
 const SEUIL_RAFALES_DEFAUT = 60;
+/** Distance minimale (pixels de la carte) entre deux villes affichées en vue département. */
+const DISTANCE_MIN_VILLES = 75;
 /** Régions et départements : on laisse libres le haut (logo, date) et la gauche (moyennes). */
 const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
 /** France entière : métropole quasi pleine hauteur, légèrement à gauche du centre (Corse à droite), comme sur le modèle. */
@@ -58,10 +74,11 @@ const FICHIERS_CONTOURS: Record<FondContours, string> = {
 
 interface ContourBoite extends Contour {
   boite: Boite;
+  nom: string;
 }
 
 type GeoJsonContours = {
-  features: { properties: { code: string }; geometry: { type: string; coordinates: unknown } }[];
+  features: { properties: { code: string; nom?: string }; geometry: { type: string; coordinates: unknown } }[];
 };
 
 function construireContours(geojson: GeoJsonContours): ContourBoite[] {
@@ -82,7 +99,7 @@ function construireContours(geojson: GeoJsonContours): ContourBoite[] {
         d += 'Z';
       }
     }
-    return { code: f.properties.code, d, boite };
+    return { code: f.properties.code, nom: f.properties.nom ?? '', d, boite };
   });
 }
 
@@ -131,6 +148,11 @@ function construireEditions(points: PointCarte[]): Record<string, Edition> {
   return editions;
 }
 
+const normaliser = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Coordonnées d'un point : celles de la ville (vue département) ou le centre du département. */
+const coordsDe = (p: PointCarte) => (p.lat != null && p.lon != null ? { lat: p.lat, lon: p.lon } : COORDS_DEPARTEMENTS[p.code]);
+
 function codesDeLaZone(zone: string): string[] {
   if (zone === 'france') return CODES_DEPARTEMENTS;
   if (zone.startsWith('reg:')) return departementsDeLaRegion(zone.slice(4));
@@ -163,7 +185,11 @@ interface Props {
 export default function CarteMeteo({ aujourdhui, initial }: Props) {
   const [modele, setModele] = useState<ModeleMeteo>(initial?.modele ?? 'harmonie');
   const [jour, setJour] = useState(0);
-  const [zone, setZone] = useState('france');
+  const [niveau, setNiveau] = useState<Niveau>('france');
+  const [region, setRegion] = useState(REGIONS_FR[0]);
+  const [departement, setDepartement] = useState('29');
+  const [densite, setDensite] = useState<Densite>('moyen');
+  const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(null);
   const [periode, setPeriode] = useState<Periode>('apres-midi');
   const [donnees, setDonnees] = useState<DonneesCarte | null>(initial);
   const [editions, setEditions] = useState<Record<string, Edition>>(() => (initial ? construireEditions(initial.points) : {}));
@@ -185,11 +211,14 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
   const colonneRef = useRef<HTMLDivElement>(null);
   const carteRef = useRef<HTMLDivElement>(null);
 
+  const zone = niveau === 'france' ? 'france' : niveau === 'region' ? `reg:${region}` : `dep:${departement}`;
+  const enDepartement = niveau === 'departement';
   const dateISO = ajouterJours(aujourdhui, jour);
   const aJour = donnees?.modele === modele && donnees.dateISO === dateISO;
+  const villesAJour = donneesVilles?.modele === modele && donneesVilles.dateISO === dateISO && donneesVilles.departement === departement;
 
   useEffect(() => {
-    if (aJour || erreur) return;
+    if (enDepartement || aJour || erreur) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}`, { signal: controleur.signal })
       .then((r) => {
@@ -205,7 +234,25 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
         if (e.name !== 'AbortError') setErreur('Prévisions momentanément indisponibles.');
       });
     return () => controleur.abort();
-  }, [aJour, erreur, modele, dateISO]);
+  }, [enDepartement, aJour, erreur, modele, dateISO]);
+
+  useEffect(() => {
+    if (!enDepartement || villesAJour || erreur) return;
+    const controleur = new AbortController();
+    fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}&dep=${departement}`, { signal: controleur.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json() as Promise<{ points: PointCarte[] }>;
+      })
+      .then((json) => {
+        setDonneesVilles({ modele, dateISO, departement, points: json.points });
+        setEditions((prev) => ({ ...prev, ...construireEditions(json.points) }));
+      })
+      .catch((e: Error) => {
+        if (e.name !== 'AbortError') setErreur('Prévisions momentanément indisponibles.');
+      });
+    return () => controleur.abort();
+  }, [enDepartement, villesAJour, erreur, modele, dateISO, departement]);
 
   useEffect(() => {
     const colonne = colonneRef.current;
@@ -220,6 +267,15 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
 
   const codes = useMemo(() => codesDeLaZone(zone), [zone]);
   const selection = useMemo(() => new Set(codes), [codes]);
+
+  const departementsAffiches = useMemo(
+    () => (zone === 'france' ? contoursDep : contoursDep.filter((c) => selection.has(c.code))),
+    [contoursDep, selection, zone]
+  );
+  const regionsAffichees = useMemo(() => {
+    if (fond !== 'regions' || enDepartement) return null;
+    return niveau === 'france' ? contoursReg : contoursReg.filter((c) => normaliser(c.nom) === normaliser(region));
+  }, [fond, enDepartement, niveau, contoursReg, region]);
 
   const vue = useMemo(() => {
     // France entière : la Corse ne compte pas dans le cadrage (elle déborde à droite de la métropole).
@@ -236,25 +292,66 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
   const logoUrl = logoPersonnalise ?? LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier ?? null;
 
   const enFrance = zone === 'france';
-  const points = useMemo(
-    () => (donnees?.points ?? []).filter((p) => selection.has(p.code) && !(enFrance && MASQUES_FRANCE.has(p.code))),
-    [donnees, selection, enFrance]
-  );
+  const points = useMemo(() => {
+    if (enDepartement) return donneesVilles?.departement === departement ? donneesVilles.points : [];
+    return (donnees?.points ?? []).filter((p) => selection.has(p.code) && !(enFrance && MASQUES_FRANCE.has(p.code)));
+  }, [enDepartement, donneesVilles, departement, donnees, selection, enFrance]);
 
   const valeurPrincipale = (code: string): number | null => {
     const e = editions[code];
     return e ? nombre(periode === 'apres-midi' ? e.tempAM : e.maxi) : null;
   };
 
+  const rafaleDe = (p: PointCarte) => (periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee);
+
+  /** Points affichés : les plus répartis selon la densité, plus toujours les extrêmes et les rafales à signaler. */
+  const pointsAffiches = useMemo(() => {
+    if (points.length === 0) return points;
+    const reglage = DENSITES[densite];
+    // Vue département : les plus grandes villes, en écartant celles trop proches d'une ville déjà choisie (leurs
+    // pictos se chevaucheraient). On garde la plus grande distance minimale qui permet d'atteindre le nombre voulu.
+    const choisirVilles = (nombreVoulu: number): string[] => {
+      for (const seuil of [DISTANCE_MIN_VILLES, 58, 44, 32, 0]) {
+        const choisies: { code: string; x: number; y: number }[] = [];
+        for (const p of points) {
+          const m = versMonde(coordsDe(p).lat, coordsDe(p).lon);
+          if (choisies.some((c) => Math.hypot(c.x - m.x, c.y - m.y) * vue.echelle < seuil)) continue;
+          choisies.push({ code: p.code, ...m });
+          if (choisies.length >= nombreVoulu) break;
+        }
+        if (choisies.length >= nombreVoulu || seuil === 0) return choisies.map((c) => c.code);
+      }
+      return [];
+    };
+    const ordre = enDepartement
+      ? choisirVilles(reglage.villes)
+      : ordreRepartition(points.map((p) => ({ code: p.code, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) })));
+    const n = enDepartement ? ordre.length : Math.max(1, Math.ceil(reglage.part * ordre.length));
+    const gardes = new Set(ordre.slice(0, n));
+    const valeurs = points
+      .map((p) => ({ code: p.code, v: valeurPrincipale(p.code) }))
+      .filter((x): x is { code: string; v: number } => x.v != null);
+    if (!enDepartement && valeurs.length > 1) {
+      gardes.add(valeurs.reduce((a, b) => (b.v > a.v ? b : a)).code);
+      gardes.add(valeurs.reduce((a, b) => (b.v < a.v ? b : a)).code);
+    }
+    for (const p of points) {
+      const r = rafaleDe(p);
+      if (r != null && r >= seuilRafales) gardes.add(p.code);
+    }
+    return points.filter((p) => gardes.has(p.code));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, enDepartement, densite, editions, periode, seuilRafales, vue]);
+
   const marqueurs: Marqueur[] = useMemo(() => {
-    const valeurs = points.map((p) => valeurPrincipale(p.code));
+    const valeurs = pointsAffiches.map((p) => valeurPrincipale(p.code));
     const numeriques = valeurs.filter((v): v is number => v != null);
     const plusChaud = numeriques.length > 1 ? Math.max(...numeriques) : null;
     const plusFroid = numeriques.length > 1 ? Math.min(...numeriques) : null;
-    return points.map((p, i) => {
+    return pointsAffiches.map((p, i) => {
       const e = editions[p.code];
-      const { x, y } = versEcran(versMonde(COORDS_DEPARTEMENTS[p.code].lat, COORDS_DEPARTEMENTS[p.code].lon), vue);
-      const rafale = periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee;
+      const { x, y } = versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
+      const rafale = rafaleDe(p);
       const v = valeurs[i];
       return {
         code: p.code,
@@ -269,11 +366,11 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, editions, vue, periode, niveauNoms, seuilRafales]);
+  }, [pointsAffiches, editions, vue, periode, niveauNoms, seuilRafales]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
-      const sel = points.filter((p) => filtre(COORDS_DEPARTEMENTS[p.code].lat));
+      const sel = points.filter((p) => filtre(coordsDe(p).lat));
       const principales = sel.map((p) => valeurPrincipale(p.code)).filter((v): v is number => v != null);
       const minis = sel.map((p) => nombre(editions[p.code]?.mini ?? '')).filter((v): v is number => v != null);
       return { valeur: moyenne(principales), mini: moyenne(minis) };
@@ -310,6 +407,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
   const titre = titreManuel ?? libelleJour(dateISO);
   const sousTitre = sousTitreManuel ?? (periode === 'apres-midi' ? 'APRÈS-MIDI' : 'JOURNÉE');
   const nomZone = enFrance ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : DEPARTEMENTS_FR[zone.slice(4)];
+  const nomsVisibles = afficherNoms || enDepartement;
 
   function changerModele(m: ModeleMeteo) {
     setModele(m);
@@ -353,7 +451,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
     }
   }
 
-  const chargement = !aJour && !erreur;
+  const chargement = !(enDepartement ? villesAJour : aJour) && !erreur;
   const departementsTries = CODES_DEPARTEMENTS.map((code) => ({ code, nom: DEPARTEMENTS_FR[code] }));
 
   return (
@@ -372,26 +470,56 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
               CEP (ECMWF)
             </label>
           </fieldset>
-          <label className={`${champLabel} mt-3`}>
-            Zone
-            <select value={zone} onChange={(e) => setZone(e.target.value)} className={champSelect}>
-              <option value="france">France entière</option>
-              <optgroup label="Régions">
+          <fieldset className="mt-3">
+            <legend className={`${champLabel} mb-1`}>Zone</legend>
+            {(
+              [
+                ['france', 'France entière'],
+                ['region', 'Par région'],
+                ['departement', 'Par département'],
+              ] as const
+            ).map(([valeur, libelle]) => (
+              <label key={valeur} className="mt-1 block text-sm">
+                <input
+                  type="radio"
+                  name="niveau"
+                  checked={niveau === valeur}
+                  onChange={() => {
+                    setNiveau(valeur);
+                    setErreur(null);
+                  }}
+                  className="mr-2"
+                />
+                {libelle}
+              </label>
+            ))}
+            {niveau === 'region' && (
+              <select value={region} onChange={(e) => setRegion(e.target.value)} className={champSelect} aria-label="Région">
                 {REGIONS_FR.map((r) => (
-                  <option key={r} value={`reg:${r}`}>
+                  <option key={r} value={r}>
                     {r}
                   </option>
                 ))}
-              </optgroup>
-              <optgroup label="Départements">
+              </select>
+            )}
+            {niveau === 'departement' && (
+              <select
+                value={departement}
+                onChange={(e) => {
+                  setDepartement(e.target.value);
+                  setErreur(null);
+                }}
+                className={champSelect}
+                aria-label="Département"
+              >
                 {departementsTries.map((d) => (
-                  <option key={d.code} value={`dep:${d.code}`}>
+                  <option key={d.code} value={d.code}>
                     {d.code} — {d.nom}
                   </option>
                 ))}
-              </optgroup>
-            </select>
-          </label>
+              </select>
+            )}
+          </fieldset>
           <label className={`${champLabel} mt-3`}>
             Jour
             <select value={jour} onChange={(e) => changerJour(Number(e.target.value))} className={champSelect}>
@@ -417,6 +545,17 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
 
         <div className="border-t border-border pt-4">
           <p className={titreGroupe}>Affichage</p>
+          <fieldset className="mt-2">
+            <legend className={`${champLabel} mb-1`}>Nombre de pictos et de T°</legend>
+            <div className="flex gap-4">
+              {(Object.keys(DENSITES) as Densite[]).map((d) => (
+                <label key={d} className="text-sm">
+                  <input type="radio" name="densite" checked={densite === d} onChange={() => setDensite(d)} className="mr-1.5" />
+                  {DENSITES[d].libelle}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label className={`${champLabel} mt-2`}>
             Contours
             <select value={fond} onChange={(e) => setFond(e.target.value as FondContours)} className={champSelect}>
@@ -432,8 +571,8 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
             </select>
           </label>
           <label className="mt-2 flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={afficherNoms} onChange={(e) => setAfficherNoms(e.target.checked)} />
-            Afficher les noms sur la carte
+            <input type="checkbox" checked={nomsVisibles} disabled={enDepartement} onChange={(e) => setAfficherNoms(e.target.checked)} />
+            Afficher les noms sur la carte{enDepartement ? ' (toujours en vue département)' : ''}
           </label>
           <label className={`${champLabel} mt-3`}>
             Rafales à partir de (km/h)
@@ -508,7 +647,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
           <button
             type="button"
             onClick={exporter}
-            disabled={enExport || !donnees}
+            disabled={enExport || !(enDepartement ? donneesVilles : donnees)}
             className="rounded-lg bg-primary px-5 py-2.5 font-medium text-white disabled:opacity-60"
           >
             {enExport ? 'Export en cours…' : 'Exporter en JPG'}
@@ -516,7 +655,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
           <button
             type="button"
             onClick={() => {
-              if (donnees) setEditions(construireEditions(donnees.points));
+              setEditions({ ...(donnees ? construireEditions(donnees.points) : {}), ...(donneesVilles ? construireEditions(donneesVilles.points) : {}) });
               setMoyennesManuelles({});
               setTitreManuel(null);
               setSousTitreManuel(null);
@@ -544,12 +683,12 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
               carteRef={carteRef}
               facteur={facteur}
               vue={vue}
-              departements={contoursDep}
-              regions={fond === 'regions' ? contoursReg : null}
+              departements={departementsAffiches}
+              regions={regionsAffichees}
               selection={selection}
               marqueurs={marqueurs}
-              echelleMarqueurs={Math.min(1.15, Math.max(0.7, vue.echelle * 1.4))}
-              afficherNoms={afficherNoms}
+              echelleMarqueurs={Math.min(enDepartement ? 1.35 : 1.2, Math.max(0.7, vue.echelle * 1.4))}
+              afficherNoms={nomsVisibles}
               titre={titre}
               sousTitre={sousTitre}
               logoUrl={logoUrl}
@@ -563,7 +702,7 @@ export default function CarteMeteo({ aujourdhui, initial }: Props) {
         </div>
         <p className="mt-3 text-xs text-muted">
           Prévisions : modèle {modele === 'harmonie' ? 'Harmonie (AROME, Météo-France)' : 'CEP (ECMWF)'} via Open-Meteo (CC BY 4.0). Fond de carte : NASA Blue Marble.
-          Contours : IGN Admin Express (Licence ouverte Etalab).
+          Contours : IGN Admin Express (Licence ouverte Etalab).{enDepartement && ' Villes : API Géo (Etalab).'}
         </p>
       </div>
     </div>

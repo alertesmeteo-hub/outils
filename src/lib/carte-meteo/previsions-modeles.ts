@@ -19,6 +19,9 @@ const REVALIDATION_S = 1800;
 export interface PointCarte {
   code: string;
   nom: string;
+  /** Renseignées pour les villes (vue département) ; les départements utilisent COORDS_DEPARTEMENTS. */
+  lat?: number;
+  lon?: number;
   mini: number | null;
   maxi: number | null;
   tempApresMidi: number | null;
@@ -32,7 +35,7 @@ export interface PointCarte {
 const rang = (code: string) => (code === '2A' ? 19.1 : code === '2B' ? 19.2 : Number(code));
 export const CODES_DEPARTEMENTS = Object.keys(COORDS_DEPARTEMENTS).sort((a, b) => rang(a) - rang(b));
 
-interface ReponseLieu {
+export interface ReponseLieu {
   hourly?: {
     time?: string[];
     temperature_2m?: (number | null)[];
@@ -48,7 +51,7 @@ interface ReponseLieu {
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function appelerOpenMeteo(url: string): Promise<ReponseLieu[]> {
+export async function appelerOpenMeteo(url: string): Promise<ReponseLieu[]> {
   let statut = 0;
   for (let tentative = 1; tentative <= 4; tentative++) {
     const reponse = await fetch(url, { next: { revalidate: REVALIDATION_S }, signal: AbortSignal.timeout(12_000) });
@@ -74,7 +77,7 @@ const arrondi = (v: number | null, decimales = 0): number | null => {
   return Math.round(v * f) / f;
 };
 
-function pointDepuisReponse(code: string, lieu: ReponseLieu): PointCarte {
+export function pointDepuisReponse(code: string, nom: string, lieu: ReponseLieu): PointCarte {
   const heures = lieu.hourly?.time ?? [];
   const temps = lieu.hourly?.temperature_2m ?? [];
   const rafales = lieu.hourly?.wind_gusts_10m ?? [];
@@ -90,7 +93,7 @@ function pointDepuisReponse(code: string, lieu: ReponseLieu): PointCarte {
 
   return {
     code,
-    nom: DEPARTEMENTS_FR[code] ?? code,
+    nom,
     mini: arrondi(lieu.daily?.temperature_2m_min?.[0] ?? null, 1),
     maxi: arrondi(lieu.daily?.temperature_2m_max?.[0] ?? null, 1),
     tempApresMidi: arrondi(maximum(apresMidi.map(({ i }) => temps[i])), 1),
@@ -99,6 +102,22 @@ function pointDepuisReponse(code: string, lieu: ReponseLieu): PointCarte {
     codeApresMidi,
     codeJournee: lieu.daily?.weather_code?.[0] ?? null,
   };
+}
+
+/** URL Open-Meteo pour une liste de lieux (une seule requête), variables de la carte météo. */
+export function urlPrevisions(lieux: { lat: number; lon: number }[], modele: ModeleMeteo, dateISO: string): string {
+  const params = new URLSearchParams({
+    latitude: lieux.map((l) => l.lat.toFixed(3)).join(','),
+    longitude: lieux.map((l) => l.lon.toFixed(3)).join(','),
+    hourly: 'temperature_2m,wind_gusts_10m,weather_code',
+    daily: 'temperature_2m_max,temperature_2m_min,weather_code',
+    models: MODELE_OPEN_METEO[modele],
+    timezone: 'Europe/Paris',
+    start_date: dateISO,
+    end_date: dateISO,
+    wind_speed_unit: 'kmh',
+  });
+  return `${OPEN_METEO_URL}?${params.toString()}`;
 }
 
 /**
@@ -114,20 +133,9 @@ export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: strin
 
   const resultats = await Promise.all(
     lots.map(async (codes) => {
-      const params = new URLSearchParams({
-        latitude: codes.map((c) => COORDS_DEPARTEMENTS[c].lat.toFixed(3)).join(','),
-        longitude: codes.map((c) => COORDS_DEPARTEMENTS[c].lon.toFixed(3)).join(','),
-        hourly: 'temperature_2m,wind_gusts_10m,weather_code',
-        daily: 'temperature_2m_max,temperature_2m_min,weather_code',
-        models: MODELE_OPEN_METEO[modele],
-        timezone: 'Europe/Paris',
-        start_date: dateISO,
-        end_date: dateISO,
-        wind_speed_unit: 'kmh',
-      });
-      const lieux = await appelerOpenMeteo(`${OPEN_METEO_URL}?${params.toString()}`);
+      const lieux = await appelerOpenMeteo(urlPrevisions(codes.map((c) => COORDS_DEPARTEMENTS[c]), modele, dateISO));
       if (lieux.length !== codes.length) throw new Error('Réponse Open-Meteo incomplète');
-      return codes.map((code, i) => pointDepuisReponse(code, lieux[i]));
+      return codes.map((code, i) => pointDepuisReponse(code, DEPARTEMENTS_FR[code] ?? code, lieux[i]));
     })
   );
   return resultats.flat();
