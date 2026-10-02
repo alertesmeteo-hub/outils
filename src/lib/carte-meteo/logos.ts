@@ -16,5 +16,5 @@ export function logoParDefaut(codesDepartements: string[]): LogoPreset {
   if (codesDepartements.length === 1 && codesDepartements[0] === '66') {
     return LOGOS_PRESETS.find((l) => l.id === 'pays-catalan-hd')!;
   }
-  return LOGOS_PRESETS.find((l) => l.id === 'alertesmeteo')!;
+  return LOGOS_PRESETS.find((l) => l.id === 'alertesmeteo-transparent')!;
 }

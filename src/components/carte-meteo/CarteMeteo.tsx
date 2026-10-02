@@ -59,12 +59,12 @@ const SEUIL_RAFALES_DEFAUT = 60;
 const DISTANCE_MIN_VILLES = 105;
 /** Régions et départements : on laisse libres le haut (logo, date) et la gauche (moyennes). */
 const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
-/** France entière (Corse comprise) : quasi pleine hauteur, légèrement à gauche du centre, comme sur le modèle. */
 /** Département : cadré au maximum, centré sur toute la carte. */
 const ZONE_DEPARTEMENT: Zone = { gauche: 14, haut: 14, droite: LARGEUR_CARTE - 14, bas: HAUTEUR_CARTE - 14 };
 /** Nombre maximal de valeurs de rafales affichées sur la carte (les plus fortes). */
 const MAX_RAFALES = 4;
-const ZONE_FRANCE: Zone = { gauche: 0, haut: 14, droite: Math.round(LARGEUR_CARTE * 0.92), bas: HAUTEUR_CARTE - 14 };
+/** France entière (Corse comprise) : quasi pleine hauteur, centrée sur la carte. */
+const ZONE_FRANCE: Zone = { gauche: 0, haut: 14, droite: LARGEUR_CARTE, bas: HAUTEUR_CARTE - 14 };
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
 const MASQUES_FRANCE = new Set(['92', '93', '94']);
 
