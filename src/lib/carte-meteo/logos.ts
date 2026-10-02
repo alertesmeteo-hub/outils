@@ -6,6 +6,7 @@ export interface LogoPreset {
 
 export const LOGOS_PRESETS: LogoPreset[] = [
   { id: 'alertesmeteo', nom: 'AlertesMétéo.com', fichier: '/logos/alertesmeteo.png' },
+  { id: 'alertesmeteo-transparent', nom: 'AlertesMétéo.com (fond transparent)', fichier: '/logos/alertesmeteo-transparent.png' },
   { id: 'pays-catalan', nom: 'Météo Pays Catalan', fichier: '/logos/meteo-pays-catalan.jpg' },
 ];
 
