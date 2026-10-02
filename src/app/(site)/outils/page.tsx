@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import SearchBox from '@/components/SearchBox';
 import { ToolGrid } from '@/components/ToolCard';
 import { toSearchItem } from '@/lib/tools/registry';
@@ -17,6 +18,19 @@ export default async function AllTools() {
     <>
       <h1 className="text-3xl font-extrabold">Tous les outils</h1>
       <div className="mt-6 max-w-2xl"><SearchBox items={tools.map(toSearchItem)} /></div>
+      <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <li>
+          <Link href="/outils/carte-meteo/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">🗺️</span>
+            <span>
+              <strong className="block leading-snug">Carte météo France</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Carte des températures mini/maxi par région ou département, export en JPG.
+              </span>
+            </span>
+          </Link>
+        </li>
+      </ul>
       <div className="mt-8"><ToolGrid tools={tools} /></div>
     </>
   );
