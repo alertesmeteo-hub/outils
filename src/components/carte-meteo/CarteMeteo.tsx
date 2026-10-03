@@ -70,6 +70,16 @@ const LARGEUR_MOYENNES = 172;
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
 const MASQUES_FRANCE = new Set(['92', '93', '94']);
 
+/**
+ * France entière : départements retenus par défaut (densité « Moyen »), relevés sur la carte de référence —
+ * un point tous les ~100 km, du Nord-Pas-de-Calais à la Corse. « Léger » en garde une partie, « Élevé » en ajoute.
+ */
+const REFERENCE_FRANCE = [
+  '62', '59', '02', '76', '50', '08', '78', '54', '67', '29', '72', '35', '85', '86', '18', '58', '21', '25', '74', '39',
+  '63', '87', '69', '26', '05', '33', '17', '47', '31', '64', '65', '12', '66', '34', '84', '04', '13', '06', '2B', '2A',
+];
+const COEFFICIENT_FRANCE: Record<Densite, number> = { leger: 0.65, moyen: 1, eleve: 1.5 };
+
 const FRANCE_NO = versMonde(51.1, -4.8);
 const FRANCE_SE = versMonde(41.3, 9.6);
 const BOITE_FRANCE: Boite = { minX: FRANCE_NO.x, minY: FRANCE_NO.y, maxX: FRANCE_SE.x, maxY: FRANCE_SE.y };
@@ -149,7 +159,7 @@ function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoAM: PictoMeteo; pi
   };
 }
 
-function construireEditions(points: PointCarte[], jeu: JeuPictos = 'emoji'): Record<string, Edition> {
+function construireEditions(points: PointCarte[], jeu: JeuPictos = 'images'): Record<string, Edition> {
   const editions: Record<string, Edition> = {};
   for (const p of points) {
     editions[p.code] = {
@@ -210,8 +220,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [departement, setDepartement] = useState(reglages?.departement ?? '29');
   const [densite, setDensite] = useState<Densite>('moyen');
   const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(initialVilles);
-  const [jeuPictos, setJeuPictos] = useState<JeuPictos>('emoji');
-  const jeuRef = useRef<JeuPictos>('emoji');
+  const [jeuPictos, setJeuPictos] = useState<JeuPictos>('images');
+  const jeuRef = useRef<JeuPictos>('images');
   jeuRef.current = jeuPictos;
   const [periode, setPeriode] = useState<Periode>('apres-midi');
   const [donnees, setDonnees] = useState<DonneesCarte | null>(initial);
@@ -363,11 +373,18 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       }
       return [];
     };
-    const cible = enDepartement ? reglage.villes : Math.max(1, Math.ceil(reglage.part * points.length));
+    const repartis = (liste: PointCarte[]) => ordreRepartition(liste.map((p) => ({ code: p.code, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) })));
+    // France : les départements de référence d'abord (répartis de façon à pouvoir couper pour « Léger »), puis les autres.
+    const ordreFrance = (): string[] => {
+      if (!enFrance) return repartis(points);
+      const reference = points.filter((p) => REFERENCE_FRANCE.includes(p.code));
+      return [...repartis(reference), ...repartis(points.filter((p) => !REFERENCE_FRANCE.includes(p.code)))];
+    };
+    const cible = enDepartement ? reglage.villes : enFrance ? Math.round(REFERENCE_FRANCE.length * COEFFICIENT_FRANCE[densite]) : Math.max(1, Math.ceil(reglage.part * points.length));
     // Candidats en réserve : si le placement sans chevauchement écarte un marqueur, le suivant le remplace.
     const ordre = enDepartement
       ? choisirVilles(cible + 4)
-      : ordreRepartition(points.map((p) => ({ code: p.code, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) })));
+      : ordreFrance();
     const candidats = ordre.slice(0, enDepartement ? ordre.length : Math.min(ordre.length, Math.ceil(cible * 1.4)));
     const gardes = new Set(candidats);
     const valeurs = points
@@ -388,32 +405,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const nomsVisibles = afficherNoms || enDepartement;
   const echelleMarqueurs = Math.min(enDepartement ? 1.15 : 1.2, Math.max(0.7, vue.echelle * 1.4));
 
-  /**
-   * France entière : le logo et les moyennes sont rapprochés de la carte (au plus près de la côte, avec un petit écart)
-   * au lieu d'être aux coins de l'image ; la date, déjà contre le nord-est de la carte, ne bouge pas.
-   * Les limites viennent des boîtes englobantes des départements métropolitains : l'écart réel est donc un peu plus grand.
-   */
-  const miseEnPageFrance = useMemo(() => {
-    if (zone !== 'france' || contoursDep.length === 0) return null;
-    const metropole = contoursDep.filter((c) => c.code !== '2A' && c.code !== '2B');
-    const bordGauche = (haut: number, bas: number) => {
-      const xs = metropole
-        .filter((c) => c.boite.maxY * vue.echelle + vue.ty >= haut && c.boite.minY * vue.echelle + vue.ty <= bas)
-        .map((c) => c.boite.minX * vue.echelle + vue.tx);
-      return xs.length ? Math.min(...xs) : null;
-    };
-    const ecart = 24;
-    const bordLogo = bordGauche(18, 108);
-    const bordMoyennes = bordGauche(295, 445);
-    return {
-      logoDroite: bordLogo != null ? Math.max(240, Math.round(bordLogo - ecart)) : null,
-      moyennesGauche: bordMoyennes != null ? Math.max(29, Math.round(bordMoyennes - ecart - LARGEUR_MOYENNES)) : null,
-    };
-  }, [zone, contoursDep, vue]);
-
   const marqueurs: Marqueur[] = useMemo(() => {
     const reglage = DENSITES[densite];
-    const cible = enDepartement ? reglage.villes : Math.max(1, Math.ceil(reglage.part * points.length));
+    const cible = enDepartement ? reglage.villes : enFrance ? Math.round(REFERENCE_FRANCE.length * COEFFICIENT_FRANCE[densite]) : Math.max(1, Math.ceil(reglage.part * points.length));
     // Vue département : plus chaud, plus froid et rafales se jugent parmi les villes visées, pas parmi la réserve.
     const reference = enDepartement ? pointsAffiches.slice(0, cible) : pointsAffiches;
     const valeurs = pointsAffiches.map((p) => valeurPrincipale(p.code));
@@ -443,8 +437,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // Jamais de chevauchement : un marqueur gênant est décalé au plus près, ou écarté s'il n'y a plus de place.
     // Le logo, la date et les moyennes sont des obstacles (positions de la mise en page, voir globals.css).
     const em = 22 * echelleMarqueurs;
-    const logoDroite = miseEnPageFrance?.logoDroite ?? 29 + 205;
-    const moyennesGauche = miseEnPageFrance?.moyennesGauche ?? 29;
+    const logoDroite = 29 + 205;
+    const moyennesGauche = 29;
     const obstacles: Rect[] = [
       { x: logoDroite - 205, y: 21, w: 205, h: 84 },
       { x: LARGEUR_CARTE - 28 - 420, y: 18, w: 420, h: 86 },
@@ -453,9 +447,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const elements = bruts.map((m) => {
       // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
-      const demiLargeur = (Math.max(4.9 * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
+      const demiLargeur = (Math.max((m.mini == null ? 4.1 : 4.9) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
-      const hautLigne = Math.max(m.mini != null ? 3.4 : 1.8, estPictoImage(m.picto) ? 2.3 : 0);
+      const hautLigne = Math.max(m.mini != null ? 3.4 : 2.1, estPictoImage(m.picto) ? 2.3 : 0);
       const hauteur = hautLigne * em + (m.rafale != null ? 1.0 * em : 0);
       return {
         code: m.code,
@@ -476,7 +470,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, miseEnPageFrance]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -872,8 +866,6 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               sousTitre={sousTitre}
               logoUrl={logoUrl}
               moyennes={moyennes}
-              logoDroite={miseEnPageFrance?.logoDroite ?? null}
-              moyennesGauche={miseEnPageFrance?.moyennesGauche ?? null}
               paletteOuvertePour={paletteOuvertePour}
               onBasculerPalette={(code) => setPaletteOuvertePour((c) => (c === code ? null : code))}
               onModifier={modifier}

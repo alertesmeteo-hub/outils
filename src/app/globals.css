@@ -164,3 +164,7 @@ body {
 .cmap-palette button:hover { background: #e2e8f0; }
 .cmap-palette .cmap-picto-image { width: 30px; height: 30px; }
 
+
+/* Après-midi : la température chevauche le haut-droit du picto, comme sur la carte de référence. */
+.cmap-ligne-simple .cmap-valeurs { align-self: flex-start; margin: -0.45em 0 0 -0.45em; position: relative; z-index: 1; }
+.cmap-ligne-simple .cmap-valeur { font-size: 1.45em; width: 1.5em; }

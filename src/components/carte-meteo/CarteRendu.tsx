@@ -1,6 +1,6 @@
 'use client';
 
-import type { RefObject } from 'react';
+import type { CSSProperties, RefObject } from 'react';
 import { FOND, type Vue } from '@/lib/carte-meteo/projection-france';
 import { PICTOS_METEO, PICTOS_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 
@@ -64,6 +64,20 @@ const TRAIT_REGION = { ...TRAIT_COMMUN, fill: 'none', stroke: '#ffffff', strokeO
 // Sans contours : remplissage opaque et trait de la même couleur, pour que les départements voisins forment une
 // surface continue (avec la transparence, les jointures apparaîtraient comme de fines lignes claires).
 const TRAIT_UNI = { ...TRAIT_COMMUN, fill: '#919fe6', fillOpacity: 1, stroke: '#919fe6', strokeOpacity: 1, strokeWidth: 0.7 };
+
+const LARGEUR_PALETTE = 232;
+const HAUTEUR_PALETTE = 270;
+
+/** Palette ouverte dans le cadre de la carte : sous le marqueur s'il est en haut, décalée pour ne jamais être coupée sur les bords. */
+function stylePalette(x: number, y: number, em: number): CSSProperties {
+  const gauche = Math.min(Math.max(x - LARGEUR_PALETTE / 2, 6), LARGEUR_CARTE - LARGEUR_PALETTE - 6);
+  const enHaut = y < HAUTEUR_PALETTE + 40;
+  return {
+    left: `calc(50% + ${gauche - x}px)`,
+    transform: 'none',
+    ...(enHaut ? { top: 1.2 * em + 10, bottom: 'auto' } : { bottom: 1.2 * em + 10 }),
+  };
+}
 
 export default function CarteRendu({
   carteRef,
@@ -146,11 +160,11 @@ export default function CarteRendu({
           <div
             key={m.code}
             className="cmap-marqueur"
-            style={{ left: m.x, top: m.y, fontSize: 22 * echelleMarqueurs }}
+            style={{ left: m.x, top: m.y, fontSize: 22 * echelleMarqueurs, ...(paletteOuvertePour === m.code ? { zIndex: 20 } : {}) }}
             title={m.nom}
           >
             {afficherNoms && <div className="cmap-nom">{m.nom}</div>}
-            <div className="cmap-ligne">
+            <div className={`cmap-ligne ${m.mini == null ? 'cmap-ligne-simple' : ''}`}>
               <button type="button" className="cmap-picto" onClick={() => onBasculerPalette(m.code)}>
                 {estPictoImage(m.picto) ? <img src={cheminPictoImage(m.picto)} alt="" className="cmap-picto-image" /> : m.picto}
               </button>
@@ -178,7 +192,7 @@ export default function CarteRendu({
               </div>
             )}
             {paletteOuvertePour === m.code && (
-              <div className="cmap-palette">
+              <div className="cmap-palette" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs)}>
                 <div className="cmap-palette-groupe">
                   {PICTOS_METEO.map((picto) => (
                     <button key={picto} type="button" onClick={() => onModifier(m.code, 'picto', picto)}>
