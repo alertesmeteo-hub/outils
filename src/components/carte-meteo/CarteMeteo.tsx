@@ -24,7 +24,7 @@ import {
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import CarteRendu, { type Fleuves, HAUTEUR_CARTE, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur } from './CarteRendu';
 
-type Periode = 'apres-midi' | 'journee';
+type Periode = 'matin' | 'apres-midi' | 'journee';
 type NiveauNoms = 'departement' | 'ville';
 type FondContours = 'aucun' | 'departements' | 'regions';
 type Niveau = 'france' | 'region' | 'departement';
@@ -48,9 +48,11 @@ export interface DonneesVilles extends DonneesCarte {
 }
 
 interface Edition {
+  tempM: string;
   tempAM: string;
   mini: string;
   maxi: string;
+  pictoM: PictoMeteo;
   pictoAM: PictoMeteo;
   pictoJ: PictoMeteo;
 }
@@ -194,8 +196,9 @@ function useContours(fichier: string | null): ContourBoite[] {
 const texte = (v: number | null) => (v == null ? '' : String(Math.round(v)));
 
 /** Pictos de l'après-midi et de la journée d'un point, d'après la nébulosité et les précipitations de la période. */
-function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoAM: PictoMeteo; pictoJ: PictoMeteo } {
+function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoM: PictoMeteo; pictoAM: PictoMeteo; pictoJ: PictoMeteo } {
   return {
+    pictoM: pictoDepuisPrevision({ code: p.codeMatin, nuages: p.nuagesMatin, pluie: p.pluieMatin, temperature: p.tempMatin }, jeu),
     pictoAM: pictoDepuisPrevision({ code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: p.pluieApresMidi, temperature: p.tempApresMidi }, jeu),
     pictoJ: pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: p.pluieJournee, temperature: p.maxi }, jeu),
   };
@@ -205,6 +208,7 @@ function construireEditions(points: PointCarte[], jeu: JeuPictos = 'images'): Re
   const editions: Record<string, Edition> = {};
   for (const p of points) {
     editions[p.code] = {
+      tempM: texte(p.tempMatin),
       tempAM: texte(p.tempApresMidi),
       mini: texte(p.mini),
       maxi: texte(p.maxi),
@@ -213,6 +217,9 @@ function construireEditions(points: PointCarte[], jeu: JeuPictos = 'images'): Re
   }
   return editions;
 }
+
+const majPicto = (e: Edition, periode: Periode, v: string): Edition =>
+  periode === 'matin' ? { ...e, pictoM: v as PictoMeteo } : periode === 'apres-midi' ? { ...e, pictoAM: v as PictoMeteo } : { ...e, pictoJ: v as PictoMeteo };
 
 const normaliser = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -389,10 +396,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const valeurPrincipale = (code: string): number | null => {
     const e = editions[code];
-    return e ? nombre(periode === 'apres-midi' ? e.tempAM : e.maxi) : null;
+    return e ? nombre(periode === 'matin' ? e.tempM : periode === 'apres-midi' ? e.tempAM : e.maxi) : null;
   };
 
-  const rafaleDe = (p: PointCarte) => (periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee);
+  const rafaleDe = (p: PointCarte) => (periode === 'matin' ? p.rafaleMatin : periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee);
 
   /** Codes des points dont la rafale est signalée : au plus MAX_RAFALES, les plus fortes à partir du seuil. */
   const plusFortesRafales = (liste: PointCarte[]) =>
@@ -541,13 +548,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         x,
         y,
         nom: niveauNoms === 'ville' ? CHEF_LIEU_PAR_DEPARTEMENT[p.code] ?? p.nom : p.nom,
-        picto: periode === 'apres-midi' ? e?.pictoAM ?? '☀️' : e?.pictoJ ?? '☀️',
-        valeur: e ? (periode === 'apres-midi' ? e.tempAM : e.maxi) : '',
+        picto: (periode === 'matin' ? e?.pictoM : periode === 'apres-midi' ? e?.pictoAM : e?.pictoJ) ?? '☀️',
+        valeur: e ? (periode === 'matin' ? e.tempM : periode === 'apres-midi' ? e.tempAM : e.maxi) : '',
         mini: periode === 'journee' ? e?.mini ?? '' : null,
         // Rafale arrondie de 5 en 5 km/h pour l'affichage.
         rafale: rafalesSignalees.has(p.code) && rafale != null ? Math.round(rafale / 5) * 5 : null,
-        fleche: afficherFleches && rafalesSignalees.has(p.code) && rafale != null ? flecheVent(periode === 'apres-midi' ? p.directionRafaleApresMidi : p.directionRafaleJournee) : null,
-        ton: periode === 'apres-midi' && v != null ? (v === plusChaud ? 'chaud' : v === plusFroid ? 'froid' : null) : null,
+        fleche: afficherFleches && rafalesSignalees.has(p.code) && rafale != null ? flecheVent(periode === 'matin' ? p.directionRafaleMatin : periode === 'apres-midi' ? p.directionRafaleApresMidi : p.directionRafaleJournee) : null,
+        ton: periode !== 'journee' && v != null ? (v === plusChaud ? 'chaud' : v === plusFroid ? 'froid' : null) : null,
       };
     });
 
@@ -628,7 +635,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       : [];
 
   const titre = titreManuel ?? libelleJour(dateISO);
-  const sousTitre = sousTitreManuel ?? (periode === 'apres-midi' ? 'APRÈS-MIDI' : 'JOURNÉE');
+  const sousTitre = sousTitreManuel ?? (periode === 'matin' ? 'MATIN' : periode === 'apres-midi' ? 'APRÈS-MIDI' : 'JOURNÉE');
   const nomZone = enFrance ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : DEPARTEMENTS_FR[zone.slice(4)];
 
   function changerModele(m: ModeleMeteo) {
@@ -648,14 +655,14 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     setEditions((prev) => {
       if (champ === 'picto' && (partout || (pictosSelectionnes.size > 0 && pictosSelectionnes.has(code)))) {
         const toutes: Record<string, Edition> = { ...prev };
-        for (const [c, e] of Object.entries(prev)) if (partout || pictosSelectionnes.has(c)) toutes[c] = periode === 'apres-midi' ? { ...e, pictoAM: valeur as PictoMeteo } : { ...e, pictoJ: valeur as PictoMeteo };
+        for (const [c, e] of Object.entries(prev)) if (partout || pictosSelectionnes.has(c)) toutes[c] = majPicto(e, periode, valeur);
         return toutes;
       }
       const e = prev[code];
       if (!e) return prev;
-      if (champ === 'picto') return { ...prev, [code]: periode === 'apres-midi' ? { ...e, pictoAM: valeur as PictoMeteo } : { ...e, pictoJ: valeur as PictoMeteo } };
+      if (champ === 'picto') return { ...prev, [code]: majPicto(e, periode, valeur) };
       if (champ === 'mini') return { ...prev, [code]: { ...e, mini: valeur } };
-      return { ...prev, [code]: periode === 'apres-midi' ? { ...e, tempAM: valeur } : { ...e, maxi: valeur } };
+      return { ...prev, [code]: periode === 'matin' ? { ...e, tempM: valeur } : periode === 'apres-midi' ? { ...e, tempAM: valeur } : { ...e, maxi: valeur } };
     });
     if (champ === 'picto') {
       setPaletteOuvertePour(null);
@@ -669,7 +676,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const suite = { ...prev };
       pictosSelectionnes.forEach((c) => {
         const e = prev[c];
-        if (e) suite[c] = periode === 'apres-midi' ? { ...e, pictoAM: picto as PictoMeteo } : { ...e, pictoJ: picto as PictoMeteo };
+        if (e) suite[c] = majPicto(e, periode, picto);
       });
       return suite;
     });
@@ -1015,7 +1022,21 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             </label>
             <fieldset>
               <legend className={legendeBarre}>Période</legend>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                <label className="text-sm">
+                  <input
+                    type="radio"
+                    name={nom('periode')}
+                    checked={periode === 'matin'}
+                    onChange={() => {
+                      setPeriode('matin');
+                      setTitreManuel(null);
+                      setSousTitreManuel(null);
+                    }}
+                    className="mr-1.5"
+                  />
+                  Matin (T° et rafales)
+                </label>
                 <label className="text-sm">
                   <input
                     type="radio"

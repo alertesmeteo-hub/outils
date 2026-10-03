@@ -33,6 +33,12 @@ export interface PointCarte {
   lon?: number;
   mini: number | null;
   maxi: number | null;
+  tempMatin: number | null;
+  rafaleMatin: number | null;
+  directionRafaleMatin: number | null;
+  codeMatin: number | null;
+  nuagesMatin: number | null;
+  pluieMatin: number | null;
   tempApresMidi: number | null;
   rafaleApresMidi: number | null;
   rafaleJournee: number | null;
@@ -130,12 +136,13 @@ function directionRafaleMax(serie: Serie, indices: number[]): number | null {
 }
 
 /**
- * Point de la carte pour un jour (date locale, Paris) : l'après-midi va de 12 h à 18 h, la journée de 7 h à 20 h pour le
+ * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h, l'après-midi de 12 h à 18 h, la journée de 7 h à 20 h pour le
  * ciel. Le minimum de la nuit n'est donné que si la série couvre le début de la journée (avant 7 h).
  */
 export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateISO: string): PointCarte {
   const locaux = serie.t.map(dateHeureParis);
   const jour = locaux.map((l, i) => ({ ...l, i })).filter((l) => l.date === dateISO);
+  const matin = jour.filter((l) => l.heure >= 6 && l.heure <= 11).map((l) => l.i);
   const apresMidi = jour.filter((l) => l.heure >= 12 && l.heure <= 17).map((l) => l.i);
   const ciel = jour.filter((l) => l.heure >= 7 && l.heure <= 20).map((l) => l.i);
   const toute = jour.map((l) => l.i);
@@ -146,6 +153,12 @@ export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateIS
     nom,
     mini: debutCouvert ? arrondi(minimum(toute.map((i) => serie.temp[i])), 1) : null,
     maxi: arrondi(maximum(toute.map((i) => serie.temp[i])), 1),
+    tempMatin: arrondi(maximum(matin.map((i) => serie.temp[i])), 1),
+    rafaleMatin: arrondi(maximum(matin.map((i) => serie.rafale[i]))),
+    directionRafaleMatin: directionRafaleMax(serie, matin),
+    codeMatin: codePeriode(serie, matin),
+    nuagesMatin: arrondi(moyenne(matin.map((i) => serie.nuages[i]))),
+    pluieMatin: arrondi(somme(matin.map((i) => serie.pluie[i])), 1),
     tempApresMidi: arrondi(maximum(apresMidi.map((i) => serie.temp[i])), 1),
     rafaleApresMidi: arrondi(maximum(apresMidi.map((i) => serie.rafale[i]))),
     rafaleJournee: arrondi(maximum(toute.map((i) => serie.rafale[i]))),
