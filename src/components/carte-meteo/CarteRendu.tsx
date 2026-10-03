@@ -49,6 +49,8 @@ interface Props {
   fleuves?: Fleuves | null;
   /** Fond relief satellite ; sinon fond bleu uni. */
   afficherRelief?: boolean;
+  /** Part du relief qui transparaît à travers la teinte du territoire (0 à 1) quand « Reliefs » est coché. */
+  reliefVisible?: number;
   vue: Vue;
   departements: Contour[];
   regions: Contour[] | null;
@@ -113,6 +115,7 @@ export default function CarteRendu({
   titreADroite = false,
   fleuves = null,
   afficherRelief = true,
+  reliefVisible = 0.28,
   vue,
   departements,
   regions,
@@ -151,7 +154,7 @@ export default function CarteRendu({
               <path key={c.code} d={c.d} {...TRAIT_HORS_SELECTION} {...(regions ? { stroke: 'none' } : {})} />
             ))}
             {/* Reliefs : le territoire est teinté en transparence (opacité du groupe, donc sans jointures visibles) pour laisser voir le relief. */}
-            <g opacity={afficherRelief ? 0.72 : 1}>
+            <g opacity={afficherRelief ? 1 - reliefVisible : 1}>
               {departements.filter((c) => selection.has(c.code)).map((c) =>
                 regions && regions.length === 0 ? (
                   <path key={c.code} d={c.d} {...TRAIT_UNI} />

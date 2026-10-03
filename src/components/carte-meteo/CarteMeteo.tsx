@@ -289,6 +289,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [afficherFleuves, setAfficherFleuves] = useState(true);
   const [afficherFleches, setAfficherFleches] = useState(true);
   const [afficherRelief, setAfficherRelief] = useState(true);
+  const [reliefPourcent, setReliefPourcent] = useState(28);
   const [enExport, setEnExport] = useState(false);
 
   const [facteur, setFacteur] = useState(1);
@@ -1010,6 +1011,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               <input type="checkbox" checked={afficherRelief} onChange={(e) => setAfficherRelief(e.target.checked)} />
               Reliefs
             </label>
+            {afficherRelief && (
+              <label className="flex items-center gap-2 pb-1.5 text-sm">
+                Opacité du relief
+                <input type="range" min={0} max={90} step={5} value={reliefPourcent} onChange={(e) => setReliefPourcent(Number(e.target.value))} aria-label="Opacité du relief" />
+                <span className="w-9 tabular-nums text-muted">{reliefPourcent} %</span>
+              </label>
+            )}
             <label className="text-sm font-medium">
               <span className={legendeBarre}>Noms</span>
               <select value={niveauNoms} onChange={(e) => setNiveauNoms(e.target.value as NiveauNoms)} className={selectBarre}>
@@ -1052,6 +1060,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               largeur={largeurCarte}
               fleuves={fleuves}
               afficherRelief={afficherRelief}
+              reliefVisible={reliefPourcent / 100}
               vue={vue}
               departements={departementsAffiches}
               regions={regionsAffichees}
