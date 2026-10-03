@@ -2,7 +2,8 @@
 # Secrets à créer dans GitHub (Settings > Secrets and variables > Actions) :
 #   VPS_HOST     adresse IP ou nom du VPS
 #   VPS_USER     utilisateur SSH (ubuntu)
-#   VPS_SSH_KEY  clé privée SSH dédiée au déploiement
+#   VPS_SSH_KEY_B64  clé privée SSH dédiée au déploiement, encodée en base64 sur une seule ligne
+#                    (évite les erreurs de copier-coller des retours à la ligne ; `base64 -w0 ~/.ssh/deploy_github`)
 name: Déploiement VPS
 
 on:
@@ -22,7 +23,7 @@ jobs:
       - name: Préparer SSH
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
