@@ -13,7 +13,10 @@ export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { harmonie: 2, cep: 6 }
 
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
 const POINTS_PAR_REQUETE = 48;
-const REVALIDATION_S = 1800;
+const REVALIDATION_S = 3600;
+/** Dernière réponse valide par URL : resservie (jusqu'à 12 h) si Open-Meteo est indisponible ou limite les appels. */
+const DERNIERES_REPONSES = new Map<string, { t: number; data: ReponseLieu[] }>();
+const AGE_MAX_REPLI_MS = 12 * 3600_000;
 
 /** Un point par département métropolitain, avec les valeurs de l'après-midi (12 h-18 h) et de la journée. */
 export interface PointCarte {
@@ -64,17 +67,28 @@ const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function appelerOpenMeteo(url: string): Promise<ReponseLieu[]> {
   let statut = 0;
+  let detail = '';
   for (let tentative = 1; tentative <= 4; tentative++) {
-    const reponse = await fetch(url, { next: { revalidate: REVALIDATION_S }, signal: AbortSignal.timeout(12_000) });
-    if (reponse.ok) {
-      const json = await reponse.json();
-      return Array.isArray(json) ? json : [json];
+    try {
+      const reponse = await fetch(url, { next: { revalidate: REVALIDATION_S }, signal: AbortSignal.timeout(12_000) });
+      if (reponse.ok) {
+        const json = await reponse.json();
+        const data = Array.isArray(json) ? json : [json];
+        DERNIERES_REPONSES.set(url, { t: Date.now(), data });
+        return data;
+      }
+      statut = reponse.status;
+      detail = (await reponse.text().catch(() => '')).slice(0, 200);
+      if (statut !== 429 && statut < 500) break;
+    } catch (e) {
+      detail = String(e);
     }
-    statut = reponse.status;
-    if (statut !== 429 && statut < 500) break;
     await pause(tentative * 700);
   }
-  throw new Error(`Open-Meteo a répondu ${statut}`);
+  // Open-Meteo indisponible ou appels limités : on resert la dernière réponse connue plutôt que d'afficher une erreur.
+  const repli = DERNIERES_REPONSES.get(url);
+  if (repli && Date.now() - repli.t < AGE_MAX_REPLI_MS) return repli.data;
+  throw new Error(`Open-Meteo a répondu ${statut} ${detail}`);
 }
 
 const maximum = (valeurs: (number | null | undefined)[]): number | null => {
