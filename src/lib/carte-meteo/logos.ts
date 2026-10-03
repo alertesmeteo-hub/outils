@@ -5,6 +5,7 @@ export interface LogoPreset {
 }
 
 export const LOGOS_PRESETS: LogoPreset[] = [
+  { id: 'aucun', nom: 'Aucun logo', fichier: '' },
   { id: 'alertesmeteo', nom: 'AlertesMétéo.com', fichier: '/logos/alertesmeteo.png' },
   { id: 'alertesmeteo-transparent', nom: 'AlertesMétéo.com (fond transparent)', fichier: '/logos/alertesmeteo-transparent.png' },
   { id: 'pays-catalan-hd', nom: 'Météo Pays Catalan (haute qualité)', fichier: '/logos/meteo-pays-catalan-hd.png' },
@@ -16,5 +17,5 @@ export function logoParDefaut(codesDepartements: string[]): LogoPreset {
   if (codesDepartements.length === 1 && codesDepartements[0] === '66') {
     return LOGOS_PRESETS.find((l) => l.id === 'pays-catalan-hd')!;
   }
-  return LOGOS_PRESETS.find((l) => l.id === 'alertesmeteo-transparent')!;
+  return LOGOS_PRESETS.find((l) => l.id === 'aucun')!;
 }

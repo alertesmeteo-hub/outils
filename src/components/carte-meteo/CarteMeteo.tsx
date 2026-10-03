@@ -280,6 +280,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [paletteOuvertePour, setPaletteOuvertePour] = useState<string | null>(null);
   const [pictosSelectionnes, setPictosSelectionnes] = useState<Set<string>>(new Set());
   const [modeMultiple, setModeMultiple] = useState(false);
+  const [pied, setPied] = useState('www.alertes-meteo.com');
   const [afficherFleuves, setAfficherFleuves] = useState(true);
   const [afficherRelief, setAfficherRelief] = useState(true);
   const [enExport, setEnExport] = useState(false);
@@ -368,7 +369,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const logoDefaut = useMemo(() => logoParDefaut(codes), [codes]);
   const logoId = logoPresetId ?? logoDefaut.id;
-  const logoUrl = logoPersonnalise ?? LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier ?? null;
+  const logoUrl = logoPersonnalise ?? (LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier || null);
 
   const enFrance = zone === 'france';
   const largeurCarte = enFrance ? LARGEUR_FRANCE : LARGEUR_CARTE;
@@ -522,6 +523,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const obstacles: Rect[] = [
       { x: logoDroite - 205, y: 21, w: 205, h: 84 },
       { x: largeurCarte - 28 - 420, y: 18, w: 420, h: 86 },
+      ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : zone.startsWith('reg:') ? [{ x: 29, y: 340, w: LARGEUR_MOYENNES, h: 58 }] : []),
     ];
     const elements = bruts.map((m) => {
@@ -550,7 +552,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -772,6 +774,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </label>
             </>
           )}
+          <label className={`${champLabel} mt-3`}>
+            Texte du bas (centré)
+            <input type="text" value={pied} onChange={(e) => setPied(e.target.value)} className={champInput} />
+          </label>
           <label className={`${champLabel} mt-3`}>
             Logo
             <select
@@ -1018,6 +1024,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               titre={titre}
               sousTitre={sousTitre}
               logoUrl={logoUrl}
+              pied={pied}
               moyennes={moyennes}
               paletteOuvertePour={paletteOuvertePour}
               pictosSelectionnes={enExport ? undefined : pictosSelectionnes}

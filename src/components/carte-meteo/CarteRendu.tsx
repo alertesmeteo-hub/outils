@@ -39,6 +39,8 @@ interface Props {
   /** Largeur de l'image : plus étroite en vue France (carte cadrée serrée, coupée sur les côtés). */
   largeur?: number;
   /** Tracé des fleuves (coordonnées « monde »), ou null pour ne pas les afficher. */
+  /** Texte centré en bas de l'image (adresse du site). */
+  pied?: string;
   fleuves?: string | null;
   /** Fond relief satellite ; sinon fond bleu uni. */
   afficherRelief?: boolean;
@@ -93,6 +95,7 @@ export default function CarteRendu({
   carteRef,
   facteur,
   largeur = LARGEUR_CARTE,
+  pied = '',
   fleuves = null,
   afficherRelief = true,
   vue,
@@ -174,6 +177,8 @@ export default function CarteRendu({
           <div className="cmap-date">{titre}</div>
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
         </div>
+
+        {pied && <div className="cmap-pied">{pied}</div>}
 
         <div className="cmap-moyennes" style={moyennesGauche != null ? { left: moyennesGauche } : undefined}>
           {moyennes.map((m) => (
