@@ -31,9 +31,9 @@ type Densite = 'leger' | 'moyen' | 'eleve';
 
 /** Nombre de points affichés : part des départements (France, région) ou nombre de villes (vue département). */
 const DENSITES: Record<Densite, { libelle: string; part: number; villes: number }> = {
-  leger: { libelle: 'Léger', part: 0.3, villes: 4 },
-  moyen: { libelle: 'Moyen', part: 0.6, villes: 6 },
-  eleve: { libelle: 'Élevé', part: 1, villes: 10 },
+  leger: { libelle: 'Léger', part: 0.3, villes: 5 },
+  moyen: { libelle: 'Moyen', part: 0.6, villes: 9 },
+  eleve: { libelle: 'Élevé', part: 1, villes: 14 },
 };
 
 export interface DonneesCarte {
@@ -454,13 +454,24 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // Vue département : les plus grandes villes, en écartant celles trop proches d'une ville déjà choisie (leurs
     // pictos se chevaucheraient). On garde la plus grande distance minimale qui permet d'atteindre le nombre voulu.
     const choisirVilles = (nombreVoulu: number): string[] => {
+      // Les villes sont triées par population : on part de la plus grande, puis on ajoute à chaque fois celle qui comble le
+      // mieux les zones vides (grande distance aux villes déjà choisies, pondérée par la taille de la ville).
+      const candidates = points.map((p, rang) => ({ code: p.code, poids: 1 / (1 + rang) ** 0.25, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) }));
       for (const seuil of [DISTANCE_MIN_VILLES, 90, 75, 60, 45, 0]) {
-        const choisies: { code: string; x: number; y: number }[] = [];
-        for (const p of points) {
-          const m = versMonde(coordsDe(p).lat, coordsDe(p).lon);
-          if (choisies.some((c) => Math.hypot(c.x - m.x, c.y - m.y) * vue.echelle < seuil)) continue;
-          choisies.push({ code: p.code, ...m });
-          if (choisies.length >= nombreVoulu) break;
+        const choisies = candidates.slice(0, 1);
+        const distance = (c: (typeof candidates)[number]) => Math.min(...choisies.map((o) => Math.hypot(o.x - c.x, o.y - c.y) * vue.echelle));
+        while (choisies.length < nombreVoulu) {
+          let meilleure: (typeof candidates)[number] | null = null;
+          let score = -1;
+          for (const c of candidates) {
+            if (choisies.includes(c)) continue;
+            const d = distance(c);
+            if (d < seuil || d * c.poids <= score) continue;
+            meilleure = c;
+            score = d * c.poids;
+          }
+          if (!meilleure) break;
+          choisies.push(meilleure);
         }
         if (choisies.length >= nombreVoulu || seuil === 0) return choisies.map((c) => c.code);
       }
