@@ -4,7 +4,7 @@
 //   node scripts/villes-departements.mjs
 import { writeFileSync } from 'node:fs';
 
-const PAR_DEPARTEMENT = 40;
+const PAR_DEPARTEMENT = 100;
 const codes = [
   ...Array.from({ length: 19 }, (_, i) => String(i + 1).padStart(2, '0')),
   '2A',

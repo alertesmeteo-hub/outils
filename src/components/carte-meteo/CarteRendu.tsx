@@ -41,12 +41,12 @@ interface Props {
   facteur: number;
   /** Largeur de l'image : plus étroite en vue France (carte cadrée serrée, coupée sur les côtés). */
   largeur?: number;
-  /** Affiche les cours d'eau principaux (plan hydrographique IGN). */
+  /** Cours d'eau principaux (BD TOPO IGN) en tracés SVG « monde », par importance (1 = fleuves) ; null = masqués. */
   /** Texte centré en bas de l'image (adresse du site). */
   pied?: string;
   /** Date et sous-titre alignés en haut à droite (vue France) au lieu d'être centrés. */
   titreADroite?: boolean;
-  fleuves?: boolean;
+  fleuves?: Fleuves | null;
   /** Fond relief satellite ; sinon fond bleu uni. */
   afficherRelief?: boolean;
   vue: Vue;
@@ -97,13 +97,21 @@ function stylePalette(x: number, y: number, em: number, largeur: number): CSSPro
 }
 
 
+export interface Fleuves {
+  d1: string;
+  d2: string;
+  d3: string;
+}
+
+const COURS_EAU = { fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke' } as const;
+
 export default function CarteRendu({
   carteRef,
   facteur,
   largeur = LARGEUR_CARTE,
   pied = '',
   titreADroite = false,
-  fleuves = false,
+  fleuves = null,
   afficherRelief = true,
   vue,
   departements,
@@ -157,10 +165,14 @@ export default function CarteRendu({
                 <clipPath id={idClip}>
                   {departements.filter((c) => selection.has(c.code)).map((c) => <path key={c.code} d={c.d} />)}
                 </clipPath>
-                <g clipPath={`url(#${idClip})`} opacity={vue.echelle < 1 ? 0.6 : 1}>
-                  {tuilesVisibles('hydro', vue, largeur, HAUTEUR_CARTE).map((t) => (
-                    <image key={t.cle} href={t.url} x={t.x} y={t.y} width={t.taille + 0.6} height={t.taille + 0.6} preserveAspectRatio="none" crossOrigin="anonymous" />
-                  ))}
+                {/* Fleuves et grandes rivières ; les rivières secondaires seulement quand la carte est zoomée (départements). */}
+                <g clipPath={`url(#${idClip})`}>
+                  {vue.echelle >= 1.2 && <path d={fleuves.d3} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={2.4} />}
+                  {vue.echelle >= 1.2 && <path d={fleuves.d3} {...COURS_EAU} stroke="#2f62c9" strokeWidth={1.1} />}
+                  <path d={fleuves.d2} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 3.2 : 2.2} />
+                  <path d={fleuves.d2} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 1.7 : 1.1} />
+                  <path d={fleuves.d1} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 4.4 : 3.2} />
+                  <path d={fleuves.d1} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 2.4 : 1.8} />
                 </g>
               </>
             )}

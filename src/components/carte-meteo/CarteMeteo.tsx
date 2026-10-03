@@ -22,7 +22,7 @@ import {
   type Zone,
 } from '@/lib/carte-meteo/projection-france';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
-import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur } from './CarteRendu';
+import CarteRendu, { type Fleuves, HAUTEUR_CARTE, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur } from './CarteRendu';
 
 type Periode = 'apres-midi' | 'journee';
 type NiveauNoms = 'departement' | 'ville';
@@ -137,6 +137,43 @@ function chargerContours(fichier: string): Promise<ContourBoite[]> {
     cacheContours.set(fichier, promesse);
   }
   return promesse;
+}
+
+let promesseFleuves: Promise<Fleuves> | null = null;
+
+/** Cours d'eau principaux (public/geo/cours-eau.json, généré par scripts/cours-eau.mjs) en tracés SVG « monde ». */
+function chargerFleuves(): Promise<Fleuves> {
+  promesseFleuves ??= fetch('/geo/cours-eau.json')
+    .then((r) => r.json())
+    .then((g: Record<string, [number, number][][]>) => {
+      const tracer = (lignes: [number, number][][] = []) =>
+        lignes
+          .map((l) =>
+            l
+              .map(([lon, lat], i) => {
+                const { x, y } = versMonde(lat, lon);
+                return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
+              })
+              .join('')
+          )
+          .join('');
+      return { d1: tracer(g['1']), d2: tracer(g['2']), d3: tracer(g['3']) };
+    });
+  promesseFleuves.catch(() => (promesseFleuves = null));
+  return promesseFleuves;
+}
+
+function useFleuves(actif: boolean): Fleuves | null {
+  const [d, setD] = useState<Fleuves | null>(null);
+  useEffect(() => {
+    if (!actif) return;
+    let vivant = true;
+    chargerFleuves().then((v) => vivant && setD(v)).catch(() => {});
+    return () => {
+      vivant = false;
+    };
+  }, [actif]);
+  return actif ? d : null;
 }
 
 function useContours(fichier: string | null): ContourBoite[] {
@@ -310,6 +347,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }, []);
 
   const contoursDep = useContours(FICHIERS_CONTOURS.departements);
+  const fleuves = useFleuves(afficherFleuves);
   const contoursReg = useContours(fond === 'regions' ? FICHIERS_CONTOURS.regions : null);
 
   const codes = useMemo(() => codesDeLaZone(zone), [zone]);
@@ -425,7 +463,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const choisirVilles = (nombreVoulu: number): string[] => {
       // Les villes sont triées par population : on part de la plus grande, puis on ajoute à chaque fois celle qui comble le
       // mieux les zones vides (grande distance aux villes déjà choisies, pondérée par la taille de la ville).
-      const candidates = points.map((p, rang) => ({ code: p.code, poids: 1 / (1 + rang) ** 0.25, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) }));
+      const candidates = points.map((p, rang) => ({ code: p.code, poids: 1 / (1 + rang) ** 0.1, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) }));
       for (const seuil of [DISTANCE_MIN_VILLES, 90, 75, 60, 45, 0]) {
         const choisies = candidates.slice(0, 1);
         const distance = (c: (typeof candidates)[number]) => Math.min(...choisies.map((o) => Math.hypot(o.x - c.x, o.y - c.y) * vue.echelle));
@@ -528,7 +566,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const demiLargeur = (Math.max((m.mini == null ? 3.8 : 4.9) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
       const hautLigne = Math.max(m.mini != null ? 3.4 : 2.6, estPictoImage(m.picto) ? 2.3 : 0);
-      const hauteur = hautLigne * em + (m.rafale != null ? 1.0 * em : 0);
+      const hauteur = hautLigne * em + (m.rafale != null ? 1.35 * em : 0);
       return {
         code: m.code,
         x: m.x,
@@ -1012,7 +1050,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               carteRef={carteRef}
               facteur={facteur}
               largeur={largeurCarte}
-              fleuves={afficherFleuves}
+              fleuves={fleuves}
               afficherRelief={afficherRelief}
               vue={vue}
               departements={departementsAffiches}
@@ -1049,7 +1087,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           {chargement && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-4 py-2 text-sm shadow">Chargement des prévisions…</p>}
         </div>
         <p className="mt-3 text-xs text-muted">
-          Prévisions : modèle {modele === 'harmonie' ? 'Harmonie (AROME, Météo-France)' : 'CEP (ECMWF)'} via Open-Meteo (CC BY 4.0). Fond de carte : © IGN (Géoplateforme, Licence ouverte).
+          Prévisions : modèle {modele === 'harmonie' ? 'Harmonie (AROME, Météo-France)' : 'CEP (ECMWF)'} via Open-Meteo (CC BY 4.0). Fond de carte et cours d'eau : © IGN (Géoplateforme, Licence ouverte).
           Contours : IGN Admin Express (Licence ouverte Etalab).{enDepartement && ' Villes : API Géo (Etalab).'}
         </p>
       </div>
