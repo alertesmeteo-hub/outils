@@ -1,24 +1,18 @@
 import { COORDS_DEPARTEMENTS } from './departements-coords';
-import { DEPARTEMENTS_FR } from './departements-fr';
 
+/**
+ * Modèles proposés : Harmonie = AROME 0,01° de Météo-France (dépôt alertesmeteo-hub/arome-meteofrance, 48 h) et
+ * CEP = ECMWF IFS (dépôt alertesmeteo-hub/cep, 15 jours). Voir `sources.ts` pour le chargement des données.
+ */
 export type ModeleMeteo = 'harmonie' | 'cep';
 
-const MODELE_OPEN_METEO: Record<ModeleMeteo, string> = {
-  harmonie: 'meteofrance_arome_france', // AROME (famille Harmonie), haute résolution, échéances courtes (~J+2)
-  cep: 'ecmwf_ifs025', // CEP = Centre Européen de Prévision (ECMWF)
-};
+/**
+ * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. AROME couvre 48 h à partir de son
+ * passage de 09 h UTC : l'après-midi de J+2 n'y est pas, d'où J+1 ; le CEP est limité à J+6 pour la carte.
+ */
+export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { harmonie: 1, cep: 6 };
 
-/** Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. */
-export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { harmonie: 2, cep: 6 };
-
-const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
-const POINTS_PAR_REQUETE = 48;
-const REVALIDATION_S = 3600;
-/** Dernière réponse valide par URL : resservie (jusqu'à 12 h) si Open-Meteo est indisponible ou limite les appels. */
-const DERNIERES_REPONSES = new Map<string, { t: number; data: ReponseLieu[] }>();
-const AGE_MAX_REPLI_MS = 12 * 3600_000;
-
-/** Un point par département métropolitain, avec les valeurs de l'après-midi (12 h-18 h) et de la journée. */
+/** Un point par département métropolitain (ou par ville), avec les valeurs de l'après-midi (12 h-18 h) et de la journée. */
 export interface PointCarte {
   code: string;
   nom: string;
@@ -46,156 +40,112 @@ export interface PointCarte {
 const rang = (code: string) => (code === '2A' ? 19.1 : code === '2B' ? 19.2 : Number(code));
 export const CODES_DEPARTEMENTS = Object.keys(COORDS_DEPARTEMENTS).sort((a, b) => rang(a) - rang(b));
 
-export interface ReponseLieu {
-  hourly?: {
-    time?: string[];
-    temperature_2m?: (number | null)[];
-    wind_gusts_10m?: (number | null)[];
-    wind_direction_10m?: (number | null)[];
-    weather_code?: (number | null)[];
-    cloud_cover?: (number | null)[];
-    precipitation?: (number | null)[];
-  };
-  daily?: {
-    temperature_2m_max?: (number | null)[];
-    temperature_2m_min?: (number | null)[];
-    weather_code?: (number | null)[];
-  };
+/** Série de prévisions d'un lieu, pas à pas (les tableaux sont alignés sur `t`). */
+export interface Serie {
+  /** Instants des échéances, ISO UTC (ex. 2026-10-03T12:00:00Z). */
+  t: string[];
+  temp: (number | null)[];
+  pluie: (number | null)[];
+  nuages: (number | null)[];
+  /** Vent à 10 m : direction (degrés), rafale (km/h). */
+  direction: (number | null)[];
+  rafale: (number | null)[];
+  /** Risque d'orage (code de 0 à 4 ; 3 et plus = orage probable), neige (mm) et visibilité (km). */
+  orage: (number | null)[];
+  neige: (number | null)[];
+  visibilite: (number | null)[];
 }
 
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const FORMAT_PARIS = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Paris',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  hourCycle: 'h23',
+});
 
-export async function appelerOpenMeteo(url: string): Promise<ReponseLieu[]> {
-  let statut = 0;
-  let detail = '';
-  for (let tentative = 1; tentative <= 4; tentative++) {
-    try {
-      const reponse = await fetch(url, { next: { revalidate: REVALIDATION_S }, signal: AbortSignal.timeout(12_000) });
-      if (reponse.ok) {
-        const json = await reponse.json();
-        const data = Array.isArray(json) ? json : [json];
-        DERNIERES_REPONSES.set(url, { t: Date.now(), data });
-        return data;
-      }
-      statut = reponse.status;
-      detail = (await reponse.text().catch(() => '')).slice(0, 200);
-      if (statut !== 429 && statut < 500) break;
-    } catch (e) {
-      detail = String(e);
-    }
-    await pause(tentative * 700);
-  }
-  // Open-Meteo indisponible ou appels limités : on resert la dernière réponse connue plutôt que d'afficher une erreur.
-  const repli = DERNIERES_REPONSES.get(url);
-  if (repli && Date.now() - repli.t < AGE_MAX_REPLI_MS) return repli.data;
-  throw new Error(`Open-Meteo a répondu ${statut} ${detail}`);
+/** Date locale (Paris) et heure d'un instant UTC. */
+function dateHeureParis(iso: string): { date: string; heure: number } {
+  const p = Object.fromEntries(FORMAT_PARIS.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, heure: Number(p.hour) };
 }
 
-const maximum = (valeurs: (number | null | undefined)[]): number | null => {
-  const nombres = valeurs.filter((v): v is number => typeof v === 'number');
-  return nombres.length ? Math.max(...nombres) : null;
+const nombres = (valeurs: (number | null | undefined)[]): number[] => valeurs.filter((v): v is number => typeof v === 'number');
+const maximum = (v: (number | null | undefined)[]) => {
+  const n = nombres(v);
+  return n.length ? Math.max(...n) : null;
 };
-
-const moyenneNombres = (valeurs: (number | null | undefined)[]): number | null => {
-  const nombres = valeurs.filter((v): v is number => typeof v === 'number');
-  return nombres.length ? nombres.reduce((a, b) => a + b, 0) / nombres.length : null;
+const minimum = (v: (number | null | undefined)[]) => {
+  const n = nombres(v);
+  return n.length ? Math.min(...n) : null;
 };
-
-const sommeNombres = (valeurs: (number | null | undefined)[]): number | null => {
-  const nombres = valeurs.filter((v): v is number => typeof v === 'number');
-  return nombres.length ? nombres.reduce((a, b) => a + b, 0) : null;
+const moyenne = (v: (number | null | undefined)[]) => {
+  const n = nombres(v);
+  return n.length ? n.reduce((a, b) => a + b, 0) / n.length : null;
 };
-
+const somme = (v: (number | null | undefined)[]) => {
+  const n = nombres(v);
+  return n.length ? n.reduce((a, b) => a + b, 0) : null;
+};
 const arrondi = (v: number | null, decimales = 0): number | null => {
   if (v == null) return null;
   const f = 10 ** decimales;
   return Math.round(v * f) / f;
 };
 
-export function pointDepuisReponse(code: string, nom: string, lieu: ReponseLieu): PointCarte {
-  const heures = lieu.hourly?.time ?? [];
-  const temps = lieu.hourly?.temperature_2m ?? [];
-  const rafales = lieu.hourly?.wind_gusts_10m ?? [];
-  const directions = lieu.hourly?.wind_direction_10m ?? [];
-  const codes = lieu.hourly?.weather_code ?? [];
-  const nuages = lieu.hourly?.cloud_cover ?? [];
-  const pluies = lieu.hourly?.precipitation ?? [];
-  // Heures locales 12 h → 17 h : l'après-midi (jusqu'à 18 h).
-  const apresMidi = heures.map((t, i) => ({ h: Number(t.slice(11, 13)), i })).filter(({ h }) => h >= 12 && h <= 17);
-  // Journée : ciel de 7 h à 20 h (la nuit ne compte pas pour le picto), précipitations sur 24 h.
-  const jour = heures.map((t, i) => ({ h: Number(t.slice(11, 13)), i })).filter(({ h }) => h >= 7 && h <= 20);
+/**
+ * Code météo (style WMO, repris par les pictos) d'une période : orage possible → 95, neige → 73, brouillard → 45.
+ * Sans phénomène particulier, null : le picto se déduit alors de la nébulosité et des précipitations.
+ */
+function codePeriode(serie: Serie, indices: number[]): number | null {
+  if (indices.some((i) => (serie.orage[i] ?? 0) >= 3)) return 95;
+  if (indices.some((i) => (serie.neige[i] ?? 0) > 0)) return 73;
+  const vis = nombres(indices.map((i) => serie.visibilite[i]));
+  if (vis.length && Math.min(...vis) < 1) return 45;
+  return null;
+}
 
-  // Code météo de l'après-midi : celui de 15 h, sauf orage dans la plage.
-  const codesPlage = apresMidi.map(({ i }) => codes[i]);
-  const code15h = apresMidi.find(({ h }) => h === 15);
-  const orage = codesPlage.find((c) => typeof c === 'number' && c >= 95);
-  const codeApresMidi = typeof orage === 'number' ? orage : code15h ? codes[code15h.i] ?? null : null;
+/** Direction du vent à l'échéance de la rafale maximale parmi `indices`. */
+function directionRafaleMax(serie: Serie, indices: number[]): number | null {
+  let meilleur = -1;
+  for (const i of indices) {
+    const r = serie.rafale[i];
+    if (typeof r === 'number' && (meilleur < 0 || r > (serie.rafale[meilleur] as number))) meilleur = i;
+  }
+  const d = meilleur >= 0 ? serie.direction[meilleur] : null;
+  return typeof d === 'number' ? Math.round(d) : null;
+}
 
-  // Direction du vent à l'heure de la rafale maximale (de la plage donnée).
-  const directionDeLaRafaleMax = (indices: number[]): number | null => {
-    let meilleur = -1;
-    for (const i of indices) {
-      const r = rafales[i];
-      if (typeof r === 'number' && (meilleur < 0 || r > (rafales[meilleur] as number))) meilleur = i;
-    }
-    const d = meilleur >= 0 ? directions[meilleur] : null;
-    return typeof d === 'number' ? Math.round(d) : null;
-  };
+/**
+ * Point de la carte pour un jour (date locale, Paris) : l'après-midi va de 12 h à 18 h, la journée de 7 h à 20 h pour le
+ * ciel. Le minimum de la nuit n'est donné que si la série couvre le début de la journée (avant 7 h).
+ */
+export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateISO: string): PointCarte {
+  const locaux = serie.t.map(dateHeureParis);
+  const jour = locaux.map((l, i) => ({ ...l, i })).filter((l) => l.date === dateISO);
+  const apresMidi = jour.filter((l) => l.heure >= 12 && l.heure <= 17).map((l) => l.i);
+  const ciel = jour.filter((l) => l.heure >= 7 && l.heure <= 20).map((l) => l.i);
+  const toute = jour.map((l) => l.i);
+  const debutCouvert = jour.length ? Math.min(...jour.map((l) => l.heure)) <= 7 : false;
 
   return {
     code,
     nom,
-    mini: arrondi(lieu.daily?.temperature_2m_min?.[0] ?? null, 1),
-    maxi: arrondi(lieu.daily?.temperature_2m_max?.[0] ?? null, 1),
-    tempApresMidi: arrondi(maximum(apresMidi.map(({ i }) => temps[i])), 1),
-    rafaleApresMidi: arrondi(maximum(apresMidi.map(({ i }) => rafales[i]))),
-    rafaleJournee: arrondi(maximum(rafales)),
-    directionRafaleApresMidi: directionDeLaRafaleMax(apresMidi.map(({ i }) => i)),
-    directionRafaleJournee: directionDeLaRafaleMax(heures.map((_, i) => i)),
-    codeApresMidi,
-    codeJournee: lieu.daily?.weather_code?.[0] ?? null,
-    nuagesApresMidi: arrondi(moyenneNombres(apresMidi.map(({ i }) => nuages[i]))),
-    pluieApresMidi: arrondi(sommeNombres(apresMidi.map(({ i }) => pluies[i])), 1),
-    nuagesJournee: arrondi(moyenneNombres(jour.map(({ i }) => nuages[i]))),
-    pluieJournee: arrondi(sommeNombres(pluies), 1),
+    mini: debutCouvert ? arrondi(minimum(toute.map((i) => serie.temp[i])), 1) : null,
+    maxi: arrondi(maximum(toute.map((i) => serie.temp[i])), 1),
+    tempApresMidi: arrondi(maximum(apresMidi.map((i) => serie.temp[i])), 1),
+    rafaleApresMidi: arrondi(maximum(apresMidi.map((i) => serie.rafale[i]))),
+    rafaleJournee: arrondi(maximum(toute.map((i) => serie.rafale[i]))),
+    directionRafaleApresMidi: directionRafaleMax(serie, apresMidi),
+    directionRafaleJournee: directionRafaleMax(serie, toute),
+    codeApresMidi: codePeriode(serie, apresMidi),
+    codeJournee: codePeriode(serie, ciel),
+    nuagesApresMidi: arrondi(moyenne(apresMidi.map((i) => serie.nuages[i]))),
+    pluieApresMidi: arrondi(somme(apresMidi.map((i) => serie.pluie[i])), 1),
+    nuagesJournee: arrondi(moyenne(ciel.map((i) => serie.nuages[i]))),
+    pluieJournee: arrondi(somme(toute.map((i) => serie.pluie[i])), 1),
   };
-}
-
-/** URL Open-Meteo pour une liste de lieux (une seule requête), variables de la carte météo. */
-export function urlPrevisions(lieux: { lat: number; lon: number }[], modele: ModeleMeteo, dateISO: string): string {
-  const params = new URLSearchParams({
-    latitude: lieux.map((l) => l.lat.toFixed(3)).join(','),
-    longitude: lieux.map((l) => l.lon.toFixed(3)).join(','),
-    hourly: 'temperature_2m,wind_gusts_10m,wind_direction_10m,weather_code,cloud_cover,precipitation',
-    daily: 'temperature_2m_max,temperature_2m_min,weather_code',
-    models: MODELE_OPEN_METEO[modele],
-    timezone: 'Europe/Paris',
-    start_date: dateISO,
-    end_date: dateISO,
-    wind_speed_unit: 'kmh',
-  });
-  return `${OPEN_METEO_URL}?${params.toString()}`;
-}
-
-/**
- * Prévisions de tous les départements métropolitains pour un modèle et un jour (Open-Meteo, gratuit,
- * sans clé, CC BY 4.0). Une requête par lot de 48 lieux, réponse mise en cache 30 min côté serveur :
- * tous les visiteurs partagent les mêmes appels (au plus quelques-uns par modèle et par jour).
- */
-export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: string): Promise<PointCarte[]> {
-  const lots: string[][] = [];
-  for (let i = 0; i < CODES_DEPARTEMENTS.length; i += POINTS_PAR_REQUETE) {
-    lots.push(CODES_DEPARTEMENTS.slice(i, i + POINTS_PAR_REQUETE));
-  }
-
-  const resultats = await Promise.all(
-    lots.map(async (codes) => {
-      const lieux = await appelerOpenMeteo(urlPrevisions(codes.map((c) => COORDS_DEPARTEMENTS[c]), modele, dateISO));
-      if (lieux.length !== codes.length) throw new Error('Réponse Open-Meteo incomplète');
-      return codes.map((code, i) => pointDepuisReponse(code, DEPARTEMENTS_FR[code] ?? code, lieux[i]));
-    })
-  );
-  return resultats.flat();
 }
 
 /** Date du jour à Paris, au format YYYY-MM-DD. */

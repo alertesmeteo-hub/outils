@@ -156,8 +156,8 @@ function pictoImageDepuisCode(code: number | null | undefined): PictoMeteo {
 }
 
 /**
- * Code météo WMO (renvoyé par Open-Meteo dans `weather_code`) → picto suggéré (emoji par défaut).
- * Table volontairement groupée par familles (voir https://open-meteo.com/en/docs — WMO Weather interpretation codes).
+ * Code météo de type WMO → picto suggéré (emoji par défaut).
+ * Table volontairement groupée par familles (WMO Weather interpretation codes).
  */
 function meteoconsDepuisCode(code: number | null | undefined): PictoMeteo {
   if (code == null || code <= 1) return 'mc:clear-day';

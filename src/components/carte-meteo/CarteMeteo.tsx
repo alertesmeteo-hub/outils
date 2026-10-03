@@ -1096,8 +1096,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           {chargement && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-4 py-2 text-sm shadow">Chargement des prévisions…</p>}
         </div>
         <p className="mt-3 text-xs text-muted">
-          Prévisions : modèle {modele === 'harmonie' ? 'Harmonie (AROME, Météo-France)' : 'CEP (ECMWF)'} via Open-Meteo (CC BY 4.0). Fond de carte et cours d'eau : © IGN (Géoplateforme, Licence ouverte).
-          Contours : IGN Admin Express (Licence ouverte Etalab).{enDepartement && ' Villes : API Géo (Etalab).'}
+          Prévisions : modèle {modele === 'harmonie' ? 'Harmonie (AROME, Météo-France)' : 'CEP (ECMWF)'} (Licence ouverte). Fond de carte et cours d'eau : © IGN (Géoplateforme, Licence ouverte).
+          Contours : IGN Admin Express (Licence ouverte Etalab).{enDepartement && ' Communes : prévisions au point de commune.'}
         </p>
       </div>
     </div>

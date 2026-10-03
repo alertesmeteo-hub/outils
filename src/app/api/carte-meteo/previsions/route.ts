@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
-import { aujourdhuiParis, ajouterJours, chargerPrevisionsCarte, CODES_DEPARTEMENTS, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
-import { chargerPrevisionsVilles } from '@/lib/carte-meteo/previsions-villes';
+import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
+import { chargerPrevisionsCarte, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
 
 /**
  * GET /api/carte-meteo/previsions/?modele=harmonie|cep&date=YYYY-MM-DD[&dep=29]
  * Sans `dep` : prévisions de tous les départements métropolitains ; avec `dep` : de ses principales villes.
- * Départements métropolitains (Open-Meteo, modèles Harmonie/AROME ou CEP/ECMWF)
- * pour le générateur /outils/carte-meteo. Réponse partagée entre visiteurs (cache serveur 30 min).
+ * Prévisions AROME (Météo-France) ou CEP (ECMWF) lues dans les paquets départementaux publiés sur GitHub
+ * (alertesmeteo-hub/arome-meteofrance et alertesmeteo-hub/cep), pour le générateur /outils/carte-meteo.
  */
 export async function GET(req: Request) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
@@ -20,8 +20,8 @@ export async function GET(req: Request) {
   const date = url.searchParams.get('date') ?? aujourdhuiParis();
 
   const aujourdhui = aujourdhuiParis();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < ajouterJours(aujourdhui, -1) || date > ajouterJours(aujourdhui, 7)) {
-    return NextResponse.json({ erreur: 'Date invalide (de la veille à J+7).' }, { status: 400 });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < ajouterJours(aujourdhui, -1) || date > ajouterJours(aujourdhui, ECHEANCE_MAX[modele])) {
+    return NextResponse.json({ erreur: 'Date invalide (de la veille à J+' + ECHEANCE_MAX[modele] + ' pour ce modèle).' }, { status: 400 });
   }
 
   const dep = url.searchParams.get('dep');

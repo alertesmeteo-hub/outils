@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import CarteMeteo, { type DonneesCarte, type DonneesVilles } from '@/components/carte-meteo/CarteMeteo';
-import { aujourdhuiParis, ajouterJours, chargerPrevisionsCarte } from '@/lib/carte-meteo/previsions-modeles';
-import { chargerPrevisionsVilles } from '@/lib/carte-meteo/previsions-villes';
+import { aujourdhuiParis, ajouterJours } from '@/lib/carte-meteo/previsions-modeles';
+import { chargerPrevisionsCarte, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
 
 // La date « du jour » doit être celle de la requête ; les prévisions elles-mêmes sont mises en cache 30 min.
 export const dynamic = 'force-dynamic';
@@ -9,11 +9,15 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Carte météo France du jour — températures et rafales',
   description:
-    "Carte de France des températures de l'après-midi et des rafales de vent (modèle Harmonie/AROME ou CEP/ECMWF), par région ou département, avec export en JPG.",
+    "Carte de France des températures de l'après-midi et des rafales de vent (modèle Harmonie/AROME de Météo-France ou CEP/ECMWF), par région ou département, avec export en JPG.",
   alternates: { canonical: '/outils/carte-meteo/' },
 };
 
 const DEPARTEMENT_PO = '66';
+
+/** Au premier chargement après un redémarrage, les 96 départements sont lus depuis GitHub : on n'attend pas plus de 9 s, le navigateur prend le relais. */
+const avecDelai = <T,>(promesse: Promise<T>, ms: number) =>
+  Promise.race([promesse, new Promise<T>((_, rejeter) => setTimeout(() => rejeter(new Error('délai dépassé')), ms))]);
 
 export default async function PageCarteMeteo() {
   const aujourdhui = aujourdhuiParis();
@@ -21,8 +25,8 @@ export default async function PageCarteMeteo() {
 
   // Si un chargement échoue ici, le composant retente côté navigateur.
   const [france, poDemain] = await Promise.allSettled([
-    chargerPrevisionsCarte('harmonie', aujourdhui),
-    chargerPrevisionsVilles('harmonie', demain, DEPARTEMENT_PO),
+    avecDelai(chargerPrevisionsCarte('harmonie', aujourdhui), 9000),
+    avecDelai(chargerPrevisionsVilles('harmonie', demain, DEPARTEMENT_PO), 9000),
   ]);
   if (france.status === 'rejected') console.error('Carte météo : France du jour indisponible', france.reason);
   if (poDemain.status === 'rejected') console.error('Carte météo : Pyrénées-Orientales de demain indisponible', poDemain.reason);
