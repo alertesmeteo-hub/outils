@@ -171,7 +171,7 @@ body {
 
 
 /* Après-midi : la température chevauche le haut-droit du picto, comme sur la carte de référence. */
-.cmap-ligne-simple .cmap-valeurs { align-self: flex-start; margin: -0.45em 0 0 -0.45em; position: relative; z-index: 1; }
+.cmap-ligne-simple .cmap-valeurs { align-self: center; margin: 0 0 0 0.12em; position: relative; z-index: 1; }
 .cmap-ligne-simple .cmap-valeur { font-size: 1.1em; width: 1.2em; }
 
 .cmap-palette-partout { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin: 0 2px 6px; cursor: pointer; }
