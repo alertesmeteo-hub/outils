@@ -5,8 +5,8 @@
  */
 export const MONDE_PX = 32768;
 
-/** Fond de carte relief (NASA Blue Marble, assemblé depuis les tuiles z7) : position et taille en pixels monde. */
-export const FOND = { url: '/geo/fond-relief.jpg', x0: 14848, y0: 9728, largeur: 3584, hauteur: 3584 };
+/** Fond de carte relief (NASA Blue Marble, assemblé depuis les tuiles z8 par scripts/fond-relief.mjs) : position et taille en pixels monde. */
+export const FOND = { url: '/geo/fond-relief.jpg', x0: 15488, y0: 10752, largeur: 2176, hauteur: 1664 };
 
 export interface Point2D {
   x: number;

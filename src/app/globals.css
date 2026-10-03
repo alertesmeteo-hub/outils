@@ -87,7 +87,7 @@ body {
   z-index: 3;
 }
 
-.cmap-titre { position: absolute; top: 18px; right: 28px; text-align: right; z-index: 3; font-family: Impact, 'Arial Narrow', sans-serif; text-transform: uppercase; }
+.cmap-titre { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); white-space: nowrap; text-align: center; z-index: 3; font-family: Impact, 'Arial Narrow', sans-serif; text-transform: uppercase; }
 .cmap-date {
   font-size: 38px;
   line-height: 1.05;

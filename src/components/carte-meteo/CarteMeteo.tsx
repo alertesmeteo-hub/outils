@@ -31,9 +31,9 @@ type Densite = 'leger' | 'moyen' | 'eleve';
 
 /** Nombre de points affichés : part des départements (France, région) ou nombre de villes (vue département). */
 const DENSITES: Record<Densite, { libelle: string; part: number; villes: number }> = {
-  leger: { libelle: 'Léger', part: 0.3, villes: 5 },
-  moyen: { libelle: 'Moyen', part: 0.6, villes: 9 },
-  eleve: { libelle: 'Élevé', part: 1, villes: 14 },
+  leger: { libelle: 'Léger', part: 0.3, villes: 7 },
+  moyen: { libelle: 'Moyen', part: 0.6, villes: 12 },
+  eleve: { libelle: 'Élevé', part: 1, villes: 18 },
 };
 
 export interface DonneesCarte {
@@ -516,8 +516,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const reference = enDepartement ? pointsAffiches.slice(0, cible) : pointsAffiches;
     const valeurs = pointsAffiches.map((p) => valeurPrincipale(p.code));
     const numeriques = reference.map((p) => valeurPrincipale(p.code)).filter((v): v is number => v != null);
-    const plusChaud = numeriques.length > 1 ? Math.max(...numeriques) : null;
-    const plusFroid = numeriques.length > 1 ? Math.min(...numeriques) : null;
+    // Plus chaud / plus froid : seulement s'ils sont uniques (si tout est à égalité, rien ne se détache).
+    const max = numeriques.length > 1 ? Math.max(...numeriques) : null;
+    const min = numeriques.length > 1 ? Math.min(...numeriques) : null;
+    const plusChaud = max != null && numeriques.filter((v) => v === max).length === 1 ? max : null;
+    const plusFroid = min != null && numeriques.filter((v) => v === min).length === 1 ? min : null;
     const rafalesSignalees = enDepartement ? plusFortesRafales(reference) : codesRafales;
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
@@ -545,7 +548,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const moyennesGauche = 29;
     const obstacles: Rect[] = [
       { x: logoDroite - 205, y: 21, w: 205, h: 84 },
-      { x: largeurCarte - 28 - 420, y: 18, w: 420, h: 86 },
+      { x: largeurCarte / 2 - 230, y: 14, w: 460, h: 90 },
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : zone.startsWith('reg:') ? [{ x: 29, y: 340, w: LARGEUR_MOYENNES, h: 58 }] : []),
     ];

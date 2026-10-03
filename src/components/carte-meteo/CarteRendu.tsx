@@ -143,7 +143,7 @@ export default function CarteRendu({
               <path key={c.code} d={c.d} {...TRAIT_HORS_SELECTION} {...(regions ? { stroke: 'none' } : {})} />
             ))}
             {/* Reliefs : le territoire est teinté en transparence (opacité du groupe, donc sans jointures visibles) pour laisser voir le relief. */}
-            <g opacity={afficherRelief ? 0.55 : 1}>
+            <g opacity={afficherRelief ? 0.72 : 1}>
               {departements.filter((c) => selection.has(c.code)).map((c) =>
                 regions && regions.length === 0 ? (
                   <path key={c.code} d={c.d} {...TRAIT_UNI} />
