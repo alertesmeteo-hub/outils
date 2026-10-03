@@ -8,7 +8,7 @@ import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
-import { PICTOS_METEO, PICTOS_IMAGES, estPictoImage, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import {
   LATITUDE_SEUIL_NORD_SUD,
@@ -685,6 +685,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               [
                 ['emoji', 'Emojis'],
                 ['images', 'Mes pictos (images)'],
+                ['meteocons', 'Meteocons (icônes libres)'],
               ] as const
             ).map(([valeur, libelle]) => (
               <label key={valeur} className="mt-1 block text-sm">
@@ -724,7 +725,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                       {picto}
                     </button>
                   ))}
-                  {PICTOS_IMAGES.map((picto) => (
+                  {[...PICTOS_IMAGES, ...PICTOS_METEOCONS].map((picto) => (
                     <button key={picto.id} type="button" title={picto.label} className="rounded p-1 hover:bg-bg" onClick={() => appliquerALaSelection(picto.id)}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={picto.fichier} alt={picto.label} className="h-8 w-8 object-contain" />

@@ -69,20 +69,69 @@ export const PICTOS_IMAGES: PictoImage[] = NUMEROS_PICTOS.map((n) => ({
   label: LABELS_PICTOS_IMAGES[n] ?? `Picto ${n}`,
 }));
 
+/** Meteocons (Bas Milius, licence MIT) : icônes météo libres de droits, stockées dans public/pictos-meteocons/. */
+const METEOCONS: [string, string][] = [
+  ['clear-day', 'Soleil'],
+  ['partly-cloudy-day', 'Éclaircies'],
+  ['overcast-day', 'Nuageux, soleil voilé'],
+  ['cloudy', 'Nuages'],
+  ['overcast', 'Couvert'],
+  ['mist', 'Brume'],
+  ['fog', 'Brouillard'],
+  ['haze', 'Brume sèche'],
+  ['dust', 'Poussières'],
+  ['smoke', 'Fumée'],
+  ['wind', 'Vent'],
+  ['drizzle', 'Bruine'],
+  ['partly-cloudy-day-drizzle', 'Éclaircies et bruine'],
+  ['rain', 'Pluie'],
+  ['partly-cloudy-day-rain', 'Éclaircies et pluie'],
+  ['overcast-rain', 'Couvert et pluie'],
+  ['extreme-rain', 'Pluie forte'],
+  ['extreme-day-rain', 'Pluie forte, éclaircies'],
+  ['hail', 'Grêle'],
+  ['partly-cloudy-day-hail', 'Éclaircies et grêle'],
+  ['sleet', 'Pluie et neige mêlées'],
+  ['partly-cloudy-day-sleet', 'Éclaircies, pluie et neige'],
+  ['overcast-sleet', 'Couvert, pluie et neige'],
+  ['snow', 'Neige'],
+  ['partly-cloudy-day-snow', 'Éclaircies et neige'],
+  ['overcast-snow', 'Couvert et neige'],
+  ['extreme-snow', 'Neige forte'],
+  ['thunderstorms', 'Orage'],
+  ['thunderstorms-day', 'Orage, éclaircies'],
+  ['thunderstorms-rain', 'Orage et pluie'],
+  ['thunderstorms-day-rain', 'Orage et pluie, éclaircies'],
+  ['thunderstorms-overcast', 'Orage, ciel couvert'],
+  ['thunderstorms-hail', 'Orage et grêle'],
+  ['thunderstorms-extreme', 'Orage violent'],
+  ['tornado', 'Tornade'],
+  ['clear-night', 'Nuit claire'],
+  ['partly-cloudy-night', 'Nuit, nuages'],
+  ['rainbow', 'Arc-en-ciel'],
+  ['rainbow-clear', 'Arc-en-ciel et soleil'],
+];
+
+export const PICTOS_METEOCONS: PictoImage[] = METEOCONS.map(([nom, label]) => ({
+  id: `mc:${nom}`,
+  fichier: `/pictos-meteocons/${nom}.svg`,
+  label,
+}));
+
 export type PictoMeteo = (typeof PICTOS_METEO)[number] | PictoImage['id'];
 
 export const PICTO_DEFAUT: PictoMeteo = '☀️';
 
 export function estPictoImage(picto: string): boolean {
-  return picto.startsWith('img:');
+  return picto.startsWith('img:') || picto.startsWith('mc:');
 }
 
 export function cheminPictoImage(picto: string): string | undefined {
-  return PICTOS_IMAGES.find((p) => p.id === picto)?.fichier;
+  return (picto.startsWith('mc:') ? PICTOS_METEOCONS : PICTOS_IMAGES).find((p) => p.id === picto)?.fichier;
 }
 
 /** Jeu de pictos appliqué automatiquement à toute la carte : emojis, ou les images fournies (public/pictos). */
-export type JeuPictos = 'emoji' | 'images';
+export type JeuPictos = 'emoji' | 'images' | 'meteocons';
 
 /**
  * Code météo WMO → image du jeu fourni. Le jeu n'a pas de « éclaircies » seul : ciel peu nuageux → soleil,
@@ -110,7 +159,23 @@ function pictoImageDepuisCode(code: number | null | undefined): PictoMeteo {
  * Code météo WMO (renvoyé par Open-Meteo dans `weather_code`) → picto suggéré (emoji par défaut).
  * Table volontairement groupée par familles (voir https://open-meteo.com/en/docs — WMO Weather interpretation codes).
  */
+function meteoconsDepuisCode(code: number | null | undefined): PictoMeteo {
+  if (code == null || code <= 1) return 'mc:clear-day';
+  if (code === 2) return 'mc:partly-cloudy-day';
+  if (code === 3) return 'mc:overcast';
+  if (code === 45 || code === 48) return 'mc:fog';
+  if (code >= 51 && code <= 57) return 'mc:drizzle';
+  if (code === 65 || code === 82) return 'mc:extreme-day-rain';
+  if (code === 66 || code === 67) return 'mc:sleet';
+  if ([71, 73, 77, 85].includes(code)) return 'mc:snow';
+  if (code === 75 || code === 86) return 'mc:extreme-snow';
+  if (code === 95) return 'mc:thunderstorms-day';
+  if (code === 96 || code === 99) return 'mc:thunderstorms-hail';
+  return 'mc:rain';
+}
+
 export function pictoDepuisCodeMeteo(code: number | null | undefined, jeu: JeuPictos = 'emoji'): PictoMeteo {
+  if (jeu === 'meteocons') return meteoconsDepuisCode(code);
   if (jeu === 'images') return pictoImageDepuisCode(code);
   if (code == null) return '☀️';
   if (code === 0) return '☀️';
@@ -144,6 +209,24 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
   const { code, nuages, pluie, temperature } = e;
   const images = jeu === 'images';
   if (nuages == null && pluie == null) return pictoDepuisCodeMeteo(code, jeu);
+  if (jeu === 'meteocons') {
+    const mm = pluie ?? 0;
+    const ciel = nuages ?? 50;
+    if (code != null && code >= 95) return code >= 96 ? 'mc:thunderstorms-hail' : mm >= 2 ? 'mc:thunderstorms-rain' : 'mc:thunderstorms-day';
+    const precipite = mm >= 0.3;
+    const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
+    if (neige && precipite) return mm >= 3 ? 'mc:extreme-snow' : ciel < 75 ? 'mc:partly-cloudy-day-snow' : 'mc:overcast-snow';
+    if ((code === 45 || code === 48) && !precipite) return 'mc:fog';
+    if (precipite) {
+      if (mm >= 8) return 'mc:extreme-day-rain';
+      if (mm >= 2) return ciel < 75 ? 'mc:partly-cloudy-day-rain' : 'mc:rain';
+      return ciel < 75 ? 'mc:partly-cloudy-day-drizzle' : 'mc:drizzle';
+    }
+    if (ciel < 20) return 'mc:clear-day';
+    if (ciel < 45) return 'mc:partly-cloudy-day';
+    if (ciel < 75) return 'mc:overcast-day';
+    return 'mc:overcast';
+  }
 
   if (code != null && code >= 95) return images ? (code >= 96 ? 'img:26' : 'img:12') : '⛈️';
   const precipite = (pluie ?? 0) >= 0.3;

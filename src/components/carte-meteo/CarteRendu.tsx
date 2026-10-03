@@ -2,7 +2,7 @@
 
 import { useId, useState, type CSSProperties, type RefObject } from 'react';
 import { FOND, type Vue } from '@/lib/carte-meteo/projection-france';
-import { PICTOS_METEO, PICTOS_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 
 export const LARGEUR_CARTE = 1280;
 export const HAUTEUR_CARTE = 720;
@@ -238,6 +238,14 @@ export default function CarteRendu({
                 <div className="cmap-palette-separateur">Mes pictos</div>
                 <div className="cmap-palette-groupe">
                   {PICTOS_IMAGES.map((picto) => (
+                    <button key={picto.id} type="button" title={picto.label} onClick={() => onModifier(m.code, 'picto', picto.id, partout)}>
+                      <img src={picto.fichier} alt={picto.label} className="cmap-picto-image" />
+                    </button>
+                  ))}
+                </div>
+                <div className="cmap-palette-separateur">Meteocons (libres)</div>
+                <div className="cmap-palette-groupe">
+                  {PICTOS_METEOCONS.map((picto) => (
                     <button key={picto.id} type="button" title={picto.label} onClick={() => onModifier(m.code, 'picto', picto.id, partout)}>
                       <img src={picto.fichier} alt={picto.label} className="cmap-picto-image" />
                     </button>
