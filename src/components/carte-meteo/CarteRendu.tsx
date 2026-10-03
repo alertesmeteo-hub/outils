@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties, type RefObject } from 'react';
+import { useId, useState, type CSSProperties, type RefObject } from 'react';
 import { FOND, type Vue } from '@/lib/carte-meteo/projection-france';
 import { PICTOS_METEO, PICTOS_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 
@@ -38,6 +38,10 @@ interface Props {
   facteur: number;
   /** Largeur de l'image : plus étroite en vue France (carte cadrée serrée, coupée sur les côtés). */
   largeur?: number;
+  /** Tracé des fleuves (coordonnées « monde »), ou null pour ne pas les afficher. */
+  fleuves?: string | null;
+  /** Fond relief satellite ; sinon fond bleu uni. */
+  afficherRelief?: boolean;
   vue: Vue;
   departements: Contour[];
   regions: Contour[] | null;
@@ -83,10 +87,14 @@ function stylePalette(x: number, y: number, em: number, largeur: number): CSSPro
   };
 }
 
+const TRAIT_FLEUVE = { ...TRAIT_COMMUN, fill: 'none', stroke: '#3f63d1', strokeOpacity: 0.95, strokeWidth: 1.6, strokeLinecap: 'round' } as const;
+
 export default function CarteRendu({
   carteRef,
   facteur,
   largeur = LARGEUR_CARTE,
+  fleuves = null,
+  afficherRelief = true,
   vue,
   departements,
   regions,
@@ -106,6 +114,7 @@ export default function CarteRendu({
   onModifier,
 }: Props) {
   const [partout, setPartout] = useState(false);
+  const idClip = `fleuves-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
@@ -113,6 +122,7 @@ export default function CarteRendu({
         className="cmap-rendu"
         style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
       >
+        {afficherRelief && (
         <img
           src={FOND.url}
           alt=""
@@ -124,6 +134,7 @@ export default function CarteRendu({
             height: FOND.hauteur * vue.echelle,
           }}
         />
+        )}
 
         <svg className="cmap-svg" viewBox={`0 0 ${largeur} ${HAUTEUR_CARTE}`} width={largeur} height={HAUTEUR_CARTE}>
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
@@ -133,6 +144,14 @@ export default function CarteRendu({
               ) : (
                 <path key={c.code} d={c.d} {...(selection.has(c.code) ? TRAIT_SELECTION : TRAIT_HORS_SELECTION)} {...(regions ? { stroke: 'none' } : {})} />
               )
+            )}
+            {fleuves && (
+              <>
+                <clipPath id={idClip}>
+                  {departements.filter((c) => selection.has(c.code)).map((c) => <path key={c.code} d={c.d} />)}
+                </clipPath>
+                <path d={fleuves} clipPath={`url(#${idClip})`} {...TRAIT_FLEUVE} />
+              </>
             )}
             {regions?.map((c) => <path key={c.code} d={c.d} {...TRAIT_REGION} />)}
           </g>

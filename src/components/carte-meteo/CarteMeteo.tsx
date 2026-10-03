@@ -8,7 +8,7 @@ import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
-import { estPictoImage, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { PICTOS_METEO, PICTOS_IMAGES, estPictoImage, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import {
   LATITUDE_SEUIL_NORD_SUD,
@@ -81,6 +81,9 @@ const REFERENCE_FRANCE = [
 ];
 const COEFFICIENT_FRANCE: Record<Densite, number> = { leger: 0.65, moyen: 1, eleve: 1.5 };
 
+/** France entière : pas de la grille (px, horizontal et vertical) sur laquelle les points sont répartis à égale distance. */
+const GRILLE_FRANCE: Record<Densite, [number, number]> = { leger: [165, 100], moyen: [126, 74], eleve: [112, 68] };
+
 const FRANCE_NO = versMonde(51.1, -4.8);
 const FRANCE_SE = versMonde(41.3, 9.6);
 const BOITE_FRANCE: Boite = { minX: FRANCE_NO.x, minY: FRANCE_NO.y, maxX: FRANCE_SE.x, maxY: FRANCE_SE.y };
@@ -133,6 +136,39 @@ function chargerContours(fichier: string): Promise<ContourBoite[]> {
     cacheContours.set(fichier, promesse);
   }
   return promesse;
+}
+
+let promesseFleuves: Promise<string> | null = null;
+
+/** Fleuves principaux (Natural Earth, domaine public) convertis en un seul tracé SVG en coordonnées « monde ». */
+function chargerFleuves(): Promise<string> {
+  promesseFleuves ??= fetch('/geo/fleuves.geojson')
+    .then((r) => r.json())
+    .then((g: { features: { geometry: { coordinates: [number, number][][] } }[] }) => {
+      let d = '';
+      for (const f of g.features)
+        for (const ligne of f.geometry.coordinates)
+          ligne.forEach(([lon, lat], i) => {
+            const { x, y } = versMonde(lat, lon);
+            d += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
+          });
+      return d;
+    });
+  promesseFleuves.catch(() => (promesseFleuves = null));
+  return promesseFleuves;
+}
+
+function useFleuves(actif: boolean): string | null {
+  const [d, setD] = useState<string | null>(null);
+  useEffect(() => {
+    if (!actif) return;
+    let vivant = true;
+    chargerFleuves().then((v) => vivant && setD(v)).catch(() => {});
+    return () => {
+      vivant = false;
+    };
+  }, [actif]);
+  return actif ? d : null;
 }
 
 function useContours(fichier: string | null): ContourBoite[] {
@@ -243,6 +279,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [moyennesManuelles, setMoyennesManuelles] = useState<Record<string, string>>({});
   const [paletteOuvertePour, setPaletteOuvertePour] = useState<string | null>(null);
   const [pictosSelectionnes, setPictosSelectionnes] = useState<Set<string>>(new Set());
+  const [modeMultiple, setModeMultiple] = useState(false);
+  const [afficherFleuves, setAfficherFleuves] = useState(true);
+  const [afficherRelief, setAfficherRelief] = useState(true);
   const [enExport, setEnExport] = useState(false);
 
   const [facteur, setFacteur] = useState(1);
@@ -301,6 +340,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }, []);
 
   const contoursDep = useContours(FICHIERS_CONTOURS.departements);
+  const fleuves = useFleuves(afficherFleuves);
   const contoursReg = useContours(fond === 'regions' ? FICHIERS_CONTOURS.regions : null);
 
   const codes = useMemo(() => codesDeLaZone(zone), [zone]);
@@ -357,9 +397,46 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const codesRafales = useMemo(() => plusFortesRafales(points), [points, periode, seuilRafales]);
 
+  /**
+   * France entière : les points sont posés sur une grille régulière (lignes décalées d'une demi-case) limitée au territoire,
+   * donc à égale distance les uns des autres ; chaque nœud affiche les valeurs du département le plus proche encore libre.
+   * Reste nul tant que les contours ne sont pas chargés (rendu serveur) : on retombe alors sur les départements de référence.
+   */
+  const grilleFrance = useMemo(() => {
+    if (!enFrance || typeof document === 'undefined' || points.length === 0 || contoursDep.length === 0) return null;
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return null;
+    const chemins = contoursDep.map((c) => new Path2D(c.d));
+    const dans = (x: number, y: number) => {
+      const wx = (x - vue.tx) / vue.echelle;
+      const wy = (y - vue.ty) / vue.echelle;
+      return chemins.some((ch) => ctx.isPointInPath(ch, wx, wy));
+    };
+    const [dx, dy] = GRILLE_FRANCE[densite];
+    const libres = points.map((p) => ({ code: p.code, ...versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue) }));
+    const resultat = new Map<string, { x: number; y: number }>();
+    let ligne = 0;
+    for (let y = 40; y < HAUTEUR_CARTE - 20; y += dy, ligne++) {
+      for (let x = 30 + (ligne % 2) * (dx / 2); x < LARGEUR_FRANCE - 30; x += dx) {
+        if (!dans(x, y)) continue;
+        let meilleur = -1;
+        let distance = Infinity;
+        libres.forEach((l, i) => {
+          const d = Math.hypot(l.x - x, l.y - y);
+          if (d < distance) { distance = d; meilleur = i; }
+        });
+        if (meilleur < 0 || distance > dx * 1.4) continue;
+        resultat.set(libres[meilleur].code, { x, y });
+        libres.splice(meilleur, 1);
+      }
+    }
+    return resultat;
+  }, [enFrance, points, contoursDep, vue, densite]);
+
   /** Points affichés : les plus répartis selon la densité, plus toujours les extrêmes et les rafales à signaler. */
   const pointsAffiches = useMemo(() => {
     if (points.length === 0) return points;
+    if (grilleFrance) return points.filter((p) => grilleFrance.has(p.code));
     const reglage = DENSITES[densite];
     // Vue département : les plus grandes villes, en écartant celles trop proches d'une ville déjà choisie (leurs
     // pictos se chevaucheraient). On garde la plus grande distance minimale qui permet d'atteindre le nombre voulu.
@@ -403,14 +480,14 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const rang = new Map(candidats.map((c, i) => [c, i]));
     return points.filter((p) => gardes.has(p.code)).sort((a, b) => (rang.get(a.code) ?? -1) - (rang.get(b.code) ?? -1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, enDepartement, densite, editions, periode, codesRafales, vue]);
+  }, [points, enDepartement, densite, editions, periode, codesRafales, vue, grilleFrance]);
 
   const nomsVisibles = afficherNoms || enDepartement;
-  const echelleMarqueurs = Math.min(enDepartement ? 1.15 : enFrance ? 1.05 : 1.2, enFrance ? 1.05 : Math.max(0.7, vue.echelle * 1.4));
+  const echelleMarqueurs = Math.min(enDepartement ? 1.15 : enFrance ? 1.15 : 1.2, enFrance ? 1.15 : Math.max(0.7, vue.echelle * 1.4));
 
   const marqueurs: Marqueur[] = useMemo(() => {
     const reglage = DENSITES[densite];
-    const cible = enDepartement ? reglage.villes : enFrance ? Math.round(REFERENCE_FRANCE.length * COEFFICIENT_FRANCE[densite]) : Math.max(1, Math.ceil(reglage.part * points.length));
+    const cible = grilleFrance ? Infinity : enDepartement ? reglage.villes : enFrance ? Math.round(REFERENCE_FRANCE.length * COEFFICIENT_FRANCE[densite]) : Math.max(1, Math.ceil(reglage.part * points.length));
     // Vue département : plus chaud, plus froid et rafales se jugent parmi les villes visées, pas parmi la réserve.
     const reference = enDepartement ? pointsAffiches.slice(0, cible) : pointsAffiches;
     const valeurs = pointsAffiches.map((p) => valeurPrincipale(p.code));
@@ -420,7 +497,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const rafalesSignalees = enDepartement ? plusFortesRafales(reference) : codesRafales;
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
-      const { x, y } = versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
+      const { x, y } = grilleFrance?.get(p.code) ?? versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
       const rafale = rafaleDe(p);
       const v = valeurs[i];
       return {
@@ -452,7 +529,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
       const demiLargeur = (Math.max((m.mini == null ? 4.1 : 4.9) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
-      const hautLigne = Math.max(m.mini != null ? 3.4 : 2.1, estPictoImage(m.picto) ? 2.3 : 0);
+      const hautLigne = Math.max(m.mini != null ? 3.4 : 2.6, estPictoImage(m.picto) ? 2.3 : 0);
       const hauteur = hautLigne * em + (m.rafale != null ? 1.0 * em : 0);
       return {
         code: m.code,
@@ -473,7 +550,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -547,6 +624,18 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     }
   }
 
+  /** Mode « plusieurs pictos » : applique le picto choisi à tous les pictos sélectionnés (période affichée). */
+  function appliquerALaSelection(picto: string) {
+    setEditions((prev) => {
+      const suite = { ...prev };
+      pictosSelectionnes.forEach((c) => {
+        const e = prev[c];
+        if (e) suite[c] = periode === 'apres-midi' ? { ...e, pictoAM: picto as PictoMeteo } : { ...e, pictoJ: picto as PictoMeteo };
+      });
+      return suite;
+    });
+  }
+
   /** Applique un jeu de pictos à toute la carte, d'après la prévision (les modifications faites picto par picto sont remplacées). */
   function changerJeuPictos(jeu: JeuPictos) {
     setJeuPictos(jeu);
@@ -604,6 +693,47 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </label>
             ))}
           </fieldset>
+          <div className="mt-3 rounded-lg border border-border p-2">
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={modeMultiple}
+                onChange={(e) => {
+                  setModeMultiple(e.target.checked);
+                  setPaletteOuvertePour(null);
+                  if (!e.target.checked) setPictosSelectionnes(new Set());
+                }}
+              />
+              Modifier plusieurs pictos
+            </label>
+            {modeMultiple && (
+              <div className="mt-2">
+                <p className="text-xs text-muted">Clique sur les pictos de la carte pour les sélectionner (cadre jaune), puis choisis l&apos;icône ci-dessous.</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <button type="button" className="btn-ghost rounded-md px-2 py-1" onClick={() => setPictosSelectionnes(new Set(marqueurs.map((m) => m.code)))}>
+                    Tout sélectionner
+                  </button>
+                  <button type="button" className="btn-ghost rounded-md px-2 py-1" onClick={() => setPictosSelectionnes(new Set())}>
+                    Aucun
+                  </button>
+                  <span className="self-center text-muted">{pictosSelectionnes.size} sélectionné(s)</span>
+                </div>
+                <div className={`mt-2 flex max-h-56 flex-wrap gap-1 overflow-y-auto ${pictosSelectionnes.size === 0 ? 'pointer-events-none opacity-40' : ''}`}>
+                  {PICTOS_METEO.map((picto) => (
+                    <button key={picto} type="button" className="rounded p-1 text-xl leading-none hover:bg-bg" onClick={() => appliquerALaSelection(picto)}>
+                      {picto}
+                    </button>
+                  ))}
+                  {PICTOS_IMAGES.map((picto) => (
+                    <button key={picto.id} type="button" title={picto.label} className="rounded p-1 hover:bg-bg" onClick={() => appliquerALaSelection(picto.id)}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={picto.fichier} alt={picto.label} className="h-8 w-8 object-contain" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <p className="mt-2 text-xs text-muted">
             Choisit les pictos de toute la carte d&apos;après la prévision. Pour changer un picto seul, clique dessus sur la carte : emojis et images au choix.
           </p>
@@ -827,6 +957,14 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 <option value="regions">Régions</option>
               </select>
             </label>
+            <label className="flex items-center gap-2 pb-1.5 text-sm">
+              <input type="checkbox" checked={afficherFleuves} onChange={(e) => setAfficherFleuves(e.target.checked)} />
+              Fleuves
+            </label>
+            <label className="flex items-center gap-2 pb-1.5 text-sm">
+              <input type="checkbox" checked={afficherRelief} onChange={(e) => setAfficherRelief(e.target.checked)} />
+              Reliefs
+            </label>
             <label className="text-sm font-medium">
               <span className={legendeBarre}>Noms</span>
               <select value={niveauNoms} onChange={(e) => setNiveauNoms(e.target.value as NiveauNoms)} className={selectBarre}>
@@ -867,6 +1005,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               carteRef={carteRef}
               facteur={facteur}
               largeur={largeurCarte}
+              fleuves={fleuves}
+              afficherRelief={afficherRelief}
               vue={vue}
               departements={departementsAffiches}
               regions={regionsAffichees}
@@ -881,13 +1021,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               paletteOuvertePour={paletteOuvertePour}
               pictosSelectionnes={enExport ? undefined : pictosSelectionnes}
               onBasculerPalette={(code, multiple) => {
-                if (multiple) {
+                if (multiple || modeMultiple) {
                   // Ctrl/Maj + clic : ajoute ou retire le picto de la sélection ; la palette s'ouvre sur le dernier ajouté.
                   const suivante = new Set(pictosSelectionnes);
                   if (suivante.has(code)) suivante.delete(code);
                   else suivante.add(code);
                   setPictosSelectionnes(suivante);
-                  setPaletteOuvertePour(suivante.has(code) ? code : null);
+                  setPaletteOuvertePour(modeMultiple || !suivante.has(code) ? null : code);
                 } else {
                   if (!pictosSelectionnes.has(code)) setPictosSelectionnes(new Set());
                   setPaletteOuvertePour((c) => (c === code ? null : code));

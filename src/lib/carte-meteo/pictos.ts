@@ -60,7 +60,10 @@ const LABELS_PICTOS_IMAGES: Record<number, string> = {
   32: 'Orage',
 };
 
-export const PICTOS_IMAGES: PictoImage[] = Array.from({ length: 32 }, (_, i) => i + 1).map((n) => ({
+/** Numéros des images présentes dans public/pictos (jeu fourni par l'utilisateur). */
+const NUMEROS_PICTOS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,99,100,101,102,103,104,105,106,107,109,110,111,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,250,251,252,253,254,255,256,257,259,260,261,299];
+
+export const PICTOS_IMAGES: PictoImage[] = NUMEROS_PICTOS.map((n) => ({
   id: `img:${n}`,
   fichier: `/pictos/${n}.png`,
   label: LABELS_PICTOS_IMAGES[n] ?? `Picto ${n}`,
