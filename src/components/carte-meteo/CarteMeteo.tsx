@@ -595,7 +595,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const sel = points.filter((p) => filtre(coordsDe(p).lat));
       const principales = sel.map((p) => valeurPrincipale(p.code)).filter((v): v is number => v != null);
       const minis = sel.map((p) => nombre(editions[p.code]?.mini ?? '')).filter((v): v is number => v != null);
-      return { valeur: moyenne(principales), mini: moyenne(minis) };
+      const auDemi = (v: number | null) => (v == null ? null : Math.round(v * 2) / 2);
+      return { valeur: auDemi(moyenne(principales)), mini: auDemi(moyenne(minis)) };
     };
     return {
       nord: groupe((lat) => lat >= LATITUDE_SEUIL_NORD_SUD),
