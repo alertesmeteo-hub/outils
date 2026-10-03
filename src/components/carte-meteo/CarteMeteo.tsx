@@ -64,9 +64,10 @@ const ZONE_DEPARTEMENT: Zone = { gauche: 14, haut: 14, droite: LARGEUR_CARTE - 1
 /** Nombre maximal de valeurs de rafales affichées sur la carte (les plus fortes). */
 const MAX_RAFALES = 4;
 /** France entière (Corse comprise) : quasi pleine hauteur, centrée sur la carte. */
-const ZONE_FRANCE: Zone = { gauche: 0, haut: 14, droite: LARGEUR_CARTE, bas: HAUTEUR_CARTE - 14 };
+const LARGEUR_FRANCE = 960;
+const ZONE_FRANCE: Zone = { gauche: 0, haut: 8, droite: LARGEUR_FRANCE, bas: HAUTEUR_CARTE - 8 };
 /** Largeur des pavés « Moyenne » (voir .cmap-moyenne dans globals.css : 162 px + bordures). */
-const LARGEUR_MOYENNES = 172;
+const LARGEUR_MOYENNES = 128;
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
 const MASQUES_FRANCE = new Set(['92', '93', '94']);
 
@@ -241,6 +242,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [sousTitreManuel, setSousTitreManuel] = useState<string | null>(null);
   const [moyennesManuelles, setMoyennesManuelles] = useState<Record<string, string>>({});
   const [paletteOuvertePour, setPaletteOuvertePour] = useState<string | null>(null);
+  const [pictosSelectionnes, setPictosSelectionnes] = useState<Set<string>>(new Set());
   const [enExport, setEnExport] = useState(false);
 
   const [facteur, setFacteur] = useState(1);
@@ -329,6 +331,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const logoUrl = logoPersonnalise ?? LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier ?? null;
 
   const enFrance = zone === 'france';
+  const largeurCarte = enFrance ? LARGEUR_FRANCE : LARGEUR_CARTE;
   const points = useMemo(() => {
     if (enDepartement) return donneesVilles?.departement === departement ? donneesVilles.points : [];
     return (donnees?.points ?? []).filter((p) => selection.has(p.code) && !(enFrance && MASQUES_FRANCE.has(p.code)));
@@ -403,7 +406,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }, [points, enDepartement, densite, editions, periode, codesRafales, vue]);
 
   const nomsVisibles = afficherNoms || enDepartement;
-  const echelleMarqueurs = Math.min(enDepartement ? 1.15 : 1.2, Math.max(0.7, vue.echelle * 1.4));
+  const echelleMarqueurs = Math.min(enDepartement ? 1.15 : enFrance ? 1.05 : 1.2, enFrance ? 1.05 : Math.max(0.7, vue.echelle * 1.4));
 
   const marqueurs: Marqueur[] = useMemo(() => {
     const reglage = DENSITES[densite];
@@ -441,8 +444,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const moyennesGauche = 29;
     const obstacles: Rect[] = [
       { x: logoDroite - 205, y: 21, w: 205, h: 84 },
-      { x: LARGEUR_CARTE - 28 - 420, y: 18, w: 420, h: 86 },
-      ...(enFrance ? [{ x: moyennesGauche, y: 285, w: LARGEUR_MOYENNES, h: 150 }] : zone.startsWith('reg:') ? [{ x: 29, y: 285, w: LARGEUR_MOYENNES, h: 78 }] : []),
+      { x: largeurCarte - 28 - 420, y: 18, w: 420, h: 86 },
+      ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : zone.startsWith('reg:') ? [{ x: 29, y: 340, w: LARGEUR_MOYENNES, h: 58 }] : []),
     ];
     const elements = bruts.map((m) => {
       // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
@@ -462,7 +465,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         priorite: m.rafale != null ? 0 : m.ton != null ? 1 : 2,
       };
     });
-    const places = placerSansChevauchement(elements, obstacles, { largeur: LARGEUR_CARTE, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em);
+    const places = placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em);
     // On s'arrête au nombre voulu : les candidats en réserve ne servent qu'à remplacer ceux qui n'ont pas trouvé de place.
     // France et régions : les extrêmes et les rafales à signaler sont toujours gardés (et comptent dans le total).
     const placesOk = bruts.filter((m) => places.has(m.code));
@@ -470,7 +473,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -525,15 +528,23 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     setTitreManuel(null);
   }
 
-  function modifier(code: string, champ: 'valeur' | 'mini' | 'picto', valeur: string) {
+  function modifier(code: string, champ: 'valeur' | 'mini' | 'picto', valeur: string, partout = false) {
     setEditions((prev) => {
+      if (champ === 'picto' && (partout || (pictosSelectionnes.size > 0 && pictosSelectionnes.has(code)))) {
+        const toutes: Record<string, Edition> = { ...prev };
+        for (const [c, e] of Object.entries(prev)) if (partout || pictosSelectionnes.has(c)) toutes[c] = periode === 'apres-midi' ? { ...e, pictoAM: valeur as PictoMeteo } : { ...e, pictoJ: valeur as PictoMeteo };
+        return toutes;
+      }
       const e = prev[code];
       if (!e) return prev;
       if (champ === 'picto') return { ...prev, [code]: periode === 'apres-midi' ? { ...e, pictoAM: valeur as PictoMeteo } : { ...e, pictoJ: valeur as PictoMeteo } };
       if (champ === 'mini') return { ...prev, [code]: { ...e, mini: valeur } };
       return { ...prev, [code]: periode === 'apres-midi' ? { ...e, tempAM: valeur } : { ...e, maxi: valeur } };
     });
-    if (champ === 'picto') setPaletteOuvertePour(null);
+    if (champ === 'picto') {
+      setPaletteOuvertePour(null);
+      setPictosSelectionnes(new Set());
+    }
   }
 
   /** Applique un jeu de pictos à toute la carte, d'après la prévision (les modifications faites picto par picto sont remplacées). */
@@ -562,7 +573,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     try {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const nom = `carte-meteo-${nomZone.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${dateISO}-${periode}`;
-      await exporterEnJpg(carteRef.current, nom, LARGEUR_CARTE, HAUTEUR_CARTE);
+      await exporterEnJpg(carteRef.current, nom, largeurCarte, HAUTEUR_CARTE);
     } finally {
       setEnExport(false);
     }
@@ -855,6 +866,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <CarteRendu
               carteRef={carteRef}
               facteur={facteur}
+              largeur={largeurCarte}
               vue={vue}
               departements={departementsAffiches}
               regions={regionsAffichees}
@@ -867,7 +879,20 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               logoUrl={logoUrl}
               moyennes={moyennes}
               paletteOuvertePour={paletteOuvertePour}
-              onBasculerPalette={(code) => setPaletteOuvertePour((c) => (c === code ? null : code))}
+              pictosSelectionnes={enExport ? undefined : pictosSelectionnes}
+              onBasculerPalette={(code, multiple) => {
+                if (multiple) {
+                  // Ctrl/Maj + clic : ajoute ou retire le picto de la sélection ; la palette s'ouvre sur le dernier ajouté.
+                  const suivante = new Set(pictosSelectionnes);
+                  if (suivante.has(code)) suivante.delete(code);
+                  else suivante.add(code);
+                  setPictosSelectionnes(suivante);
+                  setPaletteOuvertePour(suivante.has(code) ? code : null);
+                } else {
+                  if (!pictosSelectionnes.has(code)) setPictosSelectionnes(new Set());
+                  setPaletteOuvertePour((c) => (c === code ? null : code));
+                }
+              }}
               onModifier={modifier}
             />
           </div>

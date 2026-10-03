@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties, RefObject } from 'react';
+import { useState, type CSSProperties, type RefObject } from 'react';
 import { FOND, type Vue } from '@/lib/carte-meteo/projection-france';
 import { PICTOS_METEO, PICTOS_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 
@@ -36,6 +36,8 @@ export interface BoiteMoyenne {
 interface Props {
   carteRef: RefObject<HTMLDivElement | null>;
   facteur: number;
+  /** Largeur de l'image : plus étroite en vue France (carte cadrée serrée, coupée sur les côtés). */
+  largeur?: number;
   vue: Vue;
   departements: Contour[];
   regions: Contour[] | null;
@@ -51,8 +53,10 @@ interface Props {
   logoDroite?: number | null;
   moyennesGauche?: number | null;
   paletteOuvertePour: string | null;
-  onBasculerPalette: (code: string) => void;
-  onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto', valeur: string) => void;
+  /** Pictos sélectionnés (Ctrl/Maj + clic) pour être modifiés ensemble. */
+  pictosSelectionnes?: Set<string>;
+  onBasculerPalette: (code: string, multiple: boolean) => void;
+  onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto', valeur: string, partout?: boolean) => void;
 }
 
 // Couleurs en attributs SVG et non en classes CSS : html-to-image (export JPG) ne recopie pas les styles
@@ -69,8 +73,8 @@ const LARGEUR_PALETTE = 232;
 const HAUTEUR_PALETTE = 270;
 
 /** Palette ouverte dans le cadre de la carte : sous le marqueur s'il est en haut, décalée pour ne jamais être coupée sur les bords. */
-function stylePalette(x: number, y: number, em: number): CSSProperties {
-  const gauche = Math.min(Math.max(x - LARGEUR_PALETTE / 2, 6), LARGEUR_CARTE - LARGEUR_PALETTE - 6);
+function stylePalette(x: number, y: number, em: number, largeur: number): CSSProperties {
+  const gauche = Math.min(Math.max(x - LARGEUR_PALETTE / 2, 6), largeur - LARGEUR_PALETTE - 6);
   const enHaut = y < HAUTEUR_PALETTE + 40;
   return {
     left: `calc(50% + ${gauche - x}px)`,
@@ -82,6 +86,7 @@ function stylePalette(x: number, y: number, em: number): CSSProperties {
 export default function CarteRendu({
   carteRef,
   facteur,
+  largeur = LARGEUR_CARTE,
   vue,
   departements,
   regions,
@@ -96,15 +101,17 @@ export default function CarteRendu({
   logoDroite = null,
   moyennesGauche = null,
   paletteOuvertePour,
+  pictosSelectionnes,
   onBasculerPalette,
   onModifier,
 }: Props) {
+  const [partout, setPartout] = useState(false);
   return (
-    <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur }}>
+    <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
         ref={carteRef}
         className="cmap-rendu"
-        style={{ width: LARGEUR_CARTE, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
+        style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
       >
         <img
           src={FOND.url}
@@ -118,7 +125,7 @@ export default function CarteRendu({
           }}
         />
 
-        <svg className="cmap-svg" viewBox={`0 0 ${LARGEUR_CARTE} ${HAUTEUR_CARTE}`} width={LARGEUR_CARTE} height={HAUTEUR_CARTE}>
+        <svg className="cmap-svg" viewBox={`0 0 ${largeur} ${HAUTEUR_CARTE}`} width={largeur} height={HAUTEUR_CARTE}>
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
             {departements.map((c) =>
               regions && regions.length === 0 && selection.has(c.code) ? (
@@ -136,7 +143,7 @@ export default function CarteRendu({
             src={logoUrl}
             alt="Logo"
             className="cmap-logo"
-            style={logoDroite != null ? { left: 'auto', right: LARGEUR_CARTE - logoDroite } : undefined}
+            style={logoDroite != null ? { left: 'auto', right: largeur - logoDroite } : undefined}
           />
         )}
 
@@ -165,7 +172,12 @@ export default function CarteRendu({
           >
             {afficherNoms && <div className="cmap-nom">{m.nom}</div>}
             <div className={`cmap-ligne ${m.mini == null ? 'cmap-ligne-simple' : ''}`}>
-              <button type="button" className="cmap-picto" onClick={() => onBasculerPalette(m.code)}>
+              <button
+                type="button"
+                className={`cmap-picto ${pictosSelectionnes?.has(m.code) ? 'cmap-picto-selectionne' : ''}`}
+                title="Clic : changer l'icône · Ctrl/Maj + clic : en sélectionner plusieurs"
+                onClick={(e) => onBasculerPalette(m.code, e.ctrlKey || e.shiftKey || e.metaKey)}
+              >
                 {estPictoImage(m.picto) ? <img src={cheminPictoImage(m.picto)} alt="" className="cmap-picto-image" /> : m.picto}
               </button>
               <div className="cmap-valeurs">
@@ -192,10 +204,14 @@ export default function CarteRendu({
               </div>
             )}
             {paletteOuvertePour === m.code && (
-              <div className="cmap-palette" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs)}>
+              <div className="cmap-palette" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs, largeur)}>
+                <label className="cmap-palette-partout">
+                  <input type="checkbox" checked={partout} onChange={(e) => setPartout(e.target.checked)} /> Même icône sur toute la carte
+                </label>
+                <div className="cmap-palette-aide">Ctrl/Maj + clic sur d'autres pictos : les modifier ensemble</div>
                 <div className="cmap-palette-groupe">
                   {PICTOS_METEO.map((picto) => (
-                    <button key={picto} type="button" onClick={() => onModifier(m.code, 'picto', picto)}>
+                    <button key={picto} type="button" onClick={() => onModifier(m.code, 'picto', picto, partout)}>
                       {picto}
                     </button>
                   ))}
@@ -203,7 +219,7 @@ export default function CarteRendu({
                 <div className="cmap-palette-separateur">Mes pictos</div>
                 <div className="cmap-palette-groupe">
                   {PICTOS_IMAGES.map((picto) => (
-                    <button key={picto.id} type="button" title={picto.label} onClick={() => onModifier(m.code, 'picto', picto.id)}>
+                    <button key={picto.id} type="button" title={picto.label} onClick={() => onModifier(m.code, 'picto', picto.id, partout)}>
                       <img src={picto.fichier} alt={picto.label} className="cmap-picto-image" />
                     </button>
                   ))}

@@ -97,13 +97,13 @@ body {
 }
 .cmap-sous-titre { font-size: 27px; line-height: 1.1; color: #fff; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 
-.cmap-moyennes { position: absolute; left: 29px; top: 285px; display: flex; flex-direction: column; gap: 10px; z-index: 3; }
-.cmap-moyenne { background: rgba(13, 20, 40, 0.92); border: 3px solid #f5c400; border-radius: 10px; padding: 6px 14px 4px; text-align: center; min-width: 162px; }
+.cmap-moyennes { position: absolute; left: 29px; top: 340px; display: flex; flex-direction: column; gap: 8px; z-index: 3; }
+.cmap-moyenne { background: rgba(13, 20, 40, 0.92); border: 2px solid #f5c400; border-radius: 8px; padding: 4px 10px 3px; text-align: center; min-width: 120px; }
 .cmap-moyenne-sud { border-color: #ff8c1a; }
-.cmap-moyenne span { display: block; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: #f5c400; }
+.cmap-moyenne span { display: block; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; color: #f5c400; }
 .cmap-moyenne-sud span { color: #ff8c1a; }
-.cmap-moyenne strong { display: block; font-size: 34px; line-height: 1.1; color: #fff; font-weight: 800; }
-.cmap-moyenne strong em { font-style: normal; font-size: 23px; color: #6bb3ff; }
+.cmap-moyenne strong { display: block; font-size: 26px; line-height: 1.1; color: #fff; font-weight: 800; }
+.cmap-moyenne strong em { font-style: normal; font-size: 18px; color: #6bb3ff; }
 
 .cmap-marqueur { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; z-index: 4; line-height: 1; }
 .cmap-ligne { display: flex; align-items: center; gap: 0.05em; }
@@ -168,3 +168,7 @@ body {
 /* Après-midi : la température chevauche le haut-droit du picto, comme sur la carte de référence. */
 .cmap-ligne-simple .cmap-valeurs { align-self: flex-start; margin: -0.45em 0 0 -0.45em; position: relative; z-index: 1; }
 .cmap-ligne-simple .cmap-valeur { font-size: 1.45em; width: 1.5em; }
+
+.cmap-palette-partout { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin: 0 2px 6px; cursor: pointer; }
+.cmap-picto-selectionne { outline: 3px solid #ffd21a; outline-offset: 2px; border-radius: 10px; }
+.cmap-palette-aide { font-size: 11px; color: #64748b; margin: 0 2px 6px; }
