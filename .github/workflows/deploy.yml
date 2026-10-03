@@ -1,9 +1,9 @@
 # Déploiement automatique sur le VPS à chaque envoi sur main (équivalent de « ./deploy.sh » lancé à la main).
 # Secrets à créer dans GitHub (Settings > Secrets and variables > Actions) :
-#   VPS_HOST     adresse IP ou nom du VPS
-#   VPS_USER     utilisateur SSH (ubuntu)
+#   VPS_HOST         adresse IP ou nom du VPS
+#   VPS_USER         utilisateur SSH (ubuntu)
 #   VPS_SSH_KEY_B64  clé privée SSH dédiée au déploiement, encodée en base64 sur une seule ligne
-#                    (évite les erreurs de copier-coller des retours à la ligne ; `base64 -w0 ~/.ssh/deploy_github`)
+#                    (évite les erreurs de copier-coller des retours à la ligne : base64 -w0 ~/.ssh/deploy_github)
 name: Déploiement VPS
 
 on:
@@ -26,8 +26,10 @@ jobs:
           VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s' "$VPS_SSH_KEY_B64" | tr -d '[:space:]' | base64 -d > ~/.ssh/deploy_key
+          echo >> ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
       - name: Lancer deploy.sh sur le VPS
