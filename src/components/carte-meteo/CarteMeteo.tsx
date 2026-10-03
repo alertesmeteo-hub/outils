@@ -7,6 +7,7 @@ import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr
 import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
+import { flecheVent } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
@@ -60,12 +61,12 @@ const DISTANCE_MIN_VILLES = 105;
 /** Régions et départements : on laisse libres le haut (logo, date) et la gauche (moyennes). */
 const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
 /** Département : cadré au maximum, centré sur toute la carte. */
-const ZONE_DEPARTEMENT: Zone = { gauche: 14, haut: 14, droite: LARGEUR_CARTE - 14, bas: HAUTEUR_CARTE - 14 };
+const ZONE_DEPARTEMENT: Zone = { gauche: 14, haut: 72, droite: LARGEUR_CARTE - 14, bas: HAUTEUR_CARTE - 34 };
 /** Nombre maximal de valeurs de rafales affichées sur la carte (les plus fortes). */
 const MAX_RAFALES = 4;
 /** France entière (Corse comprise) : quasi pleine hauteur, centrée sur la carte. */
 const LARGEUR_FRANCE = 960;
-const ZONE_FRANCE: Zone = { gauche: 0, haut: 8, droite: LARGEUR_FRANCE, bas: HAUTEUR_CARTE - 8 };
+const ZONE_FRANCE: Zone = { gauche: 0, haut: 72, droite: LARGEUR_FRANCE, bas: HAUTEUR_CARTE - 30 };
 /** Largeur des pavés « Moyenne » (voir .cmap-moyenne dans globals.css : 162 px + bordures). */
 const LARGEUR_MOYENNES = 128;
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
@@ -282,6 +283,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [modeMultiple, setModeMultiple] = useState(false);
   const [pied, setPied] = useState('www.alertes-meteo.com');
   const [afficherFleuves, setAfficherFleuves] = useState(true);
+  const [afficherFleches, setAfficherFleches] = useState(true);
   const [afficherRelief, setAfficherRelief] = useState(true);
   const [enExport, setEnExport] = useState(false);
 
@@ -369,6 +371,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const logoDefaut = useMemo(() => logoParDefaut(codes), [codes]);
   const logoId = logoPresetId ?? logoDefaut.id;
+  const logoFondBlanc = !logoPersonnalise && LOGOS_PRESETS.find((l) => l.id === logoId)?.fondBlanc !== false;
   const logoUrl = logoPersonnalise ?? (LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier || null);
 
   const enFrance = zone === 'france';
@@ -537,6 +540,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         mini: periode === 'journee' ? e?.mini ?? '' : null,
         // Rafale arrondie de 5 en 5 km/h pour l'affichage.
         rafale: rafalesSignalees.has(p.code) && rafale != null ? Math.round(rafale / 5) * 5 : null,
+        fleche: afficherFleches && rafalesSignalees.has(p.code) && rafale != null ? flecheVent(periode === 'apres-midi' ? p.directionRafaleApresMidi : p.directionRafaleJournee) : null,
         ton: periode === 'apres-midi' && v != null ? (v === plusChaud ? 'chaud' : v === plusFroid ? 'froid' : null) : null,
       };
     });
@@ -548,7 +552,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const moyennesGauche = 29;
     const obstacles: Rect[] = [
       { x: logoDroite - 205, y: 21, w: 205, h: 84 },
-      { x: largeurCarte / 2 - 230, y: 14, w: 460, h: 90 },
+      { x: largeurCarte / 2 - 230, y: 8, w: 460, h: 68 },
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : zone.startsWith('reg:') ? [{ x: 29, y: 340, w: LARGEUR_MOYENNES, h: 58 }] : []),
     ];
@@ -578,7 +582,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -991,6 +995,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </select>
             </label>
             <label className="flex items-center gap-2 pb-1.5 text-sm">
+              <input type="checkbox" checked={afficherFleches} onChange={(e) => setAfficherFleches(e.target.checked)} />
+              Flèches de vent
+            </label>
+            <label className="flex items-center gap-2 pb-1.5 text-sm">
               <input type="checkbox" checked={afficherFleuves} onChange={(e) => setAfficherFleuves(e.target.checked)} />
               Fleuves
             </label>
@@ -1050,6 +1058,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               titre={titre}
               sousTitre={sousTitre}
               logoUrl={logoUrl}
+              logoFondBlanc={logoFondBlanc}
               pied={pied}
               moyennes={moyennes}
               paletteOuvertePour={paletteOuvertePour}

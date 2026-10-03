@@ -87,15 +87,15 @@ body {
   z-index: 3;
 }
 
-.cmap-titre { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); white-space: nowrap; text-align: center; z-index: 3; font-family: Impact, 'Arial Narrow', sans-serif; text-transform: uppercase; }
+.cmap-titre { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); white-space: nowrap; text-align: center; z-index: 3; font-family: Impact, 'Arial Narrow', sans-serif; text-transform: uppercase; }
 .cmap-date {
-  font-size: 38px;
+  font-size: 34px;
   line-height: 1.05;
   letter-spacing: 0.01em;
   color: #ffd21a;
   text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 3px 8px rgba(0, 0, 0, 0.6);
 }
-.cmap-sous-titre { font-size: 27px; line-height: 1.1; color: #fff; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.cmap-sous-titre { font-size: 23px; line-height: 1.1; color: #fff; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 
 .cmap-moyennes { position: absolute; left: 29px; top: 340px; display: flex; flex-direction: column; gap: 8px; z-index: 3; }
 .cmap-moyenne { background: rgba(13, 20, 40, 0.92); border: 2px solid #f5c400; border-radius: 8px; padding: 4px 10px 3px; text-align: center; min-width: 120px; }
@@ -173,3 +173,4 @@ body {
 .cmap-picto-selectionne { outline: 3px solid #ffd21a; outline-offset: 2px; border-radius: 10px; }
 .cmap-palette-aide { font-size: 11px; color: #64748b; margin: 0 2px 6px; }
 .cmap-pied { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; z-index: 3; font-size: 21px; font-weight: 800; letter-spacing: 0.02em; color: #fff; text-shadow: 0 0 4px #000, 0 0 4px #000, 1px 1px 2px #000; pointer-events: none; }
+.cmap-fleche { width: 1.05em; height: 1.05em; object-fit: contain; vertical-align: -0.2em; margin-right: 0.3em; filter: brightness(0) invert(1); }

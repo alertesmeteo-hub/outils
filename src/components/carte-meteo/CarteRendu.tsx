@@ -23,6 +23,8 @@ export interface Marqueur {
   /** Minimum de la journée (mode « journée » uniquement). */
   mini: string | null;
   rafale: number | null;
+  /** Flèche (image) du vent à l'heure de la rafale, si affichée. */
+  fleche?: string | null;
   ton: 'chaud' | 'froid' | null;
 }
 
@@ -54,6 +56,8 @@ interface Props {
   titre: string;
   sousTitre: string;
   logoUrl: string | null;
+  /** Fond blanc derrière le logo (faux pour un logo détouré). */
+  logoFondBlanc?: boolean;
   moyennes: BoiteMoyenne[];
   /** Position (pixels de la carte) du bord droit du logo et du bord gauche des moyennes, rapprochés du contour de la carte. */
   logoDroite?: number | null;
@@ -108,6 +112,7 @@ export default function CarteRendu({
   titre,
   sousTitre,
   logoUrl,
+  logoFondBlanc = true,
   moyennes,
   logoDroite = null,
   moyennesGauche = null,
@@ -169,7 +174,7 @@ export default function CarteRendu({
             src={logoUrl}
             alt="Logo"
             className="cmap-logo"
-            style={logoDroite != null ? { left: 'auto', right: largeur - logoDroite } : undefined}
+            style={{ ...(logoDroite != null ? { left: 'auto', right: largeur - logoDroite } : {}), ...(logoFondBlanc ? {} : { background: 'none' }) }}
           />
         )}
 
@@ -227,6 +232,7 @@ export default function CarteRendu({
             </div>
             {m.rafale != null && (
               <div className={`cmap-rafale ${m.rafale >= 90 ? 'cmap-rafale-forte' : ''}`} title="Rafales maximales (km/h)">
+                {m.fleche && <img src={m.fleche} alt="" className="cmap-fleche" />}
                 {m.rafale}
                 <small>km/h</small>
               </div>

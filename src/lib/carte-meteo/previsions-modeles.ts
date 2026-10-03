@@ -27,6 +27,9 @@ export interface PointCarte {
   tempApresMidi: number | null;
   rafaleApresMidi: number | null;
   rafaleJournee: number | null;
+  /** Direction du vent (degrés, d'où il vient) à l'heure de la rafale maximale. */
+  directionRafaleApresMidi: number | null;
+  directionRafaleJournee: number | null;
   codeApresMidi: number | null;
   codeJournee: number | null;
   /** Nébulosité moyenne (%) et cumul de précipitations (mm) : de 12 h à 18 h, puis sur la journée (7 h-20 h pour le ciel). */
@@ -45,6 +48,7 @@ export interface ReponseLieu {
     time?: string[];
     temperature_2m?: (number | null)[];
     wind_gusts_10m?: (number | null)[];
+    wind_direction_10m?: (number | null)[];
     weather_code?: (number | null)[];
     cloud_cover?: (number | null)[];
     precipitation?: (number | null)[];
@@ -98,6 +102,7 @@ export function pointDepuisReponse(code: string, nom: string, lieu: ReponseLieu)
   const heures = lieu.hourly?.time ?? [];
   const temps = lieu.hourly?.temperature_2m ?? [];
   const rafales = lieu.hourly?.wind_gusts_10m ?? [];
+  const directions = lieu.hourly?.wind_direction_10m ?? [];
   const codes = lieu.hourly?.weather_code ?? [];
   const nuages = lieu.hourly?.cloud_cover ?? [];
   const pluies = lieu.hourly?.precipitation ?? [];
@@ -112,6 +117,17 @@ export function pointDepuisReponse(code: string, nom: string, lieu: ReponseLieu)
   const orage = codesPlage.find((c) => typeof c === 'number' && c >= 95);
   const codeApresMidi = typeof orage === 'number' ? orage : code15h ? codes[code15h.i] ?? null : null;
 
+  // Direction du vent à l'heure de la rafale maximale (de la plage donnée).
+  const directionDeLaRafaleMax = (indices: number[]): number | null => {
+    let meilleur = -1;
+    for (const i of indices) {
+      const r = rafales[i];
+      if (typeof r === 'number' && (meilleur < 0 || r > (rafales[meilleur] as number))) meilleur = i;
+    }
+    const d = meilleur >= 0 ? directions[meilleur] : null;
+    return typeof d === 'number' ? Math.round(d) : null;
+  };
+
   return {
     code,
     nom,
@@ -120,6 +136,8 @@ export function pointDepuisReponse(code: string, nom: string, lieu: ReponseLieu)
     tempApresMidi: arrondi(maximum(apresMidi.map(({ i }) => temps[i])), 1),
     rafaleApresMidi: arrondi(maximum(apresMidi.map(({ i }) => rafales[i]))),
     rafaleJournee: arrondi(maximum(rafales)),
+    directionRafaleApresMidi: directionDeLaRafaleMax(apresMidi.map(({ i }) => i)),
+    directionRafaleJournee: directionDeLaRafaleMax(heures.map((_, i) => i)),
     codeApresMidi,
     codeJournee: lieu.daily?.weather_code?.[0] ?? null,
     nuagesApresMidi: arrondi(moyenneNombres(apresMidi.map(({ i }) => nuages[i]))),
@@ -134,7 +152,7 @@ export function urlPrevisions(lieux: { lat: number; lon: number }[], modele: Mod
   const params = new URLSearchParams({
     latitude: lieux.map((l) => l.lat.toFixed(3)).join(','),
     longitude: lieux.map((l) => l.lon.toFixed(3)).join(','),
-    hourly: 'temperature_2m,wind_gusts_10m,weather_code,cloud_cover,precipitation',
+    hourly: 'temperature_2m,wind_gusts_10m,wind_direction_10m,weather_code,cloud_cover,precipitation',
     daily: 'temperature_2m_max,temperature_2m_min,weather_code',
     models: MODELE_OPEN_METEO[modele],
     timezone: 'Europe/Paris',
