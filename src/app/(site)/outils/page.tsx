@@ -30,6 +30,17 @@ export default async function AllTools() {
             </span>
           </Link>
         </li>
+        <li>
+          <Link href="/outils/carte-meteo/16-jours/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">📅</span>
+            <span>
+              <strong className="block leading-snug">Cartes météo à 16 jours</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Les 16 cartes de France du CEP (ou de GFS) jour par jour, sur une seule page.
+              </span>
+            </span>
+          </Link>
+        </li>
       </ul>
       <div className="mt-8"><ToolGrid tools={tools} /></div>
     </>

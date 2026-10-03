@@ -9,16 +9,24 @@ import { CODES_DEPARTEMENTS, pointDepuisSerie, type ModeleMeteo, type PointCarte
 /**
  * Prévisions de la carte météo : les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (branche `data`),
  * un fichier JSON par département avec, pour chaque commune, la prévision pas à pas :
- *   - Harmonie : AROME 0,01° de Météo-France (arome-meteofrance), pas horaire sur 48 h ;
- *   - CEP : ECMWF IFS (cep), pas de 3 h sur 15 jours.
+ *   - AROME 0,01° de Météo-France (arome-meteofrance), pas horaire sur 48 h ;
+ *   - HARMONIE-AROME du KNMI (harmonie), pas horaire sur 60 h ;
+ *   - CEP, ECMWF IFS (cep), et GFS de la NOAA (gfs), pas de 3 h sur 15 jours.
  * Aucun service tiers : on lit ces fichiers, on n'en garde que ce qui sert (un point par département, ~30 villes par département)
  * et on le met en cache (mémoire + disque) tant que le passage du modèle n'a pas changé.
  */
 const BASES: Record<ModeleMeteo, string> = {
-  harmonie: 'https://raw.githubusercontent.com/alertesmeteo-hub/arome-meteofrance/data',
+  arome: 'https://raw.githubusercontent.com/alertesmeteo-hub/arome-meteofrance/data',
+  harmonie: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie/data',
   cep: 'https://raw.githubusercontent.com/alertesmeteo-hub/cep/data',
+  gfs: 'https://raw.githubusercontent.com/alertesmeteo-hub/gfs/data',
 };
-const LIBELLES: Record<ModeleMeteo, string> = { harmonie: 'AROME 0,01° (Météo-France)', cep: 'CEP (ECMWF IFS)' };
+const LIBELLES: Record<ModeleMeteo, string> = {
+  arome: 'AROME 0,01° (Météo-France)',
+  harmonie: 'HARMONIE-AROME (KNMI)',
+  cep: 'CEP (ECMWF IFS)',
+  gfs: 'GFS (NOAA)',
+};
 
 /** Villes retenues par département (les plus peuplées d'abord, puis celles qui comblent les zones vides). */
 const VILLES_PAR_DEPARTEMENT = 30;
@@ -237,10 +245,14 @@ async function enParallele<T, R>(liste: T[], limite: number, tache: (x: T) => Pr
   return resultats;
 }
 
-/** Prévisions des 96 départements pour un modèle et un jour (un point par département). */
-export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: string): Promise<PointCarte[]> {
+/** Prévisions des 96 départements pour un modèle et plusieurs jours (une seule lecture des fichiers) : null pour un jour sans donnée. */
+export async function chargerPrevisionsCarteJours(
+  modele: ModeleMeteo,
+  datesISO: string[],
+  apresMidiSeulement = false
+): Promise<Record<string, PointCarte[] | null>> {
   const resultats = await enParallele(CODES_DEPARTEMENTS, CONCURRENCE, (dep) => extraitDepartement(modele, dep));
-  const points: PointCarte[] = [];
+  const sortie: Record<string, PointCarte[] | null> = Object.fromEntries(datesISO.map((d) => [d, [] as PointCarte[] | null]));
   let echecs = 0;
   resultats.forEach((r, i) => {
     const dep = CODES_DEPARTEMENTS[i];
@@ -249,10 +261,20 @@ export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: strin
       console.error('Carte météo : département indisponible', modele, dep, r.reason);
       return;
     }
-    const point = pointDepuisSerie(dep, DEPARTEMENTS_FR[dep] ?? dep, r.value.chef, dateISO);
-    if (point.tempApresMidi != null || point.maxi != null) points.push(point);
+    for (const date of datesISO) {
+      const point = pointDepuisSerie(dep, DEPARTEMENTS_FR[dep] ?? dep, r.value.chef, date);
+      if (point.tempApresMidi != null || (!apresMidiSeulement && point.maxi != null)) (sortie[date] as PointCarte[]).push(point);
+    }
   });
-  if (!points.length) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO} (${echecs} échecs)`);
+  for (const date of datesISO) if (!(sortie[date] as PointCarte[]).length) sortie[date] = null;
+  if (echecs === CODES_DEPARTEMENTS.length) throw new Error(`${LIBELLES[modele]} : aucun département disponible`);
+  return sortie;
+}
+
+/** Prévisions des 96 départements pour un modèle et un jour (un point par département). */
+export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: string): Promise<PointCarte[]> {
+  const points = (await chargerPrevisionsCarteJours(modele, [dateISO], true))[dateISO];
+  if (!points) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO}`);
   return points;
 }
 
@@ -260,7 +282,7 @@ export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: strin
 export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: string, dep: string): Promise<PointCarte[]> {
   const extrait = await extraitDepartement(modele, dep);
   const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO), lat: v.lat, lon: v.lon }));
-  const valides = points.filter((p) => p.tempApresMidi != null || p.maxi != null);
+  const valides = points.filter((p) => p.tempApresMidi != null);
   if (!valides.length) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO} (département ${dep})`);
   return valides;
 }

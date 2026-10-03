@@ -1,16 +1,28 @@
 import { COORDS_DEPARTEMENTS } from './departements-coords';
 
 /**
- * Modèles proposés : Harmonie = AROME 0,01° de Météo-France (dépôt alertesmeteo-hub/arome-meteofrance, 48 h) et
- * CEP = ECMWF IFS (dépôt alertesmeteo-hub/cep, 15 jours). Voir `sources.ts` pour le chargement des données.
+ * Modèles proposés, lus dans les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (voir `sources.ts`) :
+ *   - arome : AROME 0,01° de Météo-France, pas horaire, 48 h ;
+ *   - harmonie : HARMONIE-AROME du KNMI (Pays-Bas), pas horaire, 60 h ;
+ *   - cep : CEP, modèle du Centre européen (ECMWF IFS), pas de 3 h, 15 jours ;
+ *   - gfs : GFS de la NOAA, pas de 3 h, 15 jours.
  */
-export type ModeleMeteo = 'harmonie' | 'cep';
+export type ModeleMeteo = 'arome' | 'harmonie' | 'cep' | 'gfs';
+
+export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string }[] = [
+  { id: 'arome', libelle: 'AROME', fournisseur: 'Météo-France' },
+  { id: 'harmonie', libelle: 'Harmonie', fournisseur: 'KNMI' },
+  { id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' },
+  { id: 'gfs', libelle: 'GFS', fournisseur: 'NOAA' },
+];
+
+export const estModele = (v: string | null): v is ModeleMeteo => MODELES.some((m) => m.id === v);
 
 /**
- * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. AROME couvre 48 h à partir de son
- * passage de 09 h UTC : l'après-midi de J+2 n'y est pas, d'où J+1 ; le CEP est limité à J+6 pour la carte.
+ * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. Les modèles à 48-60 h ne couvrent pas
+ * l'après-midi de J+2 ; le CEP et GFS vont jusqu'à 15 jours (J+15 n'a des données que selon l'heure du passage).
  */
-export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { harmonie: 1, cep: 6 };
+export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { arome: 1, harmonie: 1, cep: 15, gfs: 15 };
 
 /** Un point par département métropolitain (ou par ville), avec les valeurs de l'après-midi (12 h-18 h) et de la journée. */
 export interface PointCarte {

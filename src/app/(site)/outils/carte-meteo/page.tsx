@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import CarteMeteo, { type DonneesCarte, type DonneesVilles } from '@/components/carte-meteo/CarteMeteo';
 import { aujourdhuiParis, ajouterJours } from '@/lib/carte-meteo/previsions-modeles';
 import { chargerPrevisionsCarte, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
@@ -25,16 +26,16 @@ export default async function PageCarteMeteo() {
 
   // Si un chargement échoue ici, le composant retente côté navigateur.
   const [france, poDemain] = await Promise.allSettled([
-    avecDelai(chargerPrevisionsCarte('harmonie', aujourdhui), 9000),
-    avecDelai(chargerPrevisionsVilles('harmonie', demain, DEPARTEMENT_PO), 9000),
+    avecDelai(chargerPrevisionsCarte('arome', aujourdhui), 9000),
+    avecDelai(chargerPrevisionsVilles('arome', demain, DEPARTEMENT_PO), 9000),
   ]);
   if (france.status === 'rejected') console.error('Carte météo : France du jour indisponible', france.reason);
   if (poDemain.status === 'rejected') console.error('Carte météo : Pyrénées-Orientales de demain indisponible', poDemain.reason);
 
   const initial: DonneesCarte | null =
-    france.status === 'fulfilled' ? { modele: 'harmonie', dateISO: aujourdhui, points: france.value } : null;
+    france.status === 'fulfilled' ? { modele: 'arome', dateISO: aujourdhui, points: france.value } : null;
   const initialPO: DonneesVilles | null =
-    poDemain.status === 'fulfilled' ? { modele: 'harmonie', dateISO: demain, departement: DEPARTEMENT_PO, points: poDemain.value } : null;
+    poDemain.status === 'fulfilled' ? { modele: 'arome', dateISO: demain, departement: DEPARTEMENT_PO, points: poDemain.value } : null;
 
   return (
     <>
@@ -45,6 +46,11 @@ export default async function PageCarteMeteo() {
       <div className="mt-6">
         <CarteMeteo aujourdhui={aujourdhui} initial={initial} />
       </div>
+      <p className="mt-4 text-sm">
+        <Link href="/outils/carte-meteo/16-jours/" className="font-semibold underline">
+          Voir les 16 cartes à 16 jours (CEP ou GFS) sur une seule page →
+        </Link>
+      </p>
 
       <h2 className="mt-12 text-2xl font-extrabold">Pyrénées-Orientales : la carte de demain</h2>
       <div className="mt-6">

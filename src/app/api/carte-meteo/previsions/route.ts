@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
-import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
+import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, estModele, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
 import { chargerPrevisionsCarte, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
 
 /**
- * GET /api/carte-meteo/previsions/?modele=harmonie|cep&date=YYYY-MM-DD[&dep=29]
+ * GET /api/carte-meteo/previsions/?modele=arome|harmonie|cep|gfs&date=YYYY-MM-DD[&dep=29]
  * Sans `dep` : prévisions de tous les départements métropolitains ; avec `dep` : de ses principales villes.
  * Prévisions AROME (Météo-France) ou CEP (ECMWF) lues dans les paquets départementaux publiés sur GitHub
  * (alertesmeteo-hub/arome-meteofrance et alertesmeteo-hub/cep), pour le générateur /outils/carte-meteo.
@@ -16,7 +16,8 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const modele: ModeleMeteo = url.searchParams.get('modele') === 'cep' ? 'cep' : 'harmonie';
+  const demande = url.searchParams.get('modele');
+  const modele: ModeleMeteo = estModele(demande) ? demande : 'arome';
   const date = url.searchParams.get('date') ?? aujourdhuiParis();
 
   const aujourdhui = aujourdhuiParis();
@@ -34,6 +35,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ modele, date, dep, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
   } catch (erreur) {
     console.error('Erreur carte météo', erreur);
-    return NextResponse.json({ erreur: 'Prévisions momentanément indisponibles' }, { status: 503 });
+    const sansDonnee = erreur instanceof Error && erreur.message.includes('aucune donnée');
+    return NextResponse.json(
+      { erreur: sansDonnee ? 'Pas de prévision pour ce jour avec ce modèle.' : 'Prévisions momentanément indisponibles' },
+      { status: sansDonnee ? 404 : 503 }
+    );
   }
 }

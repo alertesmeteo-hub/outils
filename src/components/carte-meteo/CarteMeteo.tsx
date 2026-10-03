@@ -21,7 +21,7 @@ import {
   type Boite,
   type Zone,
 } from '@/lib/carte-meteo/projection-france';
-import { CODES_DEPARTEMENTS, ECHEANCE_MAX, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
+import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import CarteRendu, { type Fleuves, HAUTEUR_CARTE, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur } from './CarteRendu';
 
 type Periode = 'apres-midi' | 'journee';
@@ -250,12 +250,14 @@ interface Props {
   initialVilles?: DonneesVilles | null;
   /** Réglages de départ : la carte peut être préréglée (ex. un département, demain). */
   reglages?: { niveau?: Niveau; departement?: string; jour?: number };
+  /** Vignette : seulement la carte et son bouton d'export (page des 16 jours), sans les menus de réglage. */
+  compact?: boolean;
 }
 
-export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, reglages }: Props) {
+export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, reglages, compact = false }: Props) {
   const idCarte = useId();
   const nom = (base: string) => `${base}-${idCarte}`;
-  const [modele, setModele] = useState<ModeleMeteo>(initial?.modele ?? initialVilles?.modele ?? 'harmonie');
+  const [modele, setModele] = useState<ModeleMeteo>(initial?.modele ?? initialVilles?.modele ?? 'arome');
   const [jour, setJour] = useState(reglages?.jour ?? 0);
   const [niveau, setNiveau] = useState<Niveau>(reglages?.niveau ?? 'france');
   const [region, setRegion] = useState(REGIONS_FR[0]);
@@ -306,8 +308,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     if (enDepartement || aJour || erreur) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}`, { signal: controleur.signal })
-      .then((r) => {
-        if (!r.ok) throw new Error(String(r.status));
+      .then(async (r) => {
+        if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
         return r.json() as Promise<{ points: PointCarte[] }>;
       })
       .then((json) => {
@@ -316,7 +318,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         setMoyennesManuelles({});
       })
       .catch((e: Error) => {
-        if (e.name !== 'AbortError') setErreur('Prévisions momentanément indisponibles.');
+        if (e.name !== 'AbortError') setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
   }, [enDepartement, aJour, erreur, modele, dateISO]);
@@ -325,8 +327,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     if (!enDepartement || villesAJour || erreur) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}&dep=${departement}`, { signal: controleur.signal })
-      .then((r) => {
-        if (!r.ok) throw new Error(String(r.status));
+      .then(async (r) => {
+        if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
         return r.json() as Promise<{ points: PointCarte[] }>;
       })
       .then((json) => {
@@ -334,18 +336,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
       })
       .catch((e: Error) => {
-        if (e.name !== 'AbortError') setErreur('Prévisions momentanément indisponibles.');
+        if (e.name !== 'AbortError') setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
   }, [enDepartement, villesAJour, erreur, modele, dateISO, departement]);
-
-  useEffect(() => {
-    const colonne = colonneRef.current;
-    if (!colonne) return;
-    const observateur = new ResizeObserver(() => setFacteur(Math.min(1, colonne.clientWidth / LARGEUR_CARTE)));
-    observateur.observe(colonne);
-    return () => observateur.disconnect();
-  }, []);
 
   const contoursDep = useContours(FICHIERS_CONTOURS.departements);
   const fleuves = useFleuves(afficherFleuves);
@@ -381,6 +375,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const enFrance = zone === 'france';
   const largeurCarte = enFrance ? LARGEUR_FRANCE : LARGEUR_CARTE;
+  useEffect(() => {
+    const colonne = colonneRef.current;
+    if (!colonne) return;
+    const observateur = new ResizeObserver(() => setFacteur(Math.min(1, colonne.clientWidth / largeurCarte)));
+    observateur.observe(colonne);
+    return () => observateur.disconnect();
+  }, [largeurCarte]);
   const points = useMemo(() => {
     if (enDepartement) return donneesVilles?.departement === departement ? donneesVilles.points : [];
     return (donnees?.points ?? []).filter((p) => selection.has(p.code) && !(enFrance && MASQUES_FRANCE.has(p.code)));
@@ -711,6 +712,76 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const legendeBarre = 'mb-1 block text-sm font-medium';
   const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
+  const rendu = (
+    <CarteRendu
+      carteRef={carteRef}
+      facteur={facteur}
+      largeur={largeurCarte}
+      fleuves={fleuves}
+      afficherRelief={afficherRelief}
+      reliefVisible={reliefPourcent / 100}
+      vue={vue}
+      departements={departementsAffiches}
+      regions={regionsAffichees}
+      selection={selection}
+      marqueurs={marqueurs}
+      echelleMarqueurs={echelleMarqueurs}
+      afficherNoms={nomsVisibles}
+      titre={titre}
+      sousTitre={sousTitre}
+      logoUrl={logoUrl}
+      logoFondBlanc={logoFondBlanc}
+      pied={pied}
+      titreADroite={enFrance}
+      moyennes={moyennes}
+      paletteOuvertePour={paletteOuvertePour}
+      pictosSelectionnes={enExport ? undefined : pictosSelectionnes}
+      onBasculerPalette={(code, multiple) => {
+        if (multiple || modeMultiple) {
+          // Ctrl/Maj + clic : ajoute ou retire le picto de la sélection ; la palette s'ouvre sur le dernier ajouté.
+          const suivante = new Set(pictosSelectionnes);
+          if (suivante.has(code)) suivante.delete(code);
+          else suivante.add(code);
+          setPictosSelectionnes(suivante);
+          setPaletteOuvertePour(modeMultiple || !suivante.has(code) ? null : code);
+        } else {
+          if (!pictosSelectionnes.has(code)) setPictosSelectionnes(new Set());
+          setPaletteOuvertePour((c) => (c === code ? null : code));
+        }
+      }}
+      onModifier={modifier}
+    />
+  );
+
+  if (compact) {
+    return (
+      <div className="min-w-0" ref={colonneRef}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-base font-bold">
+            {NOM_ECHEANCE(jour)} <span className="font-normal text-muted">({dateISO.split('-').reverse().join('/')})</span>
+          </p>
+          <button
+            type="button"
+            onClick={exporter}
+            disabled={enExport || !donnees}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+          >
+            {enExport ? 'Export…' : 'Exporter en JPG'}
+          </button>
+        </div>
+        {erreur && (
+          <p role="alert" className="mb-2 text-sm text-danger">
+            {erreur}
+          </p>
+        )}
+        <div className="relative">
+          <div className={chargement ? 'opacity-60 transition-opacity' : 'transition-opacity'}>{rendu}</div>
+          {chargement && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-3 py-1.5 text-sm shadow">Chargement…</p>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
       <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:order-1">
@@ -870,15 +941,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <p className={`${titreGroupe} w-full`}>Prévision</p>
             <fieldset>
               <legend className={legendeBarre}>Modèle</legend>
-              <div className="flex gap-3">
-                <label className="text-sm">
-                  <input type="radio" name={nom('modele')} checked={modele === 'harmonie'} onChange={() => changerModele('harmonie')} className="mr-1.5" />
-                  Harmonie (AROME)
-                </label>
-                <label className="text-sm">
-                  <input type="radio" name={nom('modele')} checked={modele === 'cep'} onChange={() => changerModele('cep')} className="mr-1.5" />
-                  CEP (ECMWF)
-                </label>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {MODELES.map((m) => (
+                  <label key={m.id} className="text-sm" title={`${m.libelle} — ${m.fournisseur}`}>
+                    <input type="radio" name={nom('modele')} checked={modele === m.id} onChange={() => changerModele(m.id)} className="mr-1.5" />
+                    {m.libelle} ({m.fournisseur})
+                  </label>
+                ))}
               </div>
             </fieldset>
             <fieldset>
@@ -1054,49 +1123,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             </p>
           )}
           <div className={chargement ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
-            <CarteRendu
-              carteRef={carteRef}
-              facteur={facteur}
-              largeur={largeurCarte}
-              fleuves={fleuves}
-              afficherRelief={afficherRelief}
-              reliefVisible={reliefPourcent / 100}
-              vue={vue}
-              departements={departementsAffiches}
-              regions={regionsAffichees}
-              selection={selection}
-              marqueurs={marqueurs}
-              echelleMarqueurs={echelleMarqueurs}
-              afficherNoms={nomsVisibles}
-              titre={titre}
-              sousTitre={sousTitre}
-              logoUrl={logoUrl}
-              logoFondBlanc={logoFondBlanc}
-              pied={pied}
-              titreADroite={enFrance}
-              moyennes={moyennes}
-              paletteOuvertePour={paletteOuvertePour}
-              pictosSelectionnes={enExport ? undefined : pictosSelectionnes}
-              onBasculerPalette={(code, multiple) => {
-                if (multiple || modeMultiple) {
-                  // Ctrl/Maj + clic : ajoute ou retire le picto de la sélection ; la palette s'ouvre sur le dernier ajouté.
-                  const suivante = new Set(pictosSelectionnes);
-                  if (suivante.has(code)) suivante.delete(code);
-                  else suivante.add(code);
-                  setPictosSelectionnes(suivante);
-                  setPaletteOuvertePour(modeMultiple || !suivante.has(code) ? null : code);
-                } else {
-                  if (!pictosSelectionnes.has(code)) setPictosSelectionnes(new Set());
-                  setPaletteOuvertePour((c) => (c === code ? null : code));
-                }
-              }}
-              onModifier={modifier}
-            />
+            {rendu}
           </div>
           {chargement && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-4 py-2 text-sm shadow">Chargement des prévisions…</p>}
         </div>
         <p className="mt-3 text-xs text-muted">
-          Prévisions : modèle {modele === 'harmonie' ? 'Harmonie (AROME, Météo-France)' : 'CEP (ECMWF)'} (Licence ouverte). Fond de carte et cours d'eau : © IGN (Géoplateforme, Licence ouverte).
+          Prévisions : {MODELES.find((m) => m.id === modele)?.libelle} ({MODELES.find((m) => m.id === modele)?.fournisseur}), paquets départementaux alertesmeteo-hub. Fond de carte et cours d'eau : © IGN (Géoplateforme, Licence ouverte).
           Contours : IGN Admin Express (Licence ouverte Etalab).{enDepartement && ' Communes : prévisions au point de commune.'}
         </p>
       </div>
