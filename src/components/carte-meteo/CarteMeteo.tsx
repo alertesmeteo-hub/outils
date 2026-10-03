@@ -82,7 +82,7 @@ const REFERENCE_FRANCE = [
 const COEFFICIENT_FRANCE: Record<Densite, number> = { leger: 0.65, moyen: 1, eleve: 1.5 };
 
 /** France entière : pas de la grille (px, horizontal et vertical) sur laquelle les points sont répartis à égale distance. */
-const GRILLE_FRANCE: Record<Densite, [number, number]> = { leger: [165, 100], moyen: [126, 74], eleve: [112, 68] };
+const GRILLE_FRANCE: Record<Densite, [number, number]> = { leger: [165, 100], moyen: [126, 74], eleve: [104, 62] };
 
 const FRANCE_NO = versMonde(51.1, -4.8);
 const FRANCE_SE = versMonde(41.3, 9.6);
@@ -431,6 +431,18 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         libres.splice(meilleur, 1);
       }
     }
+    // Zones désertes (Corse, bords, trous de la grille) : un point au centre de chaque département resté sans voisin proche.
+    const loin = (x: number, y: number) =>
+      [...resultat.values()].every((n) => ((n.x - x) / dx) ** 2 + ((n.y - y) / dy) ** 2 >= 0.55);
+    for (const l of [...libres].sort((a, b) => Number(b.code.startsWith('2')) - Number(a.code.startsWith('2')))) {
+      if (!dans(l.x, l.y) || !loin(l.x, l.y)) continue;
+      resultat.set(l.code, { x: l.x, y: l.y });
+    }
+    // La Corse doit toujours avoir au moins un point.
+    if (!['2A', '2B'].some((c) => resultat.has(c))) {
+      const corse = points.find((q) => q.code === '2A' || q.code === '2B');
+      if (corse) resultat.set(corse.code, versEcran(versMonde(coordsDe(corse).lat, coordsDe(corse).lon), vue));
+    }
     return resultat;
   }, [enFrance, points, contoursDep, vue, densite]);
 
@@ -529,7 +541,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const elements = bruts.map((m) => {
       // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
-      const demiLargeur = (Math.max((m.mini == null ? 4.1 : 4.9) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
+      const demiLargeur = (Math.max((m.mini == null ? 3.8 : 4.9) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
       const hautLigne = Math.max(m.mini != null ? 3.4 : 2.6, estPictoImage(m.picto) ? 2.3 : 0);
       const hauteur = hautLigne * em + (m.rafale != null ? 1.0 * em : 0);
