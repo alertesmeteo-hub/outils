@@ -122,7 +122,6 @@ export default function CarteRendu({
         className="cmap-rendu"
         style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
       >
-        {afficherRelief && (
         <img
           src={FOND.url}
           alt=""
@@ -134,17 +133,22 @@ export default function CarteRendu({
             height: FOND.hauteur * vue.echelle,
           }}
         />
-        )}
 
         <svg className="cmap-svg" viewBox={`0 0 ${largeur} ${HAUTEUR_CARTE}`} width={largeur} height={HAUTEUR_CARTE}>
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
-            {departements.map((c) =>
-              regions && regions.length === 0 && selection.has(c.code) ? (
-                <path key={c.code} d={c.d} {...TRAIT_UNI} />
-              ) : (
-                <path key={c.code} d={c.d} {...(selection.has(c.code) ? TRAIT_SELECTION : TRAIT_HORS_SELECTION)} {...(regions ? { stroke: 'none' } : {})} />
-              )
-            )}
+            {departements.filter((c) => !selection.has(c.code)).map((c) => (
+              <path key={c.code} d={c.d} {...TRAIT_HORS_SELECTION} {...(regions ? { stroke: 'none' } : {})} />
+            ))}
+            {/* Reliefs : le territoire est teinté en transparence (opacité du groupe, donc sans jointures visibles) pour laisser voir le relief. */}
+            <g opacity={afficherRelief ? 0.55 : 1}>
+              {departements.filter((c) => selection.has(c.code)).map((c) =>
+                regions && regions.length === 0 ? (
+                  <path key={c.code} d={c.d} {...TRAIT_UNI} />
+                ) : (
+                  <path key={c.code} d={c.d} {...TRAIT_SELECTION} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} />
+                )
+              )}
+            </g>
             {fleuves && (
               <>
                 <clipPath id={idClip}>
