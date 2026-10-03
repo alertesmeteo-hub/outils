@@ -43,14 +43,14 @@ export default async function PageCarteMeteo() {
       <p className="mt-2 max-w-2xl text-muted">
         Températures de l&apos;après-midi et rafales de vent, par région ou département. Pictos et valeurs modifiables avant export en JPG.
       </p>
+      <p className="mt-4">
+        <Link href="/outils/carte-meteo/16-jours/" className="inline-block rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
+          Les 16 cartes à 16 jours (CEP ou GFS) sur une seule page →
+        </Link>
+      </p>
       <div className="mt-6">
         <CarteMeteo aujourdhui={aujourdhui} initial={initial} />
       </div>
-      <p className="mt-4 text-sm">
-        <Link href="/outils/carte-meteo/16-jours/" className="font-semibold underline">
-          Voir les 16 cartes à 16 jours (CEP ou GFS) sur une seule page →
-        </Link>
-      </p>
 
       <h2 className="mt-12 text-2xl font-extrabold">Pyrénées-Orientales : la carte de demain</h2>
       <div className="mt-6">
