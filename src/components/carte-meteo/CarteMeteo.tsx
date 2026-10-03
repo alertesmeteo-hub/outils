@@ -243,6 +243,7 @@ function libelleJour(dateISO: string): string {
     .toUpperCase();
 }
 
+const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { arome: 'harmonie', harmonie: 'cep' };
 const NOM_ECHEANCE = (n: number) => (n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : `J+${n}`);
 
 const champLabel = 'block text-sm font-medium';
@@ -325,7 +326,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         setMoyennesManuelles({});
       })
       .catch((e: Error) => {
-        if (e.name !== 'AbortError') setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
+        if (e.name === 'AbortError') return;
+        // AROME (18 h) et Harmonie (60 h) n'ont pas toujours le jour demandé : on passe au modèle suivant, puis au CEP.
+        const suivant = SECOURS[modele];
+        if (e.message.startsWith('Pas de prévision') && suivant) setModele(suivant);
+        else setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
   }, [enDepartement, aJour, erreur, modele, dateISO]);
@@ -343,7 +348,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
       })
       .catch((e: Error) => {
-        if (e.name !== 'AbortError') setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
+        if (e.name === 'AbortError') return;
+        // AROME (18 h) et Harmonie (60 h) n'ont pas toujours le jour demandé : on passe au modèle suivant, puis au CEP.
+        const suivant = SECOURS[modele];
+        if (e.message.startsWith('Pas de prévision') && suivant) setModele(suivant);
+        else setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
   }, [enDepartement, villesAJour, erreur, modele, dateISO, departement]);
