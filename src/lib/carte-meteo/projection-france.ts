@@ -1,12 +1,9 @@
 /**
- * Projection Web Mercator (la même que les tuiles NASA du fond de carte) en « pixels monde » au niveau
+ * Projection Web Mercator (la même que les tuiles IGN du fond de carte) en « pixels monde » au niveau
  * de zoom 7 : le monde fait 128 tuiles de 256 px. Toutes les géométries et le fond partagent ce repère,
  * seule la transformation d'affichage (translation + échelle) change selon la zone à montrer.
  */
 export const MONDE_PX = 32768;
-
-/** Fond de carte relief (NASA Blue Marble, assemblé depuis les tuiles z8 par scripts/fond-relief.mjs) : position et taille en pixels monde. */
-export const FOND = { url: '/geo/fond-relief.jpg', x0: 15488, y0: 10752, largeur: 2176, hauteur: 1664 };
 
 export interface Point2D {
   x: number;

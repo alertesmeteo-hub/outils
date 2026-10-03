@@ -139,39 +139,6 @@ function chargerContours(fichier: string): Promise<ContourBoite[]> {
   return promesse;
 }
 
-let promesseFleuves: Promise<string> | null = null;
-
-/** Fleuves principaux (Natural Earth, domaine public) convertis en un seul tracé SVG en coordonnées « monde ». */
-function chargerFleuves(): Promise<string> {
-  promesseFleuves ??= fetch('/geo/fleuves.geojson')
-    .then((r) => r.json())
-    .then((g: { features: { geometry: { coordinates: [number, number][][] } }[] }) => {
-      let d = '';
-      for (const f of g.features)
-        for (const ligne of f.geometry.coordinates)
-          ligne.forEach(([lon, lat], i) => {
-            const { x, y } = versMonde(lat, lon);
-            d += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
-          });
-      return d;
-    });
-  promesseFleuves.catch(() => (promesseFleuves = null));
-  return promesseFleuves;
-}
-
-function useFleuves(actif: boolean): string | null {
-  const [d, setD] = useState<string | null>(null);
-  useEffect(() => {
-    if (!actif) return;
-    let vivant = true;
-    chargerFleuves().then((v) => vivant && setD(v)).catch(() => {});
-    return () => {
-      vivant = false;
-    };
-  }, [actif]);
-  return actif ? d : null;
-}
-
 function useContours(fichier: string | null): ContourBoite[] {
   const [etat, setEtat] = useState<{ fichier: string; contours: ContourBoite[] } | null>(null);
   useEffect(() => {
@@ -343,7 +310,6 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }, []);
 
   const contoursDep = useContours(FICHIERS_CONTOURS.departements);
-  const fleuves = useFleuves(afficherFleuves);
   const contoursReg = useContours(fond === 'regions' ? FICHIERS_CONTOURS.regions : null);
 
   const codes = useMemo(() => codesDeLaZone(zone), [zone]);
@@ -552,7 +518,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const moyennesGauche = 29;
     const obstacles: Rect[] = [
       { x: logoDroite - 205, y: 21, w: 205, h: 84 },
-      { x: largeurCarte / 2 - 230, y: 8, w: 460, h: 68 },
+      enFrance ? { x: largeurCarte - 28 - 380, y: 8, w: 380, h: 68 } : { x: largeurCarte / 2 - 230, y: 8, w: 460, h: 68 },
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : zone.startsWith('reg:') ? [{ x: 29, y: 340, w: LARGEUR_MOYENNES, h: 58 }] : []),
     ];
@@ -1046,7 +1012,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               carteRef={carteRef}
               facteur={facteur}
               largeur={largeurCarte}
-              fleuves={fleuves}
+              fleuves={afficherFleuves}
               afficherRelief={afficherRelief}
               vue={vue}
               departements={departementsAffiches}
@@ -1060,6 +1026,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               logoUrl={logoUrl}
               logoFondBlanc={logoFondBlanc}
               pied={pied}
+              titreADroite={enFrance}
               moyennes={moyennes}
               paletteOuvertePour={paletteOuvertePour}
               pictosSelectionnes={enExport ? undefined : pictosSelectionnes}
@@ -1082,7 +1049,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           {chargement && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-4 py-2 text-sm shadow">Chargement des prévisions…</p>}
         </div>
         <p className="mt-3 text-xs text-muted">
-          Prévisions : modèle {modele === 'harmonie' ? 'Harmonie (AROME, Météo-France)' : 'CEP (ECMWF)'} via Open-Meteo (CC BY 4.0). Fond de carte : NASA Blue Marble.
+          Prévisions : modèle {modele === 'harmonie' ? 'Harmonie (AROME, Météo-France)' : 'CEP (ECMWF)'} via Open-Meteo (CC BY 4.0). Fond de carte : © IGN (Géoplateforme, Licence ouverte).
           Contours : IGN Admin Express (Licence ouverte Etalab).{enDepartement && ' Villes : API Géo (Etalab).'}
         </p>
       </div>

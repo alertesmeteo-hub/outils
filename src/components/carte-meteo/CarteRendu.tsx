@@ -1,7 +1,8 @@
 'use client';
 
 import { useId, useState, type CSSProperties, type RefObject } from 'react';
-import { FOND, type Vue } from '@/lib/carte-meteo/projection-france';
+import type { Vue } from '@/lib/carte-meteo/projection-france';
+import { tuilesVisibles } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 
 export const LARGEUR_CARTE = 1280;
@@ -40,10 +41,12 @@ interface Props {
   facteur: number;
   /** Largeur de l'image : plus étroite en vue France (carte cadrée serrée, coupée sur les côtés). */
   largeur?: number;
-  /** Tracé des fleuves (coordonnées « monde »), ou null pour ne pas les afficher. */
+  /** Affiche les cours d'eau principaux (plan hydrographique IGN). */
   /** Texte centré en bas de l'image (adresse du site). */
   pied?: string;
-  fleuves?: string | null;
+  /** Date et sous-titre alignés en haut à droite (vue France) au lieu d'être centrés. */
+  titreADroite?: boolean;
+  fleuves?: boolean;
   /** Fond relief satellite ; sinon fond bleu uni. */
   afficherRelief?: boolean;
   vue: Vue;
@@ -93,14 +96,14 @@ function stylePalette(x: number, y: number, em: number, largeur: number): CSSPro
   };
 }
 
-const TRAIT_FLEUVE = { ...TRAIT_COMMUN, fill: 'none', stroke: '#3f63d1', strokeOpacity: 0.95, strokeWidth: 1.6, strokeLinecap: 'round' } as const;
 
 export default function CarteRendu({
   carteRef,
   facteur,
   largeur = LARGEUR_CARTE,
   pied = '',
-  fleuves = null,
+  titreADroite = false,
+  fleuves = false,
   afficherRelief = true,
   vue,
   departements,
@@ -130,20 +133,12 @@ export default function CarteRendu({
         className="cmap-rendu"
         style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
       >
-        <img
-          src={FOND.url}
-          alt=""
-          className="cmap-fond-img"
-          style={{
-            left: FOND.x0 * vue.echelle + vue.tx,
-            top: FOND.y0 * vue.echelle + vue.ty,
-            width: FOND.largeur * vue.echelle,
-            height: FOND.hauteur * vue.echelle,
-          }}
-        />
-
         <svg className="cmap-svg" viewBox={`0 0 ${largeur} ${HAUTEUR_CARTE}`} width={largeur} height={HAUTEUR_CARTE}>
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
+            {/* Fond : photographies aériennes IGN. Léger chevauchement (+0,6) pour éviter les joints entre tuiles. */}
+            {tuilesVisibles('ortho', vue, largeur, HAUTEUR_CARTE).map((t) => (
+              <image key={t.cle} href={t.url} x={t.x} y={t.y} width={t.taille + 0.6} height={t.taille + 0.6} preserveAspectRatio="none" crossOrigin="anonymous" />
+            ))}
             {departements.filter((c) => !selection.has(c.code)).map((c) => (
               <path key={c.code} d={c.d} {...TRAIT_HORS_SELECTION} {...(regions ? { stroke: 'none' } : {})} />
             ))}
@@ -162,7 +157,11 @@ export default function CarteRendu({
                 <clipPath id={idClip}>
                   {departements.filter((c) => selection.has(c.code)).map((c) => <path key={c.code} d={c.d} />)}
                 </clipPath>
-                <path d={fleuves} clipPath={`url(#${idClip})`} {...TRAIT_FLEUVE} />
+                <g clipPath={`url(#${idClip})`} opacity={vue.echelle < 1 ? 0.6 : 1}>
+                  {tuilesVisibles('hydro', vue, largeur, HAUTEUR_CARTE).map((t) => (
+                    <image key={t.cle} href={t.url} x={t.x} y={t.y} width={t.taille + 0.6} height={t.taille + 0.6} preserveAspectRatio="none" crossOrigin="anonymous" />
+                  ))}
+                </g>
               </>
             )}
             {regions?.map((c) => <path key={c.code} d={c.d} {...TRAIT_REGION} />)}
@@ -178,7 +177,7 @@ export default function CarteRendu({
           />
         )}
 
-        <div className="cmap-titre">
+        <div className={`cmap-titre ${titreADroite ? 'cmap-titre-droite' : ''}`}>
           <div className="cmap-date">{titre}</div>
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
         </div>
