@@ -646,6 +646,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }
 
   function changerJour(j: number) {
+    // Au-delà de l'échéance du modèle (AROME, Harmonie : J+1), on passe au CEP, qui va jusqu'à J+15.
+    if (j > ECHEANCE_MAX[modele]) setModele('cep');
     setJour(j);
     setErreur(null);
     setTitreManuel(null);
@@ -1013,9 +1015,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <label className="text-sm font-medium">
               <span className={legendeBarre}>Jour</span>
               <select value={jour} onChange={(e) => changerJour(Number(e.target.value))} className={selectBarre}>
-                {Array.from({ length: ECHEANCE_MAX[modele] + 1 }, (_, n) => (
+                {Array.from({ length: ECHEANCE_MAX.cep + 1 }, (_, n) => (
                   <option key={n} value={n}>
                     {NOM_ECHEANCE(n)}
+                    {n > ECHEANCE_MAX[modele] ? ' (CEP)' : ''}
                   </option>
                 ))}
               </select>
