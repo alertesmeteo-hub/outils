@@ -57,6 +57,8 @@ interface Edition {
   pictoJ: PictoMeteo;
 }
 
+/** Ville ajoutée d'office sur la carte de France. */
+const MONTPELLIER = { lat: 43.611, lon: 3.877 };
 const SEUIL_RAFALES_DEFAUT = 60;
 /** Distance minimale (pixels de la carte) entre deux villes affichées en vue département. */
 const DISTANCE_MIN_VILLES = 90;
@@ -470,6 +472,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     if (!['2A', '2B'].some((c) => resultat.has(c))) {
       const corse = points.find((q) => q.code === '2A' || q.code === '2B');
       if (corse) resultat.set(corse.code, versEcran(versMonde(coordsDe(corse).lat, coordsDe(corse).lon), vue));
+    }
+    // Montpellier : ville imposée, à sa vraie position (valeurs de l'Hérault) ; les nœuds de la grille trop proches s'effacent.
+    const herault = points.find((q) => q.code === '34');
+    if (herault) {
+      const mtp = versEcran(versMonde(MONTPELLIER.lat, MONTPELLIER.lon), vue);
+      for (const [code, n] of [...resultat]) if (code !== '34' && ((n.x - mtp.x) / dx) ** 2 + ((n.y - mtp.y) / dy) ** 2 < 0.8) resultat.delete(code);
+      resultat.set('34', mtp);
     }
     return resultat;
   }, [enFrance, points, contoursDep, vue, densite]);
