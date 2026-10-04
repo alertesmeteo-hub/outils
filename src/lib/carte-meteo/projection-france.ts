@@ -39,7 +39,7 @@ export function versMonde(lat: number, lon: number): Point2D {
 }
 
 /** Plus petite taille (pixels monde) affichée : évite un zoom démesuré sur un petit département. */
-const COTE_MINIMAL = 150;
+const COTE_MINIMAL = 50;
 
 /** Échelle et translation pour centrer `boite` dans `zone` (pixels écran), avec une marge relative. */
 export function ajusterVue(boite: Boite, zone: Zone, marge = 0.06): Vue {
