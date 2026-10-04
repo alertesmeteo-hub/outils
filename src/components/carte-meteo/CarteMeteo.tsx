@@ -33,7 +33,7 @@ type Densite = 'leger' | 'moyen' | 'eleve';
 /** Nombre de points affichés : part des départements (France, région) ou nombre de villes (vue département). */
 const DENSITES: Record<Densite, { libelle: string; part: number; villes: number }> = {
   leger: { libelle: 'Léger', part: 0.3, villes: 7 },
-  moyen: { libelle: 'Moyen', part: 0.6, villes: 12 },
+  moyen: { libelle: 'Moyen', part: 0.6, villes: 14 },
   eleve: { libelle: 'Élevé', part: 1, villes: 18 },
 };
 
@@ -59,7 +59,7 @@ interface Edition {
 
 const SEUIL_RAFALES_DEFAUT = 60;
 /** Distance minimale (pixels de la carte) entre deux villes affichées en vue département. */
-const DISTANCE_MIN_VILLES = 105;
+const DISTANCE_MIN_VILLES = 90;
 /** Régions et départements : on laisse libres le haut (logo, date) et la gauche (moyennes). */
 const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
 /** Département : cadré au maximum, centré sur toute la carte. */
@@ -272,8 +272,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [departement, setDepartement] = useState(reglages?.departement ?? '29');
   const [densite, setDensite] = useState<Densite>('moyen');
   const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(initialVilles);
-  const [jeuPictos, setJeuPictos] = useState<JeuPictos>('images');
-  const jeuRef = useRef<JeuPictos>('images');
+  // Vue département : emojis par défaut (tant que l'utilisateur n'a pas choisi lui-même un jeu de pictos).
+  const jeuInitial: JeuPictos = reglages?.niveau === 'departement' ? 'emoji' : 'images';
+  const [jeuPictos, setJeuPictos] = useState<JeuPictos>(jeuInitial);
+  const jeuRef = useRef<JeuPictos>(jeuInitial);
+  const jeuChoisi = useRef(false);
   jeuRef.current = jeuPictos;
   const [periode, setPeriode] = useState<Periode>('apres-midi');
   const [donnees, setDonnees] = useState<DonneesCarte | null>(initial);
@@ -482,7 +485,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       // Les villes sont triées par population : on part de la plus grande, puis on ajoute à chaque fois celle qui comble le
       // mieux les zones vides (grande distance aux villes déjà choisies, pondérée par la taille de la ville).
       const candidates = points.map((p, rang) => ({ code: p.code, poids: 1 / (1 + rang) ** 0.1, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) }));
-      for (const seuil of [DISTANCE_MIN_VILLES, 90, 75, 60, 45, 0]) {
+      for (const seuil of [DISTANCE_MIN_VILLES, 78, 66, 55, 45, 0]) {
         const choisies = candidates.slice(0, 1);
         const distance = (c: (typeof candidates)[number]) => Math.min(...choisies.map((o) => Math.hypot(o.x - c.x, o.y - c.y) * vue.echelle));
         while (choisies.length < nombreVoulu) {
@@ -694,7 +697,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }
 
   /** Applique un jeu de pictos à toute la carte, d'après la prévision (les modifications faites picto par picto sont remplacées). */
-  function changerJeuPictos(jeu: JeuPictos) {
+  function changerJeuPictos(jeu: JeuPictos, choixUtilisateur = true) {
+    if (choixUtilisateur) jeuChoisi.current = true;
     setJeuPictos(jeu);
     const tous = [...(donnees?.points ?? []), ...(donneesVilles?.points ?? [])];
     setEditions((prev) => {
@@ -987,6 +991,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                       onChange={() => {
                         setNiveau(valeur);
                         setErreur(null);
+                        if (!jeuChoisi.current) changerJeuPictos(valeur === 'departement' ? 'emoji' : 'images', false);
                       }}
                       className="mr-1.5"
                     />
