@@ -1,4 +1,7 @@
-# Déploiement automatique sur le VPS à chaque envoi sur main (équivalent de « ./deploy.sh » lancé à la main).
+# Déploiement automatique sur le VPS à chaque envoi sur main.
+# Le site est construit ici, dans GitHub Actions (le VPS, 3,8 Go de RAM partagés avec d'autres applications, ne reconstruit
+# plus rien) : seul le dossier .next fabriqué est envoyé, puis PM2 redémarre l'application (quelques secondes d'interruption).
+# Si le site ne répond pas après le redémarrage, l'ancien .next est remis en place automatiquement.
 # Secrets à créer dans GitHub (Settings > Secrets and variables > Actions) :
 #   VPS_HOST         adresse IP ou nom du VPS
 #   VPS_USER         utilisateur SSH (ubuntu)
@@ -18,8 +21,28 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      # Variables publiques intégrées au build (identiques à celles du .env du VPS).
+      NEXT_PUBLIC_SITE_URL: https://outils.alertes-meteo.com
+      NEXT_PUBLIC_SITE_NAME: Météo Outils
+      NEXT_TELEMETRY_DISABLED: '1'
     steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci --no-audit --no-fund
+
+      - name: Construire le site
+        run: npm run build
+
       - name: Préparer SSH
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -32,10 +55,75 @@ jobs:
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
 
-      - name: Lancer deploy.sh sur le VPS
+      - name: Envoyer le build sur le VPS
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          ssh -i ~/.ssh/deploy_key "$VPS_USER@$VPS_HOST" \
-            'bash -lc "[ -s ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; cd ~/outils-meteo && ./deploy.sh"'
+          # Le build part dans un dossier à côté : il ne remplace .next qu'une fois entièrement copié.
+          rsync -az --delete \
+            --exclude 'cache/' --exclude 'standalone/' --exclude 'diagnostics/' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            .next/ "$VPS_USER@$VPS_HOST:outils-meteo/.next-nouveau/"
+
+      - name: Activer le build et redémarrer
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          SHA: ${{ github.sha }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$VPS_USER@$VPS_HOST" "SHA=$SHA bash -l -s" <<'EOF'
+          set -euo pipefail
+          [ -s ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh
+          cd ~/outils-meteo
+
+          # Fichiers du dépôt (public/, prisma/, configuration) à la version construite.
+          avant=$(cat package-lock.json prisma/schema.prisma | sha256sum)
+          git fetch --quiet origin main
+          git merge --ff-only "$SHA"
+          apres=$(cat package-lock.json prisma/schema.prisma | sha256sum)
+          # Dépendances et client Prisma : seulement si elles ont changé (c'est la partie lourde en mémoire).
+          if [ "$avant" != "$apres" ]; then
+            npm ci --no-audit --no-fund
+          fi
+
+          # Bascule : ancien .next mis de côté (retour arrière possible), nouveau en place, redémarrage.
+          rm -rf .next-ancien
+          [ -d .next ] && mv .next .next-ancien
+          mv .next-nouveau .next
+          mkdir -p .next/cache
+          [ -d .next-ancien/cache/fetch-cache ] && mv .next-ancien/cache/fetch-cache .next/cache/ || true
+          pm2 restart outils-meteo --update-env
+          echo "Déployé : $SHA"
+          EOF
+
+      - name: Vérifier le site
+        id: verification
+        run: |
+          code=000
+          for i in 1 2 3 4 5 6 7 8; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://outils.alertes-meteo.com/outils/carte-meteo/ || true)
+            [ "$code" = "200" ] && { echo "Site en ligne (200)"; exit 0; }
+            sleep 5
+          done
+          echo "Le site ne répond pas correctement (dernier code : $code)"
+          exit 1
+
+      - name: Retour à la version précédente
+        if: failure() && steps.verification.outcome == 'failure'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$VPS_USER@$VPS_HOST" 'bash -l -s' <<'EOF'
+          set -euo pipefail
+          [ -s ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh
+          cd ~/outils-meteo
+          if [ -d .next-ancien ]; then
+            rm -rf .next-casse
+            mv .next .next-casse
+            mv .next-ancien .next
+            pm2 restart outils-meteo --update-env
+            echo "Ancienne version remise en place"
+          fi
+          EOF

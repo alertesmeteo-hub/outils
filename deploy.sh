@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mise à jour sur le VPS : ./deploy.sh  (git pull, dépendances, build, redémarrage PM2)
+# Mise à jour MANUELLE sur le VPS (secours) : git pull, dépendances, build, redémarrage PM2. Le déploiement normal se fait dans GitHub Actions (.github/workflows/deploy.yml), qui construit le site hors du VPS.
 set -euo pipefail
 cd "$(dirname "$0")"
 git pull --ff-only
