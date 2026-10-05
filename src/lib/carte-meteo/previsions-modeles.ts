@@ -31,6 +31,8 @@ export interface PointCarte {
   /** Renseignées pour les villes (vue département) ; les départements utilisent COORDS_DEPARTEMENTS. */
   lat?: number;
   lon?: number;
+  /** Ville à toujours afficher en vue département. */
+  prioritaire?: boolean;
   mini: number | null;
   maxi: number | null;
   tempMatin: number | null;

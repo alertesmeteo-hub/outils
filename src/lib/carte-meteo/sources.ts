@@ -41,6 +41,8 @@ interface Ville {
   lat: number;
   lon: number;
   serie: Serie;
+  /** Ville à toujours afficher (retouche manuelle). */
+  prioritaire?: boolean;
 }
 
 interface Extrait {
@@ -153,6 +155,11 @@ function repartir<T extends { lat: number; lon: number }>(liste: T[], n: number)
   return liste.filter((v) => choisies.includes(v));
 }
 
+/** Retouches à la main de la liste des villes d'un département : villes à toujours garder, villes à écarter (noms exacts). */
+const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[] }> = {
+  '66': { garder: ['Ille-sur-Têt', 'Bourg-Madame'], ecarter: ['Corbère', 'Osséja'] },
+};
+
 function extraire(dep: string, fichier: FichierDepartement, runTime: string): Extrait {
   const cols = fichier.columns.values;
   const c: Colonnes = {
@@ -175,12 +182,17 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
   const centre = COORDS_DEPARTEMENTS[dep];
   const chefCommune = centre ? communes.reduce((a, b) => (distance(centre, b) < distance(centre, a) ? b : a)) : communes[0];
 
-  const villes = repartir(communes.slice(0, CANDIDATES_VILLES), VILLES_PAR_DEPARTEMENT).map((v) => ({
+  const retouche = VILLES_RETOUCHEES[dep];
+  const gardees = communes.filter((x) => retouche?.garder?.includes(x.nom));
+  const candidates = communes.filter((x) => !retouche?.ecarter?.includes(x.nom) && !gardees.includes(x)).slice(0, CANDIDATES_VILLES);
+  const choisies = [...gardees, ...repartir(candidates, VILLES_PAR_DEPARTEMENT - gardees.length)].sort((a, b) => b.population - a.population);
+  const villes = choisies.map((v) => ({
     code: v.code,
     nom: v.nom,
     lat: v.lat,
     lon: v.lon,
     serie: serieDuPoint(fichier, c, v.pointId),
+    ...(gardees.includes(v) ? { prioritaire: true } : {}),
   }));
   return { runTime, chef: serieDuPoint(fichier, c, chefCommune.pointId), villes };
 }
@@ -204,7 +216,7 @@ async function ecrireDisque(cle: string, extrait: Extrait): Promise<void> {
 
 /** Extrait d'un département pour le passage courant du modèle (mémoire, puis disque, puis dépôt GitHub). */
 async function extraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> {
-  const cle = `${modele}-${dep}`;
+  const cle = `${modele}-${dep}-v3`;
   const runTime = await passageCourant(modele);
   const enMemoire = memoire.get(cle);
   if (enMemoire && (!runTime || enMemoire.runTime === runTime)) return enMemoire;
@@ -281,7 +293,7 @@ export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: strin
 /** Prévisions des principales communes d'un département (vue « département »). */
 export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: string, dep: string): Promise<PointCarte[]> {
   const extrait = await extraitDepartement(modele, dep);
-  const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO), lat: v.lat, lon: v.lon }));
+  const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO), lat: v.lat, lon: v.lon, ...(v.prioritaire ? { prioritaire: true } : {}) }));
   const valides = points.filter((p) => p.tempApresMidi != null);
   if (!valides.length) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO} (département ${dep})`);
   return valides;

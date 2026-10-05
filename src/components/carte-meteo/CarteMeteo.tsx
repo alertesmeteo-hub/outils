@@ -496,9 +496,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const choisirVilles = (nombreVoulu: number): string[] => {
       // Les villes sont triées par population : on part de la plus grande, puis on ajoute à chaque fois celle qui comble le
       // mieux les zones vides (grande distance aux villes déjà choisies, pondérée par la taille de la ville).
-      const candidates = points.map((p, rang) => ({ code: p.code, poids: 1 / (1 + rang) ** 0.1, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) }));
+      const candidates = points.map((p, rang) => ({ code: p.code, fixe: p.prioritaire === true, poids: 1 / (1 + rang) ** 0.1, ...versMonde(coordsDe(p).lat, coordsDe(p).lon) }));
       for (const seuil of [DISTANCE_MIN_VILLES, 78, 66, 55, 45, 0]) {
-        const choisies = candidates.slice(0, 1);
+        const choisies = [...candidates.slice(0, 1), ...candidates.slice(1).filter((c) => c.fixe)];
         const distance = (c: (typeof candidates)[number]) => Math.min(...choisies.map((o) => Math.hypot(o.x - c.x, o.y - c.y) * vue.echelle));
         while (choisies.length < nombreVoulu) {
           let meilleure: (typeof candidates)[number] | null = null;
