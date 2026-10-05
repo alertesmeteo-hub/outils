@@ -1,9 +1,52 @@
 'use client';
 
-import { useId, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useId, useState, type CSSProperties, type RefObject } from 'react';
 import type { Vue } from '@/lib/carte-meteo/projection-france';
-import { tuilesVisibles } from '@/lib/carte-meteo/tuiles';
+import { TAILLE_TUILE_VIDE, tuileParente, tuilesVisibles, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+
+/**
+ * Tuile du fond. L'IGN renvoie un aplat bleu marine quand il n'a pas d'image (hors couverture, par exemple en Espagne) :
+ * on le détecte à sa taille minuscule et on le remplace par la tuile du zoom inférieur qui contient la zone (moins nette, mais réelle).
+ */
+function TuileFond({ t }: { t: Tuile }) {
+  const [source, setSource] = useState<Tuile>(t);
+  const idDecoupe = `tuile${useId().replace(/:/g, '')}`;
+  useEffect(() => {
+    let annule = false;
+    setSource(t);
+    const poids = (u: string) =>
+      fetch(u, { mode: 'cors' })
+        .then((r) => (r.ok ? r.blob() : null))
+        .then((b) => b?.size ?? 0)
+        .catch(() => 0);
+    (async () => {
+      if ((await poids(t.url)) >= TAILLE_TUILE_VIDE) return;
+      for (const niveaux of [1, 2, 3]) {
+        const parent = tuileParente('ortho', t, niveaux);
+        if (!parent) return;
+        if ((await poids(parent.url)) >= TAILLE_TUILE_VIDE) {
+          if (!annule) setSource(parent);
+          return;
+        }
+      }
+    })();
+    return () => {
+      annule = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t.cle]);
+  if (source.cle === t.cle) return <image href={t.url} x={t.x} y={t.y} width={t.taille + 0.6} height={t.taille + 0.6} preserveAspectRatio="none" crossOrigin="anonymous" />;
+  // Tuile de remplacement : l'image du parent est découpée à l'emprise de la tuile d'origine.
+  return (
+    <g clipPath={`url(#${idDecoupe})`}>
+      <clipPath id={idDecoupe}>
+        <rect x={t.x} y={t.y} width={t.taille + 0.6} height={t.taille + 0.6} />
+      </clipPath>
+      <image href={source.url} x={source.x} y={source.y} width={source.taille} height={source.taille} preserveAspectRatio="none" crossOrigin="anonymous" />
+    </g>
+  );
+}
 
 export const LARGEUR_CARTE = 1280;
 export const HAUTEUR_CARTE = 720;
@@ -148,7 +191,7 @@ export default function CarteRendu({
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
             {/* Fond : photographies aériennes IGN. Léger chevauchement (+0,6) pour éviter les joints entre tuiles. */}
             {tuilesVisibles('ortho', vue, largeur, HAUTEUR_CARTE).map((t) => (
-              <image key={t.cle} href={t.url} x={t.x} y={t.y} width={t.taille + 0.6} height={t.taille + 0.6} preserveAspectRatio="none" crossOrigin="anonymous" />
+              <TuileFond key={t.cle} t={t} />
             ))}
             {departements.filter((c) => !selection.has(c.code)).map((c) => (
               <path key={c.code} d={c.d} {...TRAIT_HORS_SELECTION} {...(regions ? { stroke: 'none' } : {})} />

@@ -286,8 +286,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [periode, setPeriode] = useState<Periode>('apres-midi');
   const [donnees, setDonnees] = useState<DonneesCarte | null>(initial);
   const [editions, setEditions] = useState<Record<string, Edition>>(() => ({
-    ...(initial ? construireEditions(initial.points) : {}),
-    ...(initialVilles ? construireEditions(initialVilles.points) : {}),
+    ...(initial ? construireEditions(initial.points, jeuInitial) : {}),
+    ...(initialVilles ? construireEditions(initialVilles.points, jeuInitial) : {}),
   }));
   const [erreur, setErreur] = useState<string | null>(null);
 

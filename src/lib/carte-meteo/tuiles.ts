@@ -12,6 +12,9 @@ const COUCHES: Record<Couche, { layer: string; format: string; zoomMin: number; 
 
 export interface Tuile {
   cle: string;
+  z: number;
+  col: number;
+  ligne: number;
   url: string;
   x: number;
   y: number;
@@ -38,8 +41,21 @@ export function tuilesVisibles(couche: Couche, vue: Vue, largeur: number, hauteu
   for (let ligne = yMin; ligne <= yMax; ligne++) {
     for (let col = xMin; col <= xMax; col++) {
       if (ligne < 0 || col < 0 || ligne >= 2 ** z || col >= 2 ** z) continue;
-      tuiles.push({ cle: `${couche}/${z}/${col}/${ligne}`, url: urlTuile(couche, z, col, ligne), x: col * taille, y: ligne * taille, taille });
+      tuiles.push({ cle: `${couche}/${z}/${col}/${ligne}`, z, col, ligne, url: urlTuile(couche, z, col, ligne), x: col * taille, y: ligne * taille, taille });
     }
   }
   return tuiles;
+}
+
+/** Taille (octets) en dessous de laquelle l'IGN renvoie une tuile « sans donnée » (aplat bleu marine : mer, hors couverture). */
+export const TAILLE_TUILE_VIDE = 2500;
+
+/** Tuile du niveau de zoom inférieur qui contient `t` (`niveaux` niveaux plus haut), pour combler une tuile sans donnée. */
+export function tuileParente(couche: Couche, t: Tuile, niveaux: number): Tuile | null {
+  const z = t.z - niveaux;
+  if (z < COUCHES[couche].zoomMin) return null;
+  const col = t.col >> niveaux;
+  const ligne = t.ligne >> niveaux;
+  const taille = MONDE_PX / 2 ** z;
+  return { cle: `${couche}/${z}/${col}/${ligne}`, z, col, ligne, url: urlTuile(couche, z, col, ligne), x: col * taille, y: ligne * taille, taille };
 }
