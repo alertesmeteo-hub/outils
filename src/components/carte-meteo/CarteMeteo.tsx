@@ -277,8 +277,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [departement, setDepartement] = useState(reglages?.departement ?? '29');
   const [densite, setDensite] = useState<Densite>('moyen');
   const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(initialVilles);
-  // Vue département : emojis par défaut (tant que l'utilisateur n'a pas choisi lui-même un jeu de pictos).
-  const jeuInitial: JeuPictos = reglages?.niveau === 'departement' ? 'emoji' : 'images';
+  // Vues région et département : emojis par défaut (tant que l'utilisateur n'a pas choisi lui-même un jeu de pictos).
+  const jeuInitial: JeuPictos = reglages?.niveau && reglages.niveau !== 'france' ? 'emoji' : 'images';
   const [jeuPictos, setJeuPictos] = useState<JeuPictos>(jeuInitial);
   const jeuRef = useRef<JeuPictos>(jeuInitial);
   const jeuChoisi = useRef(false);
@@ -1003,7 +1003,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                       onChange={() => {
                         setNiveau(valeur);
                         setErreur(null);
-                        if (!jeuChoisi.current) changerJeuPictos(valeur === 'departement' ? 'emoji' : 'images', false);
+                        if (!jeuChoisi.current) changerJeuPictos(valeur !== 'france' ? 'emoji' : 'images', false);
                       }}
                       className="mr-1.5"
                     />
