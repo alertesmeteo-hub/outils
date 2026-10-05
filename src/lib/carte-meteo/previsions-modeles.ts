@@ -114,12 +114,17 @@ const arrondi = (v: number | null, decimales = 0): number | null => {
   return Math.round(v * f) / f;
 };
 
+/** Cumul minimal (mm) sur la période pour afficher un orage. */
+const SEUIL_PLUIE_ORAGE = 0.5;
+
 /**
  * Code météo (style WMO, repris par les pictos) d'une période : orage possible → 95, neige → 73, brouillard → 45.
  * Sans phénomène particulier, null : le picto se déduit alors de la nébulosité et des précipitations.
  */
 function codePeriode(serie: Serie, indices: number[]): number | null {
-  if (indices.some((i) => (serie.orage[i] ?? 0) >= 3)) return 95;
+  // L'indicateur d'orage (diagnostic de convection) est trop généreux : sans précipitations prévues, on ne le retient pas.
+  const pluie = somme(indices.map((i) => serie.pluie[i])) ?? 0;
+  if (pluie >= SEUIL_PLUIE_ORAGE && indices.some((i) => (serie.orage[i] ?? 0) >= 3)) return 95;
   if (indices.some((i) => (serie.neige[i] ?? 0) > 0)) return 73;
   const vis = nombres(indices.map((i) => serie.visibilite[i]));
   if (vis.length && Math.min(...vis) < 1) return 45;
