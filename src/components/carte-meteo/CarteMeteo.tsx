@@ -62,6 +62,8 @@ const VILLES_IMPOSEES = [
   { code: '34', lat: 43.611, lon: 3.877 }, // Montpellier
   { code: '13', lat: 43.296, lon: 5.37 }, // Marseille
 ];
+/** Date du titre de la carte des Pyrénées-Orientales : orange. */
+const COULEUR_TITRE_PO = '#ff8c1a';
 const SEUIL_RAFALES_DEFAUT = 60;
 /** Distance minimale (pixels de la carte) entre deux villes affichées en vue département. */
 const DISTANCE_MIN_VILLES = 90;
@@ -768,6 +770,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       logoFondBlanc={logoFondBlanc}
       pied={pied}
       titreADroite={enFrance}
+      couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
       paletteOuvertePour={paletteOuvertePour}
       pictosSelectionnes={enExport ? undefined : pictosSelectionnes}

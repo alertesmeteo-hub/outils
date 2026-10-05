@@ -89,6 +89,8 @@ interface Props {
   pied?: string;
   /** Date et sous-titre alignés en haut à droite (vue France) au lieu d'être centrés. */
   titreADroite?: boolean;
+  /** Couleur de la date du titre (vert par défaut, voir .cmap-date). */
+  couleurTitre?: string;
   fleuves?: Fleuves | null;
   /** Fond relief satellite ; sinon fond bleu uni. */
   afficherRelief?: boolean;
@@ -156,6 +158,7 @@ export default function CarteRendu({
   largeur = LARGEUR_CARTE,
   pied = '',
   titreADroite = false,
+  couleurTitre,
   fleuves = null,
   afficherRelief = true,
   reliefVisible = 0.28,
@@ -236,7 +239,7 @@ export default function CarteRendu({
         )}
 
         <div className={`cmap-titre ${titreADroite ? 'cmap-titre-droite' : ''}`}>
-          <div className="cmap-date">{titre}</div>
+          <div className="cmap-date" style={couleurTitre ? { color: couleurTitre } : undefined}>{titre}</div>
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
         </div>
 
