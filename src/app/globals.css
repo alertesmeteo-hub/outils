@@ -111,9 +111,9 @@ body {
 .cmap-picto-image { width: 1.9em; height: 1.9em; object-fit: contain; display: block; }
 /* Sur la carte, le bouton picto a une police de 1,7 em : une image de 1,3 em y fait ~2,2 em du marqueur (≈ la largeur d'un emoji). */
 .cmap-ligne .cmap-picto-image { width: 1.3em; height: 1.3em; }
-/* Vue département : pictos deux fois plus grands. */
-.cmap-gros .cmap-picto { font-size: 3.4em; }
-.cmap-gros .cmap-ligne .cmap-picto-image { width: 2.6em; height: 2.6em; }
+/* Vue département : pictos 1,6 fois plus grands. */
+.cmap-gros .cmap-picto { font-size: 2.7em; }
+.cmap-gros .cmap-ligne .cmap-picto-image { width: 2.1em; height: 2.1em; }
 .cmap-valeurs { display: flex; flex-direction: column; align-items: flex-start; }
 .cmap-valeur {
   width: 1.75em;

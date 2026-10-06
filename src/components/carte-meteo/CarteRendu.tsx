@@ -89,7 +89,7 @@ interface Props {
   pied?: string;
   /** Date et sous-titre alignés en haut à droite (vue France) au lieu d'être centrés. */
   titreADroite?: boolean;
-  /** Pictos deux fois plus grands (vue département). */
+  /** Pictos plus grands (vue département). */
   grosPictos?: boolean;
   /** Couleur de la date du titre (vert par défaut, voir .cmap-date). */
   couleurTitre?: string;

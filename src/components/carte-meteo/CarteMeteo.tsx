@@ -600,7 +600,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const elements = bruts.map((m) => {
       // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
-      const gros = enDepartement ? 1 : 0; // pictos doublés : +2,35 em de large, +1,8 em de haut
+      const gros = enDepartement ? 0.6 : 0; // pictos 1,6 fois plus grands : +1,4 em de large, +1,1 em de haut
       const demiLargeur = (Math.max(((m.mini == null ? 4.2 : 4.9) + gros * 2.35) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
       const hautLigne = Math.max((m.mini != null ? 3.4 : 2.6) + gros * 1.8, estPictoImage(m.picto) ? 2.3 * (1 + gros) : 0);
