@@ -89,6 +89,8 @@ interface Props {
   pied?: string;
   /** Date et sous-titre alignés en haut à droite (vue France) au lieu d'être centrés. */
   titreADroite?: boolean;
+  /** Pictos deux fois plus grands (vue département). */
+  grosPictos?: boolean;
   /** Couleur de la date du titre (vert par défaut, voir .cmap-date). */
   couleurTitre?: string;
   fleuves?: Fleuves | null;
@@ -158,6 +160,7 @@ export default function CarteRendu({
   largeur = LARGEUR_CARTE,
   pied = '',
   titreADroite = false,
+  grosPictos = false,
   couleurTitre,
   fleuves = null,
   afficherRelief = true,
@@ -259,7 +262,7 @@ export default function CarteRendu({
         {marqueurs.map((m) => (
           <div
             key={m.code}
-            className="cmap-marqueur"
+            className={`cmap-marqueur ${grosPictos ? 'cmap-gros' : ''}`}
             style={{ left: m.x, top: m.y, fontSize: 22 * echelleMarqueurs, ...(paletteOuvertePour === m.code ? { zIndex: 20 } : {}) }}
             title={m.nom}
           >

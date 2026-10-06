@@ -550,7 +550,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points, enDepartement, densite, editions, periode, codesRafales, vue, grilleFrance]);
 
-  const nomsVisibles = afficherNoms || enDepartement;
+  const nomsVisibles = afficherNoms;
   const echelleMarqueurs = Math.min(enDepartement ? 1.15 : enFrance ? 1.15 : 1.2, enFrance ? 1.15 : Math.max(0.7, vue.echelle * 1.4));
 
   const marqueurs: Marqueur[] = useMemo(() => {
@@ -600,9 +600,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const elements = bruts.map((m) => {
       // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
-      const demiLargeur = (Math.max((m.mini == null ? 4.2 : 4.9) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
+      const gros = enDepartement ? 1 : 0; // pictos doublés : +2,35 em de large, +1,8 em de haut
+      const demiLargeur = (Math.max(((m.mini == null ? 4.2 : 4.9) + gros * 2.35) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
-      const hautLigne = Math.max(m.mini != null ? 3.4 : 2.6, estPictoImage(m.picto) ? 2.3 : 0);
+      const hautLigne = Math.max((m.mini != null ? 3.4 : 2.6) + gros * 1.8, estPictoImage(m.picto) ? 2.3 * (1 + gros) : 0);
       const hauteur = hautLigne * em + (m.rafale != null ? 1.35 * em : 0);
       return {
         code: m.code,
@@ -772,6 +773,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       logoFondBlanc={logoFondBlanc}
       pied={pied}
       titreADroite={enFrance}
+      grosPictos={enDepartement}
       couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
       paletteOuvertePour={paletteOuvertePour}
@@ -1151,8 +1153,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </select>
             </label>
             <label className="flex items-center gap-2 pb-1.5 text-sm">
-              <input type="checkbox" checked={nomsVisibles} disabled={enDepartement} onChange={(e) => setAfficherNoms(e.target.checked)} />
-              Afficher les noms sur la carte{enDepartement ? ' (toujours en vue département)' : ''}
+              <input type="checkbox" checked={nomsVisibles} onChange={(e) => setAfficherNoms(e.target.checked)} />
+              Afficher les noms sur la carte
             </label>
             <label className="text-sm font-medium">
               <span className={legendeBarre}>Rafales à partir de (km/h, 4 valeurs maxi)</span>
