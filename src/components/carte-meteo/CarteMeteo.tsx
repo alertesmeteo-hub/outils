@@ -61,6 +61,8 @@ interface Edition {
 const VILLES_IMPOSEES = [
   { code: '34', lat: 43.611, lon: 3.877 }, // Montpellier
   { code: '13', lat: 43.296, lon: 5.37 }, // Marseille
+  { code: '75', lat: 48.857, lon: 2.352 }, // Paris
+  { code: '59', lat: 50.629, lon: 3.057 }, // Lille
 ];
 /** Date du titre de la carte des Pyrénées-Orientales : orange. */
 const COULEUR_TITRE_PO = '#ff8c1a';
@@ -478,7 +480,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const corse = points.find((q) => q.code === '2A' || q.code === '2B');
       if (corse) resultat.set(corse.code, versEcran(versMonde(coordsDe(corse).lat, coordsDe(corse).lon), vue));
     }
-    // Villes imposées (Montpellier, Marseille…) : à leur vraie position ; les nœuds de la grille trop proches s'effacent.
+    // Villes imposées (Montpellier, Marseille, Paris, Lille…) : à leur vraie position ; les nœuds de la grille trop proches s'effacent.
     for (const v of VILLES_IMPOSEES) {
       if (!points.some((q) => q.code === v.code)) continue;
       const pos = versEcran(versMonde(v.lat, v.lon), vue);
