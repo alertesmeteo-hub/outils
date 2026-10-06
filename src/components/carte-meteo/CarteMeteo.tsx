@@ -415,6 +415,36 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     return (donnees?.points ?? []).filter((p) => selection.has(p.code) && !(enFrance && MASQUES_FRANCE.has(p.code)));
   }, [enDepartement, donneesVilles, departement, donnees, selection, enFrance]);
 
+  /**
+   * Vue département : ramène vers l'intérieur un point (pixels de la carte) qui tombe en mer ou hors du département
+   * (villes du littoral dont les coordonnées sortent du contour simplifié). Nul tant que les contours ne sont pas chargés.
+   */
+  const terre = useMemo(() => {
+    if (!enDepartement || typeof document === 'undefined' || contoursDep.length === 0) return null;
+    const retenus = contoursDep.filter((c) => selection.has(c.code));
+    const ctx = document.createElement('canvas').getContext('2d');
+    const boite = unirBoites(retenus.map((c) => c.boite));
+    if (!ctx || !boite) return null;
+    const chemins = retenus.map((c) => new Path2D(c.d));
+    const dedans = (x: number, y: number) => chemins.some((ch) => ctx.isPointInPath(ch, (x - vue.tx) / vue.echelle, (y - vue.ty) / vue.echelle));
+    const centre = versEcran({ x: (boite.minX + boite.maxX) / 2, y: (boite.minY + boite.maxY) / 2 }, vue);
+    const surTerre = (qx: number, qy: number, decalagePicto: number) => {
+      return dedans(qx - decalagePicto, qy);
+    };
+    const ramener = (x: number, y: number, decalagePicto: number) => {
+      let px = x;
+      let py = y;
+      // Le picto est à gauche du centre du marqueur (la température est à droite) : c'est lui qui doit être sur terre.
+      for (let k = 0; k < 120 && !surTerre(px, py, decalagePicto); k++) {
+        const d = Math.hypot(centre.x - px, centre.y - py) || 1;
+        px += ((centre.x - px) / d) * 3;
+        py += ((centre.y - py) / d) * 3;
+      }
+      return { x: px, y: py };
+    };
+    return { ramener, surTerre };
+  }, [enDepartement, contoursDep, selection, vue]);
+
   const valeurPrincipale = (code: string): number | null => {
     const e = editions[code];
     return e ? nombre(periode === 'matin' ? e.tempM : periode === 'apres-midi' ? e.tempAM : e.maxi) : null;
@@ -568,7 +598,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const rafalesSignalees = enDepartement ? plusFortesRafales(reference) : codesRafales;
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
-      const { x, y } = grilleFrance?.get(p.code) ?? versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
+      const brut = grilleFrance?.get(p.code) ?? versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
+      const { x, y } = terre ? terre.ramener(brut.x, brut.y, 1.5 * 22 * echelleMarqueurs) : brut;
       const rafale = rafaleDe(p);
       const v = valeurs[i];
       return {
@@ -619,12 +650,16 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const places = placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em);
     // On s'arrête au nombre voulu : les candidats en réserve ne servent qu'à remplacer ceux qui n'ont pas trouvé de place.
     // France et régions : les extrêmes et les rafales à signaler sont toujours gardés (et comptent dans le total).
-    const placesOk = bruts.filter((m) => places.has(m.code));
+    // Vue département : après décalage anti-chevauchement, un picto qui se retrouve en mer est écarté (une ville de réserve le remplace).
+    const placesOk = bruts.filter((m) => {
+      const pos = places.get(m.code);
+      return pos != null && (!terre || terre.surTerre(pos.x, pos.y, 1.5 * em));
+    });
     const imposes = new Set(enDepartement ? [] : placesOk.filter((m) => m.rafale != null || m.ton != null).map((m) => m.code));
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
