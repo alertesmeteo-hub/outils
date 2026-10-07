@@ -227,7 +227,7 @@ function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoM: PictoMeteo; pic
   };
 }
 
-function construireEditions(points: PointCarte[], jeu: JeuPictos = 'images'): Record<string, Edition> {
+function construireEditions(points: PointCarte[], jeu: JeuPictos = 'emoji'): Record<string, Edition> {
   const editions: Record<string, Edition> = {};
   for (const p of points) {
     editions[p.code] = {
@@ -295,11 +295,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [departement, setDepartement] = useState(reglages?.departement ?? '29');
   const [densite, setDensite] = useState<Densite>('moyen');
   const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(initialVilles);
-  // Vues région et département : emojis par défaut (tant que l'utilisateur n'a pas choisi lui-même un jeu de pictos).
-  const jeuInitial: JeuPictos = reglages?.niveau && reglages.niveau !== 'france' ? 'emoji' : 'images';
+  // Emojis par défaut, quelle que soit la zone (France, région, département) et sur la page des 16 jours.
+  const jeuInitial: JeuPictos = 'emoji';
   const [jeuPictos, setJeuPictos] = useState<JeuPictos>(jeuInitial);
   const jeuRef = useRef<JeuPictos>(jeuInitial);
-  const jeuChoisi = useRef(false);
   jeuRef.current = jeuPictos;
   const [periode, setPeriode] = useState<Periode>('apres-midi');
   const [donnees, setDonnees] = useState<DonneesCarte | null>(initial);
@@ -782,8 +781,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }
 
   /** Applique un jeu de pictos à toute la carte, d'après la prévision (les modifications faites picto par picto sont remplacées). */
-  function changerJeuPictos(jeu: JeuPictos, choixUtilisateur = true) {
-    if (choixUtilisateur) jeuChoisi.current = true;
+  function changerJeuPictos(jeu: JeuPictos) {
     setJeuPictos(jeu);
     const tous = [...(donnees?.points ?? []), ...(donneesVilles?.points ?? [])];
     setEditions((prev) => {
@@ -1098,7 +1096,6 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                       onChange={() => {
                         setNiveau(valeur);
                         setErreur(null);
-                        if (!jeuChoisi.current) changerJeuPictos(valeur !== 'france' ? 'emoji' : 'images', false);
                       }}
                       className="mr-1.5"
                     />
