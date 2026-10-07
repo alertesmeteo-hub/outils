@@ -178,6 +178,8 @@ interface Props {
   logoUrl: string | null;
   /** Fond blanc derrière le logo (faux pour un logo détouré). */
   logoFondBlanc?: boolean;
+  /** Hauteur du logo en pixels de la carte (83 par défaut, voir .cmap-logo). */
+  hauteurLogo?: number;
   moyennes: BoiteMoyenne[];
   /** Position (pixels de la carte) du bord droit du logo et du bord gauche des moyennes, rapprochés du contour de la carte. */
   logoDroite?: number | null;
@@ -245,6 +247,7 @@ export default function CarteRendu({
   sousTitre,
   logoUrl,
   logoFondBlanc = true,
+  hauteurLogo,
   moyennes,
   logoDroite = null,
   moyennesGauche = null,
@@ -306,7 +309,7 @@ export default function CarteRendu({
             src={logoUrl}
             alt="Logo"
             className="cmap-logo"
-            style={{ ...(logoDroite != null ? { left: 'auto', right: largeur - logoDroite } : {}), ...(logoFondBlanc ? {} : { background: 'none' }) }}
+            style={{ ...(logoDroite != null ? { left: 'auto', right: largeur - logoDroite } : {}), ...(logoFondBlanc ? {} : { background: 'none' }), ...(hauteurLogo ? { height: hauteurLogo, maxWidth: 'none' } : {}) }}
           />
         )}
 

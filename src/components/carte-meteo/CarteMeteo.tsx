@@ -66,6 +66,9 @@ const VILLES_IMPOSEES = [
 ];
 /** Date du titre de la carte des Pyrénées-Orientales : orange. */
 const COULEUR_TITRE_PO = '#ff8c1a';
+/** Hauteur du logo (px de la carte) : agrandi sur la carte des Pyrénées-Orientales (logo rond Météo Pays Catalan). */
+const HAUTEUR_LOGO = 83;
+const HAUTEUR_LOGO_PO = 150;
 const SEUIL_RAFALES_DEFAUT = 60;
 /** Distance minimale (pixels de la carte) entre deux villes affichées en vue département. */
 const DISTANCE_MIN_VILLES = 90;
@@ -417,6 +420,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const logoId = logoPresetId ?? logoDefaut.id;
   const logoFondBlanc = !logoPersonnalise && LOGOS_PRESETS.find((l) => l.id === logoId)?.fondBlanc !== false;
   const logoUrl = logoPersonnalise ?? (LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier || null);
+  const hauteurLogo = zone === 'dep:66' ? HAUTEUR_LOGO_PO : HAUTEUR_LOGO;
 
   const enFrance = zone === 'france';
   const largeurCarte = enFrance ? LARGEUR_FRANCE : LARGEUR_CARTE;
@@ -650,10 +654,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // Jamais de chevauchement : un marqueur gênant est décalé au plus près, ou écarté s'il n'y a plus de place.
     // Le logo, la date et les moyennes sont des obstacles (positions de la mise en page, voir globals.css).
     const em = 22 * echelleMarqueurs;
-    const logoDroite = 29 + 205;
+    const logoDroite = 29 + Math.max(205, hauteurLogo);
     const moyennesGauche = 29;
     const obstacles: Rect[] = [
-      { x: logoDroite - 205, y: 21, w: 205, h: 84 },
+      { x: 29, y: 21, w: logoDroite - 29, h: hauteurLogo + 1 },
       enFrance ? { x: largeurCarte - 28 - 380, y: 8, w: 380, h: 68 } : { x: largeurCarte / 2 - 230, y: 8, w: 460, h: 68 },
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : []),
@@ -689,7 +693,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -843,6 +847,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       sousTitre={sousTitre}
       logoUrl={logoUrl}
       logoFondBlanc={logoFondBlanc}
+      hauteurLogo={hauteurLogo}
       pied={pied}
       titreADroite={enFrance}
       grosPictos={enDepartement}
