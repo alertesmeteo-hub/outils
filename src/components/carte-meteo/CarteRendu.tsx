@@ -4,6 +4,7 @@ import { useEffect, useId, useState, type CSSProperties, type RefObject } from '
 import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { TAILLE_TUILE_VIDE, tuileParente, tuilesVisibles, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { couleurRafale } from '@/lib/carte-meteo/vent';
 
 /**
  * Tuile du fond. L'IGN renvoie un aplat bleu marine quand il n'a pas d'image (hors couverture, par exemple en Espagne) :
@@ -67,9 +68,58 @@ export interface Marqueur {
   /** Minimum de la journée (mode « journée » uniquement). */
   mini: string | null;
   rafale: number | null;
-  /** Flèche (image) du vent à l'heure de la rafale, si affichée. */
-  fleche?: string | null;
+  /** Angle de la flèche du vent (degrés, sens horaire depuis le haut : là où souffle le vent) à l'heure de la rafale ; null = sans flèche. */
+  direction?: number | null;
   ton: 'chaud' | 'froid' | null;
+}
+
+/** Rafales : pastille (flèche + valeur sur une ligne) ou rond avec la valeur, dont la pointe indique où souffle le vent. */
+export type StyleVent = 'pastille' | 'rond';
+
+/** Hauteur (em du marqueur) qu'ajoute l'indicateur de rafale sous le picto, pour le placement sans chevauchement. */
+export const HAUTEUR_VENT: Record<StyleVent, number> = { pastille: 1.25, rond: 2.15 };
+
+// Attributs SVG (et non classes CSS) : html-to-image ne recopie pas les styles CSS des éléments SVG (voir plus bas).
+const POLICE_VALEUR = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
+const CONTOUR_SOMBRE = 'rgba(5, 12, 30, 0.55)';
+
+function BadgeVent({ rafale, direction, style }: { rafale: number; direction: number | null; style: StyleVent }) {
+  const { fond, texte } = couleurRafale(rafale);
+  if (style === 'pastille') {
+    return (
+      <div className="cmap-vent" style={{ background: fond, color: texte }} title="Rafales maximales (km/h)">
+        {direction != null && (
+          <svg viewBox="-12 -12 24 24" style={{ width: '1.15em', height: '1.15em', flex: 'none' }} aria-hidden>
+            <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" fill={texte} stroke={texte} strokeWidth={1} strokeLinejoin="round" transform={`rotate(${direction})`} />
+          </svg>
+        )}
+        <strong>{rafale}</strong>
+        <small>km/h</small>
+      </div>
+    );
+  }
+  // Rond : disque de rayon 30 centré en (0, 0) ; la pointe part du disque (base sur le cercle) jusqu'à 47 du centre.
+  const forme = (
+    <>
+      <circle r={30} />
+      {direction != null && <path d="M0 -47 L15.5 -25.7 L-15.5 -25.7 Z" transform={`rotate(${direction})`} />}
+    </>
+  );
+  return (
+    <svg viewBox="-50 -50 100 100" style={{ width: '2.6em', height: '2.6em', margin: '-0.3em 0 -0.15em', display: 'block' }} role="img" aria-label={`Rafales ${rafale} km/h`}>
+      <title>Rafales maximales (km/h)</title>
+      <g fill={CONTOUR_SOMBRE} stroke={CONTOUR_SOMBRE} strokeWidth={11} strokeLinejoin="round">{forme}</g>
+      <g fill="#ffffff" stroke="#ffffff" strokeWidth={6} strokeLinejoin="round">{forme}</g>
+      <g fill={fond}>{forme}</g>
+      {/* Trois chiffres (100 km/h et plus) : police réduite pour tenir dans le disque. */}
+      <text y={rafale >= 100 ? 4 : 5} textAnchor="middle" fontFamily={POLICE_VALEUR} fontSize={rafale >= 100 ? 25 : 30} fill={texte}>
+        {rafale}
+      </text>
+      <text y={21} textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight={700} fontSize={12.5} fill={texte}>
+        km/h
+      </text>
+    </svg>
+  );
 }
 
 export interface BoiteMoyenne {
@@ -91,6 +141,8 @@ interface Props {
   titreADroite?: boolean;
   /** Pictos plus grands (vue département). */
   grosPictos?: boolean;
+  /** Présentation des rafales (pastille par défaut). */
+  styleVent?: StyleVent;
   /** Couleur de la date du titre (vert par défaut, voir .cmap-date). */
   couleurTitre?: string;
   fleuves?: Fleuves | null;
@@ -161,6 +213,7 @@ export default function CarteRendu({
   pied = '',
   titreADroite = false,
   grosPictos = false,
+  styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
   afficherRelief = true,
@@ -293,13 +346,7 @@ export default function CarteRendu({
                 )}
               </div>
             </div>
-            {m.rafale != null && (
-              <div className={`cmap-rafale ${m.rafale >= 90 ? 'cmap-rafale-forte' : ''}`} title="Rafales maximales (km/h)">
-                {m.fleche && <img src={m.fleche} alt="" className="cmap-fleche" />}
-                {m.rafale}
-                <small>km/h</small>
-              </div>
-            )}
+            {m.rafale != null && <BadgeVent rafale={m.rafale} direction={m.direction ?? null} style={styleVent} />}
             {paletteOuvertePour === m.code && (
               <div className="cmap-palette" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs, largeur)}>
                 <label className="cmap-palette-partout">

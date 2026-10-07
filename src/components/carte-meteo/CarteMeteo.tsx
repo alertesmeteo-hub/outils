@@ -7,7 +7,7 @@ import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr
 import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
-import { flecheVent } from '@/lib/carte-meteo/vent';
+import { angleFleche } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
@@ -22,7 +22,7 @@ import {
   type Zone,
 } from '@/lib/carte-meteo/projection-france';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
-import CarteRendu, { type Fleuves, HAUTEUR_CARTE, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur } from './CarteRendu';
+import CarteRendu, { type Fleuves, HAUTEUR_CARTE, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent } from './CarteRendu';
 
 type Periode = 'matin' | 'apres-midi' | 'journee';
 type NiveauNoms = 'departement' | 'ville';
@@ -73,8 +73,19 @@ const DISTANCE_MIN_VILLES = 90;
 const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
 /** Département : cadré au maximum, centré sur toute la carte. */
 const ZONE_DEPARTEMENT: Zone = { gauche: 14, haut: 72, droite: LARGEUR_CARTE - 14, bas: HAUTEUR_CARTE - 34 };
-/** Nombre maximal de valeurs de rafales affichées sur la carte (les plus fortes). */
-const MAX_RAFALES = 4;
+/**
+ * Nombre de valeurs de rafales affichées (les plus fortes à partir du seuil). Par défaut : toutes en vue département
+ * (une par ville affichée), les 4 plus fortes en France et en région (elles y ajoutent des points à la carte).
+ */
+type NombreRafales = 'aucune' | '4' | '8' | '12' | 'toutes';
+const NOMBRES_RAFALES: { valeur: NombreRafales; libelle: string }[] = [
+  { valeur: 'aucune', libelle: 'Aucune' },
+  { valeur: '4', libelle: 'Les 4 plus fortes' },
+  { valeur: '8', libelle: 'Les 8 plus fortes' },
+  { valeur: '12', libelle: 'Les 12 plus fortes' },
+  { valeur: 'toutes', libelle: 'Toutes' },
+];
+const maximumRafales = (n: NombreRafales) => (n === 'aucune' ? 0 : n === 'toutes' ? Infinity : Number(n));
 /** France entière (Corse comprise) : quasi pleine hauteur, centrée sur la carte. */
 const LARGEUR_FRANCE = 960;
 const ZONE_FRANCE: Zone = { gauche: 0, haut: 72, droite: LARGEUR_FRANCE, bas: HAUTEUR_CARTE - 30 };
@@ -299,6 +310,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [niveauNoms, setNiveauNoms] = useState<NiveauNoms>('departement');
   const [afficherNoms, setAfficherNoms] = useState(false);
   const [seuilRafales, setSeuilRafales] = useState(SEUIL_RAFALES_DEFAUT);
+  const [choixRafales, setChoixRafales] = useState<NombreRafales | null>(null);
+  const [styleVent, setStyleVent] = useState<StyleVent>('pastille');
   const [logoPresetId, setLogoPresetId] = useState<string | null>(null);
   const [logoPersonnalise, setLogoPersonnalise] = useState<string | null>(null);
   const [titreManuel, setTitreManuel] = useState<string | null>(null);
@@ -321,6 +334,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const zone = niveau === 'france' ? 'france' : niveau === 'region' ? `reg:${region}` : `dep:${departement}`;
   const enDepartement = niveau === 'departement';
+  const nombreRafales: NombreRafales = choixRafales ?? (enDepartement ? 'toutes' : '4');
+  const maxRafales = maximumRafales(nombreRafales);
   const dateISO = ajouterJours(aujourdhui, jour);
   const aJour = donnees?.modele === modele && donnees.dateISO === dateISO;
   const villesAJour = donneesVilles?.modele === modele && donneesVilles.dateISO === dateISO && donneesVilles.departement === departement;
@@ -453,18 +468,18 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const rafaleDe = (p: PointCarte) => (periode === 'matin' ? p.rafaleMatin : periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee);
 
-  /** Codes des points dont la rafale est signalée : au plus MAX_RAFALES, les plus fortes à partir du seuil. */
+  /** Codes des points dont la rafale est signalée : au plus `maxRafales`, les plus fortes à partir du seuil. */
   const plusFortesRafales = (liste: PointCarte[]) =>
     new Set(
       liste
         .map((p) => ({ code: p.code, r: rafaleDe(p) }))
         .filter((x): x is { code: string; r: number } => x.r != null && x.r >= seuilRafales)
         .sort((a, b) => b.r - a.r)
-        .slice(0, MAX_RAFALES)
+        .slice(0, maxRafales)
         .map((x) => x.code)
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const codesRafales = useMemo(() => plusFortesRafales(points), [points, periode, seuilRafales]);
+  const codesRafales = useMemo(() => plusFortesRafales(points), [points, periode, seuilRafales, maxRafales]);
 
   /**
    * France entière : les points sont posés sur une grille régulière (lignes décalées d'une demi-case) limitée au territoire,
@@ -518,8 +533,17 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       for (const [code, n] of [...resultat]) if (code !== v.code && !VILLES_IMPOSEES.some((o) => o.code === code) && ((n.x - pos.x) / dx) ** 2 + ((n.y - pos.y) / dy) ** 2 < 0.8) resultat.delete(code);
       resultat.set(v.code, pos);
     }
+    // Rafales à signaler : un département absent de la grille prend la place du nœud voisin (sinon ses rafales n'apparaîtraient pas).
+    for (const code of codesRafales) {
+      if (resultat.has(code)) continue;
+      const p = points.find((q) => q.code === code);
+      if (!p) continue;
+      const pos = versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
+      for (const [c, n] of [...resultat]) if (!VILLES_IMPOSEES.some((o) => o.code === c) && !codesRafales.has(c) && ((n.x - pos.x) / dx) ** 2 + ((n.y - pos.y) / dy) ** 2 < 0.8) resultat.delete(c);
+      resultat.set(code, pos);
+    }
     return resultat;
-  }, [enFrance, points, contoursDep, vue, densite]);
+  }, [enFrance, points, contoursDep, vue, densite, codesRafales]);
 
   /** Points affichés : les plus répartis selon la densité, plus toujours les extrêmes et les rafales à signaler. */
   const pointsAffiches = useMemo(() => {
@@ -596,7 +620,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const min = numeriques.length > 1 ? Math.min(...numeriques) : null;
     const plusChaud = max != null && numeriques.filter((v) => v === max).length === 1 ? max : null;
     const plusFroid = min != null && numeriques.filter((v) => v === min).length === 1 ? min : null;
-    const rafalesSignalees = enDepartement ? plusFortesRafales(reference) : codesRafales;
+    // Toutes les rafales : y compris celles des villes de réserve, qui peuvent remplacer une ville sans place.
+    const rafalesSignalees = enDepartement ? plusFortesRafales(maxRafales === Infinity ? pointsAffiches : reference) : codesRafales;
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
       const brut = grilleFrance?.get(p.code) ?? versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
@@ -613,7 +638,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         mini: periode === 'journee' ? e?.mini ?? '' : null,
         // Rafale arrondie de 5 en 5 km/h pour l'affichage.
         rafale: rafalesSignalees.has(p.code) && rafale != null ? Math.round(rafale / 5) * 5 : null,
-        fleche: afficherFleches && rafalesSignalees.has(p.code) && rafale != null ? flecheVent(periode === 'matin' ? p.directionRafaleMatin : periode === 'apres-midi' ? p.directionRafaleApresMidi : p.directionRafaleJournee) : null,
+        direction: afficherFleches ? angleFleche(periode === 'matin' ? p.directionRafaleMatin : periode === 'apres-midi' ? p.directionRafaleApresMidi : p.directionRafaleJournee) : null,
         ton: periode !== 'journee' && v != null ? (v === plusChaud ? 'chaud' : v === plusFroid ? 'froid' : null) : null,
       };
     });
@@ -636,7 +661,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const demiLargeur = (Math.max(((m.mini == null ? 4.2 : 4.9) + gros * 2.35) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
       const hautLigne = Math.max((m.mini != null ? 3.4 : 2.6) + gros * 1.8, estPictoImage(m.picto) ? 2.3 * (1 + gros) : 0);
-      const hauteur = hautLigne * em + (m.rafale != null ? 1.35 * em : 0);
+      const hauteur = hautLigne * em + (m.rafale != null ? HAUTEUR_VENT[styleVent] * em : 0);
       return {
         code: m.code,
         x: m.x,
@@ -660,7 +685,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -818,6 +843,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       pied={pied}
       titreADroite={enFrance}
       grosPictos={enDepartement}
+      styleVent={styleVent}
       couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
       paletteOuvertePour={paletteOuvertePour}
@@ -1211,16 +1237,36 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               Afficher les noms sur la carte
             </label>
             <label className="text-sm font-medium">
-              <span className={legendeBarre}>Rafales à partir de (km/h, 4 valeurs maxi)</span>
+              <span className={legendeBarre}>Valeurs de rafales</span>
+              <select value={nombreRafales} onChange={(e) => setChoixRafales(e.target.value as NombreRafales)} className={selectBarre}>
+                {NOMBRES_RAFALES.map((n) => (
+                  <option key={n.valeur} value={n.valeur}>
+                    {n.libelle}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm font-medium">
+              <span className={legendeBarre}>Rafales à partir de (km/h)</span>
               <input
                 type="number"
-                min={20}
+                min={0}
                 max={200}
                 step={5}
                 value={seuilRafales}
-                onChange={(e) => setSeuilRafales(Math.max(20, Number(e.target.value) || SEUIL_RAFALES_DEFAUT))}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  setSeuilRafales(e.target.value === '' || !Number.isFinite(n) ? SEUIL_RAFALES_DEFAUT : Math.min(200, Math.max(0, n)));
+                }}
                 className={`${selectBarre} w-24`}
               />
+            </label>
+            <label className="text-sm font-medium">
+              <span className={legendeBarre}>Style du vent</span>
+              <select value={styleVent} onChange={(e) => setStyleVent(e.target.value as StyleVent)} className={selectBarre}>
+                <option value="pastille">Pastille (flèche + valeur)</option>
+                <option value="rond">Rond fléché</option>
+              </select>
             </label>
           </div>
         </div>
