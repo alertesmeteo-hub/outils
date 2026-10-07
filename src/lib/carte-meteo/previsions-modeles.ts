@@ -86,9 +86,16 @@ const FORMAT_PARIS = new Intl.DateTimeFormat('en-CA', {
 });
 
 /** Date locale (Paris) et heure d'un instant UTC. */
+const CACHE_DATE_HEURE = new Map<string, { date: string; heure: number }>();
 function dateHeureParis(iso: string): { date: string; heure: number } {
+  // Tous les départements partagent la même grille d'instants : sans cache, la page des 16 jours refait des milliers de conversions.
+  const connu = CACHE_DATE_HEURE.get(iso);
+  if (connu) return connu;
   const p = Object.fromEntries(FORMAT_PARIS.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
-  return { date: `${p.year}-${p.month}-${p.day}`, heure: Number(p.hour) };
+  const resultat = { date: `${p.year}-${p.month}-${p.day}`, heure: Number(p.hour) };
+  if (CACHE_DATE_HEURE.size > 5000) CACHE_DATE_HEURE.clear();
+  CACHE_DATE_HEURE.set(iso, resultat);
+  return resultat;
 }
 
 const nombres = (valeurs: (number | null | undefined)[]): number[] => valeurs.filter((v): v is number => typeof v === 'number');

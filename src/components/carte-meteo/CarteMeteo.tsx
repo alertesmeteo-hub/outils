@@ -313,6 +313,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [afficherRelief, setAfficherRelief] = useState(true);
   const [reliefPourcent, setReliefPourcent] = useState(28);
   const [enExport, setEnExport] = useState(false);
+  const [erreurExport, setErreurExport] = useState<string | null>(null);
 
   const [facteur, setFacteur] = useState(1);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -771,11 +772,19 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   async function exporter() {
     if (!carteRef.current) return;
     setPaletteOuvertePour(null);
+    setErreurExport(null);
     setEnExport(true);
     try {
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const nom = `carte-meteo-${nomZone.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${dateISO}-${periode}`;
+      // Laisse React retirer la palette ; requestAnimationFrame ne se déclenche pas dans un onglet masqué : délai de secours.
+      await new Promise((r) => {
+        const secours = setTimeout(r, 250);
+        requestAnimationFrame(() => requestAnimationFrame(() => (clearTimeout(secours), r(null))));
+      });
+      const nom = `carte-meteo-${normaliser(nomZone).replace(/ /g, '-')}-${dateISO}-${periode}`;
       await exporterEnJpg(carteRef.current, nom, largeurCarte, HAUTEUR_CARTE);
+    } catch (e) {
+      console.error('Export de la carte', e);
+      setErreurExport("L'export a échoué (fond de carte injoignable ?). Réessayez dans un instant.");
     } finally {
       setEnExport(false);
     }
@@ -846,6 +855,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             {enExport ? 'Export…' : 'Exporter en JPG'}
           </button>
         </div>
+        {erreurExport && (
+          <p role="alert" className="mb-2 text-sm text-danger">
+            {erreurExport}
+          </p>
+        )}
         {erreur && (
           <p role="alert" className="mb-2 text-sm text-danger">
             {erreur}
@@ -993,6 +1007,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           >
             {enExport ? 'Export en cours…' : 'Exporter en JPG'}
           </button>
+          {erreurExport && (
+            <p role="alert" className="text-sm text-danger">
+              {erreurExport}
+            </p>
+          )}
           <button
             type="button"
             onClick={() => {

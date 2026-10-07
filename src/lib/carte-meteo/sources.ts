@@ -69,6 +69,8 @@ interface FichierDepartement {
 }
 
 const memoire = new Map<string, Extrait>();
+/** Lectures en cours : plusieurs requêtes simultanées pour le même département n'ouvrent qu'un seul téléchargement. */
+const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleMeteo, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 
@@ -215,7 +217,16 @@ async function ecrireDisque(cle: string, extrait: Extrait): Promise<void> {
 }
 
 /** Extrait d'un département pour le passage courant du modèle (mémoire, puis disque, puis dépôt GitHub). */
-async function extraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> {
+function extraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> {
+  const cle = `${modele}-${dep}`;
+  const deja = enCours.get(cle);
+  if (deja) return deja;
+  const lecture = lireExtraitDepartement(modele, dep).finally(() => enCours.delete(cle));
+  enCours.set(cle, lecture);
+  return lecture;
+}
+
+async function lireExtraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> {
   const cle = `${modele}-${dep}-v3`;
   const runTime = await passageCourant(modele);
   const enMemoire = memoire.get(cle);

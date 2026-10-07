@@ -22,7 +22,7 @@ async function integrerTuiles(noeud: HTMLElement): Promise<() => void> {
     images.map(async (image) => {
       const url = image.getAttribute('href') as string;
       try {
-        const reponse = await fetch(url, { mode: 'cors' });
+        const reponse = await fetch(url, { mode: 'cors', signal: AbortSignal.timeout(15_000) });
         const data = reponse.ok ? await versDataUrl(await reponse.blob()) : VIDE;
         originaux.set(image, url);
         image.setAttribute('href', data);
@@ -44,14 +44,17 @@ export async function exporterEnJpg(noeud: HTMLElement, nomFichier: string, larg
   const remettre = await integrerTuiles(noeud);
   let dataUrl: string;
   try {
-    dataUrl = await toJpeg(noeud, {
-      quality: 0.93,
-      pixelRatio: 1.5,
-      width: largeur,
-      height: hauteur,
-      backgroundColor: '#0b2a4a',
-      style: { transform: 'none', transformOrigin: 'top left' },
-    });
+    dataUrl = await Promise.race([
+      toJpeg(noeud, {
+        quality: 0.93,
+        pixelRatio: 1.5,
+        width: largeur,
+        height: hauteur,
+        backgroundColor: '#0b2a4a',
+        style: { transform: 'none', transformOrigin: 'top left' },
+      }),
+      new Promise<never>((_, rejeter) => setTimeout(() => rejeter(new Error("Délai dépassé pendant l'export")), 60_000)),
+    ]);
   } finally {
     remettre();
   }
