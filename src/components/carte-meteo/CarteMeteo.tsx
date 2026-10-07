@@ -7,7 +7,7 @@ import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr
 import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
-import { angleFleche } from '@/lib/carte-meteo/vent';
+import { angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
@@ -22,7 +22,7 @@ import {
   type Zone,
 } from '@/lib/carte-meteo/projection-france';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
-import CarteRendu, { type Fleuves, HAUTEUR_CARTE, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent } from './CarteRendu';
+import CarteRendu, { type Fleuves, HAUTEUR_CARTE, HAUTEUR_RESSENTI, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent } from './CarteRendu';
 
 type Periode = 'matin' | 'apres-midi' | 'journee';
 type NiveauNoms = 'departement' | 'ville';
@@ -312,6 +312,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [seuilRafales, setSeuilRafales] = useState(SEUIL_RAFALES_DEFAUT);
   const [choixRafales, setChoixRafales] = useState<NombreRafales | null>(null);
   const [styleVent, setStyleVent] = useState<StyleVent>('pastille');
+  const [afficherRessenti, setAfficherRessenti] = useState(false);
   const [logoPresetId, setLogoPresetId] = useState<string | null>(null);
   const [logoPersonnalise, setLogoPersonnalise] = useState<string | null>(null);
   const [titreManuel, setTitreManuel] = useState<string | null>(null);
@@ -467,6 +468,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   };
 
   const rafaleDe = (p: PointCarte) => (periode === 'matin' ? p.rafaleMatin : periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee);
+  const ventDe = (p: PointCarte) => (periode === 'matin' ? p.ventMatin : periode === 'apres-midi' ? p.ventApresMidi : p.ventJournee);
 
   /** Codes des points dont la rafale est signalée : au plus `maxRafales`, les plus fortes à partir du seuil. */
   const plusFortesRafales = (liste: PointCarte[]) =>
@@ -639,6 +641,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         // Rafale arrondie de 5 en 5 km/h pour l'affichage.
         rafale: rafalesSignalees.has(p.code) && rafale != null ? Math.round(rafale / 5) * 5 : null,
         direction: afficherFleches ? angleFleche(periode === 'matin' ? p.directionRafaleMatin : periode === 'apres-midi' ? p.directionRafaleApresMidi : p.directionRafaleJournee) : null,
+        // Ressenti avec la température affichée (donc modifiable) et le vent moyen à l'heure de la rafale maximale.
+        ressenti: afficherRessenti && rafalesSignalees.has(p.code) && rafale != null ? calculerRessenti(v, ventDe(p)) : null,
         ton: periode !== 'journee' && v != null ? (v === plusChaud ? 'chaud' : v === plusFroid ? 'froid' : null) : null,
       };
     });
@@ -652,7 +656,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       { x: logoDroite - 205, y: 21, w: 205, h: 84 },
       enFrance ? { x: largeurCarte - 28 - 380, y: 8, w: 380, h: 68 } : { x: largeurCarte / 2 - 230, y: 8, w: 460, h: 68 },
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
-      ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : zone.startsWith('reg:') ? [{ x: 29, y: 340, w: LARGEUR_MOYENNES, h: 58 }] : []),
+      ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : []),
     ];
     const elements = bruts.map((m) => {
       // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
@@ -661,7 +665,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const demiLargeur = (Math.max(((m.mini == null ? 4.2 : 4.9) + gros * 2.35) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
       const hautLigne = Math.max((m.mini != null ? 3.4 : 2.6) + gros * 1.8, estPictoImage(m.picto) ? 2.3 * (1 + gros) : 0);
-      const hauteur = hautLigne * em + (m.rafale != null ? HAUTEUR_VENT[styleVent] * em : 0);
+      const hauteur = hautLigne * em + (m.rafale != null ? HAUTEUR_VENT[styleVent] * em : 0) + (m.ressenti != null ? HAUTEUR_RESSENTI * em : 0);
       return {
         code: m.code,
         x: m.x,
@@ -685,7 +689,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -715,14 +719,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     return periode === 'journee' && v != null ? String(v) : undefined;
   };
 
+  // Seule la vue France affiche des moyennes (Nord et Sud) ; régions et départements n'en ont pas.
   const moyennes: BoiteMoyenne[] = enFrance
     ? [
         { libelle: 'MOYENNE NORD', valeur: valeurMoyenne('nord'), mini: miniMoyenne('nord'), couleur: 'nord' },
         { libelle: 'MOYENNE SUD', valeur: valeurMoyenne('sud'), mini: miniMoyenne('sud'), couleur: 'sud' },
       ]
-    : zone.startsWith('reg:')
-      ? [{ libelle: 'MOYENNE', valeur: valeurMoyenne('zone'), mini: miniMoyenne('zone'), couleur: 'nord' }]
-      : [];
+    : [];
 
   const titre = titreManuel ?? libelleJour(dateISO);
   const sousTitre = sousTitreManuel ?? (periode === 'matin' ? 'MATIN' : periode === 'apres-midi' ? 'APRÈS-MIDI' : 'JOURNÉE');
@@ -1267,6 +1270,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 <option value="pastille">Pastille (flèche + valeur)</option>
                 <option value="rond">Rond fléché</option>
               </select>
+            </label>
+            <label className="flex items-center gap-2 pb-1.5 text-sm">
+              <input type="checkbox" checked={afficherRessenti} onChange={(e) => setAfficherRessenti(e.target.checked)} />
+              Ressenti (windchill) avec le vent
             </label>
           </div>
         </div>

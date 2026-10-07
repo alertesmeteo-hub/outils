@@ -70,6 +70,8 @@ export interface Marqueur {
   rafale: number | null;
   /** Angle de la flèche du vent (degrés, sens horaire depuis le haut : là où souffle le vent) à l'heure de la rafale ; null = sans flèche. */
   direction?: number | null;
+  /** Température ressentie (windchill) affichée sous l'indicateur de vent, si l'option est active. */
+  ressenti?: number | null;
   ton: 'chaud' | 'froid' | null;
 }
 
@@ -78,15 +80,24 @@ export type StyleVent = 'pastille' | 'rond';
 
 /** Hauteur (em du marqueur) qu'ajoute l'indicateur de rafale sous le picto, pour le placement sans chevauchement. */
 export const HAUTEUR_VENT: Record<StyleVent, number> = { pastille: 1.25, rond: 2.15 };
+/** Hauteur (em du marqueur) du cartouche « ressenti » sous l'indicateur de vent. */
+export const HAUTEUR_RESSENTI = 1.05;
 
 // Attributs SVG (et non classes CSS) : html-to-image ne recopie pas les styles CSS des éléments SVG (voir plus bas).
 const POLICE_VALEUR = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 const CONTOUR_SOMBRE = 'rgba(5, 12, 30, 0.55)';
 
-function BadgeVent({ rafale, direction, style }: { rafale: number; direction: number | null; style: StyleVent }) {
+function BadgeVent({ rafale, direction, ressenti, style }: { rafale: number; direction: number | null; ressenti: number | null; style: StyleVent }) {
   const { fond, texte } = couleurRafale(rafale);
+  const cartoucheRessenti = ressenti != null && (
+    <div className="cmap-ressenti" style={{ background: ressenti <= -10 ? '#0b3d91' : '#1f6fe0' }} title="Température ressentie (refroidissement éolien)">
+      <small>ressenti</small>
+      <strong>{ressenti}°</strong>
+    </div>
+  );
   if (style === 'pastille') {
     return (
+      <>
       <div className="cmap-vent" style={{ background: fond, color: texte }} title="Rafales maximales (km/h)">
         {direction != null && (
           <svg viewBox="-12 -12 24 24" style={{ width: '1.15em', height: '1.15em', flex: 'none' }} aria-hidden>
@@ -96,6 +107,8 @@ function BadgeVent({ rafale, direction, style }: { rafale: number; direction: nu
         <strong>{rafale}</strong>
         <small>km/h</small>
       </div>
+      {cartoucheRessenti}
+      </>
     );
   }
   // Rond : disque de rayon 30 centré en (0, 0) ; la pointe part du disque (base sur le cercle) jusqu'à 47 du centre.
@@ -106,6 +119,7 @@ function BadgeVent({ rafale, direction, style }: { rafale: number; direction: nu
     </>
   );
   return (
+    <>
     <svg viewBox="-50 -50 100 100" style={{ width: '2.6em', height: '2.6em', margin: '-0.3em 0 -0.15em', display: 'block' }} role="img" aria-label={`Rafales ${rafale} km/h`}>
       <title>Rafales maximales (km/h)</title>
       <g fill={CONTOUR_SOMBRE} stroke={CONTOUR_SOMBRE} strokeWidth={11} strokeLinejoin="round">{forme}</g>
@@ -119,6 +133,8 @@ function BadgeVent({ rafale, direction, style }: { rafale: number; direction: nu
         km/h
       </text>
     </svg>
+    {cartoucheRessenti}
+    </>
   );
 }
 
@@ -346,7 +362,7 @@ export default function CarteRendu({
                 )}
               </div>
             </div>
-            {m.rafale != null && <BadgeVent rafale={m.rafale} direction={m.direction ?? null} style={styleVent} />}
+            {m.rafale != null && <BadgeVent rafale={m.rafale} direction={m.direction ?? null} ressenti={m.ressenti ?? null} style={styleVent} />}
             {paletteOuvertePour === m.code && (
               <div className="cmap-palette" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs, largeur)}>
                 <label className="cmap-palette-partout">

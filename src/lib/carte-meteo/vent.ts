@@ -1,3 +1,5 @@
+import { windChill } from '@/lib/tools/defs/temperature-ressentie';
+
 /** Échelle de couleurs des rafales (km/h) : fond de la pastille et couleur du texte, de la brise (bleu) à la tempête (violet). */
 const PALIERS: { min: number; fond: string; texte: string }[] = [
   { min: 110, fond: '#8e24c9', texte: '#ffffff' },
@@ -18,4 +20,13 @@ export function couleurRafale(kmh: number): { fond: string; texte: string } {
 export function angleFleche(degres: number | null | undefined): number | null {
   if (degres == null || Number.isNaN(degres)) return null;
   return (((degres + 180) % 360) + 360) % 360;
+}
+
+/**
+ * Température ressentie (refroidissement éolien, Environnement Canada), comme dans les classements : calculée dès que
+ * le vent moyen dépasse 4,8 km/h et plafonnée à la température de l'air ; arrondie au degré.
+ */
+export function ressenti(temperature: number | null, ventKmh: number | null): number | null {
+  if (temperature == null || ventKmh == null) return null;
+  return Math.round(ventKmh > 4.8 ? Math.min(temperature, windChill(temperature, ventKmh)) : temperature);
 }

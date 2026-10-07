@@ -47,6 +47,10 @@ export interface PointCarte {
   /** Direction du vent (degrés, d'où il vient) à l'heure de la rafale maximale. */
   directionRafaleApresMidi: number | null;
   directionRafaleJournee: number | null;
+  /** Vent moyen (km/h) à l'heure de la rafale maximale : sert au ressenti (windchill) affiché avec le vent. */
+  ventMatin: number | null;
+  ventApresMidi: number | null;
+  ventJournee: number | null;
   codeApresMidi: number | null;
   codeJournee: number | null;
   /** Nébulosité moyenne (%) et cumul de précipitations (mm) : de 12 h à 18 h, puis sur la journée (7 h-20 h pour le ciel). */
@@ -67,8 +71,9 @@ export interface Serie {
   temp: (number | null)[];
   pluie: (number | null)[];
   nuages: (number | null)[];
-  /** Vent à 10 m : direction (degrés), rafale (km/h). */
+  /** Vent à 10 m : direction (degrés), vent moyen et rafale (km/h). */
   direction: (number | null)[];
+  vent: (number | null)[];
   rafale: (number | null)[];
   /** Risque d'orage (code de 0 à 4 ; 3 et plus = orage probable), neige (mm) et visibilité (km). */
   orage: (number | null)[];
@@ -138,15 +143,28 @@ function codePeriode(serie: Serie, indices: number[]): number | null {
   return null;
 }
 
-/** Direction du vent à l'échéance de la rafale maximale parmi `indices`. */
-function directionRafaleMax(serie: Serie, indices: number[]): number | null {
+/** Indice de l'échéance de la rafale maximale parmi `indices` (-1 si aucune rafale connue). */
+function indiceRafaleMax(serie: Serie, indices: number[]): number {
   let meilleur = -1;
   for (const i of indices) {
     const r = serie.rafale[i];
     if (typeof r === 'number' && (meilleur < 0 || r > (serie.rafale[meilleur] as number))) meilleur = i;
   }
-  const d = meilleur >= 0 ? serie.direction[meilleur] : null;
+  return meilleur;
+}
+
+/** Direction du vent à l'échéance de la rafale maximale parmi `indices`. */
+function directionRafaleMax(serie: Serie, indices: number[]): number | null {
+  const i = indiceRafaleMax(serie, indices);
+  const d = i >= 0 ? serie.direction[i] : null;
   return typeof d === 'number' ? Math.round(d) : null;
+}
+
+/** Vent moyen (km/h) à l'échéance de la rafale maximale parmi `indices`. */
+function ventRafaleMax(serie: Serie, indices: number[]): number | null {
+  const i = indiceRafaleMax(serie, indices);
+  const v = i >= 0 ? serie.vent[i] : null;
+  return typeof v === 'number' ? Math.round(v) : null;
 }
 
 /**
@@ -178,6 +196,9 @@ export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateIS
     rafaleJournee: arrondi(maximum(toute.map((i) => serie.rafale[i]))),
     directionRafaleApresMidi: directionRafaleMax(serie, apresMidi),
     directionRafaleJournee: directionRafaleMax(serie, toute),
+    ventMatin: ventRafaleMax(serie, matin),
+    ventApresMidi: ventRafaleMax(serie, apresMidi),
+    ventJournee: ventRafaleMax(serie, toute),
     codeApresMidi: codePeriode(serie, apresMidi),
     codeJournee: codePeriode(serie, ciel),
     nuagesApresMidi: arrondi(moyenne(apresMidi.map((i) => serie.nuages[i]))),

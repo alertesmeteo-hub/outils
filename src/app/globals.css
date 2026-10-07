@@ -146,6 +146,10 @@ body {
 }
 .cmap-vent strong { font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-weight: 400; font-size: 1.12em; letter-spacing: 0.01em; }
 .cmap-vent small { font-family: Arial, sans-serif; font-size: 0.6em; font-weight: 700; margin-left: 0.05em; align-self: flex-end; margin-bottom: 0.2em; }
+/* Ressenti (windchill) sous l'indicateur de vent : cartouche bleu « ressenti −3° » (fond en style, voir CarteRendu). */
+.cmap-ressenti { display: flex; align-items: baseline; gap: 0.25em; margin-top: 0.15em; padding: 0.06em 0.45em; border-radius: 0.6em; border: 0.1em solid #fff; box-shadow: 0 0.06em 0.3em rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.62em; line-height: 1.15; white-space: nowrap; }
+.cmap-ressenti small { font-family: Arial, sans-serif; font-size: 0.72em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.cmap-ressenti strong { font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-weight: 400; font-size: 1.15em; }
 
 .cmap-palette {
   position: absolute;

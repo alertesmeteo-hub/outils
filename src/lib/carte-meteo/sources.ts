@@ -56,6 +56,7 @@ interface Colonnes {
   precipitation_mm: number;
   cloud_cover_pct: number;
   wind_direction_deg: number;
+  wind_speed_kmh: number;
   wind_gust_kmh: number;
   visibility_km: number;
   thunder_risk_code: number;
@@ -129,6 +130,7 @@ function serieDuPoint(fichier: FichierDepartement, c: Colonnes, pointId: number)
     pluie: etapes.map(([, v]) => valeur(v, c.precipitation_mm)),
     nuages: etapes.map(([, v]) => valeur(v, c.cloud_cover_pct)),
     direction: etapes.map(([, v]) => valeur(v, c.wind_direction_deg)),
+    vent: etapes.map(([, v]) => valeur(v, c.wind_speed_kmh)),
     rafale: etapes.map(([, v]) => valeur(v, c.wind_gust_kmh)),
     orage: etapes.map(([, v]) => valeur(v, c.thunder_risk_code)),
     neige: etapes.map(([, v]) => valeur(v, c.snowfall_mm)),
@@ -169,6 +171,7 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     precipitation_mm: indice(cols, 'precipitation_mm'),
     cloud_cover_pct: indice(cols, 'cloud_cover_pct'),
     wind_direction_deg: indice(cols, 'wind_direction_deg'),
+    wind_speed_kmh: indice(cols, 'wind_speed_kmh'),
     wind_gust_kmh: indice(cols, 'wind_gust_kmh'),
     visibility_km: indice(cols, 'visibility_km'),
     thunder_risk_code: indice(cols, 'thunder_risk_code'),
@@ -227,7 +230,7 @@ function extraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> 
 }
 
 async function lireExtraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> {
-  const cle = `${modele}-${dep}-v3`;
+  const cle = `${modele}-${dep}-v4`;
   const runTime = await passageCourant(modele);
   const enMemoire = memoire.get(cle);
   if (enMemoire && (!runTime || enMemoire.runTime === runTime)) return enMemoire;
