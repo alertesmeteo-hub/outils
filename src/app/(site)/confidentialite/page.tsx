@@ -16,6 +16,7 @@ export default function Privacy() {
         <li>L’historique de vos calculs et votre préférence de thème (clair / sombre) sont enregistrés uniquement dans le stockage local de votre navigateur. Vous pouvez les effacer à tout moment (bouton « Effacer l’historique » ou paramètres du navigateur).</li>
         <li>La géolocalisation est facultative, demandée uniquement sur clic, arrondie et non transmise.</li>
         <li>Nous ne demandons jamais d’adresse précise.</li>
+        <li>Si une erreur technique survient, un rapport anonyme (message d’erreur, page concernée, type de navigateur) peut être envoyé à notre outil de suivi des erreurs, Sentry, pour nous permettre de la corriger. Ce rapport ne contient ni vos saisies ni votre adresse IP complète.</li>
       </ul>
       <h2>Cookies</h2>
       <p>Aucun cookie publicitaire ni de suivi n’est déposé par défaut. Seuls des éléments strictement nécessaires au fonctionnement peuvent l’être (par exemple l’authentification de l’administration). Si un outil de mesure d’audience est ajouté, une bannière de consentement devra être mise en place.</p>

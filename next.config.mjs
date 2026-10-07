@@ -1,3 +1,5 @@
+import { withSentryConfig } from '@sentry/nextjs/config';
+
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -13,7 +15,7 @@ const csp = (frameAncestors) =>
     "style-src 'self' 'unsafe-inline' https://sibforms.com",
     "font-src 'self' data: https://assets.brevo.com",
     "img-src 'self' data: https://sibforms.com https://assets.brevo.com https://data.geopf.fr",
-    "connect-src 'self' https://*.sibforms.com https://sibforms.com https://data.geopf.fr",
+    "connect-src 'self' https://*.sibforms.com https://sibforms.com https://data.geopf.fr https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self' https://*.sibforms.com",
@@ -49,4 +51,11 @@ const nextConfig = {
     ];
   },
 };
-export default nextConfig;
+// Sentry : envoi des erreurs seulement (pas de téléversement de sources, pas de télémétrie du plugin).
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  telemetry: false,
+  sourcemaps: { disable: true },
+  disableLogger: true,
+  automaticVercelMonitors: false,
+});

@@ -27,6 +27,9 @@ jobs:
       NEXT_PUBLIC_SITE_URL: https://outils.alertes-meteo.com
       NEXT_PUBLIC_SITE_NAME: Météo Outils
       NEXT_TELEMETRY_DISABLED: '1'
+      # Suivi des erreurs : DSN du projet Sentry (variable de dépôt SENTRY_DSN, pas un secret ; vide = Sentry désactivé).
+      NEXT_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      NEXT_PUBLIC_RELEASE: ${{ github.sha }}
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
