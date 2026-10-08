@@ -189,6 +189,7 @@ function BadgeVent({
 }
 
 export interface BoiteMoyenne {
+  id: 'nord' | 'sud';
   libelle: string;
   valeur: string;
   mini?: string;
@@ -231,6 +232,8 @@ interface Props {
   /** Hauteur du logo en pixels de la carte (83 par défaut, voir .cmap-logo). */
   hauteurLogo?: number;
   moyennes: BoiteMoyenne[];
+  /** Modification d'une moyenne directement sur la carte (la valeur devient un champ de saisie). */
+  onModifierMoyenne?: (id: 'nord' | 'sud', valeur: string) => void;
   /** Position (pixels de la carte) du bord droit du logo et du bord gauche des moyennes, rapprochés du contour de la carte. */
   logoDroite?: number | null;
   moyennesGauche?: number | null;
@@ -305,6 +308,7 @@ export default function CarteRendu({
   logoFondBlanc = true,
   hauteurLogo,
   moyennes,
+  onModifierMoyenne,
   logoDroite = null,
   moyennesGauche = null,
   paletteOuvertePour,
@@ -389,7 +393,18 @@ export default function CarteRendu({
             <div key={m.libelle} className={`cmap-moyenne cmap-moyenne-${m.couleur}`}>
               <span>{m.libelle}</span>
               <strong>
-                {m.valeur}°{m.mini != null && <em> / {m.mini}°</em>}
+                {onModifierMoyenne ? (
+                  <input
+                    className="cmap-moyenne-valeur"
+                    value={m.valeur}
+                    onChange={(e) => onModifierMoyenne(m.id, e.target.value)}
+                    style={{ width: `${Math.max(1, m.valeur.length) * 0.62 + 0.15}em` }}
+                    title="Modifier la moyenne"
+                  />
+                ) : (
+                  m.valeur
+                )}
+                °{m.mini != null && <em> / {m.mini}°</em>}
               </strong>
             </div>
           ))}

@@ -836,8 +836,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   // Seule la vue France affiche des moyennes (Nord et Sud) ; régions et départements n'en ont pas.
   const moyennes: BoiteMoyenne[] = enFrance
     ? [
-        { libelle: 'MOYENNE NORD', valeur: valeurMoyenne('nord'), mini: miniMoyenne('nord'), couleur: 'nord' },
-        { libelle: 'MOYENNE SUD', valeur: valeurMoyenne('sud'), mini: miniMoyenne('sud'), couleur: 'sud' },
+        { id: 'nord', libelle: 'MOYENNE NORD', valeur: valeurMoyenne('nord'), mini: miniMoyenne('nord'), couleur: 'nord' },
+        { id: 'sud', libelle: 'MOYENNE SUD', valeur: valeurMoyenne('sud'), mini: miniMoyenne('sud'), couleur: 'sud' },
       ]
     : [];
 
@@ -989,6 +989,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       styleVent={styleVent}
       couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
+      onModifierMoyenne={(id, v) => setMoyennesManuelles((m) => ({ ...m, [cleMoyenne(id)]: v }))}
       paletteOuvertePour={paletteOuvertePour}
       pictosSelectionnes={enExport ? undefined : pictosSelectionnes}
       onBasculerPalette={(code, multiple) => {
@@ -1229,7 +1230,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           >
             Rétablir les valeurs du modèle
           </button>
-          <p className="text-xs text-muted">Les températures sont modifiables directement sur la carte.</p>
+          <p className="text-xs text-muted">Les températures et les moyennes Nord / Sud sont modifiables directement sur la carte.</p>
         </div>
       </aside>
 

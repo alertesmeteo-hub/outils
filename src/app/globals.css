@@ -103,6 +103,9 @@ body {
 .cmap-moyenne-sud span { color: #ff8c1a; }
 .cmap-moyenne strong { display: block; font-size: 26px; line-height: 1.1; color: #fff; font-weight: 800; }
 .cmap-moyenne strong em { font-style: normal; font-size: 18px; color: #6bb3ff; }
+/* Moyenne modifiable sur la carte : champ sans bordure, même police que la valeur affichée. */
+.cmap-moyenne-valeur { padding: 0; border: none; background: transparent; color: #fff; font: inherit; font-size: 26px; font-weight: 800; line-height: 1.1; text-align: right; outline: none; }
+.cmap-moyenne-valeur:focus { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
 
 .cmap-marqueur { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; z-index: 4; line-height: 1; }
 .cmap-ligne { display: flex; align-items: center; gap: 0.05em; }
