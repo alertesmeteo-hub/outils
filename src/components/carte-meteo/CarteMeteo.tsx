@@ -463,12 +463,17 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const ctx = document.createElement('canvas').getContext('2d');
     const boite = unirBoites(retenus.map((c) => c.boite));
     if (!ctx || !boite) return null;
-    const chemins = retenus.map((c) => new Path2D(c.d));
+    // « Sur terre » = sur n'importe quel département (le lido du Barcarès se prolonge dans l'Aude) ; le recentrage, lui, vise le
+    // département affiché.
+    const chemins = contoursDep.map((c) => new Path2D(c.d));
     const dedans = (x: number, y: number) => chemins.some((ch) => ctx.isPointInPath(ch, (x - vue.tx) / vue.echelle, (y - vue.ty) / vue.echelle));
     const centre = versEcran({ x: (boite.minX + boite.maxX) / 2, y: (boite.minY + boite.maxY) / 2 }, vue);
-    const surTerre = (qx: number, qy: number, decalagePicto: number) => {
-      return dedans(qx - decalagePicto, qy);
-    };
+    // Le picto est à gauche de la température : son centre est ~0,7 em à gauche du centre du marqueur et son bord gauche ~1,8 em
+    // (`decalagePicto` vaut 1,5 em). Les deux doivent être sur le territoire : un picto à cheval sur la côte est ramené vers l'intérieur.
+    const surTerre = (qx: number, qy: number, decalagePicto: number) => dedans(qx - decalagePicto * 0.47, qy) && dedans(qx - decalagePicto * 1.2, qy);
+    // Règle souple pour les positions de repli (anti-chevauchement) : le centre du picto sur la terre suffit, sinon les villes
+    // du littoral (Le Barcarès, Saint-Cyprien…) n'auraient plus aucune place et disparaîtraient.
+    const centreSurTerre = (qx: number, qy: number, decalagePicto: number) => dedans(qx - decalagePicto * 0.47, qy);
     // France entière : chaque point est ramené vers le centre de son propre département (une ville de Corse reste en Corse).
     const centreDe = (code: string) => {
       const c = enFrance ? retenus.find((r) => r.code === code) : undefined;
@@ -486,7 +491,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       }
       return { x: px, y: py };
     };
-    return { ramener, surTerre };
+    return { ramener, surTerre, centreSurTerre };
   }, [enDepartement, enFrance, contoursDep, selection, vue]);
 
   const valeurPrincipale = (code: string): number | null => {
@@ -657,10 +662,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const plusFroid = min != null && numeriques.filter((v) => v === min).length === 1 ? min : null;
     // Toutes les rafales : y compris celles des villes de réserve, qui peuvent remplacer une ville sans place.
     const rafalesSignalees = enDepartement ? plusFortesRafales(maxRafales === Infinity ? pointsAffiches : reference) : codesRafales;
+    // Distance (px) du centre du picto au centre du marqueur, pour les tests « sur la terre » (France : pictos plus petits).
+    const decalagePicto = (enFrance ? 1.2 : 1.5) * 22 * echelleMarqueurs;
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
       const brut = grilleFrance?.get(p.code) ?? versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
-      const { x, y } = terre ? terre.ramener(brut.x, brut.y, (enFrance ? 1.2 : 1.5) * 22 * echelleMarqueurs, p.code) : brut;
+      const { x, y } = terre ? terre.ramener(brut.x, brut.y, decalagePicto, p.code) : brut;
       const rafale = rafaleDe(p);
       const v = valeurs[i];
       return {
@@ -715,13 +722,22 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         priorite: enDepartement ? (m.ton != null ? 1 : 2) : m.rafale != null && Number.isFinite(maxRafales) ? 0 : m.ton != null || m.rafale != null ? 1 : 2,
       };
     });
-    const places = placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em);
+    // Taille de la pastille de rafale d'un marqueur (plus petite sous SEUIL_VENT_REDUIT).
+    const tailleVent = (m: Marqueur) => {
+      const reduit = (m.rafale ?? 0) < SEUIL_VENT_REDUIT;
+      const k = (reduit ? ECHELLE_VENT_REDUIT : 1) * em;
+      return { reduit, w: LARGEUR_VENT[styleVent] * k, h: (HAUTEUR_VENT[styleVent] + (m.ressenti != null ? HAUTEUR_RESSENTI : 0)) * k };
+    };
+    // France et départements : aucune position de repli en mer (le décalage anti-chevauchement reste sur la terre).
+    const places = placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em, (e, x, y) =>
+      !terre || terre.centreSurTerre(x, y, decalagePicto)
+    );
     // On s'arrête au nombre voulu : les candidats en réserve ne servent qu'à remplacer ceux qui n'ont pas trouvé de place.
     // France et régions : les extrêmes et les rafales à signaler sont toujours gardés (et comptent dans le total).
     // Vue département : après décalage anti-chevauchement, un picto qui se retrouve en mer est écarté (une ville de réserve le remplace).
     const placesOk = bruts.filter((m) => {
       const pos = places.get(m.code);
-      return pos != null && (!terre || !enDepartement || terre.surTerre(pos.x, pos.y, 1.5 * em));
+      return pos != null && (!terre || terre.centreSurTerre(pos.x, pos.y, decalagePicto));
     });
     const imposes = new Set(enDepartement ? [] : placesOk.filter((m) => m.rafale != null || m.ton != null).map((m) => m.code));
     let restantes = Math.max(0, cible - imposes.size);
@@ -747,34 +763,50 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const avecVent = retenus.filter((m) => m.rafale != null).sort((a, b) => (b.rafale ?? 0) - (a.rafale ?? 0));
     const positions = new Map<string, { dx: number; dy: number; reduit: boolean }>();
     for (const m of avecVent) {
-      const reduit = (m.rafale ?? 0) < SEUIL_VENT_REDUIT;
-      const k = (reduit ? ECHELLE_VENT_REDUIT : 1) * em;
-      const w = LARGEUR_VENT[styleVent] * k;
-      const h = (HAUTEUR_VENT[styleVent] + (m.ressenti != null ? HAUTEUR_RESSENTI : 0)) * k;
+      const { reduit, w, h } = tailleVent(m);
       const e = elementDe.get(m.code)!;
-      // La pastille est toujours collée à son picto, centrée, dessous de préférence (sinon dessus) : on ne la pose jamais
+      // La pastille est toujours collée à son picto (dessous de préférence, sinon dessus, à droite ou à gauche) : on ne la pose jamais
       // ailleurs, sinon on ne sait plus à quel picto elle appartient. Le rectangle du picto est retiré des zones occupées
       // le temps de la recherche ; faute de place, c'est le picto qui se décale un peu avec sa pastille (jusqu'à ~4 em).
-      const sous = e.bas + h / 2 + 2;
-      const dessus = -(e.haut + h / 2 + 2);
+      // Places collées au picto, par ordre de préférence : dessous, dessus, puis à droite ou à gauche (à hauteur du picto).
+      const collees: [number, number][] = [
+        [0, e.bas + h / 2 + 2],
+        [0, -(e.haut + h / 2 + 2)],
+        [e.droite + w / 2 + 2, 0],
+        [-(e.gauche + w / 2 + 2), 0],
+      ];
       const propre = rectsMarqueurs.get(m.code)!;
       occupes.splice(occupes.indexOf(propre), 1);
-      const essai = (ox: number, oy: number, dy: number): [number, number] | null => {
+      const essai = (ox: number, oy: number, [dx, dy]: [number, number]): [number, number] | null => {
         const rectPicto = { x: propre.x + ox, y: propre.y + oy, w: propre.w, h: propre.h };
-        const rectPastille = { x: m.x + ox - w / 2, y: m.y + oy + dy - h / 2, w, h };
-        if (!libre(rectPicto) || !libre(rectPastille)) return null;
+        const rectPastille = { x: m.x + ox + dx - w / 2, y: m.y + oy + dy - h / 2, w, h };
+        // Le picto n'est re-testé que s'il bouge : à sa place, il est déjà validé (avec une marge plus faible que `libre`).
+        if (((ox || oy) && !libre(rectPicto)) || !libre(rectPastille)) return null;
+        // Vue département : un picto décalé doit rester sur la terre (pas sur la mer ni hors du département).
+        if (terre && (ox || oy) && !terre.centreSurTerre(m.x + ox, m.y + oy, decalagePicto)) return null;
         m.x += ox;
         m.y += oy;
         propre.x = rectPicto.x;
         propre.y = rectPicto.y;
-        return [0, dy];
+        return [dx, dy];
       };
-      let choix = essai(0, 0, sous) ?? essai(0, 0, dessus);
-      for (let r = 0.5; !choix && r <= 4; r += 0.5) {
-        for (let a = 0; !choix && a < 16; a++) {
-          const ox = Math.cos((a * Math.PI) / 8) * r * em;
-          const oy = Math.sin((a * Math.PI) / 8) * r * em;
-          choix = essai(ox, oy, sous) ?? essai(ox, oy, dessus);
+      // Dessous / dessus d'abord, même s'il faut décaler un peu le picto ; à droite / à gauche seulement en dernier recours.
+      let choix: [number, number] | null = null;
+      for (const places of [collees.slice(0, 2), collees.slice(2)]) {
+        const essais = (ox: number, oy: number) => {
+          for (const c of places) {
+            const r = essai(ox, oy, c);
+            if (r) return r;
+          }
+          return null;
+        };
+        choix ??= essais(0, 0);
+        for (let r = 0.5; !choix && r <= 4; r += 0.5) {
+          for (let a = 0; !choix && a < 16; a++) {
+            const ox = Math.cos((a * Math.PI) / 8) * r * em;
+            const oy = Math.sin((a * Math.PI) / 8) * r * em;
+            choix = essais(ox, oy);
+          }
         }
       }
       occupes.push(propre);

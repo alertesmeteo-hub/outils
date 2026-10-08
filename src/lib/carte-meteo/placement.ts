@@ -33,7 +33,9 @@ export function placerSansChevauchement(
   elements: ElementAPlacer[],
   obstacles: Rect[],
   limites: { largeur: number; hauteur: number },
-  decalageMax: number
+  decalageMax: number,
+  /** Position (centre) acceptable pour cet élément ? Ex. en vue département : rester sur la terre. */
+  valide?: (e: ElementAPlacer, x: number, y: number) => boolean
 ): Map<string, { x: number; y: number }> {
   const genererDecalages = (max: number, anneaux: number): [number, number][] => {
     const liste: [number, number][] = [[0, 0]];
@@ -59,6 +61,7 @@ export function placerSansChevauchement(
     for (const [dx, dy] of e.priorite === 0 ? decalagesPrioritaires : decalages) {
       const rect: Rect = { x: e.x + dx - e.gauche, y: e.y + dy - e.haut, w: e.gauche + e.droite, h: e.haut + e.bas };
       if (rect.x < 2 || rect.y < 2 || rect.x + rect.w > limites.largeur - 2 || rect.y + rect.h > limites.hauteur - 2) continue;
+      if (valide && !valide(e, e.x + dx, e.y + dy)) continue;
       if (occupes.some((o) => seChevauchent(rect, o))) continue;
       occupes.push(rect);
       places.set(e.code, { x: e.x + dx, y: e.y + dy });
