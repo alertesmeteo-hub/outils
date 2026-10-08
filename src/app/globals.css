@@ -145,6 +145,11 @@ body {
   white-space: nowrap;
 }
 .cmap-vent strong { font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-weight: 400; font-size: 1.12em; letter-spacing: 0.01em; }
+/* Valeur de rafale modifiable : même police que le nombre affiché. */
+.cmap-vent-valeur { background: transparent; border: none; padding: 0; margin: 0; text-align: center; font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-size: 1.12em; letter-spacing: 0.01em; line-height: 1; }
+.cmap-vent-valeur:focus, .cmap-vent-saisie:focus { outline: 2px solid #ffd21a; outline-offset: 1px; border-radius: 3px; }
+/* Rond : champ transparent posé sur le nombre du disque (le SVG affiche la valeur, le champ sert à la saisir). */
+.cmap-vent-saisie { position: absolute; left: 50%; top: 32%; transform: translateX(-50%); width: 1.6em; height: 0.95em; background: transparent; border: none; padding: 0; text-align: center; color: transparent; font-size: 1em; cursor: text; }
 .cmap-vent small { font-family: Arial, sans-serif; font-size: 0.6em; font-weight: 700; margin-left: 0.05em; align-self: flex-end; margin-bottom: 0.2em; }
 /* Ressenti (windchill) sous l'indicateur de vent : cartouche bleu « ressenti −3° » (fond en style, voir CarteRendu). */
 .cmap-ressenti { display: flex; align-items: baseline; gap: 0.25em; margin-top: 0.15em; padding: 0.06em 0.45em; border-radius: 0.6em; border: 0.1em solid #fff; box-shadow: 0 0.06em 0.3em rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.62em; line-height: 1.15; white-space: nowrap; }

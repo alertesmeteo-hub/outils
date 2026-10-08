@@ -320,6 +320,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [titreManuel, setTitreManuel] = useState<string | null>(null);
   const [sousTitreManuel, setSousTitreManuel] = useState<string | null>(null);
   const [moyennesManuelles, setMoyennesManuelles] = useState<Record<string, string>>({});
+  /** Rafales corrigées à la main, par période et par point (clé « période|code »). */
+  const [rafalesManuelles, setRafalesManuelles] = useState<Record<string, string>>({});
   const [paletteOuvertePour, setPaletteOuvertePour] = useState<string | null>(null);
   const [pictosSelectionnes, setPictosSelectionnes] = useState<Set<string>>(new Set());
   const [modeMultiple, setModeMultiple] = useState(false);
@@ -355,6 +357,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         setDonnees({ modele, dateISO, points: json.points });
         setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
         setMoyennesManuelles({});
+        setRafalesManuelles({});
       })
       .catch((e: Error) => {
         if (e.name === 'AbortError') return;
@@ -376,6 +379,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       })
       .then((json) => {
         setDonneesVilles({ modele, dateISO, departement, points: json.points });
+        setRafalesManuelles({});
         setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
       })
       .catch((e: Error) => {
@@ -468,6 +472,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const valeurPrincipale = (code: string): number | null => {
     const e = editions[code];
     return e ? nombre(periode === 'matin' ? e.tempM : periode === 'apres-midi' ? e.tempAM : e.maxi) : null;
+  };
+
+  /** Rafale affichée : la valeur corrigée à la main si c'est un nombre (elle donne aussi la couleur), sinon celle du modèle. */
+  const rafaleAffichee = (code: string, modele: number) => {
+    const manuelle = Number(rafalesManuelles[`${periode}|${code}`]?.replace(',', '.'));
+    return rafalesManuelles[`${periode}|${code}`]?.trim() && Number.isFinite(manuelle) ? Math.round(manuelle) : modele;
   };
 
   const rafaleDe = (p: PointCarte) => (periode === 'matin' ? p.rafaleMatin : periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee);
@@ -642,7 +652,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         valeur: e ? (periode === 'matin' ? e.tempM : periode === 'apres-midi' ? e.tempAM : e.maxi) : '',
         mini: periode === 'journee' ? e?.mini ?? '' : null,
         // Rafale arrondie de 5 en 5 km/h pour l'affichage.
-        rafale: rafalesSignalees.has(p.code) && rafale != null ? Math.round(rafale / 5) * 5 : null,
+        rafale: rafalesSignalees.has(p.code) && rafale != null ? rafaleAffichee(p.code, Math.round(rafale / 5) * 5) : null,
+        rafaleTexte: rafalesManuelles[`${periode}|${p.code}`],
         direction: afficherFleches ? angleFleche(periode === 'matin' ? p.directionRafaleMatin : periode === 'apres-midi' ? p.directionRafaleApresMidi : p.directionRafaleJournee) : null,
         // Ressenti avec la température affichée (donc modifiable) et le vent moyen à l'heure de la rafale maximale.
         ressenti: afficherRessenti && rafalesSignalees.has(p.code) && rafale != null ? calculerRessenti(v, ventDe(p)) : null,
@@ -692,7 +703,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     let restantes = Math.max(0, cible - imposes.size);
     return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles]);
 
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
@@ -749,7 +760,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     setTitreManuel(null);
   }
 
-  function modifier(code: string, champ: 'valeur' | 'mini' | 'picto', valeur: string, partout = false) {
+  function modifier(code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale', valeur: string, partout = false) {
+    if (champ === 'rafale') {
+      setRafalesManuelles((r) => ({ ...r, [`${periode}|${code}`]: valeur }));
+      return;
+    }
     setEditions((prev) => {
       if (champ === 'picto' && (partout || (pictosSelectionnes.size > 0 && pictosSelectionnes.has(code)))) {
         const toutes: Record<string, Edition> = { ...prev };
@@ -1052,6 +1067,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 ...(donneesVilles ? construireEditions(donneesVilles.points, jeuPictos) : {}),
               });
               setMoyennesManuelles({});
+        setRafalesManuelles({});
               setTitreManuel(null);
               setSousTitreManuel(null);
             }}

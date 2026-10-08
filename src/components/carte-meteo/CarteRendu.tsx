@@ -68,6 +68,8 @@ export interface Marqueur {
   /** Minimum de la journée (mode « journée » uniquement). */
   mini: string | null;
   rafale: number | null;
+  /** Valeur de rafale affichée (modifiable à la main) ; la couleur suit `rafale`. */
+  rafaleTexte?: string;
   /** Angle de la flèche du vent (degrés, sens horaire depuis le haut : là où souffle le vent) à l'heure de la rafale ; null = sans flèche. */
   direction?: number | null;
   /** Température ressentie (windchill) affichée sous l'indicateur de vent, si l'option est active. */
@@ -87,8 +89,24 @@ export const HAUTEUR_RESSENTI = 1.05;
 const POLICE_VALEUR = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 const CONTOUR_SOMBRE = 'rgba(5, 12, 30, 0.55)';
 
-function BadgeVent({ rafale, direction, ressenti, style }: { rafale: number; direction: number | null; ressenti: number | null; style: StyleVent }) {
+function BadgeVent({
+  rafale,
+  texteRafale,
+  onModifier,
+  direction,
+  ressenti,
+  style,
+}: {
+  rafale: number;
+  texteRafale: string;
+  onModifier: (valeur: string) => void;
+  direction: number | null;
+  ressenti: number | null;
+  style: StyleVent;
+}) {
   const { fond, texte } = couleurRafale(rafale);
+  const nombre = Number(texteRafale);
+  const grand = Number.isFinite(nombre) && nombre >= 100;
   const cartoucheRessenti = ressenti != null && (
     <div className="cmap-ressenti" style={{ background: ressenti <= -10 ? '#0b3d91' : '#1f6fe0' }} title="Température ressentie (refroidissement éolien)">
       <small>ressenti</small>
@@ -104,7 +122,14 @@ function BadgeVent({ rafale, direction, ressenti, style }: { rafale: number; dir
             <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" fill={texte} stroke={texte} strokeWidth={1} strokeLinejoin="round" transform={`rotate(${direction})`} />
           </svg>
         )}
-        <strong>{rafale}</strong>
+        <input
+          className="cmap-vent-valeur"
+          value={texteRafale}
+          onChange={(e) => onModifier(e.target.value)}
+          size={Math.max(2, texteRafale.length)}
+          style={{ color: texte, width: `${Math.max(2, texteRafale.length) * 0.6}em` }}
+          aria-label="Rafales (km/h)"
+        />
         <small>km/h</small>
       </div>
       {cartoucheRessenti}
@@ -120,19 +145,29 @@ function BadgeVent({ rafale, direction, ressenti, style }: { rafale: number; dir
   );
   return (
     <>
-    <svg viewBox="-50 -50 100 100" style={{ width: '2.6em', height: '2.6em', margin: '-0.3em 0 -0.15em', display: 'block' }} role="img" aria-label={`Rafales ${rafale} km/h`}>
+    <div style={{ position: 'relative' }}>
+    <svg viewBox="-50 -50 100 100" style={{ width: '2.6em', height: '2.6em', margin: '-0.3em 0 -0.15em', display: 'block' }} role="img" aria-label={`Rafales ${texteRafale} km/h`}>
       <title>Rafales maximales (km/h)</title>
       <g fill={CONTOUR_SOMBRE} stroke={CONTOUR_SOMBRE} strokeWidth={11} strokeLinejoin="round">{forme}</g>
       <g fill="#ffffff" stroke="#ffffff" strokeWidth={6} strokeLinejoin="round">{forme}</g>
       <g fill={fond}>{forme}</g>
       {/* Trois chiffres (100 km/h et plus) : police réduite pour tenir dans le disque. */}
-      <text y={rafale >= 100 ? 4 : 5} textAnchor="middle" fontFamily={POLICE_VALEUR} fontSize={rafale >= 100 ? 25 : 30} fill={texte}>
-        {rafale}
+      <text y={grand ? 4 : 5} textAnchor="middle" fontFamily={POLICE_VALEUR} fontSize={grand ? 25 : 30} fill={texte}>
+        {texteRafale}
       </text>
       <text y={21} textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight={700} fontSize={12.5} fill={texte}>
         km/h
       </text>
     </svg>
+    <input
+      className="cmap-vent-saisie"
+      value={texteRafale}
+      onChange={(e) => onModifier(e.target.value)}
+      size={3}
+      style={{ caretColor: texte }}
+      aria-label="Rafales (km/h)"
+    />
+    </div>
     {cartoucheRessenti}
     </>
   );
@@ -188,7 +223,7 @@ interface Props {
   /** Pictos sélectionnés (Ctrl/Maj + clic) pour être modifiés ensemble. */
   pictosSelectionnes?: Set<string>;
   onBasculerPalette: (code: string, multiple: boolean) => void;
-  onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto', valeur: string, partout?: boolean) => void;
+  onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale', valeur: string, partout?: boolean) => void;
 }
 
 // Couleurs en attributs SVG et non en classes CSS : html-to-image (export JPG) ne recopie pas les styles
@@ -365,7 +400,16 @@ export default function CarteRendu({
                 )}
               </div>
             </div>
-            {m.rafale != null && <BadgeVent rafale={m.rafale} direction={m.direction ?? null} ressenti={m.ressenti ?? null} style={styleVent} />}
+            {m.rafale != null && (
+              <BadgeVent
+                rafale={m.rafale}
+                texteRafale={m.rafaleTexte ?? String(m.rafale)}
+                onModifier={(v) => onModifier(m.code, 'rafale', v)}
+                direction={m.direction ?? null}
+                ressenti={m.ressenti ?? null}
+                style={styleVent}
+              />
+            )}
             {paletteOuvertePour === m.code && (
               <div className="cmap-palette" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs, largeur)}>
                 <label className="cmap-palette-partout">
