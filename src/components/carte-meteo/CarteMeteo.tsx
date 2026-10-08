@@ -727,13 +727,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
     // Indicateurs de rafale : sous le picto de préférence, sinon à côté ou au-dessus, sans chevaucher pictos, textes ni autres rafales.
     const elementDe = new Map(elements.map((e) => [e.code, e]));
-    const occupes: Rect[] = [
-      ...obstacles,
-      ...retenus.map((m) => {
+    const rectsMarqueurs = new Map(
+      retenus.map((m) => {
         const e = elementDe.get(m.code)!;
-        return { x: m.x - e.gauche, y: m.y - e.haut, w: e.gauche + e.droite, h: e.haut + e.bas };
-      }),
-    ];
+        return [m.code, { x: m.x - e.gauche, y: m.y - e.haut, w: e.gauche + e.droite, h: e.haut + e.bas } as Rect];
+      })
+    );
+    const occupes: Rect[] = [...obstacles, ...rectsMarqueurs.values()];
     // Deux pastilles de rafale ne se touchent jamais : au moins ~0,7 em entre elles (4 px avec le reste).
     const pastilles: Rect[] = [];
     const MARGE_PASTILLES = 0.7 * em;
@@ -750,17 +750,39 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const w = LARGEUR_VENT[styleVent] * k;
       const h = (HAUTEUR_VENT[styleVent] + (m.ressenti != null ? HAUTEUR_RESSENTI : 0)) * k;
       const e = elementDe.get(m.code)!;
-      const sous = e.bas + h / 2 + 3;
-      const cotes = e.droite + w / 2 + 2;
+      const sous = e.bas + h / 2 + 5;
+      const cotes = e.droite + w / 2 + 5;
       const candidats: [number, number][] = [
         [0, sous], [w * 0.3, sous], [-w * 0.3, sous], [w * 0.6, sous], [-w * 0.6, sous],
         [cotes, e.bas * 0.5], [-cotes, e.bas * 0.5], [cotes, 0], [-cotes, 0],
         [0, -(e.haut + h / 2 + 1)], [w * 0.5, -(e.haut + h / 2 + 1)], [-w * 0.5, -(e.haut + h / 2 + 1)],
       ];
-      // Puis en s'éloignant progressivement (jusqu'à ~6 em), toujours autour du bas du picto.
-      for (let r = 0.5; r <= 6; r += 0.5) for (let a = 0; a < 24; a++) candidats.push([Math.cos((a * Math.PI) / 12) * r * em, sous + Math.sin((a * Math.PI) / 12) * r * em]);
+      // Puis en s'éloignant un peu (jusqu'à ~2,5 em) autour du bas du picto : au-delà, on ne sait plus à quel picto elle appartient.
+      for (let r = 0.5; r <= 2.5; r += 0.5) for (let a = 0; a < 24; a++) candidats.push([Math.cos((a * Math.PI) / 12) * r * em, sous + Math.sin((a * Math.PI) / 12) * r * em]);
+      let choix = candidats.find(([dx, dy]) => libre({ x: m.x + dx - w / 2, y: m.y + dy - h / 2, w, h }));
+      if (!choix) {
+        // Pas de place près du picto : on décale un peu le picto avec sa pastille dessous (jusqu'à ~2,4 em), plutôt que
+        // d'éloigner la pastille ou de la cacher. Le rectangle du picto est retiré des zones occupées le temps de la recherche.
+        const propre = rectsMarqueurs.get(m.code)!;
+        occupes.splice(occupes.indexOf(propre), 1);
+        recherche: for (let r = 0.5; r <= 2.4; r += 0.5) {
+          for (let a = 0; a < 16; a++) {
+            const ox = Math.cos((a * Math.PI) / 8) * r * em;
+            const oy = Math.sin((a * Math.PI) / 8) * r * em;
+            const rectPicto = { x: propre.x + ox, y: propre.y + oy, w: propre.w, h: propre.h };
+            const rectPastille = { x: m.x + ox - w / 2, y: m.y + oy + sous - h / 2, w, h };
+            if (!libre(rectPicto) || !libre(rectPastille)) continue;
+            m.x += ox;
+            m.y += oy;
+            propre.x = rectPicto.x;
+            propre.y = rectPicto.y;
+            choix = [0, sous];
+            break recherche;
+          }
+        }
+        occupes.push(propre);
+      }
       // Chevauchement interdit : sans place libre, la pastille n'est pas affichée (plutôt que de mordre sur un picto ou une autre pastille).
-      const choix = candidats.find(([dx, dy]) => libre({ x: m.x + dx - w / 2, y: m.y + dy - h / 2, w, h }));
       if (!choix) continue;
       const rect = { x: m.x + choix[0] - w / 2, y: m.y + choix[1] - h / 2, w, h };
       occupes.push(rect);
