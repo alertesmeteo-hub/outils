@@ -710,7 +710,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         haut: hauteur / 2 + (nomsVisibles ? 0.9 * em : 0),
         bas: hauteur / 2,
         // Rafales signalées en petit nombre : prioritaires (jamais écartées). « Toutes » : elles suivent simplement les pictos affichés.
-        priorite: m.rafale != null && Number.isFinite(maxRafales) ? 0 : m.ton != null || m.rafale != null ? 1 : 2,
+        // Vue département : les villes sont déjà choisies, la rafale ne change pas l'ordre de placement (sinon une ville
+        // venteuse prend la place d'une autre et des pictos disparaissent dès qu'on affiche les rafales).
+        priorite: enDepartement ? (m.ton != null ? 1 : 2) : m.rafale != null && Number.isFinite(maxRafales) ? 0 : m.ton != null || m.rafale != null ? 1 : 2,
       };
     });
     const places = placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em);

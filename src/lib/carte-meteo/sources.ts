@@ -1,5 +1,5 @@
 import 'server-only';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { COORDS_DEPARTEMENTS } from './departements-coords';
@@ -78,6 +78,21 @@ const memoire = new Map<string, Extrait>();
 const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleMeteo, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
+/** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
+const VERSION_CACHE = 'v5';
+let purgeFaite = false;
+
+/** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
+async function purgerAnciensExtraits(): Promise<void> {
+  if (purgeFaite) return;
+  purgeFaite = true;
+  try {
+    const fichiers = await readdir(dossierCache);
+    await Promise.all(fichiers.filter((f) => f.endsWith('.json') && !f.endsWith(`-${VERSION_CACHE}.json`)).map((f) => unlink(join(dossierCache, f)).catch(() => {})));
+  } catch {
+    // Dossier absent : rien à purger.
+  }
+}
 
 async function recuperer(url: string, delaiMs: number): Promise<Response> {
   let derniere: unknown = null;
@@ -221,6 +236,7 @@ async function lireDisque(cle: string): Promise<Extrait | null> {
 async function ecrireDisque(cle: string, extrait: Extrait): Promise<void> {
   try {
     await mkdir(dossierCache, { recursive: true });
+    await purgerAnciensExtraits();
     await writeFile(join(dossierCache, `${cle}.json`), JSON.stringify(extrait));
   } catch {
     // Le cache disque est facultatif.
@@ -238,7 +254,7 @@ function extraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> 
 }
 
 async function lireExtraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> {
-  const cle = `${modele}-${dep}-v5`;
+  const cle = `${modele}-${dep}-${VERSION_CACHE}`;
   const runTime = await passageCourant(modele);
   const enMemoire = memoire.get(cle);
   if (enMemoire && (!runTime || enMemoire.runTime === runTime)) return enMemoire;

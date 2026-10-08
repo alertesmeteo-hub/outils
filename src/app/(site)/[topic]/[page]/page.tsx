@@ -10,7 +10,7 @@ import { hubOfTool, toolHref, topicOf } from '@/lib/tools/hubs';
 import { CTA_URL, SITE_NAME, SITE_URL } from '@/lib/config';
 
 export const revalidate = 3600; // ISR : les modifications d'admin apparaissent sous 1 h (ou immédiatement via revalidatePath)
-export const dynamicParams = false;
+// Voir [topic]/page.tsx : pas de « dynamicParams = false » (erreur interne NoFallbackError journalisée) ; notFound() suffit.
 
 type Props = { params: Promise<{ topic: string; page: string }> };
 

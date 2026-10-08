@@ -5,7 +5,8 @@ import { hubs, getHub, toolsOfHub } from '@/lib/tools/hubs';
 import { listEnabledTools } from '@/lib/tools/resolve';
 
 export const revalidate = 3600;
-export const dynamicParams = false; // seuls les hubs déclarés existent : le reste renvoie 404
+// Pas de « dynamicParams = false » : avec lui, Next.js 15 journalise une erreur interne (NoFallbackError) à chaque URL inconnue ;
+// un slug inconnu passe par notFound() ci-dessous, ce qui donne le même 404 proprement.
 type Props = { params: Promise<{ topic: string }> };
 
 export const generateStaticParams = () => hubs.map((h) => ({ topic: h.slug }));
