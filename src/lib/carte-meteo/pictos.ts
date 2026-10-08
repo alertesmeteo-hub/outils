@@ -126,6 +126,14 @@ export function estPictoImage(picto: string): boolean {
   return picto.startsWith('img:') || picto.startsWith('mc:');
 }
 
+/** Picto de neige (emojis, images ou Meteocons) : on peut y afficher une altitude (ex. « 2000 m »). */
+export function estPictoNeige(picto: string): boolean {
+  if (picto === '🌨️' || picto === '❄️' || picto === '☃️') return true;
+  if (picto.startsWith('mc:')) return /snow|sleet/.test(picto);
+  if (picto.startsWith('img:')) return /neige/i.test(PICTOS_IMAGES.find((p) => p.id === picto)?.label ?? '');
+  return false;
+}
+
 export function cheminPictoImage(picto: string): string | undefined {
   return (picto.startsWith('mc:') ? PICTOS_METEOCONS : PICTOS_IMAGES).find((p) => p.id === picto)?.fichier;
 }

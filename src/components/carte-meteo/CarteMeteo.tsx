@@ -9,7 +9,7 @@ import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
-import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import {
   LATITUDE_SEUIL_NORD_SUD,
@@ -322,6 +322,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [moyennesManuelles, setMoyennesManuelles] = useState<Record<string, string>>({});
   /** Rafales corrigées à la main, par période et par point (clé « période|code »). */
   const [rafalesManuelles, setRafalesManuelles] = useState<Record<string, string>>({});
+  /** Pictos ajoutés à la main (clic sur la carte), propres à chaque zone. */
+  const [ajouts, setAjouts] = useState<{ id: number; zone: string; x: number; y: number; picto: PictoMeteo; valeur: string }[]>([]);
+  const [modeAjout, setModeAjout] = useState(false);
+  /** Altitude affichée sous les pictos de neige : par défaut pour toute la carte, et corrigée picto par picto (clé « période|code »). */
+  const [altitudeNeige, setAltitudeNeige] = useState('');
+  const [altitudes, setAltitudes] = useState<Record<string, string>>({});
   const [paletteOuvertePour, setPaletteOuvertePour] = useState<string | null>(null);
   const [pictosSelectionnes, setPictosSelectionnes] = useState<Set<string>>(new Set());
   const [modeMultiple, setModeMultiple] = useState(false);
@@ -705,6 +711,35 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles]);
 
+  const altitudeDe = (code: string, picto: string) => (estPictoNeige(picto) ? altitudes[`${periode}|${code}`] ?? altitudeNeige : undefined);
+  const marqueursAffiches: Marqueur[] = [
+    ...marqueurs.map((m) => ({ ...m, neige: estPictoNeige(m.picto), altitude: altitudeDe(m.code, m.picto) })),
+    ...ajouts
+      .filter((a) => a.zone === zone)
+      .map((a) => ({
+        code: `ajout:${a.id}`,
+        x: a.x,
+        y: a.y,
+        nom: '',
+        picto: a.picto,
+        valeur: a.valeur,
+        mini: null,
+        rafale: null,
+        ton: null,
+        ajoute: true,
+        neige: estPictoNeige(a.picto),
+        altitude: altitudeDe(`ajout:${a.id}`, a.picto),
+      })),
+  ];
+
+  /** Mode « ajouter un picto » : un clic sur la carte pose un picto (soleil par défaut) et ouvre sa palette. */
+  function ajouterPicto(x: number, y: number) {
+    const id = Date.now();
+    setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : '☀️', valeur: '' }]);
+    setPictosSelectionnes(new Set());
+    setPaletteOuvertePour(`ajout:${id}`);
+  }
+
   const moyennesCalculees = useMemo(() => {
     const groupe = (filtre: (lat: number) => boolean) => {
       const sel = points.filter((p) => filtre(coordsDe(p).lat));
@@ -760,10 +795,28 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     setTitreManuel(null);
   }
 
-  function modifier(code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale', valeur: string, partout = false) {
+  function modifier(code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale' | 'altitude', valeur: string, partout = false) {
     if (champ === 'rafale') {
       setRafalesManuelles((r) => ({ ...r, [`${periode}|${code}`]: valeur }));
       return;
+    }
+    if (champ === 'altitude') {
+      setAltitudes((a) => ({ ...a, [`${periode}|${code}`]: valeur }));
+      return;
+    }
+    // Pictos ajoutés à la main (et ceux de la sélection, s'il y en a) : ils vivent dans « ajouts », pas dans les éditions.
+    if (champ !== 'mini') {
+      const vises = new Set(champ === 'picto' && (partout || pictosSelectionnes.size > 0) ? (partout ? ajouts.map((a) => `ajout:${a.id}`) : [...pictosSelectionnes, code]) : [code]);
+      if ([...vises].some((c) => c.startsWith('ajout:'))) {
+        setAjouts((liste) => liste.map((a) => (vises.has(`ajout:${a.id}`) ? (champ === 'picto' ? { ...a, picto: valeur as PictoMeteo } : { ...a, valeur }) : a)));
+      }
+      if (code.startsWith('ajout:') && !partout && !(champ === 'picto' && pictosSelectionnes.has(code))) {
+        if (champ === 'picto') {
+          setPaletteOuvertePour(null);
+          setPictosSelectionnes(new Set());
+        }
+        return;
+      }
     }
     setEditions((prev) => {
       if (champ === 'picto' && (partout || (pictosSelectionnes.size > 0 && pictosSelectionnes.has(code)))) {
@@ -793,6 +846,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       });
       return suite;
     });
+    setAjouts((liste) => liste.map((a) => (pictosSelectionnes.has(`ajout:${a.id}`) ? { ...a, picto: picto as PictoMeteo } : a)));
   }
 
   /** Applique un jeu de pictos à toute la carte, d'après la prévision (les modifications faites picto par picto sont remplacées). */
@@ -853,7 +907,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       departements={departementsAffiches}
       regions={regionsAffichees}
       selection={selection}
-      marqueurs={marqueurs}
+      marqueurs={marqueursAffiches}
+      onClicCarte={modeAjout && !enExport ? ajouterPicto : undefined}
+      onSupprimer={enExport ? undefined : (code) => setAjouts((liste) => liste.filter((a) => `ajout:${a.id}` !== code))}
       echelleMarqueurs={echelleMarqueurs}
       afficherNoms={nomsVisibles}
       titre={titre}
@@ -944,6 +1000,37 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <label className="flex items-center gap-2 text-sm font-semibold">
               <input
                 type="checkbox"
+                checked={modeAjout}
+                onChange={(e) => {
+                  setModeAjout(e.target.checked);
+                  setPaletteOuvertePour(null);
+                }}
+              />
+              Ajouter des pictos sur la carte
+            </label>
+            {modeAjout && <p className="mt-1 text-xs text-muted">Clique sur la carte à l&apos;endroit voulu : un picto apparaît, choisis son icône (et une température si besoin). La croix rouge le retire (elle n&apos;apparaît pas sur l&apos;image).</p>}
+            {ajouts.some((a) => a.zone === zone) && (
+              <button type="button" className="btn-ghost mt-2 rounded-md px-2 py-1 text-xs" onClick={() => setAjouts((liste) => liste.filter((a) => a.zone !== zone))}>
+                Retirer les pictos ajoutés ({ajouts.filter((a) => a.zone === zone).length})
+              </button>
+            )}
+          </div>
+          <label className="mt-3 block text-sm font-medium">
+            Altitude de la neige (m)
+            <input
+              type="text"
+              inputMode="numeric"
+              value={altitudeNeige}
+              onChange={(e) => setAltitudeNeige(e.target.value)}
+              placeholder="ex. 2000 (vide = aucune)"
+              className="mt-1 w-full rounded-lg border border-border bg-surface p-1.5 text-sm"
+            />
+            <span className="mt-1 block text-xs font-normal text-muted">Affichée sous chaque picto de neige ; modifiable picto par picto dans sa palette.</span>
+          </label>
+          <div className="mt-3 rounded-lg border border-border p-2">
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
                 checked={modeMultiple}
                 onChange={(e) => {
                   setModeMultiple(e.target.checked);
@@ -957,7 +1044,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               <div className="mt-2">
                 <p className="text-xs text-muted">Clique sur les pictos de la carte pour les sélectionner (cadre jaune), puis choisis l&apos;icône ci-dessous.</p>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                  <button type="button" className="btn-ghost rounded-md px-2 py-1" onClick={() => setPictosSelectionnes(new Set(marqueurs.map((m) => m.code)))}>
+                  <button type="button" className="btn-ghost rounded-md px-2 py-1" onClick={() => setPictosSelectionnes(new Set(marqueursAffiches.map((m) => m.code)))}>
                     Tout sélectionner
                   </button>
                   <button type="button" className="btn-ghost rounded-md px-2 py-1" onClick={() => setPictosSelectionnes(new Set())}>

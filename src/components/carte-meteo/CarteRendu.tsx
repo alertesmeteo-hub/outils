@@ -75,6 +75,12 @@ export interface Marqueur {
   /** Température ressentie (windchill) affichée sous l'indicateur de vent, si l'option est active. */
   ressenti?: number | null;
   ton: 'chaud' | 'froid' | null;
+  /** Picto ajouté à la main (clic sur la carte) : peut être supprimé. */
+  ajoute?: boolean;
+  /** Altitude affichée sous un picto de neige (ex. « 2000 »), vide = rien. */
+  altitude?: string;
+  /** Le picto est un picto de neige (l'altitude est alors modifiable dans la palette). */
+  neige?: boolean;
 }
 
 /** Rafales : pastille (flèche + valeur sur une ligne) ou rond avec la valeur, dont la pointe indique où souffle le vent. */
@@ -223,7 +229,11 @@ interface Props {
   /** Pictos sélectionnés (Ctrl/Maj + clic) pour être modifiés ensemble. */
   pictosSelectionnes?: Set<string>;
   onBasculerPalette: (code: string, multiple: boolean) => void;
-  onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale', valeur: string, partout?: boolean) => void;
+  onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale' | 'altitude', valeur: string, partout?: boolean) => void;
+  /** Mode « ajouter un picto » : clic sur la carte (position en pixels de la carte). */
+  onClicCarte?: (x: number, y: number) => void;
+  /** Supprime un picto ajouté à la main. */
+  onSupprimer?: (code: string) => void;
 }
 
 // Couleurs en attributs SVG et non en classes CSS : html-to-image (export JPG) ne recopie pas les styles
@@ -290,6 +300,8 @@ export default function CarteRendu({
   pictosSelectionnes,
   onBasculerPalette,
   onModifier,
+  onClicCarte,
+  onSupprimer,
 }: Props) {
   const [partout, setPartout] = useState(false);
   const idClip = `fleuves-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
@@ -297,8 +309,13 @@ export default function CarteRendu({
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
         ref={carteRef}
-        className="cmap-rendu"
+        className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''}`}
         style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
+        onClick={(e) => {
+          if (!onClicCarte || (e.target as HTMLElement).closest('.cmap-marqueur, .cmap-palette')) return;
+          const cadre = e.currentTarget.getBoundingClientRect();
+          onClicCarte((e.clientX - cadre.left) / facteur, (e.clientY - cadre.top) / facteur);
+        }}
       >
         <svg className="cmap-svg" viewBox={`0 0 ${largeur} ${HAUTEUR_CARTE}`} width={largeur} height={HAUTEUR_CARTE}>
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
@@ -400,6 +417,12 @@ export default function CarteRendu({
                 )}
               </div>
             </div>
+            {m.altitude && m.altitude.trim() && <div className="cmap-altitude">{m.altitude.trim().replace(/\s*m$/i, '')} m</div>}
+            {m.ajoute && onSupprimer && (
+              <button type="button" className="cmap-supprimer cmap-sans-export" title="Retirer ce picto" onClick={() => onSupprimer(m.code)}>
+                ×
+              </button>
+            )}
             {m.rafale != null && (
               <BadgeVent
                 rafale={m.rafale}
@@ -416,6 +439,12 @@ export default function CarteRendu({
                   <input type="checkbox" checked={partout} onChange={(e) => setPartout(e.target.checked)} /> Même icône sur toute la carte
                 </label>
                 <div className="cmap-palette-aide">Ctrl/Maj + clic sur d'autres pictos : les modifier ensemble</div>
+                {m.neige && (
+                  <label className="cmap-palette-altitude">
+                    Altitude de la neige (m)
+                    <input value={m.altitude ?? ''} onChange={(e) => onModifier(m.code, 'altitude', e.target.value)} placeholder="ex. 2000" inputMode="numeric" size={6} />
+                  </label>
+                )}
                 <div className="cmap-palette-groupe">
                   {PICTOS_METEO.map((picto) => (
                     <button key={picto} type="button" onClick={() => onModifier(m.code, 'picto', picto, partout)}>

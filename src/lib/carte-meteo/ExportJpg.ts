@@ -51,6 +51,8 @@ export async function exporterEnJpg(noeud: HTMLElement, nomFichier: string, larg
         width: largeur,
         height: hauteur,
         backgroundColor: '#0b2a4a',
+        // Boutons d'édition (suppression d'un picto ajouté…) : jamais sur l'image.
+        filter: (n) => !(n instanceof Element && n.classList.contains('cmap-sans-export')),
         style: { transform: 'none', transformOrigin: 'top left' },
       }),
       new Promise<never>((_, rejeter) => setTimeout(() => rejeter(new Error("Délai dépassé pendant l'export")), 60_000)),
