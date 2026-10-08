@@ -555,7 +555,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       resultat.set(v.code, pos);
     }
     // Rafales à signaler : un département absent de la grille prend la place du nœud voisin (sinon ses rafales n'apparaîtraient pas).
-    for (const code of codesRafales) {
+    for (const code of Number.isFinite(maxRafales) ? codesRafales : []) {
       if (resultat.has(code)) continue;
       const p = points.find((q) => q.code === code);
       if (!p) continue;
@@ -564,7 +564,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       resultat.set(code, pos);
     }
     return resultat;
-  }, [enFrance, points, contoursDep, vue, densite, codesRafales]);
+  }, [enFrance, points, contoursDep, vue, densite, codesRafales, maxRafales]);
 
   /** Points affichés : les plus répartis selon la densité, plus toujours les extrêmes et les rafales à signaler. */
   const pointsAffiches = useMemo(() => {
@@ -694,7 +694,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         droite: demiLargeur,
         haut: hauteur / 2 + (nomsVisibles ? 0.9 * em : 0),
         bas: hauteur / 2,
-        priorite: m.rafale != null ? 0 : m.ton != null ? 1 : 2,
+        // Rafales signalées en petit nombre : prioritaires (jamais écartées). « Toutes » : elles suivent simplement les pictos affichés.
+        priorite: m.rafale != null && Number.isFinite(maxRafales) ? 0 : m.ton != null || m.rafale != null ? 1 : 2,
       };
     });
     const places = placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em);
@@ -1365,6 +1366,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 onChange={(e) => {
                   const n = Number(e.target.value);
                   setSeuilRafales(e.target.value === '' || !Number.isFinite(n) ? SEUIL_RAFALES_DEFAUT : Math.min(200, Math.max(0, n)));
+                  // Changer le seuil, c'est vouloir voir toutes les rafales au-dessus (sauf si un nombre a été choisi exprès).
+                  if (choixRafales == null) setChoixRafales('toutes');
                 }}
                 className={`${selectBarre} w-24`}
               />

@@ -168,7 +168,7 @@ function ventRafaleMax(serie: Serie, indices: number[]): number | null {
 }
 
 /**
- * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h, l'après-midi de 12 h à 18 h, la journée de 7 h à 20 h pour le
+ * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h, l'après-midi de 12 h à 18 h (température : maximum de 14 h à 18 h), la journée de 7 h à 20 h pour le
  * ciel. Le minimum de la nuit n'est donné que si la série couvre le début de la journée (avant 7 h).
  */
 export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateISO: string): PointCarte {
@@ -176,6 +176,8 @@ export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateIS
   const jour = locaux.map((l, i) => ({ ...l, i })).filter((l) => l.date === dateISO);
   const matin = jour.filter((l) => l.heure >= 6 && l.heure <= 11).map((l) => l.i);
   const apresMidi = jour.filter((l) => l.heure >= 12 && l.heure <= 17).map((l) => l.i);
+  // Température de l'après-midi : le maximum entre 14 h et 18 h (heure de Paris).
+  const chaleurApresMidi = jour.filter((l) => l.heure >= 14 && l.heure <= 18).map((l) => l.i);
   const ciel = jour.filter((l) => l.heure >= 7 && l.heure <= 20).map((l) => l.i);
   const toute = jour.map((l) => l.i);
   const debutCouvert = jour.length ? Math.min(...jour.map((l) => l.heure)) <= 7 : false;
@@ -191,7 +193,7 @@ export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateIS
     codeMatin: codePeriode(serie, matin),
     nuagesMatin: arrondi(moyenne(matin.map((i) => serie.nuages[i]))),
     pluieMatin: arrondi(somme(matin.map((i) => serie.pluie[i])), 1),
-    tempApresMidi: arrondi(maximum(apresMidi.map((i) => serie.temp[i])), 1),
+    tempApresMidi: arrondi(maximum(chaleurApresMidi.map((i) => serie.temp[i])), 1),
     rafaleApresMidi: arrondi(maximum(apresMidi.map((i) => serie.rafale[i]))),
     rafaleJournee: arrondi(maximum(toute.map((i) => serie.rafale[i]))),
     directionRafaleApresMidi: directionRafaleMax(serie, apresMidi),

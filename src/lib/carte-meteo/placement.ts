@@ -35,23 +35,28 @@ export function placerSansChevauchement(
   limites: { largeur: number; hauteur: number },
   decalageMax: number
 ): Map<string, { x: number; y: number }> {
-  const decalages: [number, number][] = [[0, 0]];
-  const anneaux = 6;
-  for (let k = 1; k <= anneaux; k++) {
-    const rayon = (decalageMax * k) / anneaux;
-    const pas = 16;
-    for (let i = 0; i < pas; i++) {
-      const angle = (2 * Math.PI * i) / pas;
-      decalages.push([Math.round(rayon * Math.cos(angle)), Math.round(rayon * Math.sin(angle))]);
+  const genererDecalages = (max: number, anneaux: number): [number, number][] => {
+    const liste: [number, number][] = [[0, 0]];
+    for (let k = 1; k <= anneaux; k++) {
+      const rayon = (max * k) / anneaux;
+      const pas = 16;
+      for (let i = 0; i < pas; i++) {
+        const angle = (2 * Math.PI * i) / pas;
+        liste.push([Math.round(rayon * Math.cos(angle)), Math.round(rayon * Math.sin(angle))]);
+      }
     }
-  }
+    return liste;
+  };
+  const decalages = genererDecalages(decalageMax, 6);
+  // Marqueurs prioritaires (rafales signalées) : ils peuvent s'éloigner davantage plutôt que de disparaître.
+  const decalagesPrioritaires = genererDecalages(decalageMax * 3, 15);
 
   const occupes: Rect[] = [...obstacles];
   const places = new Map<string, { x: number; y: number }>();
   const ordre = elements.map((e, i) => ({ e, i })).sort((a, b) => a.e.priorite - b.e.priorite || a.i - b.i);
 
   for (const { e } of ordre) {
-    for (const [dx, dy] of decalages) {
+    for (const [dx, dy] of e.priorite === 0 ? decalagesPrioritaires : decalages) {
       const rect: Rect = { x: e.x + dx - e.gauche, y: e.y + dy - e.haut, w: e.gauche + e.droite, h: e.haut + e.bas };
       if (rect.x < 2 || rect.y < 2 || rect.x + rect.w > limites.largeur - 2 || rect.y + rect.h > limites.hauteur - 2) continue;
       if (occupes.some((o) => seChevauchent(rect, o))) continue;
