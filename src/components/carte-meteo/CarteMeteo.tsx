@@ -734,9 +734,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         return { x: m.x - e.gauche, y: m.y - e.haut, w: e.gauche + e.droite, h: e.haut + e.bas };
       }),
     ];
+    // Deux pastilles de rafale ne se touchent jamais : au moins ~0,7 em entre elles (4 px avec le reste).
+    const pastilles: Rect[] = [];
+    const MARGE_PASTILLES = 0.7 * em;
+    const touche = (r: Rect, o: Rect, marge: number) => r.x < o.x + o.w + marge && r.x + r.w + marge > o.x && r.y < o.y + o.h + marge && r.y + r.h + marge > o.y;
     const libre = (r: Rect) =>
       r.x >= 2 && r.y >= 2 && r.x + r.w <= largeurCarte - 2 && r.y + r.h <= HAUTEUR_CARTE - 2 &&
-      !occupes.some((o) => r.x < o.x + o.w + 2 && r.x + r.w + 2 > o.x && r.y < o.y + o.h + 2 && r.y + r.h + 2 > o.y);
+      !occupes.some((o) => touche(r, o, 4)) && !pastilles.some((o) => touche(r, o, MARGE_PASTILLES));
     // Les plus fortes d'abord : ce sont elles qui gardent la meilleure place.
     const avecVent = retenus.filter((m) => m.rafale != null).sort((a, b) => (b.rafale ?? 0) - (a.rafale ?? 0));
     const positions = new Map<string, { dx: number; dy: number; reduit: boolean }>();
@@ -746,39 +750,28 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const w = LARGEUR_VENT[styleVent] * k;
       const h = (HAUTEUR_VENT[styleVent] + (m.ressenti != null ? HAUTEUR_RESSENTI : 0)) * k;
       const e = elementDe.get(m.code)!;
-      const sous = e.bas + h / 2 + 1;
+      const sous = e.bas + h / 2 + 3;
       const cotes = e.droite + w / 2 + 2;
       const candidats: [number, number][] = [
         [0, sous], [w * 0.3, sous], [-w * 0.3, sous], [w * 0.6, sous], [-w * 0.6, sous],
         [cotes, e.bas * 0.5], [-cotes, e.bas * 0.5], [cotes, 0], [-cotes, 0],
         [0, -(e.haut + h / 2 + 1)], [w * 0.5, -(e.haut + h / 2 + 1)], [-w * 0.5, -(e.haut + h / 2 + 1)],
       ];
-      // Puis en s'éloignant un peu, toujours autour du bas du picto.
-      for (let r = 0.5; r <= 4; r += 0.5) for (let a = 0; a < 16; a++) candidats.push([Math.cos((a * Math.PI) / 8) * r * em, sous + Math.sin((a * Math.PI) / 8) * r * em]);
-      // Pas de place libre : la position qui chevauche le moins.
-      const recouvrement = (r: Rect) =>
-        occupes.reduce((t, o) => t + Math.max(0, Math.min(r.x + r.w, o.x + o.w) - Math.max(r.x, o.x)) * Math.max(0, Math.min(r.y + r.h, o.y + o.h) - Math.max(r.y, o.y)), 0) +
-        (r.x < 2 || r.y < 2 || r.x + r.w > largeurCarte - 2 || r.y + r.h > HAUTEUR_CARTE - 2 ? 1e6 : 0);
-      let choix: [number, number] = [0, sous];
-      let meilleur = Infinity;
-      for (const [dx, dy] of candidats) {
-        const r = { x: m.x + dx - w / 2, y: m.y + dy - h / 2, w, h };
-        if (libre(r)) {
-          choix = [dx, dy];
-          break;
-        }
-        const cout = recouvrement(r);
-        if (cout < meilleur) {
-          meilleur = cout;
-          choix = [dx, dy];
-        }
-      }
-      occupes.push({ x: m.x + choix[0] - w / 2, y: m.y + choix[1] - h / 2, w, h });
+      // Puis en s'éloignant progressivement (jusqu'à ~6 em), toujours autour du bas du picto.
+      for (let r = 0.5; r <= 6; r += 0.5) for (let a = 0; a < 24; a++) candidats.push([Math.cos((a * Math.PI) / 12) * r * em, sous + Math.sin((a * Math.PI) / 12) * r * em]);
+      // Chevauchement interdit : sans place libre, la pastille n'est pas affichée (plutôt que de mordre sur un picto ou une autre pastille).
+      const choix = candidats.find(([dx, dy]) => libre({ x: m.x + dx - w / 2, y: m.y + dy - h / 2, w, h }));
+      if (!choix) continue;
+      const rect = { x: m.x + choix[0] - w / 2, y: m.y + choix[1] - h / 2, w, h };
+      occupes.push(rect);
+      pastilles.push(rect);
       positions.set(m.code, { dx: Math.round(choix[0]), dy: Math.round(choix[1]), reduit });
     }
     return retenus.map((m) => {
       const p = positions.get(m.code);
-      return p ? { ...m, vent: { dx: p.dx, dy: p.dy }, ventReduit: p.reduit } : m;
+      if (p) return { ...m, vent: { dx: p.dx, dy: p.dy }, ventReduit: p.reduit };
+      // Rafale sans place : le picto reste, sans pastille.
+      return m.rafale != null ? { ...m, rafale: null, ressenti: null } : m;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees]);
