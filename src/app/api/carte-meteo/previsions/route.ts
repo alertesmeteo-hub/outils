@@ -34,8 +34,9 @@ export async function GET(req: Request) {
     const points = dep ? await chargerPrevisionsVilles(modele, date, dep) : await chargerPrevisionsCarte(modele, date);
     return NextResponse.json({ modele, date, dep, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
   } catch (erreur) {
-    console.error('Erreur carte météo', erreur);
     const sansDonnee = erreur instanceof Error && erreur.message.includes('aucune donnée');
+    // Un jour sans donnée (J+15 avant le passage de 12 h UTC…) est un cas normal : pas d'erreur dans les logs.
+    if (!sansDonnee) console.error('Erreur carte météo', erreur);
     return NextResponse.json(
       { erreur: sansDonnee ? 'Pas de prévision pour ce jour avec ce modèle.' : 'Prévisions momentanément indisponibles' },
       { status: sansDonnee ? 404 : 503 }

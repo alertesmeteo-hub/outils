@@ -79,7 +79,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleMeteo, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v5';
+const VERSION_CACHE = 'v6';
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -180,7 +180,7 @@ function repartir<T extends { lat: number; lon: number }>(liste: T[], n: number)
 
 /** Retouches à la main de la liste des villes d'un département : villes à toujours garder, villes à écarter (noms exacts). */
 const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[] }> = {
-  '66': { garder: ['Ille-sur-Têt', 'Bourg-Madame'], ecarter: ['Corbère', 'Osséja'] },
+  '66': { garder: ['Ille-sur-Têt', 'Bourg-Madame', 'Le Barcarès', 'Saint-Cyprien'], ecarter: ['Corbère', 'Osséja'] },
 };
 
 function extraire(dep: string, fichier: FichierDepartement, runTime: string): Extrait {

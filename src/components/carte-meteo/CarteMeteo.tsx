@@ -463,9 +463,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const ctx = document.createElement('canvas').getContext('2d');
     const boite = unirBoites(retenus.map((c) => c.boite));
     if (!ctx || !boite) return null;
-    // « Sur terre » = sur n'importe quel département (le lido du Barcarès se prolonge dans l'Aude) ; le recentrage, lui, vise le
-    // département affiché.
-    const chemins = contoursDep.map((c) => new Path2D(c.d));
+    // « Sur terre » = sur le territoire affiché (département sélectionné, ou toute la France) : un picto de ville frontalière ne
+    // déborde pas sur le département voisin.
+    const chemins = retenus.map((c) => new Path2D(c.d));
     const dedans = (x: number, y: number) => chemins.some((ch) => ctx.isPointInPath(ch, (x - vue.tx) / vue.echelle, (y - vue.ty) / vue.echelle));
     const centre = versEcran({ x: (boite.minX + boite.maxX) / 2, y: (boite.minY + boite.maxY) / 2 }, vue);
     // Le picto est à gauche de la température : son centre est ~0,7 em à gauche du centre du marqueur et son bord gauche ~1,8 em
@@ -579,7 +579,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const p = points.find((q) => q.code === code);
       if (!p) continue;
       const pos = versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
-      for (const [c, n] of [...resultat]) if (!VILLES_IMPOSEES.some((o) => o.code === c) && !codesRafales.has(c) && ((n.x - pos.x) / dx) ** 2 + ((n.y - pos.y) / dy) ** 2 < 0.8) resultat.delete(c);
+      const proche = (n: { x: number; y: number }) => ((n.x - pos.x) / dx) ** 2 + ((n.y - pos.y) / dy) ** 2 < 0.8;
+      // Une ville imposée (Perpignan, Marseille…) tout près : on ne force pas ce département, sinon les deux pictos se gênent et
+      // l'un est repoussé loin de sa place (l'Aude, juste au-dessus de Perpignan, poussait les Pyrénées-Orientales vers le Tarn).
+      if (VILLES_IMPOSEES.some((o) => o.code !== code && resultat.has(o.code) && proche(resultat.get(o.code)!))) continue;
+      for (const [c, n] of [...resultat]) if (!VILLES_IMPOSEES.some((o) => o.code === c) && !codesRafales.has(c) && proche(n)) resultat.delete(c);
       resultat.set(code, pos);
     }
     return resultat;
@@ -719,7 +723,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         // Rafales signalées en petit nombre : prioritaires (jamais écartées). « Toutes » : elles suivent simplement les pictos affichés.
         // Vue département : les villes sont déjà choisies, la rafale ne change pas l'ordre de placement (sinon une ville
         // venteuse prend la place d'une autre et des pictos disparaissent dès qu'on affiche les rafales).
-        priorite: enDepartement ? (m.ton != null ? 1 : 2) : m.rafale != null && Number.isFinite(maxRafales) ? 0 : m.ton != null || m.rafale != null ? 1 : 2,
+        // France : les villes imposées (Perpignan, Montpellier, Marseille, Paris, Lille) sont placées en tout premier, à leur place :
+        // elles ne sont jamais écartées ni repoussées par un picto voisin.
+        priorite: enDepartement ? (m.ton != null ? 1 : 2) : enFrance && VILLES_IMPOSEES.some((v) => v.code === m.code) ? -1 : m.rafale != null && Number.isFinite(maxRafales) ? 0 : m.ton != null || m.rafale != null ? 1 : 2,
       };
     });
     // Taille de la pastille de rafale d'un marqueur (plus petite sous SEUIL_VENT_REDUIT).

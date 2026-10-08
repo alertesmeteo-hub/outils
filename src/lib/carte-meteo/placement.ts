@@ -37,28 +37,35 @@ export function placerSansChevauchement(
   /** Position (centre) acceptable pour cet élément ? Ex. en vue département : rester sur la terre. */
   valide?: (e: ElementAPlacer, x: number, y: number) => boolean
 ): Map<string, { x: number; y: number }> {
-  const genererDecalages = (max: number, anneaux: number): [number, number][] => {
+  const genererDecalages = (max: number, anneaux: number, versLeNord = false): [number, number][] => {
     const liste: [number, number][] = [[0, 0]];
     for (let k = 1; k <= anneaux; k++) {
       const rayon = (max * k) / anneaux;
       const pas = 16;
+      const anneau: [number, number][] = [];
       for (let i = 0; i < pas; i++) {
         const angle = (2 * Math.PI * i) / pas;
-        liste.push([Math.round(rayon * Math.cos(angle)), Math.round(rayon * Math.sin(angle))]);
+        anneau.push([Math.round(rayon * Math.cos(angle)), Math.round(rayon * Math.sin(angle))]);
       }
+      // Villes imposées : à distance égale, on essaie d'abord vers le nord (l'intérieur des terres pour les villes du littoral sud),
+      // puis de biais, les côtés et le sud en dernier : un décalage vers le côté repousse souvent la ville voisine (Montpellier → Perpignan).
+      if (versLeNord) anneau.sort((a, b) => Math.abs(Math.atan2(a[0], -a[1])) - Math.abs(Math.atan2(b[0], -b[1])));
+      liste.push(...anneau);
     }
     return liste;
   };
   const decalages = genererDecalages(decalageMax, 6);
   // Marqueurs prioritaires (rafales signalées) : ils peuvent s'éloigner davantage plutôt que de disparaître.
   const decalagesPrioritaires = genererDecalages(decalageMax * 3, 15);
+  // Priorité négative (villes imposées de la carte de France) : même portée, mais vers le nord d'abord.
+  const decalagesImposes = genererDecalages(decalageMax * 3, 15, true);
 
   const occupes: Rect[] = [...obstacles];
   const places = new Map<string, { x: number; y: number }>();
   const ordre = elements.map((e, i) => ({ e, i })).sort((a, b) => a.e.priorite - b.e.priorite || a.i - b.i);
 
   for (const { e } of ordre) {
-    for (const [dx, dy] of e.priorite === 0 ? decalagesPrioritaires : decalages) {
+    for (const [dx, dy] of e.priorite < 0 ? decalagesImposes : e.priorite === 0 ? decalagesPrioritaires : decalages) {
       const rect: Rect = { x: e.x + dx - e.gauche, y: e.y + dy - e.haut, w: e.gauche + e.droite, h: e.haut + e.bas };
       if (rect.x < 2 || rect.y < 2 || rect.x + rect.w > limites.largeur - 2 || rect.y + rect.h > limites.hauteur - 2) continue;
       if (valide && !valide(e, e.x + dx, e.y + dy)) continue;
