@@ -243,6 +243,8 @@ interface Props {
   onClicCarte?: (x: number, y: number) => void;
   /** Supprime un picto ajouté à la main. */
   onSupprimer?: (code: string) => void;
+  /** Retire l'indicateur de rafale d'un marqueur. */
+  onSupprimerRafale?: (code: string) => void;
 }
 
 // Couleurs en attributs SVG et non en classes CSS : html-to-image (export JPG) ne recopie pas les styles
@@ -311,6 +313,7 @@ export default function CarteRendu({
   onModifier,
   onClicCarte,
   onSupprimer,
+  onSupprimerRafale,
 }: Props) {
   const [partout, setPartout] = useState(false);
   const idClip = `fleuves-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
@@ -441,6 +444,11 @@ export default function CarteRendu({
                   ...(m.ventReduit ? { fontSize: `${ECHELLE_VENT_REDUIT}em` } : {}),
                 }}
               >
+              {onSupprimerRafale && (
+                <button type="button" className="cmap-supprimer cmap-supprimer-vent cmap-sans-export" title="Retirer cette rafale" onClick={() => onSupprimerRafale(m.code)}>
+                  ×
+                </button>
+              )}
               <BadgeVent
                 rafale={m.rafale}
                 texteRafale={m.rafaleTexte ?? String(m.rafale)}

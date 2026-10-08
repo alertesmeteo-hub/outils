@@ -30,6 +30,8 @@ const LIBELLES: Record<ModeleMeteo, string> = {
 
 /** Villes retenues par département (les plus peuplées d'abord, puis celles qui comblent les zones vides). */
 const VILLES_PAR_DEPARTEMENT = 30;
+/** Altitude maximale (m) du point qui représente un département sur la carte de France. */
+const ALTITUDE_MAX_FRANCE = 500;
 const CANDIDATES_VILLES = 100;
 /** Durée pendant laquelle on ne redemande pas l'index (passage du modèle) au dépôt. */
 const VALIDITE_INDEX_MS = 5 * 60_000;
@@ -66,6 +68,8 @@ interface Colonnes {
 interface FichierDepartement {
   columns: { values: string[] };
   communes: [string, string, string[], number, number, number, number][];
+  /** [indice du modèle, latitude, longitude, altitude (m)] par point de grille. */
+  points?: [number, number, number, number][];
   forecast: [string, (number | null)[][]][];
 }
 
@@ -183,9 +187,13 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     .sort((a, b) => b.population - a.population);
   if (!communes.length) throw new Error(`Département ${dep} sans commune`);
 
-  // Point du département : la commune la plus proche de son centre.
+  // Point du département (carte de France) : la commune la plus proche de son centre, mais jamais au-dessus de 500 m
+  // (altitude du point de grille du modèle). Département sans commune assez basse : la plus basse.
   const centre = COORDS_DEPARTEMENTS[dep];
-  const chefCommune = centre ? communes.reduce((a, b) => (distance(centre, b) < distance(centre, a) ? b : a)) : communes[0];
+  const altitude = (pointId: number) => fichier.points?.[pointId]?.[3] ?? 0;
+  const basses = communes.filter((x) => altitude(x.pointId) <= ALTITUDE_MAX_FRANCE);
+  const plusBasse = communes.reduce((a, b) => (altitude(b.pointId) < altitude(a.pointId) ? b : a));
+  const chefCommune = basses.length === 0 ? plusBasse : centre ? basses.reduce((a, b) => (distance(centre, b) < distance(centre, a) ? b : a)) : basses[0];
 
   const retouche = VILLES_RETOUCHEES[dep];
   const gardees = communes.filter((x) => retouche?.garder?.includes(x.nom));
@@ -230,7 +238,7 @@ function extraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> 
 }
 
 async function lireExtraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> {
-  const cle = `${modele}-${dep}-v4`;
+  const cle = `${modele}-${dep}-v5`;
   const runTime = await passageCourant(modele);
   const enMemoire = memoire.get(cle);
   if (enMemoire && (!runTime || enMemoire.runTime === runTime)) return enMemoire;

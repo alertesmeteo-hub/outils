@@ -66,6 +66,7 @@ const VILLES_IMPOSEES = [
   { code: '13', lat: 43.296, lon: 5.37 }, // Marseille
   { code: '75', lat: 48.857, lon: 2.352 }, // Paris
   { code: '59', lat: 50.629, lon: 3.057 }, // Lille
+  { code: '66', lat: 42.699, lon: 2.895 }, // Perpignan
 ];
 /** Date du titre de la carte des Pyrénées-Orientales : orange. */
 const COULEUR_TITRE_PO = '#ff8c1a';
@@ -325,6 +326,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [moyennesManuelles, setMoyennesManuelles] = useState<Record<string, string>>({});
   /** Rafales corrigées à la main, par période et par point (clé « période|code »). */
   const [rafalesManuelles, setRafalesManuelles] = useState<Record<string, string>>({});
+  /** Rafales retirées à la main (clé « période|code »). */
+  const [rafalesRetirees, setRafalesRetirees] = useState<Set<string>>(new Set());
   /** Pictos ajoutés à la main (clic sur la carte), propres à chaque zone. */
   const [ajouts, setAjouts] = useState<{ id: number; zone: string; x: number; y: number; picto: PictoMeteo; valeur: string }[]>([]);
   const [modeAjout, setModeAjout] = useState(false);
@@ -367,6 +370,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
         setMoyennesManuelles({});
         setRafalesManuelles({});
+        setRafalesRetirees(new Set());
       })
       .catch((e: Error) => {
         if (e.name === 'AbortError') return;
@@ -389,6 +393,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       .then((json) => {
         setDonneesVilles({ modele, dateISO, departement, points: json.points });
         setRafalesManuelles({});
+        setRafalesRetirees(new Set());
         setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
       })
       .catch((e: Error) => {
@@ -453,7 +458,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
    * (villes du littoral dont les coordonnées sortent du contour simplifié). Nul tant que les contours ne sont pas chargés.
    */
   const terre = useMemo(() => {
-    if (!enDepartement || typeof document === 'undefined' || contoursDep.length === 0) return null;
+    if (!(enDepartement || enFrance) || typeof document === 'undefined' || contoursDep.length === 0) return null;
     const retenus = contoursDep.filter((c) => selection.has(c.code));
     const ctx = document.createElement('canvas').getContext('2d');
     const boite = unirBoites(retenus.map((c) => c.boite));
@@ -464,7 +469,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const surTerre = (qx: number, qy: number, decalagePicto: number) => {
       return dedans(qx - decalagePicto, qy);
     };
-    const ramener = (x: number, y: number, decalagePicto: number) => {
+    // France entière : chaque point est ramené vers le centre de son propre département (une ville de Corse reste en Corse).
+    const centreDe = (code: string) => {
+      const c = enFrance ? retenus.find((r) => r.code === code) : undefined;
+      return c ? versEcran({ x: (c.boite.minX + c.boite.maxX) / 2, y: (c.boite.minY + c.boite.maxY) / 2 }, vue) : centre;
+    };
+    const ramener = (x: number, y: number, decalagePicto: number, code = '') => {
+      const centre = centreDe(code);
       let px = x;
       let py = y;
       // Le picto est à gauche du centre du marqueur (la température est à droite) : c'est lui qui doit être sur terre.
@@ -476,7 +487,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       return { x: px, y: py };
     };
     return { ramener, surTerre };
-  }, [enDepartement, contoursDep, selection, vue]);
+  }, [enDepartement, enFrance, contoursDep, selection, vue]);
 
   const valeurPrincipale = (code: string): number | null => {
     const e = editions[code];
@@ -649,7 +660,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
       const brut = grilleFrance?.get(p.code) ?? versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
-      const { x, y } = terre ? terre.ramener(brut.x, brut.y, 1.5 * 22 * echelleMarqueurs) : brut;
+      const { x, y } = terre ? terre.ramener(brut.x, brut.y, (enFrance ? 1.2 : 1.5) * 22 * echelleMarqueurs, p.code) : brut;
       const rafale = rafaleDe(p);
       const v = valeurs[i];
       return {
@@ -661,7 +672,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         valeur: e ? (periode === 'matin' ? e.tempM : periode === 'apres-midi' ? e.tempAM : e.maxi) : '',
         mini: periode === 'journee' ? e?.mini ?? '' : null,
         // Rafale arrondie de 5 en 5 km/h pour l'affichage.
-        rafale: rafalesSignalees.has(p.code) && rafale != null ? rafaleAffichee(p.code, Math.round(rafale / 5) * 5) : null,
+        rafale: rafalesSignalees.has(p.code) && rafale != null && !rafalesRetirees.has(`${periode}|${p.code}`) ? rafaleAffichee(p.code, Math.round(rafale / 5) * 5) : null,
         rafaleTexte: rafalesManuelles[`${periode}|${p.code}`],
         direction: afficherFleches ? angleFleche(periode === 'matin' ? p.directionRafaleMatin : periode === 'apres-midi' ? p.directionRafaleApresMidi : p.directionRafaleJournee) : null,
         // Ressenti avec la température affichée (donc modifiable) et le vent moyen à l'heure de la rafale maximale.
@@ -708,7 +719,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // Vue département : après décalage anti-chevauchement, un picto qui se retrouve en mer est écarté (une ville de réserve le remplace).
     const placesOk = bruts.filter((m) => {
       const pos = places.get(m.code);
-      return pos != null && (!terre || terre.surTerre(pos.x, pos.y, 1.5 * em));
+      return pos != null && (!terre || !enDepartement || terre.surTerre(pos.x, pos.y, 1.5 * em));
     });
     const imposes = new Set(enDepartement ? [] : placesOk.filter((m) => m.rafale != null || m.ton != null).map((m) => m.code));
     let restantes = Math.max(0, cible - imposes.size);
@@ -770,7 +781,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       return p ? { ...m, vent: { dx: p.dx, dy: p.dy }, ventReduit: p.reduit } : m;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees]);
 
   const altitudeDe = (code: string, picto: string) => (estPictoNeige(picto) ? altitudes[`${periode}|${code}`] ?? altitudeNeige : undefined);
   const marqueursAffiches: Marqueur[] = [
@@ -970,6 +981,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       selection={selection}
       marqueurs={marqueursAffiches}
       onClicCarte={modeAjout && !enExport ? ajouterPicto : undefined}
+      onSupprimerRafale={enExport ? undefined : (code) => setRafalesRetirees((r) => new Set(r).add(`${periode}|${code}`))}
       onSupprimer={enExport ? undefined : (code) => setAjouts((liste) => liste.filter((a) => `ajout:${a.id}` !== code))}
       echelleMarqueurs={echelleMarqueurs}
       afficherNoms={nomsVisibles}
@@ -1216,6 +1228,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               });
               setMoyennesManuelles({});
         setRafalesManuelles({});
+        setRafalesRetirees(new Set());
               setTitreManuel(null);
               setSousTitreManuel(null);
             }}
@@ -1414,6 +1427,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                   </option>
                 ))}
               </select>
+              <span className="mt-1 block text-xs font-normal text-muted">Survole une rafale sur la carte : la croix rouge la retire.</span>
+              {[...rafalesRetirees].some((c) => c.startsWith(`${periode}|`)) && (
+                <button type="button" className="btn-ghost mt-1 rounded-md px-2 py-1 text-xs" onClick={() => setRafalesRetirees((r) => new Set([...r].filter((c) => !c.startsWith(`${periode}|`))))}>
+                  Réafficher les rafales retirées ({[...rafalesRetirees].filter((c) => c.startsWith(`${periode}|`)).length})
+                </button>
+              )}
             </label>
             <label className="text-sm font-medium">
               <span className={legendeBarre}>Rafales à partir de (km/h)</span>
