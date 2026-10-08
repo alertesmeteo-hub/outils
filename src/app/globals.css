@@ -130,6 +130,9 @@ body {
 .cmap-chaud { color: #e5191e; }
 .cmap-froid { color: #1f6fe0; }
 /* Pastille de rafale : fond coloré selon la force (couleurs en style, voir lib/carte-meteo/vent.ts), liseré blanc, flèche et valeur. */
+/* Indicateur de rafale placé à part du picto (le picto reste à sa place, la pastille se met où il y a de la place). */
+.cmap-vent-place { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; z-index: 2; }
+.cmap-vent-place .cmap-vent { margin-top: 0; }
 .cmap-vent {
   display: flex;
   align-items: center;

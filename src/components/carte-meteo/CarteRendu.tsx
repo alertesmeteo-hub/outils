@@ -70,6 +70,10 @@ export interface Marqueur {
   rafale: number | null;
   /** Valeur de rafale affichée (modifiable à la main) ; la couleur suit `rafale`. */
   rafaleTexte?: string;
+  /** Position de l'indicateur de rafale par rapport au centre du marqueur (pixels de la carte) : placé à part, il ne déplace pas le picto. */
+  vent?: { dx: number; dy: number };
+  /** Rafale modérée (sous 60 km/h) : indicateur plus petit. */
+  ventReduit?: boolean;
   /** Angle de la flèche du vent (degrés, sens horaire depuis le haut : là où souffle le vent) à l'heure de la rafale ; null = sans flèche. */
   direction?: number | null;
   /** Température ressentie (windchill) affichée sous l'indicateur de vent, si l'option est active. */
@@ -90,6 +94,11 @@ export type StyleVent = 'pastille' | 'rond';
 export const HAUTEUR_VENT: Record<StyleVent, number> = { pastille: 1.25, rond: 2.15 };
 /** Hauteur (em du marqueur) du cartouche « ressenti » sous l'indicateur de vent. */
 export const HAUTEUR_RESSENTI = 1.05;
+/** Largeur (em du marqueur) de l'indicateur de rafale. */
+export const LARGEUR_VENT: Record<StyleVent, number> = { pastille: 3.4, rond: 2.6 };
+/** Rafales sous 60 km/h : indicateur réduit à cette échelle. */
+export const ECHELLE_VENT_REDUIT = 0.78;
+export const SEUIL_VENT_REDUIT = 60;
 
 // Attributs SVG (et non classes CSS) : html-to-image ne recopie pas les styles CSS des éléments SVG (voir plus bas).
 const POLICE_VALEUR = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
@@ -424,6 +433,14 @@ export default function CarteRendu({
               </button>
             )}
             {m.rafale != null && (
+              <div
+                className="cmap-vent-place"
+                style={{
+                  left: `calc(50% + ${m.vent?.dx ?? 0}px)`,
+                  top: `calc(50% + ${m.vent?.dy ?? 0}px)`,
+                  ...(m.ventReduit ? { fontSize: `${ECHELLE_VENT_REDUIT}em` } : {}),
+                }}
+              >
               <BadgeVent
                 rafale={m.rafale}
                 texteRafale={m.rafaleTexte ?? String(m.rafale)}
@@ -432,6 +449,7 @@ export default function CarteRendu({
                 ressenti={m.ressenti ?? null}
                 style={styleVent}
               />
+              </div>
             )}
             {paletteOuvertePour === m.code && (
               <div className="cmap-palette" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs, largeur)}>

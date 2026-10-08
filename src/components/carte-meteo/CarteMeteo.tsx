@@ -22,7 +22,10 @@ import {
   type Zone,
 } from '@/lib/carte-meteo/projection-france';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
-import CarteRendu, { type Fleuves, HAUTEUR_CARTE, HAUTEUR_RESSENTI, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent } from './CarteRendu';
+import CarteRendu, {
+  ECHELLE_VENT_REDUIT,
+  LARGEUR_VENT,
+  SEUIL_VENT_REDUIT, type Fleuves, HAUTEUR_CARTE, HAUTEUR_RESSENTI, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent } from './CarteRendu';
 
 type Periode = 'matin' | 'apres-midi' | 'journee';
 type NiveauNoms = 'departement' | 'ville';
@@ -685,7 +688,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const demiLargeur = (Math.max(((m.mini == null ? 4.2 : 4.9) + gros * 2.35) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
       const hautLigne = Math.max((m.mini != null ? 3.4 : 2.6) + gros * 1.8, estPictoImage(m.picto) ? 2.3 * (1 + gros) : 0);
-      const hauteur = hautLigne * em + (m.rafale != null ? HAUTEUR_VENT[styleVent] * em : 0) + (m.ressenti != null ? HAUTEUR_RESSENTI * em : 0);
+      // La rafale n'en fait plus partie : elle est placée ensuite, là où il y a de la place, sans déplacer le picto.
+      const hauteur = hautLigne * em;
       return {
         code: m.code,
         x: m.x,
@@ -708,7 +712,63 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     });
     const imposes = new Set(enDepartement ? [] : placesOk.filter((m) => m.rafale != null || m.ton != null).map((m) => m.code));
     let restantes = Math.max(0, cible - imposes.size);
-    return placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
+    const retenus = placesOk.filter((m) => imposes.has(m.code) || restantes-- > 0).map((m) => ({ ...m, ...places.get(m.code)! }));
+
+    // Indicateurs de rafale : sous le picto de préférence, sinon à côté ou au-dessus, sans chevaucher pictos, textes ni autres rafales.
+    const elementDe = new Map(elements.map((e) => [e.code, e]));
+    const occupes: Rect[] = [
+      ...obstacles,
+      ...retenus.map((m) => {
+        const e = elementDe.get(m.code)!;
+        return { x: m.x - e.gauche, y: m.y - e.haut, w: e.gauche + e.droite, h: e.haut + e.bas };
+      }),
+    ];
+    const libre = (r: Rect) =>
+      r.x >= 2 && r.y >= 2 && r.x + r.w <= largeurCarte - 2 && r.y + r.h <= HAUTEUR_CARTE - 2 &&
+      !occupes.some((o) => r.x < o.x + o.w + 2 && r.x + r.w + 2 > o.x && r.y < o.y + o.h + 2 && r.y + r.h + 2 > o.y);
+    // Les plus fortes d'abord : ce sont elles qui gardent la meilleure place.
+    const avecVent = retenus.filter((m) => m.rafale != null).sort((a, b) => (b.rafale ?? 0) - (a.rafale ?? 0));
+    const positions = new Map<string, { dx: number; dy: number; reduit: boolean }>();
+    for (const m of avecVent) {
+      const reduit = (m.rafale ?? 0) < SEUIL_VENT_REDUIT;
+      const k = (reduit ? ECHELLE_VENT_REDUIT : 1) * em;
+      const w = LARGEUR_VENT[styleVent] * k;
+      const h = (HAUTEUR_VENT[styleVent] + (m.ressenti != null ? HAUTEUR_RESSENTI : 0)) * k;
+      const e = elementDe.get(m.code)!;
+      const sous = e.bas + h / 2 + 1;
+      const cotes = e.droite + w / 2 + 2;
+      const candidats: [number, number][] = [
+        [0, sous], [w * 0.3, sous], [-w * 0.3, sous], [w * 0.6, sous], [-w * 0.6, sous],
+        [cotes, e.bas * 0.5], [-cotes, e.bas * 0.5], [cotes, 0], [-cotes, 0],
+        [0, -(e.haut + h / 2 + 1)], [w * 0.5, -(e.haut + h / 2 + 1)], [-w * 0.5, -(e.haut + h / 2 + 1)],
+      ];
+      // Puis en s'éloignant un peu, toujours autour du bas du picto.
+      for (let r = 0.5; r <= 4; r += 0.5) for (let a = 0; a < 16; a++) candidats.push([Math.cos((a * Math.PI) / 8) * r * em, sous + Math.sin((a * Math.PI) / 8) * r * em]);
+      // Pas de place libre : la position qui chevauche le moins.
+      const recouvrement = (r: Rect) =>
+        occupes.reduce((t, o) => t + Math.max(0, Math.min(r.x + r.w, o.x + o.w) - Math.max(r.x, o.x)) * Math.max(0, Math.min(r.y + r.h, o.y + o.h) - Math.max(r.y, o.y)), 0) +
+        (r.x < 2 || r.y < 2 || r.x + r.w > largeurCarte - 2 || r.y + r.h > HAUTEUR_CARTE - 2 ? 1e6 : 0);
+      let choix: [number, number] = [0, sous];
+      let meilleur = Infinity;
+      for (const [dx, dy] of candidats) {
+        const r = { x: m.x + dx - w / 2, y: m.y + dy - h / 2, w, h };
+        if (libre(r)) {
+          choix = [dx, dy];
+          break;
+        }
+        const cout = recouvrement(r);
+        if (cout < meilleur) {
+          meilleur = cout;
+          choix = [dx, dy];
+        }
+      }
+      occupes.push({ x: m.x + choix[0] - w / 2, y: m.y + choix[1] - h / 2, w, h });
+      positions.set(m.code, { dx: Math.round(choix[0]), dy: Math.round(choix[1]), reduit });
+    }
+    return retenus.map((m) => {
+      const p = positions.get(m.code);
+      return p ? { ...m, vent: { dx: p.dx, dy: p.dy }, ventReduit: p.reduit } : m;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles]);
 
