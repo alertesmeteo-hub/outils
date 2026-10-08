@@ -116,7 +116,9 @@ async function passageCourant(modele: ModeleMeteo): Promise<string | null> {
   try {
     const reponse = await recuperer(`${BASES[modele]}/index.json`, 15_000);
     const index = (await reponse.json()) as { model?: { run_time?: string }; generated_at?: string };
-    const runTime = index.model?.run_time ?? index.generated_at ?? null;
+    // Version des données = passage du modèle + date de publication : les pipelines publient d'abord un passage tronqué
+    // (ex. GFS sur 5 jours) puis le complètent sous le même run_time ; sans generated_at, le cache gardait la version tronquée.
+    const runTime = [index.model?.run_time, index.generated_at].filter(Boolean).join('|') || null;
     if (runTime) {
       indexCourant.set(modele, { t: Date.now(), runTime });
       return runTime;
