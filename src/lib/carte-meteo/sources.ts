@@ -45,6 +45,8 @@ interface Ville {
   serie: Serie;
   /** Ville à toujours afficher (retouche manuelle). */
   prioritaire?: boolean;
+  /** Picto au plus près de la ville même en bord de frontière ou de côte (retouche manuelle). */
+  placeExacte?: boolean;
 }
 
 interface Extrait {
@@ -79,7 +81,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleMeteo, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v7';
+const VERSION_CACHE = 'v9';
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -180,9 +182,19 @@ function repartir<T extends { lat: number; lon: number }>(liste: T[], n: number)
   return liste.filter((v) => choisies.includes(v));
 }
 
-/** Retouches à la main de la liste des villes d'un département : villes à toujours garder, villes à écarter (noms exacts). */
-const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[] }> = {
-  '66': { garder: ['Ille-sur-Têt', 'Bourg-Madame', 'Le Barcarès', 'Saint-Cyprien'], ecarter: ['Corbère', 'Osséja', 'Caudiès-de-Fenouillèdes'] },
+/**
+ * Retouches à la main de la liste des villes d'un département (noms exacts) : villes à toujours garder, villes à écarter,
+ * villes dont le picto reste au plus près de la ville en bord de frontière ou de côte (`exactes` ; les villes gardées
+ * le sont d'office), et position du village (lat, lon) quand le point des données en est loin (`centres` : grandes
+ * communes de montagne, où le point est au milieu du territoire communal).
+ */
+const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[]; exactes?: string[]; centres?: Record<string, [number, number]> }> = {
+  '66': {
+    garder: ['Ille-sur-Têt', 'Bourg-Madame', 'Le Barcarès', 'Saint-Cyprien'],
+    ecarter: ['Corbère', 'Osséja', 'Caudiès-de-Fenouillèdes'],
+    exactes: ['Prats-de-Mollo-la-Preste', 'Banyuls-sur-Mer'],
+    centres: { 'Prats-de-Mollo-la-Preste': [42.4044, 2.4794], 'Banyuls-sur-Mer': [42.4833, 3.1289] },
+  },
 };
 
 function extraire(dep: string, fichier: FichierDepartement, runTime: string): Extrait {
@@ -219,10 +231,11 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
   const villes = choisies.map((v) => ({
     code: v.code,
     nom: v.nom,
-    lat: v.lat,
-    lon: v.lon,
+    lat: retouche?.centres?.[v.nom]?.[0] ?? v.lat,
+    lon: retouche?.centres?.[v.nom]?.[1] ?? v.lon,
     serie: serieDuPoint(fichier, c, v.pointId),
     ...(gardees.includes(v) ? { prioritaire: true } : {}),
+    ...(gardees.includes(v) || retouche?.exactes?.includes(v.nom) ? { placeExacte: true } : {}),
   }));
   return { runTime, chef: serieDuPoint(fichier, c, chefCommune.pointId), villes };
 }
@@ -333,7 +346,7 @@ export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: strin
 /** Prévisions des principales communes d'un département (vue « département »). */
 export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: string, dep: string): Promise<PointCarte[]> {
   const extrait = await extraitDepartement(modele, dep);
-  const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO), lat: v.lat, lon: v.lon, ...(v.prioritaire ? { prioritaire: true } : {}) }));
+  const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO), lat: v.lat, lon: v.lon, ...(v.prioritaire ? { prioritaire: true } : {}), ...(v.placeExacte ? { placeExacte: true } : {}) }));
   const valides = points.filter((p) => p.tempApresMidi != null);
   if (!valides.length) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO} (département ${dep})`);
   return valides;

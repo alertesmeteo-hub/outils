@@ -33,6 +33,8 @@ export interface PointCarte {
   lon?: number;
   /** Ville à toujours afficher en vue département. */
   prioritaire?: boolean;
+  /** Vue département : picto au plus près de la ville même en bord de frontière ou de côte. */
+  placeExacte?: boolean;
   mini: number | null;
   maxi: number | null;
   tempMatin: number | null;

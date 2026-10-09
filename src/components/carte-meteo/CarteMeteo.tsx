@@ -488,7 +488,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const c = enFrance ? retenus.find((r) => r.code === code) : undefined;
       return c ? versEcran({ x: (c.boite.minX + c.boite.maxX) / 2, y: (c.boite.minY + c.boite.maxY) / 2 }, vue) : centre;
     };
-    // `souple` (villes imposées à la main, ex. Bourg-Madame sur la frontière) : seul le centre du picto doit être sur le
+    // `souple` (villes retouchées à la main, ex. Bourg-Madame sur la frontière) : seul le centre du picto doit être sur le
     // territoire, sinon la ville est repoussée de plusieurs kilomètres vers l'intérieur.
     const ramener = (x: number, y: number, decalagePicto: number, code = '', souple = false) => {
       const centre = centreDe(code);
@@ -683,7 +683,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
       const brut = grilleFrance?.get(p.code) ?? versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
-      const { x, y } = terre ? terre.ramener(brut.x, brut.y, decalagePicto, p.code, enDepartement && p.prioritaire === true) : brut;
+      const { x, y } = terre ? terre.ramener(brut.x, brut.y, decalagePicto, p.code, enDepartement && p.placeExacte === true) : brut;
       const rafale = rafaleDe(p);
       const v = valeurs[i];
       return {
