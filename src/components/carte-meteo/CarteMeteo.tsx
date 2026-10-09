@@ -336,6 +336,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Rafales retirées à la main (clé « période|code »). */
   const [rafalesRetirees, setRafalesRetirees] = useState<Set<string>>(new Set());
   /** Pictos ajoutés à la main (clic sur la carte), propres à chaque zone. */
+  /** Pictos du modèle retirés à la main (croix au survol), par zone : `zone|code`. Pas de ville de remplacement. */
+  const [pictosRetires, setPictosRetires] = useState<Set<string>>(new Set());
   const [ajouts, setAjouts] = useState<{ id: number; zone: string; x: number; y: number; picto: PictoMeteo; valeur: string }[]>([]);
   const [modeAjout, setModeAjout] = useState(false);
   /** Altitude affichée sous les pictos de neige : par défaut pour toute la carte, et corrigée picto par picto (clé « période|code »). */
@@ -845,7 +847,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const altitudeDe = (code: string, picto: string) => (estPictoNeige(picto) ? altitudes[`${periode}|${code}`] ?? altitudeNeige : undefined);
   const marqueursAffiches: Marqueur[] = [
-    ...marqueurs.map((m) => ({ ...m, neige: estPictoNeige(m.picto), altitude: altitudeDe(m.code, m.picto) })),
+    ...marqueurs
+      .filter((m) => !pictosRetires.has(`${zone}|${m.code}`))
+      .map((m) => ({ ...m, neige: estPictoNeige(m.picto), altitude: altitudeDe(m.code, m.picto) })),
     ...ajouts
       .filter((a) => a.zone === zone)
       .map((a) => ({
@@ -1042,7 +1046,14 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       marqueurs={marqueursAffiches}
       onClicCarte={modeAjout && !enExport ? ajouterPicto : undefined}
       onSupprimerRafale={enExport ? undefined : (code) => setRafalesRetirees((r) => new Set(r).add(`${periode}|${code}`))}
-      onSupprimer={enExport ? undefined : (code) => setAjouts((liste) => liste.filter((a) => `ajout:${a.id}` !== code))}
+      onSupprimer={
+        enExport
+          ? undefined
+          : (code) =>
+              code.startsWith('ajout:')
+                ? setAjouts((liste) => liste.filter((a) => `ajout:${a.id}` !== code))
+                : setPictosRetires((r) => new Set(r).add(`${zone}|${code}`))
+      }
       echelleMarqueurs={echelleMarqueurs}
       afficherNoms={nomsVisibles}
       titre={titre}
@@ -1147,6 +1158,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             {ajouts.some((a) => a.zone === zone) && (
               <button type="button" className="btn-ghost mt-2 rounded-md px-2 py-1 text-xs" onClick={() => setAjouts((liste) => liste.filter((a) => a.zone !== zone))}>
                 Retirer les pictos ajoutés ({ajouts.filter((a) => a.zone === zone).length})
+              </button>
+            )}
+            <p className="mt-1 text-xs text-muted">Survole un picto : la croix rouge le retire de la carte.</p>
+            {[...pictosRetires].some((c) => c.startsWith(`${zone}|`)) && (
+              <button type="button" className="btn-ghost mt-2 rounded-md px-2 py-1 text-xs" onClick={() => setPictosRetires((r) => new Set([...r].filter((c) => !c.startsWith(`${zone}|`))))}>
+                Réafficher les pictos retirés ({[...pictosRetires].filter((c) => c.startsWith(`${zone}|`)).length})
               </button>
             )}
           </div>

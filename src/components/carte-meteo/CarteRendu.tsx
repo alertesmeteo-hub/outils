@@ -448,8 +448,9 @@ export default function CarteRendu({
               </div>
             </div>
             {m.altitude && m.altitude.trim() && <div className="cmap-altitude">{m.altitude.trim().replace(/\s*m$/i, '')} m</div>}
-            {m.ajoute && onSupprimer && (
-              <button type="button" className="cmap-supprimer cmap-sans-export" title="Retirer ce picto" onClick={() => onSupprimer(m.code)}>
+            {onSupprimer && (
+              // Picto ajouté : croix toujours visible ; picto du modèle : croix au survol seulement.
+              <button type="button" className={`cmap-supprimer cmap-sans-export ${m.ajoute ? '' : 'cmap-supprimer-survol'}`} title="Retirer ce picto" onClick={() => onSupprimer(m.code)}>
                 ×
               </button>
             )}

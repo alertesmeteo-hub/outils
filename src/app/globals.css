@@ -204,6 +204,9 @@ body {
 /* Pictos ajoutés à la main : bouton de suppression (absent de l'export JPG). */
 .cmap-supprimer { position: absolute; top: -0.35em; left: -0.35em; width: 1.1em; height: 1.1em; border-radius: 50%; border: none; background: #dc2626; color: #fff; font-size: 0.6em; line-height: 1.1em; padding: 0; cursor: pointer; }
 .cmap-mode-ajout { cursor: crosshair; }
+/* Croix de suppression d'un picto du modèle : visible au survol du picto. */
+.cmap-supprimer-survol { display: none; z-index: 5; }
+.cmap-marqueur:hover > .cmap-supprimer-survol, .cmap-marqueur:focus-within > .cmap-supprimer-survol { display: block; }
 /* Croix de suppression d'une rafale : visible au survol de la pastille. */
 .cmap-supprimer-vent { top: -0.45em; left: auto; right: -0.45em; z-index: 3; display: none; }
 .cmap-vent-place:hover .cmap-supprimer-vent, .cmap-vent-place:focus-within .cmap-supprimer-vent { display: block; }
