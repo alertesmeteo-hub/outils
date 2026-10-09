@@ -189,6 +189,13 @@ body {
 /* Après-midi : la température chevauche le haut-droit du picto, comme sur la carte de référence. */
 .cmap-ligne-simple .cmap-valeurs { align-self: center; margin: 0 0 0 0.12em; position: relative; z-index: 1; }
 .cmap-ligne-simple .cmap-valeur { font-size: 1.1em; width: 1.2em; }
+/* Régions et départements : températures 15 % et pictos 5 % plus grands (ECHELLE_*_LOCAL dans CarteMeteo.tsx). */
+.cmap-local .cmap-valeur { font-size: calc(1.35em * 1.15); }
+.cmap-local .cmap-ligne-simple .cmap-valeur { font-size: calc(1.1em * 1.15); }
+.cmap-local .cmap-picto { font-size: calc(1.7em * 1.05); }
+.cmap-local.cmap-gros .cmap-picto { font-size: calc(2.7em * 1.05); }
+.cmap-local .cmap-ligne .cmap-picto-image { width: calc(1.3em * 1.05); height: calc(1.3em * 1.05); }
+.cmap-local.cmap-gros .cmap-ligne .cmap-picto-image { width: calc(2.1em * 1.05); height: calc(2.1em * 1.05); }
 
 /* Altitude sous un picto de neige (ex. « 2000 m »). */
 .cmap-altitude { margin-top: 0.05em; padding: 0.08em 0.4em; border-radius: 0.6em; background: rgba(13, 20, 40, 0.85); color: #fff; font-family: Arial, sans-serif; font-weight: 700; font-size: 0.55em; white-space: nowrap; }

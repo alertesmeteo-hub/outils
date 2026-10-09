@@ -208,6 +208,8 @@ interface Props {
   titreADroite?: boolean;
   /** Pictos plus grands (vue département). */
   grosPictos?: boolean;
+  /** Carte de région ou de département : températures +15 % et pictos +5 % (voir `.cmap-local` dans globals.css). */
+  carteLocale?: boolean;
   /** Présentation des rafales (pastille par défaut). */
   styleVent?: StyleVent;
   /** Couleur de la date du titre (vert par défaut, voir .cmap-date). */
@@ -290,6 +292,7 @@ export default function CarteRendu({
   pied = '',
   titreADroite = false,
   grosPictos = false,
+  carteLocale = false,
   styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
@@ -413,7 +416,7 @@ export default function CarteRendu({
         {marqueurs.map((m) => (
           <div
             key={m.code}
-            className={`cmap-marqueur ${grosPictos ? 'cmap-gros' : ''}`}
+            className={`cmap-marqueur ${grosPictos ? 'cmap-gros' : ''} ${carteLocale ? 'cmap-local' : ''}`}
             style={{ left: m.x, top: m.y, fontSize: 22 * echelleMarqueurs, ...(paletteOuvertePour === m.code ? { zIndex: 20 } : {}) }}
             title={m.nom}
           >

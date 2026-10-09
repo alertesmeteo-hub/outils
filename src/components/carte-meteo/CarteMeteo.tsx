@@ -34,6 +34,9 @@ type Niveau = 'france' | 'region' | 'departement';
 type Densite = 'leger' | 'moyen' | 'eleve';
 
 /** Nombre de points affichés : part des départements (France, région) ou nombre de villes (vue département). */
+/** Régions et départements : pictos et températures agrandis (mêmes valeurs que `.cmap-local` dans globals.css). */
+const ECHELLE_PICTO_LOCAL = 1.05;
+const ECHELLE_TEMP_LOCAL = 1.15;
 const DENSITES: Record<Densite, { libelle: string; part: number; villes: number }> = {
   leger: { libelle: 'Léger', part: 0.3, villes: 7 },
   moyen: { libelle: 'Moyen', part: 0.6, villes: 14 },
@@ -711,9 +714,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
       const gros = enDepartement ? 0.6 : 0; // pictos 1,6 fois plus grands : +1,4 em de large, +1,1 em de haut
-      const demiLargeur = (Math.max(((m.mini == null ? 4.2 : 4.9) + gros * 2.35) * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
+      // Régions et départements : températures 15 % et pictos 5 % plus grands (`.cmap-local`).
+      const kPicto = enFrance ? 1 : ECHELLE_PICTO_LOCAL;
+      const kTemp = enFrance ? 1 : ECHELLE_TEMP_LOCAL;
+      const largeurLigne = 2.35 * (1 + gros) * kPicto + (m.mini == null ? 1.85 : 2.55) * kTemp;
+      const demiLargeur = (Math.max(largeurLigne * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
-      const hautLigne = Math.max((m.mini != null ? 3.4 : 2.6) + gros * 1.8, estPictoImage(m.picto) ? 2.3 * (1 + gros) : 0);
+      const hautLigne = Math.max((m.mini != null ? 3.4 * kTemp : 2.6 * kPicto) + gros * 1.8 * kPicto, estPictoImage(m.picto) ? 2.3 * (1 + gros) * kPicto : 0);
       // La rafale n'en fait plus partie : elle est placée ensuite, là où il y a de la place, sans déplacer le picto.
       const hauteur = hautLigne * em;
       return {
@@ -1046,6 +1053,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       pied={pied}
       titreADroite={enFrance}
       grosPictos={enDepartement}
+      carteLocale={!enFrance}
       styleVent={styleVent}
       couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
