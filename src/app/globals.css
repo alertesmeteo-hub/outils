@@ -196,6 +196,9 @@ body {
 .cmap-local.cmap-gros .cmap-picto { font-size: calc(2.7em * 1.05); }
 .cmap-local .cmap-ligne .cmap-picto-image { width: calc(1.3em * 1.05); height: calc(1.3em * 1.05); }
 .cmap-local.cmap-gros .cmap-ligne .cmap-picto-image { width: calc(2.1em * 1.05); height: calc(2.1em * 1.05); }
+/* Départements : températures encore 7 % plus grandes (ECHELLE_TEMP_DEPARTEMENT). */
+.cmap-local.cmap-gros .cmap-valeur { font-size: calc(1.35em * 1.15 * 1.07); }
+.cmap-local.cmap-gros .cmap-ligne-simple .cmap-valeur { font-size: calc(1.1em * 1.15 * 1.07); }
 
 /* Altitude sous un picto de neige (ex. « 2000 m »). */
 .cmap-altitude { margin-top: 0.05em; padding: 0.08em 0.4em; border-radius: 0.6em; background: rgba(13, 20, 40, 0.85); color: #fff; font-family: Arial, sans-serif; font-weight: 700; font-size: 0.55em; white-space: nowrap; }

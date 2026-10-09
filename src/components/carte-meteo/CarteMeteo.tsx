@@ -37,6 +37,8 @@ type Densite = 'leger' | 'moyen' | 'eleve';
 /** Régions et départements : pictos et températures agrandis (mêmes valeurs que `.cmap-local` dans globals.css). */
 const ECHELLE_PICTO_LOCAL = 1.05;
 const ECHELLE_TEMP_LOCAL = 1.15;
+/** Départements : températures encore 7 % plus grandes (`.cmap-local.cmap-gros` dans globals.css). */
+const ECHELLE_TEMP_DEPARTEMENT = ECHELLE_TEMP_LOCAL * 1.07;
 const DENSITES: Record<Densite, { libelle: string; part: number; villes: number }> = {
   leger: { libelle: 'Léger', part: 0.3, villes: 7 },
   moyen: { libelle: 'Moyen', part: 0.6, villes: 14 },
@@ -721,7 +723,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const gros = enDepartement ? 0.6 : 0; // pictos 1,6 fois plus grands : +1,4 em de large, +1,1 em de haut
       // Régions et départements : températures 15 % et pictos 5 % plus grands (`.cmap-local`).
       const kPicto = enFrance ? 1 : ECHELLE_PICTO_LOCAL;
-      const kTemp = enFrance ? 1 : ECHELLE_TEMP_LOCAL;
+      const kTemp = enFrance ? 1 : enDepartement ? ECHELLE_TEMP_DEPARTEMENT : ECHELLE_TEMP_LOCAL;
       const largeurLigne = 2.35 * (1 + gros) * kPicto + (m.mini == null ? 1.85 : 2.55) * kTemp;
       const demiLargeur = (Math.max(largeurLigne * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
