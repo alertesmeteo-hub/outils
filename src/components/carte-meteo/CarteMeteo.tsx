@@ -39,6 +39,10 @@ const DENSITES: Record<Densite, { libelle: string; part: number; villes: number 
   moyen: { libelle: 'Moyen', part: 0.6, villes: 14 },
   eleve: { libelle: 'Élevé', part: 1, villes: 18 },
 };
+/** Vue département : nombre de villes ajusté pour certains départements (écart par rapport à `villes` de la densité). */
+const AJUSTEMENT_VILLES: Record<string, Partial<Record<Densite, number>>> = {
+  '66': { moyen: -4 },
+};
 
 export interface DonneesCarte {
   modele: ModeleMeteo;
@@ -627,7 +631,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const reference = points.filter((p) => REFERENCE_FRANCE.includes(p.code));
       return [...repartis(reference), ...repartis(points.filter((p) => !REFERENCE_FRANCE.includes(p.code)))];
     };
-    const cible = enDepartement ? reglage.villes : enFrance ? Math.round(REFERENCE_FRANCE.length * COEFFICIENT_FRANCE[densite]) : Math.max(1, Math.ceil(reglage.part * points.length));
+    const cible = enDepartement ? reglage.villes + (AJUSTEMENT_VILLES[departement]?.[densite] ?? 0) : enFrance ? Math.round(REFERENCE_FRANCE.length * COEFFICIENT_FRANCE[densite]) : Math.max(1, Math.ceil(reglage.part * points.length));
     // Candidats en réserve : si le placement sans chevauchement écarte un marqueur, le suivant le remplace.
     const ordre = enDepartement
       ? choisirVilles(cible + 4)
@@ -654,7 +658,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const marqueurs: Marqueur[] = useMemo(() => {
     const reglage = DENSITES[densite];
-    const cible = grilleFrance ? Infinity : enDepartement ? reglage.villes : enFrance ? Math.round(REFERENCE_FRANCE.length * COEFFICIENT_FRANCE[densite]) : Math.max(1, Math.ceil(reglage.part * points.length));
+    const cible = grilleFrance ? Infinity : enDepartement ? reglage.villes + (AJUSTEMENT_VILLES[departement]?.[densite] ?? 0) : enFrance ? Math.round(REFERENCE_FRANCE.length * COEFFICIENT_FRANCE[densite]) : Math.max(1, Math.ceil(reglage.part * points.length));
     // Vue département : plus chaud, plus froid et rafales se jugent parmi les villes visées, pas parmi la réserve.
     const reference = enDepartement ? pointsAffiches.slice(0, cible) : pointsAffiches;
     const valeurs = pointsAffiches.map((p) => valeurPrincipale(p.code));
