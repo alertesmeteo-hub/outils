@@ -488,12 +488,15 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const c = enFrance ? retenus.find((r) => r.code === code) : undefined;
       return c ? versEcran({ x: (c.boite.minX + c.boite.maxX) / 2, y: (c.boite.minY + c.boite.maxY) / 2 }, vue) : centre;
     };
-    const ramener = (x: number, y: number, decalagePicto: number, code = '') => {
+    // `souple` (villes imposées à la main, ex. Bourg-Madame sur la frontière) : seul le centre du picto doit être sur le
+    // territoire, sinon la ville est repoussée de plusieurs kilomètres vers l'intérieur.
+    const ramener = (x: number, y: number, decalagePicto: number, code = '', souple = false) => {
       const centre = centreDe(code);
+      const test = souple ? centreSurTerre : surTerre;
       let px = x;
       let py = y;
       // Le picto est à gauche du centre du marqueur (la température est à droite) : c'est lui qui doit être sur terre.
-      for (let k = 0; k < 120 && !surTerre(px, py, decalagePicto); k++) {
+      for (let k = 0; k < 120 && !test(px, py, decalagePicto); k++) {
         const d = Math.hypot(centre.x - px, centre.y - py) || 1;
         px += ((centre.x - px) / d) * 3;
         py += ((centre.y - py) / d) * 3;
@@ -680,7 +683,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
       const brut = grilleFrance?.get(p.code) ?? versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
-      const { x, y } = terre ? terre.ramener(brut.x, brut.y, decalagePicto, p.code) : brut;
+      const { x, y } = terre ? terre.ramener(brut.x, brut.y, decalagePicto, p.code, enDepartement && p.prioritaire === true) : brut;
       const rafale = rafaleDe(p);
       const v = valeurs[i];
       return {
