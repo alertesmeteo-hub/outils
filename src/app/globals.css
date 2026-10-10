@@ -244,3 +244,7 @@ body {
 .cinfo-encadre ol li small { font-family: Arial, sans-serif; font-size: 10px; font-weight: 700; }
 .cinfo-encadre ul li { display: flex; align-items: center; gap: 7px; height: 19px; white-space: nowrap; }
 .cinfo-encadre ul li i { display: inline-block; width: 22px; height: 13px; border: 1px solid rgba(255, 255, 255, 0.85); border-radius: 3px; flex: none; }
+/* Synthèse (maxi, mini, rafales, pluie) : pictogramme dans la pastille, valeur colorée dans le classement. */
+.cinfo-icone { font-size: 0.9em; margin-right: 0.1em; }
+.cinfo-vide { margin: 2px 0 0; color: #cbd5e1; font-size: 12px; }
+.cinfo-encadre ol li .cinfo-valeur-top { padding: 0 5px; border-radius: 4px; line-height: 17px; }

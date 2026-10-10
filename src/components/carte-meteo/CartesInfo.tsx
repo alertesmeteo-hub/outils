@@ -19,6 +19,7 @@ import {
   type ThemeInfo,
 } from '@/lib/carte-meteo/cartes-info';
 import CarteInfo, { type PointInfo } from './CarteInfo';
+import CarteSynthese, { type RubriqueSynthese } from './CarteSynthese';
 import { MASQUES_FRANCE, NOM_ECHEANCE, SECOURS, codesDeLaZone, libelleJour, normaliser } from './CarteMeteo';
 
 type Mode = 'prevision' | 'bilan' | 'climat';
@@ -64,6 +65,16 @@ function sansValeursAberrantes(points: PointInfo[]): PointInfo[] {
     return Math.abs(p.valeur - mediane) <= 8;
   });
 }
+
+/** Rubrique de la carte « l'essentiel » à partir d'un thème (prévision ou bilan). */
+const rubrique = (themes: ThemeInfo[], id: string, libelle: string, icone: string, points: Record<string, PointInfo[]>): RubriqueSynthese => ({
+  libelle,
+  icone,
+  theme: themes.find((t) => t.id === id)!,
+  points: points[id] ?? [],
+});
+/** Filtre « Thème » : la synthèse se range sous ce titre, en tête de page. */
+const ESSENTIEL = 'L’essentiel';
 
 const legendeBarre = 'mb-1 block text-sm font-medium';
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
@@ -118,7 +129,8 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   }, [mode, cle, previsions?.cle, erreur, modele, dateISO, requeteZone]);
 
   useEffect(() => {
-    if (mode !== 'bilan' || bilans || erreurBilans) return;
+    // Aussi en prévision pour aujourd'hui : la synthèse prend le mini relevé cette nuit (le modèle ne couvre plus la nuit).
+    if (!(mode === 'bilan' || (mode === 'prevision' && jour === 0)) || bilans || erreurBilans) return;
     const controleur = new AbortController();
     fetch('/api/carte-meteo/bilans/', { signal: controleur.signal })
       .then(async (r) => {
@@ -128,7 +140,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
       .then(setBilans)
       .catch((e: Error) => e.name !== 'AbortError' && setErreurBilans(e.message));
     return () => controleur.abort();
-  }, [mode, bilans, erreurBilans]);
+  }, [mode, jour, bilans, erreurBilans]);
 
   // Réchauffement climatique : pluies DRIAS par département (France, région) et par commune (département).
   useEffect(() => {
@@ -235,6 +247,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
   const groupes = parGroupe(themes);
   const groupesAffiches = groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
+  const avecSynthese = mode !== 'climat' && (groupeChoisi === 'tous' || groupeChoisi === ESSENTIEL);
   const chargement =
     mode === 'prevision'
       ? previsions?.cle !== cle && !erreur
@@ -379,6 +392,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
             <span className={legendeBarre}>Thème</span>
             <select value={groupeChoisi} onChange={(e) => setGroupeChoisi(e.target.value)} className={selectBarre}>
               <option value="tous">Tous les thèmes</option>
+              {mode !== 'climat' && <option value={ESSENTIEL}>{ESSENTIEL} (maxi, mini, rafales, pluie)</option>}
               {groupes.map((g) => (
                 <option key={g.groupe} value={g.groupe}>
                   {g.groupe} ({g.themes.length})
@@ -398,6 +412,14 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
           </label>
         </div>
         <nav aria-label="Aller à une carte" className="flex flex-col gap-1.5 border-t border-border pt-3">
+          {avecSynthese && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{ESSENTIEL}</span>
+              <a href="#carte-essentiel" className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
+                Maxi, mini, rafales, pluie
+              </a>
+            </div>
+          )}
           {groupesAffiches.map((g) => (
             <div key={g.groupe} className="flex flex-wrap items-center gap-1.5">
               <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{g.groupe}</span>
@@ -436,6 +458,71 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                 ? `Bilans — ${nomZone}, stations Météo-France${bilans?.majA ? `, mise à jour ${new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}` : ''}.`
                 : `Réchauffement climatique — ${nomZone}, horizon ${horizon}, trajectoire de référence TRACC (Météo-France), par rapport à 1976-2005.`}
           </p>
+          {avecSynthese && (
+            <section id="carte-essentiel" className="mt-8 scroll-mt-4">
+              <h2 className="border-b border-border pb-1 text-xl font-extrabold">{ESSENTIEL} : maxi, mini, plus fortes rafales et pluies</h2>
+              <div className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-2">
+                {mode === 'prevision' ? (
+                  <div className="min-w-0">
+                    <CarteSynthese
+                      key={zone}
+                      titre="LES EXTRÊMES DU JOUR"
+                      sousTitre={`PRÉVISION · ${libelleJour(dateISO)}`}
+                      zone={zone}
+                      logoId={logoId}
+                      nomFichier={`${prefixe}-essentiel`}
+                      rubriques={[
+                        rubrique(THEMES_PREVISION, 'tmax', 'Maxi', '🔥', pointsPrevision),
+                        // Aujourd'hui, la nuit (voire la matinée) est passée avant le calcul du modèle : le matin prévu, sinon le mini relevé cette nuit.
+                        (pointsPrevision.tmin?.length ?? 0) > 0
+                          ? rubrique(THEMES_PREVISION, 'tmin', 'Mini', '❄️', pointsPrevision)
+                          : (pointsPrevision.tmatin?.length ?? 0) > 0
+                            ? rubrique(THEMES_PREVISION, 'tmatin', 'Mini (matin)', '❄️', pointsPrevision)
+                            : rubrique(THEMES_BILAN, 'tn-prov', 'Mini relevé cette nuit', '❄️', pointsBilan),
+                        rubrique(THEMES_PREVISION, 'rafales', 'Rafales', '💨', pointsPrevision),
+                        rubrique(THEMES_PREVISION, 'pluie', 'Pluie', '🌧️', pointsPrevision),
+                      ]}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="min-w-0">
+                      <CarteSynthese
+                        key={`jour-${zone}`}
+                        titre="BILAN DE LA JOURNÉE"
+                        sousTitre={`OBSERVATIONS · ${libelleJour(aujourdhui)} (PROVISOIRE)`}
+                        zone={zone}
+                        logoId={logoId}
+                        nomFichier={`${prefixe}-journee`}
+                        rubriques={[
+                          rubrique(THEMES_BILAN, 'tx-prov', 'Maxi', '🔥', pointsBilan),
+                          rubrique(THEMES_BILAN, 'tn-prov', 'Mini de la nuit', '❄️', pointsBilan),
+                          rubrique(THEMES_BILAN, 'raf24', 'Rafales (24 h)', '💨', pointsBilan),
+                          rubrique(THEMES_BILAN, 'rr6', 'Pluie depuis ce matin', '🌧️', pointsBilan),
+                        ]}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <CarteSynthese
+                        key={`veille-${zone}`}
+                        titre="BILAN DE LA VEILLE"
+                        sousTitre={`OBSERVATIONS · ${libelleJour(ajouterJours(aujourdhui, -1))}`}
+                        zone={zone}
+                        logoId={logoId}
+                        nomFichier={`${prefixe}-veille`}
+                        rubriques={[
+                          rubrique(THEMES_BILAN, 'tx-fin', 'Maxi', '🔥', pointsBilan),
+                          rubrique(THEMES_BILAN, 'tn-fin', 'Mini', '❄️', pointsBilan),
+                          rubrique(THEMES_BILAN, 'raf24', 'Rafales (24 h)', '💨', pointsBilan),
+                          rubrique(THEMES_BILAN, 'rr24c', 'Pluie (8 h → 8 h)', '🌧️', pointsBilan),
+                        ]}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+          )}
           {groupesAffiches.map((g) => (
             <section key={g.groupe} className="mt-8">
               <h2 className="border-b border-border pb-1 text-xl font-extrabold">{g.groupe}</h2>
