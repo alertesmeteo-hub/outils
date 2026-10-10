@@ -41,7 +41,7 @@ const nextConfig = {
       },
       {
         // Fonds de carte, pictos, flèches de vent et logos de la carte météo : rarement modifiés, inutile de les revalider à chaque visite.
-        source: '/:dossier(geo|pictos|pictos-meteocons|vent|logos)/:path*',
+        source: '/:dossier(geo|pictos|pictos-meteocons|vent|logos|climat)/:path*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=3600, stale-while-revalidate=86400' }],
       },
       {

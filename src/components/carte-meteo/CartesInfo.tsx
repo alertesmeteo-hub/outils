@@ -3,14 +3,37 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
-import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
+import { REGIONS_FR, REGION_PAR_DEPARTEMENT, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr';
+import { CLIMAT_REGIONS, type Horizon } from '@/lib/carte-meteo/climat-tracc';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
-import { THEMES_BILAN, THEMES_PREVISION, type ReponseBilans } from '@/lib/carte-meteo/cartes-info';
+import {
+  THEMES_BILAN,
+  THEMES_CLIMAT,
+  THEMES_PREVISION,
+  parGroupe,
+  type ClimatCommune,
+  type ClimatDepartements,
+  type ReponseBilans,
+  type ThemeClimat,
+  type ThemeInfo,
+} from '@/lib/carte-meteo/cartes-info';
 import CarteInfo, { type PointInfo } from './CarteInfo';
 import { MASQUES_FRANCE, NOM_ECHEANCE, SECOURS, codesDeLaZone, libelleJour, normaliser } from './CarteMeteo';
 
-type Mode = 'prevision' | 'bilan';
+type Mode = 'prevision' | 'bilan' | 'climat';
+
+const MODES: [Mode, string][] = [
+  ['prevision', 'Prévisions'],
+  ['bilan', 'Bilans (observations)'],
+  ['climat', 'Réchauffement climatique'],
+];
+
+/** Centre d'une région : moyenne des centres de ses départements. */
+function centreRegion(region: string) {
+  const deps = departementsDeLaRegion(region).map((d) => COORDS_DEPARTEMENTS[d]).filter(Boolean);
+  return { lat: deps.reduce((s, c) => s + c.lat, 0) / deps.length, lon: deps.reduce((s, c) => s + c.lon, 0) / deps.length };
+}
 type Niveau = 'france' | 'region' | 'departement';
 
 /** Les stations de Corse sont rattachées au « 20 » : on les répartit entre la Corse-du-Sud et la Haute-Corse. */
@@ -55,6 +78,12 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const [modele, setModele] = useState<ModeleMeteo>('arome');
   const [jour, setJour] = useState(0);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
+  const [horizon, setHorizon] = useState<Horizon>(2050);
+  /** Thème affiché (« tous » : toutes les cartes de la catégorie, rangées par thème). */
+  const [groupeChoisi, setGroupeChoisi] = useState('tous');
+  const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
+  const [climatCommunes, setClimatCommunes] = useState<{ dep: string; communes: ClimatCommune[] } | null>(null);
+  const [erreurClimat, setErreurClimat] = useState<string | null>(null);
 
   const [previsions, setPrevisions] = useState<{ cle: string; modele: ModeleMeteo; points: (PointCarte & { dep?: string })[] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -101,6 +130,67 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
     return () => controleur.abort();
   }, [mode, bilans, erreurBilans]);
 
+  // Réchauffement climatique : pluies DRIAS par département (France, région) et par commune (département).
+  useEffect(() => {
+    if (mode !== 'climat' || climatDeps || erreurClimat) return;
+    const controleur = new AbortController();
+    fetch('/climat/departements.json', { signal: controleur.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<ClimatDepartements>) : Promise.reject(new Error('Données climatiques indisponibles.'))))
+      .then(setClimatDeps)
+      .catch((e: Error) => e.name !== 'AbortError' && setErreurClimat(e.message));
+    return () => controleur.abort();
+  }, [mode, climatDeps, erreurClimat]);
+
+  useEffect(() => {
+    if (mode !== 'climat' || !enDepartement || climatCommunes?.dep === departement || erreurClimat) return;
+    const controleur = new AbortController();
+    fetch(`/climat/communes/${departement}.json`, { signal: controleur.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<ClimatCommune[]>) : Promise.reject(new Error('Données climatiques indisponibles.'))))
+      .then((communes) => setClimatCommunes({ dep: departement, communes }))
+      .catch((e: Error) => e.name !== 'AbortError' && setErreurClimat(e.message));
+    return () => controleur.abort();
+  }, [mode, enDepartement, departement, climatCommunes?.dep, erreurClimat]);
+
+  /** Cartes climat : points (régions, départements ou communes) et teinte des départements, par thème. */
+  const climat = useMemo(() => {
+    const resultat: Record<string, { points: PointInfo[]; valeursDepartements?: Record<string, number> }> = {};
+    for (const theme of THEMES_CLIMAT) {
+      if (theme.regional) {
+        const cle = theme.regional;
+        const valeurDe = (region: string) => CLIMAT_REGIONS[region]?.[cle]?.[horizon] ?? null;
+        const valeursDepartements: Record<string, number> = {};
+        for (const d of CODES_DEPARTEMENTS) {
+          const v = valeurDe(REGION_PAR_DEPARTEMENT[d]);
+          if (v != null) valeursDepartements[d] = v;
+        }
+        // Une étiquette par région ; en vue département, au centre du département (valeur de sa région).
+        const regions = niveau === 'france' ? REGIONS_FR : [niveau === 'region' ? region : REGION_PAR_DEPARTEMENT[departement]];
+        const points = regions
+          .map((r): PointInfo | null => {
+            const v = valeurDe(r);
+            if (v == null) return null;
+            const c = enDepartement ? COORDS_DEPARTEMENTS[departement] : centreRegion(r);
+            return { code: r, nom: r, dep: enDepartement ? departement : departementsDeLaRegion(r)[0], lat: c.lat, lon: c.lon, valeur: v };
+          })
+          .filter((x): x is PointInfo => x != null);
+        resultat[theme.id] = { points, valeursDepartements };
+      } else if (theme.drias && climatDeps) {
+        const indice = climatDeps.champs.indexOf(theme.drias) * 2 + (horizon === 2100 ? 1 : 0);
+        const valeursDepartements: Record<string, number> = {};
+        for (const [d, valeurs] of Object.entries(climatDeps.departements)) if (valeurs[indice] != null) valeursDepartements[d] = valeurs[indice]!;
+        const points: PointInfo[] = enDepartement
+          ? (climatCommunes?.dep === departement ? climatCommunes.communes : [])
+              .filter((c) => c[4 + indice] != null)
+              .map((c) => ({ code: c[0], nom: c[1], dep: departement, lat: c[2], lon: c[3], valeur: c[4 + indice] as number }))
+          : Object.entries(valeursDepartements)
+              .filter(([d]) => COORDS_DEPARTEMENTS[d])
+              .map(([d, v]) => ({ code: d, nom: DEPARTEMENTS_FR[d] ?? d, dep: d, lat: COORDS_DEPARTEMENTS[d].lat, lon: COORDS_DEPARTEMENTS[d].lon, valeur: v }));
+        resultat[theme.id] = { points, valeursDepartements: enDepartement ? undefined : valeursDepartements };
+      }
+    }
+    return resultat;
+  }, [horizon, niveau, region, departement, enDepartement, climatDeps, climatCommunes]);
+
   /** Points de prévision par thème. */
   const pointsPrevision = useMemo(() => {
     const resultat: Record<string, PointInfo[]> = {};
@@ -142,10 +232,21 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
 
   const nomZone = niveau === 'france' ? 'France' : niveau === 'region' ? region : DEPARTEMENTS_FR[departement];
   const modeleAffiche = previsions?.cle === cle ? MODELES.find((m) => m.id === previsions.modele) : undefined;
-  const themes = mode === 'prevision' ? THEMES_PREVISION : THEMES_BILAN;
-  const chargement = mode === 'prevision' ? previsions?.cle !== cle && !erreur : !bilans && !erreurBilans;
-  const erreurAffichee = mode === 'prevision' ? erreur : erreurBilans;
-  const prefixe = `carte-${mode === 'prevision' ? `prevision-${dateISO}` : 'bilan'}-${normaliser(nomZone).replace(/ /g, '-')}`;
+  const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
+  const groupes = parGroupe(themes);
+  const groupesAffiches = groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
+  const chargement =
+    mode === 'prevision'
+      ? previsions?.cle !== cle && !erreur
+      : mode === 'bilan'
+        ? !bilans && !erreurBilans
+        : !erreurClimat && (!climatDeps || (enDepartement && climatCommunes?.dep !== departement));
+  const erreurAffichee = mode === 'prevision' ? erreur : mode === 'bilan' ? erreurBilans : erreurClimat;
+  const prefixe = `carte-${mode === 'prevision' ? `prevision-${dateISO}` : mode === 'bilan' ? 'bilan' : `climat-${horizon}`}-${normaliser(nomZone).replace(/ /g, '-')}`;
+
+  /** Climat : horizon et source sous le titre. */
+  const sousTitreClimat = (theme: ThemeClimat) =>
+    `HORIZON ${horizon} · ${theme.regional ? 'FICHES RÉGIONALES MÉTÉO-FRANCE' : 'DRIAS, MÉDIANE DES MODÈLES'}${theme.regional || theme.drias === 'intensitePct' ? ' · RÉF. 1976-2005' : ''}`;
 
   /** Bilans : période en clair, sans « (heure de Paris) ». */
   const periodeBilan = (themeId: string) => (bilans?.cartes[themeId]?.fenetre ?? '').replace(/\s*\(heure de Paris\)/, '').toUpperCase();
@@ -157,17 +258,15 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
           <fieldset>
             <legend className={legendeBarre}>Cartes</legend>
             <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  ['prevision', 'Prévisions'],
-                  ['bilan', 'Bilans (observations)'],
-                ] as const
-              ).map(([valeur, libelle]) => (
+              {MODES.map(([valeur, libelle]) => (
                 <button
                   key={valeur}
                   type="button"
                   aria-pressed={mode === valeur}
-                  onClick={() => setMode(valeur)}
+                  onClick={() => {
+                    setMode(valeur);
+                    setGroupeChoisi('tous');
+                  }}
                   className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === valeur ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
                 >
                   {libelle}
@@ -263,6 +362,30 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
               </label>
             </>
           )}
+          {mode === 'climat' && (
+            <fieldset>
+              <legend className={legendeBarre}>Horizon</legend>
+              <div className="flex gap-3">
+                {([2050, 2100] as const).map((h) => (
+                  <label key={h} className="text-sm">
+                    <input type="radio" name={nom('horizon')} checked={horizon === h} onChange={() => setHorizon(h)} className="mr-1.5" />
+                    {h} ({h === 2050 ? '+2,7' : '+4'} °C en France)
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Thème</span>
+            <select value={groupeChoisi} onChange={(e) => setGroupeChoisi(e.target.value)} className={selectBarre}>
+              <option value="tous">Tous les thèmes</option>
+              {groupes.map((g) => (
+                <option key={g.groupe} value={g.groupe}>
+                  {g.groupe} ({g.themes.length})
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="text-sm font-medium">
             <span className={legendeBarre}>Logo</span>
             <select value={logoId} onChange={(e) => setLogoChoisi(e.target.value)} className={selectBarre}>
@@ -274,11 +397,16 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
             </select>
           </label>
         </div>
-        <nav aria-label="Aller à une carte" className="flex flex-wrap gap-1.5 border-t border-border pt-3">
-          {themes.map((t) => (
-            <a key={t.id} href={`#carte-${t.id}`} className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
-              {t.court}
-            </a>
+        <nav aria-label="Aller à une carte" className="flex flex-col gap-1.5 border-t border-border pt-3">
+          {groupesAffiches.map((g) => (
+            <div key={g.groupe} className="flex flex-wrap items-center gap-1.5">
+              <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{g.groupe}</span>
+              {g.themes.map((t) => (
+                <a key={t.id} href={`#carte-${t.id}`} className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
+                  {t.court}
+                </a>
+              ))}
+            </div>
           ))}
         </nav>
       </div>
@@ -288,42 +416,52 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
           {erreurAffichee}
           <button
             type="button"
-            onClick={() => (mode === 'prevision' ? setErreur(null) : setErreurBilans(null))}
+            onClick={() => (mode === 'prevision' ? setErreur(null) : mode === 'bilan' ? setErreurBilans(null) : setErreurClimat(null))}
             className="rounded-lg border border-border px-3 py-1 text-sm text-text"
           >
             Réessayer
           </button>
         </p>
       )}
-      {chargement && <p className="mt-4 text-sm text-muted">Chargement des {mode === 'prevision' ? 'prévisions' : 'observations'}…</p>}
+      {chargement && (
+        <p className="mt-4 text-sm text-muted">Chargement des {mode === 'prevision' ? 'prévisions' : mode === 'bilan' ? 'observations' : 'projections'}…</p>
+      )}
 
       {!chargement && !erreurAffichee && (
         <>
           <p className="mt-4 text-sm text-muted">
             {mode === 'prevision'
-              ? `${themes.length} cartes de prévision — ${nomZone}, ${NOM_ECHEANCE(jour).toLowerCase()} (${dateISO.split('-').reverse().join('/')}), modèle ${modeleAffiche?.libelle} (${modeleAffiche?.fournisseur}).`
-              : `${themes.length} cartes de bilan — ${nomZone}, stations Météo-France${bilans?.majA ? `, mise à jour ${new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}` : ''}.`}
+              ? `Prévisions — ${nomZone}, ${NOM_ECHEANCE(jour).toLowerCase()} (${dateISO.split('-').reverse().join('/')}), modèle ${modeleAffiche?.libelle} (${modeleAffiche?.fournisseur}).`
+              : mode === 'bilan'
+                ? `Bilans — ${nomZone}, stations Météo-France${bilans?.majA ? `, mise à jour ${new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}` : ''}.`
+                : `Réchauffement climatique — ${nomZone}, horizon ${horizon}, trajectoire de référence TRACC (Météo-France), par rapport à 1976-2005.`}
           </p>
-          <div className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-2">
-            {mode === 'prevision'
-              ? THEMES_PREVISION.map((theme) => (
-                  <section key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">
-                    <CarteInfo
-                      theme={theme}
-                      zone={zone}
-                      points={pointsPrevision[theme.id] ?? []}
-                      sousTitre={`${libelleJour(dateISO)}`}
-                      logoId={logoId}
-                      prefixeFichier={prefixe}
-                    />
-                  </section>
-                ))
-              : THEMES_BILAN.map((theme) => (
-                  <section key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">
-                    <CarteInfo theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} />
-                  </section>
+          {groupesAffiches.map((g) => (
+            <section key={g.groupe} className="mt-8">
+              <h2 className="border-b border-border pb-1 text-xl font-extrabold">{g.groupe}</h2>
+              <div className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-2">
+                {g.themes.map((theme) => (
+                  <div key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">
+                    {mode === 'prevision' ? (
+                      <CarteInfo theme={theme} zone={zone} points={pointsPrevision[theme.id] ?? []} sousTitre={libelleJour(dateISO)} logoId={logoId} prefixeFichier={prefixe} />
+                    ) : mode === 'bilan' ? (
+                      <CarteInfo theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} />
+                    ) : (
+                      <CarteInfo
+                        theme={theme}
+                        zone={zone}
+                        points={climat[theme.id]?.points ?? []}
+                        valeursDepartements={climat[theme.id]?.valeursDepartements}
+                        sousTitre={sousTitreClimat(theme as ThemeClimat)}
+                        logoId={logoId}
+                        prefixeFichier={prefixe}
+                      />
+                    )}
+                  </div>
                 ))}
-          </div>
+              </div>
+            </section>
+          ))}
         </>
       )}
     </div>

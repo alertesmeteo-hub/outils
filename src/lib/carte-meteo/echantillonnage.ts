@@ -19,14 +19,17 @@ export function ordreRepartition(points: PointPlan[]): string[] {
   for (const p of points) if (distance(p, { code: '', x: cx, y: cy }) < distance(premier, { code: '', x: cx, y: cy })) premier = p;
 
   const ordre = [premier];
+  // Marque des points déjà pris (au lieu de `ordre.includes`, en O(n) : les ~400 communes d'un département restent rapides).
+  const pris = points.map((p) => p === premier);
   const plusProche = points.map((p) => distance(p, premier));
   while (ordre.length < points.length) {
     let meilleur = -1;
     for (let i = 0; i < points.length; i++) {
-      if (ordre.includes(points[i])) continue;
+      if (pris[i]) continue;
       if (meilleur < 0 || plusProche[i] > plusProche[meilleur]) meilleur = i;
     }
     ordre.push(points[meilleur]);
+    pris[meilleur] = true;
     for (let i = 0; i < points.length; i++) plusProche[i] = Math.min(plusProche[i], distance(points[i], points[meilleur]));
   }
   return ordre.map((p) => p.code);

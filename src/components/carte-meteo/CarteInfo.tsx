@@ -35,6 +35,8 @@ interface Props {
   logoId: string;
   /** Début du nom du fichier exporté. */
   prefixeFichier: string;
+  /** Valeur de chaque département pour sa teinte, quand elle ne se déduit pas des points (projections régionales). */
+  valeursDepartements?: Record<string, number>;
 }
 
 const NOP = () => {};
@@ -48,7 +50,7 @@ const PAR_DEPARTEMENT = { france: 1, region: 4, departement: Infinity };
 
 const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements }: Props) {
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
@@ -92,6 +94,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
 
   /** Teinte des départements : valeur la plus marquante du département (moyenne pour les écarts et les nuages). */
   const remplissages = useMemo(() => {
+    if (valeursDepartements) {
+      return Object.fromEntries(Object.entries(valeursDepartements).map(([dep, v]) => [dep, palierDe(theme.paliers, v).fond]));
+    }
     if (enDepartement) return undefined;
     const parDep = new Map<string, number[]>();
     for (const p of dansZone) {
@@ -106,7 +111,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       resultat[dep] = palierDe(theme.paliers, v).fond;
     }
     return resultat;
-  }, [dansZone, enDepartement, theme]);
+  }, [dansZone, enDepartement, theme, valeursDepartements]);
 
   // Paliers de la légende : seulement ceux qui couvrent les valeurs de la carte (une échelle de 12 couleurs pour 3 utilisées encombre).
   const legende = useMemo(() => {
@@ -118,13 +123,15 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const uniteVisible = !theme.texteValeur && theme.unite && theme.unite !== '°' ? theme.unite : '';
   // Encadrés : France → classement à droite (mer au large de l'Alsace et des Alpes) et légende en bas à gauche (golfe de Gascogne) ;
   // régions et départements → les deux dans la colonne de gauche laissée libre par le cadrage.
-  const hauteurTop = top.length && !theme.sansTop ? 34 + top.length * 19 : 0;
+
   const hauteurLegende = 30 + legende.length * 19;
   // Largeur du classement : rang + nom (17 caractères au plus) + département + valeur, en 13 px.
   const largeurTop = Math.max(
     LARGEUR_ENCADRE,
-    ...top.map((p) => Math.round(30 + Math.min(17, p.nom.length) * 6.6 + (enDepartement ? 0 : 30) + texteInfo(theme, p.valeur).length * 8 + (uniteVisible ? 26 : 0)))
+    ...top.map((p) => Math.round(34 + Math.min(17, p.nom.length) * 7 + (enDepartement || theme.maille ? 0 : 30) + texteInfo(theme, p.valeur).length * 9 + (uniteVisible ? 30 : 0)))
   );
+  // Titre de l'encadré sur deux lignes s'il dépasse la largeur (≈ 9 px par lettre en 16 px condensé).
+  const hauteurTop = top.length && !theme.sansTop ? 34 + top.length * 19 + (theme.titreTop.length * 9 > largeurTop - 18 ? 18 : 0) : 0;
   const rectTop: Rect = enFrance
     ? { x: largeur - MARGE_COLONNE - largeurTop, y: 96, w: largeurTop, h: hauteurTop }
     : { x: MARGE_COLONNE, y: logoUrl ? 21 + hauteurLogo + 14 : 24, w: largeurTop, h: hauteurTop };
@@ -281,7 +288,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
                 <li key={p.code}>
                   <span>
                     {i + 1}. {p.nom.length > 17 ? `${p.nom.slice(0, 16)}…` : p.nom}
-                    {!enDepartement && <em> ({p.dep})</em>}
+                    {!enDepartement && !theme.maille && <em> ({p.dep})</em>}
                   </span>
                   <strong>
                     {texteInfo(theme, p.valeur)}
