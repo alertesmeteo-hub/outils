@@ -248,3 +248,5 @@ body {
 .cinfo-icone { font-size: 0.9em; margin-right: 0.1em; }
 .cinfo-vide { margin: 2px 0 0; color: #cbd5e1; font-size: 12px; }
 .cinfo-encadre ol li .cinfo-valeur-top { padding: 0 5px; border-radius: 4px; line-height: 17px; }
+/* Texte IA posé sur l'image (option), au-dessus de l'adresse du site. */
+.cinfo-texte-ia { position: absolute; z-index: 3; box-sizing: border-box; padding: 7px 12px; background: rgba(13, 20, 40, 0.88); border: 2px solid #f5c400; border-radius: 8px; color: #fff; font-size: 15px; line-height: 20px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; white-space: pre-line; }

@@ -272,6 +272,10 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
       ? rubrique(THEMES_BILAN, 'tn-prov', `${libelle} (en cours)`, '❄️', pointsBilan)
       : rubrique(THEMES_BILAN, 'tn-fin', `${libelle} (nuit dernière)`, '❄️', pointsBilan);
 
+  /** Nature des données, transmise au texte IA. */
+  const contextePrevision = `Prévision du modèle ${modeleAffiche?.libelle ?? modele} (${modeleAffiche?.fournisseur ?? ''})`;
+  const contexteBilan = `Bilan des observations des stations Météo-France${altitudeMax ? ` situées jusqu'à ${altitudeMax} m d'altitude` : ''}`;
+
   /** Climat : horizon et source sous le titre. */
   const sousTitreClimat = (theme: ThemeClimat) =>
     `HORIZON ${horizon} · ${theme.regional ? 'FICHES RÉGIONALES MÉTÉO-FRANCE' : 'DRIAS, MÉDIANE DES MODÈLES'}${theme.regional || theme.drias === 'intensitePct' ? ' · RÉF. 1976-2005' : ''}`;
@@ -498,6 +502,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                       zone={zone}
                       logoId={logoId}
                       nomFichier={`${prefixe}-essentiel`}
+                      contexte={contextePrevision}
                       rubriques={[
                         rubrique(THEMES_PREVISION, 'tmax', 'Maxi', '🔥', pointsPrevision),
                         // Aujourd'hui, la nuit (voire la matinée) est passée avant le calcul du modèle : le matin prévu, sinon le mini relevé cette nuit.
@@ -521,6 +526,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                         zone={zone}
                         logoId={logoId}
                         nomFichier={`${prefixe}-journee`}
+                        contexte={contexteBilan}
                         rubriques={[
                           rubrique(THEMES_BILAN, 'tx-prov', 'Maxi', '🔥', pointsBilan),
                           miniNuit('Mini de la nuit'),
@@ -537,6 +543,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                         zone={zone}
                         logoId={logoId}
                         nomFichier={`${prefixe}-veille`}
+                        contexte={contexteBilan}
                         rubriques={[
                           rubrique(THEMES_BILAN, 'tx-fin', 'Maxi', '🔥', pointsBilan),
                           rubrique(THEMES_BILAN, 'tn-fin', 'Mini (nuit dernière)', '❄️', pointsBilan),
@@ -557,9 +564,9 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                 {g.themes.map((theme) => (
                   <div key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">
                     {mode === 'prevision' ? (
-                      <CarteInfo theme={theme} zone={zone} points={pointsPrevision[theme.id] ?? []} sousTitre={libelleJour(dateISO)} logoId={logoId} prefixeFichier={prefixe} />
+                      <CarteInfo theme={theme} zone={zone} points={pointsPrevision[theme.id] ?? []} sousTitre={libelleJour(dateISO)} logoId={logoId} prefixeFichier={prefixe} contexte={contextePrevision} />
                     ) : mode === 'bilan' ? (
-                      <CarteInfo theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} />
+                      <CarteInfo theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
                     ) : (
                       <CarteInfo
                         theme={theme}
@@ -569,6 +576,11 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                         sousTitre={sousTitreClimat(theme as ThemeClimat)}
                         logoId={logoId}
                         prefixeFichier={prefixe}
+                        contexte={
+                          (theme as ThemeClimat).regional
+                            ? 'Projection climatique : fiches régionales Météo-France (trajectoire TRACC), écart à la période 1976-2005'
+                            : 'Projection climatique DRIAS (Météo-France / CNRM, médiane des modèles, trajectoire TRACC)'
+                        }
                       />
                     )}
                   </div>

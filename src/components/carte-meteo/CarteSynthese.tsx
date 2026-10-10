@@ -9,6 +9,9 @@ import { palierDe, texteInfo, type ThemeInfo } from '@/lib/carte-meteo/cartes-in
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
 import { BOITE_FRANCE, FICHIERS_CONTOURS, codesDeLaZone, normaliser, useContours } from './CarteMeteo';
 import type { PointInfo } from './CarteInfo';
+import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
+import { statsDe } from '@/lib/carte-meteo/texte-ia';
+import { useTexteIA } from './TexteIA';
 
 /** Un phénomène de la synthèse : son thème (couleurs, unité, sens du classement), son pictogramme et ses points. */
 export interface RubriqueSynthese {
@@ -26,6 +29,8 @@ interface Props {
   rubriques: RubriqueSynthese[];
   logoId: string;
   nomFichier: string;
+  /** Nature et source des données (texte IA). */
+  contexte?: string;
 }
 
 const NOP = () => {};
@@ -48,7 +53,7 @@ const trier = (r: RubriqueSynthese, zone: Set<string>) =>
  * Carte « l'essentiel » : les extrêmes de la journée (maxi, mini, rafales, pluie…) sur une seule image, avec le classement
  * des cinq premiers de chaque phénomène et les trois premiers pointés sur la carte.
  */
-export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoId, nomFichier }: Props) {
+export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoId, nomFichier, contexte = '' }: Props) {
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
@@ -90,6 +95,32 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
     return { x: gauche ? MARGE : largeur - MARGE - LARGEUR_ENCADRE, y, w: LARGEUR_ENCADRE, h: hauteurEncadre(i) };
   });
 
+  // Texte IA (à la demande) : posé en bas, entre les deux colonnes d'encadrés.
+  const nomZone = enFrance ? 'France métropolitaine' : enDepartement ? `${DEPARTEMENTS_FR[zone.slice(4)]} (${zone.slice(4)})` : zone.slice(4);
+  const texteIA = useTexteIA(
+    () =>
+      classes.every((c) => c.length === 0)
+        ? null
+        : {
+            type: `Synthèse des extrêmes — ${contexte}`,
+            titre,
+            periode: sousTitre,
+            zone: nomZone,
+            source: contexte,
+            rubriques: rubriques
+              .map((r, i) => ({
+                nom: `${r.libelle} (${r.theme.court})`,
+                unite: r.theme.unite === '°' ? '°C' : r.theme.unite,
+                sens: (r.theme.ordre === 'desc' ? 'plus hautes' : 'plus basses') as 'plus hautes' | 'plus basses',
+                classement: classes[i].slice(0, 5).map((p) => ({ lieu: p.nom, departement: p.dep, valeur: p.valeur })),
+                stats: statsDe(classes[i].map((p) => p.valeur)),
+              }))
+              .filter((r) => r.classement.length > 0),
+          },
+    { x: MARGE + LARGEUR_ENCADRE + 16, largeur: LARGEUR_CARTE - 2 * (MARGE + LARGEUR_ENCADRE + 16) }
+  );
+  const cleTexte = texteIA.rect ? `${texteIA.rect.y}|${texteIA.rect.h}` : '';
+
   const places = useMemo(() => {
     if (contoursDep.length === 0) return [];
     const elements = classes.flatMap((liste, i) =>
@@ -108,11 +139,12 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
       { x: largeur / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 },
       ...rects,
       ...(logoUrl ? [{ x: 29, y: 21, w: 240, h: hauteurLogo }] : []),
+      ...(texteIA.rect ? [texteIA.rect] : []),
     ];
     const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, TAILLE * 1.2);
     return elements.filter((e) => positions.has(e.code)).map((e) => ({ ...e, ...positions.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classes, vue, contoursDep.length, logoUrl, hauteurLogo]);
+  }, [classes, vue, contoursDep.length, logoUrl, hauteurLogo, cleTexte]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -132,9 +164,12 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
     <div className="min-w-0" ref={colonneRef}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-base font-bold">{rubriques.map((r) => r.libelle).join(', ')}</p>
-        <button type="button" onClick={exporter} disabled={enExport || contoursDep.length === 0} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
-          {enExport ? 'Export…' : 'Exporter en JPG'}
-        </button>
+        <div className="flex gap-2">
+          {texteIA.bouton}
+          <button type="button" onClick={exporter} disabled={enExport || contoursDep.length === 0} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
+            {enExport ? 'Export…' : 'Exporter en JPG'}
+          </button>
+        </div>
       </div>
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
@@ -183,6 +218,8 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
           );
         })}
 
+        {texteIA.calque}
+
         {rubriques.map((r, i) => (
           <div key={r.libelle} className="cinfo-encadre" style={{ left: rects[i].x, top: rects[i].y, width: rects[i].w }}>
             <div className="cinfo-encadre-titre">
@@ -213,6 +250,7 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
           </div>
         ))}
       </CarteRendu>
+      {texteIA.panneau}
     </div>
   );
 }

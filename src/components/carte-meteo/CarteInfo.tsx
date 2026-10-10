@@ -10,6 +10,9 @@ import { angleFleche } from '@/lib/carte-meteo/vent';
 import { palierDe, texteInfo, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
 import { BOITE_FRANCE, FICHIERS_CONTOURS, LARGEUR_FRANCE, ZONE_FRANCE, ZONE_UTILE, codesDeLaZone, normaliser, useContours } from './CarteMeteo';
+import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
+import { statsDe } from '@/lib/carte-meteo/texte-ia';
+import { useTexteIA } from './TexteIA';
 
 /** Une valeur à placer sur la carte : point de prévision (département, ville) ou station d'observation. */
 export interface PointInfo {
@@ -37,6 +40,8 @@ interface Props {
   prefixeFichier: string;
   /** Valeur de chaque département pour sa teinte, quand elle ne se déduit pas des points (projections régionales). */
   valeursDepartements?: Record<string, number>;
+  /** Nature et source des données (texte IA) : « Prévision du modèle AROME (Météo-France) »… */
+  contexte?: string;
 }
 
 const NOP = () => {};
@@ -50,7 +55,7 @@ const PAR_DEPARTEMENT = { france: 1, region: 4, departement: Infinity };
 
 const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '' }: Props) {
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
@@ -139,6 +144,40 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const largeurLegende = Math.max(118, Math.round(48 + Math.max(...legende.map((x) => x.libelle.length)) * 6.7));
   const rectLegende: Rect = { x: MARGE_COLONNE, y: HAUTEUR_CARTE - 44 - hauteurLegende, w: largeurLegende, h: hauteurLegende };
 
+  // Texte IA (à la demande) : posé en bas, à droite de la légende.
+  const nomZone = enFrance ? 'France métropolitaine' : enDepartement ? `${DEPARTEMENTS_FR[zone.slice(4)]} (${zone.slice(4)})` : zone.slice(4);
+  const xTexte = rectLegende.x + rectLegende.w + 16;
+  const texteIA = useTexteIA(
+    () =>
+      tries.length === 0
+        ? null
+        : {
+            type: contexte,
+            titre: theme.titre,
+            periode: sousTitre,
+            zone: nomZone,
+            source: contexte,
+            rubriques: [
+              {
+                nom: theme.court,
+                unite: theme.texteValeur ? 'niveau de 0 à 4 (1 faible, 2 modéré, 3 fort, 4 sévère)' : theme.unite === '°' ? '°C' : theme.unite,
+                sens: theme.ordre === 'desc' ? 'plus hautes' : 'plus basses',
+                classement: tries.slice(0, 6).map((p) => ({ lieu: p.nom, departement: theme.maille ? undefined : p.dep, valeur: p.valeur })),
+                stats: statsDe(tries.map((p) => p.valeur)),
+              },
+              // L'autre bout du classement (le plus frais, le plus sec…) ; sans intérêt pour une carte de niveaux (orages).
+              ...(theme.texteValeur ? [] : [{
+                nom: `${theme.court} (autre extrémité)`,
+                unite: theme.unite === '°' ? '°C' : theme.unite,
+                sens: (theme.ordre === 'desc' ? 'plus basses' : 'plus hautes') as 'plus basses' | 'plus hautes',
+                classement: tries.slice(-3).reverse().map((p) => ({ lieu: p.nom, departement: theme.maille ? undefined : p.dep, valeur: p.valeur })),
+              }]),
+            ],
+          },
+    { x: xTexte, largeur: largeur - xTexte - MARGE_COLONNE }
+  );
+  const cleTexte = texteIA.rect ? `${texteIA.rect.y}|${texteIA.rect.h}` : '';
+
   const taille = enFrance ? 16 : enDepartement ? 19 : 17;
   const avecFleche = (p: PointInfo) => p.direction != null && Number.isFinite(p.direction);
 
@@ -184,6 +223,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       rectLegende,
       ...(hauteurTop ? [rectTop] : []),
       ...(logoUrl ? [{ x: 29, y: 21, w: 240, h: hauteurLogo }] : []),
+      ...(texteIA.rect ? [texteIA.rect] : []),
     ];
     const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * 0.9);
     const parCode = new Map(ecran.map((e) => [e.p.code, e.p]));
@@ -193,7 +233,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       .filter((e) => e.priorite === 0 || restantes-- > 0)
       .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance]);
+  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -225,9 +265,12 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     <div className="min-w-0" ref={colonneRef}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-base font-bold">{theme.court}</p>
-        <button type="button" onClick={exporter} disabled={enExport || contoursDep.length === 0} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
-          {enExport ? 'Export…' : 'Exporter en JPG'}
-        </button>
+        <div className="flex gap-2">
+          {texteIA.bouton}
+          <button type="button" onClick={exporter} disabled={enExport || contoursDep.length === 0} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
+            {enExport ? 'Export…' : 'Exporter en JPG'}
+          </button>
+        </div>
       </div>
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
@@ -280,6 +323,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           );
         })}
 
+        {texteIA.calque}
+
         {hauteurTop > 0 && (
           <div className="cinfo-encadre" style={{ left: rectTop.x, top: rectTop.y, width: rectTop.w }}>
             <div className="cinfo-encadre-titre">{theme.titreTop}</div>
@@ -312,6 +357,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           </ul>
         </div>
       </CarteRendu>
+      {texteIA.panneau}
     </div>
   );
 }
