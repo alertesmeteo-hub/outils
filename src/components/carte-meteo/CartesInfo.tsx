@@ -257,6 +257,12 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const erreurAffichee = mode === 'prevision' ? erreur : mode === 'bilan' ? erreurBilans : erreurClimat;
   const prefixe = `carte-${mode === 'prevision' ? `prevision-${dateISO}` : mode === 'bilan' ? 'bilan' : `climat-${horizon}`}-${normaliser(nomZone).replace(/ /g, '-')}`;
 
+  /** Mini de la nuit en cours (20 h → 8 h) ; en soirée, la fenêtre vient de s'ouvrir : celui de la nuit dernière. */
+  const miniNuit = (libelle: string) =>
+    (pointsBilan['tn-prov']?.length ?? 0) > 0
+      ? rubrique(THEMES_BILAN, 'tn-prov', `${libelle} (en cours)`, '❄️', pointsBilan)
+      : rubrique(THEMES_BILAN, 'tn-fin', `${libelle} (nuit dernière)`, '❄️', pointsBilan);
+
   /** Climat : horizon et source sous le titre. */
   const sousTitreClimat = (theme: ThemeClimat) =>
     `HORIZON ${horizon} · ${theme.regional ? 'FICHES RÉGIONALES MÉTÉO-FRANCE' : 'DRIAS, MÉDIANE DES MODÈLES'}${theme.regional || theme.drias === 'intensitePct' ? ' · RÉF. 1976-2005' : ''}`;
@@ -478,7 +484,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                           ? rubrique(THEMES_PREVISION, 'tmin', 'Mini', '❄️', pointsPrevision)
                           : (pointsPrevision.tmatin?.length ?? 0) > 0
                             ? rubrique(THEMES_PREVISION, 'tmatin', 'Mini (matin)', '❄️', pointsPrevision)
-                            : rubrique(THEMES_BILAN, 'tn-prov', 'Mini relevé cette nuit', '❄️', pointsBilan),
+                            : miniNuit('Mini relevé'),
                         rubrique(THEMES_PREVISION, 'rafales', 'Rafales', '💨', pointsPrevision),
                         rubrique(THEMES_PREVISION, 'pluie', 'Pluie', '🌧️', pointsPrevision),
                       ]}
@@ -496,7 +502,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                         nomFichier={`${prefixe}-journee`}
                         rubriques={[
                           rubrique(THEMES_BILAN, 'tx-prov', 'Maxi', '🔥', pointsBilan),
-                          rubrique(THEMES_BILAN, 'tn-prov', 'Mini de la nuit', '❄️', pointsBilan),
+                          miniNuit('Mini de la nuit'),
                           rubrique(THEMES_BILAN, 'raf24', 'Rafales (24 h)', '💨', pointsBilan),
                           rubrique(THEMES_BILAN, 'rr6', 'Pluie depuis ce matin', '🌧️', pointsBilan),
                         ]}
@@ -512,7 +518,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                         nomFichier={`${prefixe}-veille`}
                         rubriques={[
                           rubrique(THEMES_BILAN, 'tx-fin', 'Maxi', '🔥', pointsBilan),
-                          rubrique(THEMES_BILAN, 'tn-fin', 'Mini', '❄️', pointsBilan),
+                          rubrique(THEMES_BILAN, 'tn-fin', 'Mini (nuit dernière)', '❄️', pointsBilan),
                           rubrique(THEMES_BILAN, 'raf24', 'Rafales (24 h)', '💨', pointsBilan),
                           rubrique(THEMES_BILAN, 'rr24c', 'Pluie (8 h → 8 h)', '🌧️', pointsBilan),
                         ]}
