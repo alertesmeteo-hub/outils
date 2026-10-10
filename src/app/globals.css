@@ -207,6 +207,15 @@ body {
 /* Pictos ajoutés à la main : bouton de suppression (absent de l'export JPG). */
 .cmap-supprimer { position: absolute; top: -0.35em; left: -0.35em; width: 1.1em; height: 1.1em; border-radius: 50%; border: none; background: #dc2626; color: #fff; font-size: 0.6em; line-height: 1.1em; padding: 0; cursor: pointer; }
 .cmap-mode-ajout { cursor: crosshair; }
+/* Rafale ajoutée à la main : point d'ancrage (centre de la pastille) ; clic sur la pastille = choix de la direction. */
+.cmap-vent-ajoute { position: absolute; width: 0; height: 0; z-index: 5; line-height: 1; }
+.cmap-vent-ajoute .cmap-vent-place { cursor: pointer; }
+.cmap-vent-ajoute .cmap-supprimer-vent { display: block; }
+.cmap-palette-direction { width: auto; left: 0; }
+.cmap-rose { display: grid; grid-template-columns: repeat(3, 44px); gap: 3px; }
+.cmap-palette .cmap-rose button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px; font-size: 11px; font-weight: 700; color: #111; border: 1px solid #e2e8f0; }
+.cmap-rose svg { width: 20px; height: 20px; fill: #1e3a8a; }
+.cmap-palette .cmap-rose button.cmap-rose-choisie { background: #fde68a; border-color: #f59e0b; }
 /* Croix de suppression d'un picto du modèle : visible au survol du picto. */
 .cmap-supprimer-survol { display: none; z-index: 5; }
 .cmap-marqueur:hover > .cmap-supprimer-survol, .cmap-marqueur:focus-within > .cmap-supprimer-survol { display: block; }

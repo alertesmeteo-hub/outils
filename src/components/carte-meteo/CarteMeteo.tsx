@@ -7,7 +7,7 @@ import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr
 import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
-import { angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
+import { DIRECTIONS_VENT, angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
@@ -25,7 +25,7 @@ import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMet
 import CarteRendu, {
   ECHELLE_VENT_REDUIT,
   LARGEUR_VENT,
-  SEUIL_VENT_REDUIT, type Fleuves, HAUTEUR_CARTE, HAUTEUR_RESSENTI, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent } from './CarteRendu';
+  SEUIL_VENT_REDUIT, type Fleuves, HAUTEUR_CARTE, HAUTEUR_RESSENTI, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent, valeurRafaleSaisie } from './CarteRendu';
 
 type Periode = 'matin' | 'apres-midi' | 'journee';
 type NiveauNoms = 'departement' | 'ville';
@@ -342,6 +342,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [pictosRetires, setPictosRetires] = useState<Set<string>>(new Set());
   const [ajouts, setAjouts] = useState<{ id: number; zone: string; x: number; y: number; picto: PictoMeteo; valeur: string }[]>([]);
   const [modeAjout, setModeAjout] = useState(false);
+  /** Rafales ajoutées à la main (clic sur la carte), avec la direction du vent, propres à chaque zone. */
+  const [rafalesAjoutees, setRafalesAjoutees] = useState<{ id: number; zone: string; x: number; y: number; texte: string; provenance: number }[]>([]);
+  const [modeAjoutRafale, setModeAjoutRafale] = useState(false);
+  /** Valeur et direction des prochaines rafales posées (tramontane / mistral par défaut : vent de nord-ouest). */
+  const [rafaleNouvelle, setRafaleNouvelle] = useState('80');
+  const [provenanceNouvelle, setProvenanceNouvelle] = useState(315);
   /** Altitude affichée sous les pictos de neige : par défaut pour toute la carte, et corrigée picto par picto (clé « période|code »). */
   const [altitudeNeige, setAltitudeNeige] = useState('');
   const [altitudes, setAltitudes] = useState<Record<string, string>>({});
@@ -775,7 +781,16 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         return [m.code, { x: m.x - e.gauche, y: m.y - e.haut, w: e.gauche + e.droite, h: e.haut + e.bas } as Rect];
       })
     );
-    const occupes: Rect[] = [...obstacles, ...rectsMarqueurs.values()];
+    // Les rafales ajoutées à la main sont posées par l'utilisateur : les pastilles automatiques les évitent.
+    const ajouteesIci = rafalesAjoutees
+      .filter((r) => r.zone === zone)
+      .map((r) => {
+        const k = (valeurRafaleSaisie(r.texte) < SEUIL_VENT_REDUIT ? ECHELLE_VENT_REDUIT : 1) * em;
+        const w = LARGEUR_VENT[styleVent] * k;
+        const h = HAUTEUR_VENT[styleVent] * k;
+        return { x: r.x - w / 2, y: r.y - h / 2, w, h };
+      });
+    const occupes: Rect[] = [...obstacles, ...rectsMarqueurs.values(), ...ajouteesIci];
     // Deux pastilles de rafale ne se touchent jamais : au moins ~0,7 em entre elles (4 px avec le reste).
     const pastilles: Rect[] = [];
     const MARGE_PASTILLES = 0.7 * em;
@@ -848,7 +863,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       return m.rafale != null ? { ...m, rafale: null, ressenti: null } : m;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees]);
 
   const altitudeDe = (code: string, picto: string) => (estPictoNeige(picto) ? altitudes[`${periode}|${code}`] ?? altitudeNeige : undefined);
   const marqueursAffiches: Marqueur[] = [
@@ -879,6 +894,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : '☀️', valeur: '' }]);
     setPictosSelectionnes(new Set());
     setPaletteOuvertePour(`ajout:${id}`);
+  }
+
+  /** Mode « ajouter une rafale » : un clic sur la carte pose une pastille avec la valeur et la direction choisies. */
+  function ajouterRafale(x: number, y: number) {
+    setRafalesAjoutees((liste) => [...liste, { id: Date.now(), zone, x: Math.round(x), y: Math.round(y), texte: rafaleNouvelle, provenance: provenanceNouvelle }]);
   }
 
   const moyennesCalculees = useMemo(() => {
@@ -1049,7 +1069,14 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       regions={regionsAffichees}
       selection={selection}
       marqueurs={marqueursAffiches}
-      onClicCarte={modeAjout && !enExport ? ajouterPicto : undefined}
+      onClicCarte={enExport ? undefined : modeAjout ? ajouterPicto : modeAjoutRafale ? ajouterRafale : undefined}
+      rafalesAjoutees={rafalesAjoutees.filter((r) => r.zone === zone).map((r) => ({ code: `rafale:${r.id}`, x: r.x, y: r.y, texte: r.texte, provenance: r.provenance }))}
+      onModifierRafaleAjoutee={(code, champ, valeur) =>
+        setRafalesAjoutees((liste) =>
+          liste.map((r) => (`rafale:${r.id}` !== code ? r : champ === 'texte' ? { ...r, texte: valeur } : { ...r, provenance: Number(valeur) }))
+        )
+      }
+      onSupprimerRafaleAjoutee={enExport ? undefined : (code) => setRafalesAjoutees((liste) => liste.filter((r) => `rafale:${r.id}` !== code))}
       onSupprimerRafale={enExport ? undefined : (code) => setRafalesRetirees((r) => new Set(r).add(`${periode}|${code}`))}
       onSupprimer={
         enExport
@@ -1154,6 +1181,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 checked={modeAjout}
                 onChange={(e) => {
                   setModeAjout(e.target.checked);
+                  if (e.target.checked) setModeAjoutRafale(false);
                   setPaletteOuvertePour(null);
                 }}
               />
@@ -1169,6 +1197,54 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             {[...pictosRetires].some((c) => c.startsWith(`${zone}|`)) && (
               <button type="button" className="btn-ghost mt-2 rounded-md px-2 py-1 text-xs" onClick={() => setPictosRetires((r) => new Set([...r].filter((c) => !c.startsWith(`${zone}|`))))}>
                 Réafficher les pictos retirés ({[...pictosRetires].filter((c) => c.startsWith(`${zone}|`)).length})
+              </button>
+            )}
+          </div>
+          <div className="mt-3 rounded-lg border border-border p-2">
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={modeAjoutRafale}
+                onChange={(e) => {
+                  setModeAjoutRafale(e.target.checked);
+                  if (e.target.checked) setModeAjout(false);
+                  setPaletteOuvertePour(null);
+                }}
+              />
+              Ajouter des rafales sur la carte
+            </label>
+            {modeAjoutRafale && (
+              <>
+                <div className="mt-2 flex items-end gap-2">
+                  <label className="text-xs font-medium">
+                    Rafale (km/h)
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={rafaleNouvelle}
+                      onChange={(e) => setRafaleNouvelle(e.target.value)}
+                      className="mt-0.5 block w-16 rounded-md border border-border bg-surface p-1 text-sm"
+                    />
+                  </label>
+                  <label className="text-xs font-medium">
+                    Vent de
+                    <select value={provenanceNouvelle} onChange={(e) => setProvenanceNouvelle(Number(e.target.value))} className="mt-0.5 block rounded-md border border-border bg-surface p-1 text-sm">
+                      {DIRECTIONS_VENT.map((d) => (
+                        <option key={d.degres} value={d.degres}>
+                          {d.libelle}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  Clique sur la carte : une pastille apparaît avec cette valeur et cette direction. Sa valeur se modifie dessus ; un clic sur la pastille change la direction. La croix rouge la retire.
+                </p>
+              </>
+            )}
+            {rafalesAjoutees.some((r) => r.zone === zone) && (
+              <button type="button" className="btn-ghost mt-2 rounded-md px-2 py-1 text-xs" onClick={() => setRafalesAjoutees((liste) => liste.filter((r) => r.zone !== zone))}>
+                Retirer les rafales ajoutées ({rafalesAjoutees.filter((r) => r.zone === zone).length})
               </button>
             )}
           </div>
@@ -1451,102 +1527,6 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             </fieldset>
           </div>
 
-          <div className="flex flex-wrap items-end gap-x-6 gap-y-3 border-t border-border pt-3">
-            <p className={`${titreGroupe} w-full`}>Affichage</p>
-            <fieldset>
-              <legend className={legendeBarre}>Nombre de pictos et de T°</legend>
-              <div className="flex gap-3">
-                {(Object.keys(DENSITES) as Densite[]).map((d) => (
-                  <label key={d} className="text-sm">
-                    <input type="radio" name={nom('densite')} checked={densite === d} onChange={() => setDensite(d)} className="mr-1.5" />
-                    {DENSITES[d].libelle}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <label className="text-sm font-medium">
-              <span className={legendeBarre}>Contours</span>
-              <select value={fond} onChange={(e) => setFond(e.target.value as FondContours)} className={selectBarre}>
-                <option value="aucun">Aucun</option>
-                <option value="departements">Départements</option>
-                <option value="regions">Régions</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2 pb-1.5 text-sm">
-              <input type="checkbox" checked={afficherFleches} onChange={(e) => setAfficherFleches(e.target.checked)} />
-              Flèches de vent
-            </label>
-            <label className="flex items-center gap-2 pb-1.5 text-sm">
-              <input type="checkbox" checked={afficherFleuves} onChange={(e) => setAfficherFleuves(e.target.checked)} />
-              Fleuves
-            </label>
-            <label className="flex items-center gap-2 pb-1.5 text-sm">
-              <input type="checkbox" checked={afficherRelief} onChange={(e) => setAfficherRelief(e.target.checked)} />
-              Reliefs
-            </label>
-            {afficherRelief && (
-              <label className="flex items-center gap-2 pb-1.5 text-sm">
-                Opacité du relief
-                <input type="range" min={0} max={90} step={5} value={reliefPourcent} onChange={(e) => setReliefPourcent(Number(e.target.value))} aria-label="Opacité du relief" />
-                <span className="w-9 tabular-nums text-muted">{reliefPourcent} %</span>
-              </label>
-            )}
-            <label className="text-sm font-medium">
-              <span className={legendeBarre}>Noms</span>
-              <select value={niveauNoms} onChange={(e) => setNiveauNoms(e.target.value as NiveauNoms)} className={selectBarre}>
-                <option value="departement">Départements</option>
-                <option value="ville">Villes (chefs-lieux)</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2 pb-1.5 text-sm">
-              <input type="checkbox" checked={nomsVisibles} onChange={(e) => setAfficherNoms(e.target.checked)} />
-              Afficher les noms sur la carte
-            </label>
-            <label className="text-sm font-medium">
-              <span className={legendeBarre}>Valeurs de rafales</span>
-              <select value={nombreRafales} onChange={(e) => setChoixRafales(e.target.value as NombreRafales)} className={selectBarre}>
-                {NOMBRES_RAFALES.map((n) => (
-                  <option key={n.valeur} value={n.valeur}>
-                    {n.libelle}
-                  </option>
-                ))}
-              </select>
-              <span className="mt-1 block text-xs font-normal text-muted">Survole une rafale sur la carte : la croix rouge la retire.</span>
-              {[...rafalesRetirees].some((c) => c.startsWith(`${periode}|`)) && (
-                <button type="button" className="btn-ghost mt-1 rounded-md px-2 py-1 text-xs" onClick={() => setRafalesRetirees((r) => new Set([...r].filter((c) => !c.startsWith(`${periode}|`))))}>
-                  Réafficher les rafales retirées ({[...rafalesRetirees].filter((c) => c.startsWith(`${periode}|`)).length})
-                </button>
-              )}
-            </label>
-            <label className="text-sm font-medium">
-              <span className={legendeBarre}>Rafales à partir de (km/h)</span>
-              <input
-                type="number"
-                min={0}
-                max={200}
-                step={5}
-                value={seuilRafales}
-                onChange={(e) => {
-                  const n = Number(e.target.value);
-                  setSeuilRafales(e.target.value === '' || !Number.isFinite(n) ? SEUIL_RAFALES_DEFAUT : Math.min(200, Math.max(0, n)));
-                  // Changer le seuil, c'est vouloir voir toutes les rafales au-dessus (sauf si un nombre a été choisi exprès).
-                  if (choixRafales == null) setChoixRafales('toutes');
-                }}
-                className={`${selectBarre} w-24`}
-              />
-            </label>
-            <label className="text-sm font-medium">
-              <span className={legendeBarre}>Style du vent</span>
-              <select value={styleVent} onChange={(e) => setStyleVent(e.target.value as StyleVent)} className={selectBarre}>
-                <option value="pastille">Pastille (flèche + valeur)</option>
-                <option value="rond">Rond fléché</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2 pb-1.5 text-sm">
-              <input type="checkbox" checked={afficherRessenti} onChange={(e) => setAfficherRessenti(e.target.checked)} />
-              Ressenti (windchill) avec le vent
-            </label>
-          </div>
         </div>
 
         <div className="relative">
@@ -1562,6 +1542,102 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             {rendu}
           </div>
           {chargement && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-4 py-2 text-sm shadow">Chargement des prévisions…</p>}
+        </div>
+        <div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
+          <p className={`${titreGroupe} w-full`}>Affichage</p>
+          <fieldset>
+            <legend className={legendeBarre}>Nombre de pictos et de T°</legend>
+            <div className="flex gap-3">
+              {(Object.keys(DENSITES) as Densite[]).map((d) => (
+                <label key={d} className="text-sm">
+                  <input type="radio" name={nom('densite')} checked={densite === d} onChange={() => setDensite(d)} className="mr-1.5" />
+                  {DENSITES[d].libelle}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Contours</span>
+            <select value={fond} onChange={(e) => setFond(e.target.value as FondContours)} className={selectBarre}>
+              <option value="aucun">Aucun</option>
+              <option value="departements">Départements</option>
+              <option value="regions">Régions</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 pb-1.5 text-sm">
+            <input type="checkbox" checked={afficherFleches} onChange={(e) => setAfficherFleches(e.target.checked)} />
+            Flèches de vent
+          </label>
+          <label className="flex items-center gap-2 pb-1.5 text-sm">
+            <input type="checkbox" checked={afficherFleuves} onChange={(e) => setAfficherFleuves(e.target.checked)} />
+            Fleuves
+          </label>
+          <label className="flex items-center gap-2 pb-1.5 text-sm">
+            <input type="checkbox" checked={afficherRelief} onChange={(e) => setAfficherRelief(e.target.checked)} />
+            Reliefs
+          </label>
+          {afficherRelief && (
+            <label className="flex items-center gap-2 pb-1.5 text-sm">
+              Opacité du relief
+              <input type="range" min={0} max={90} step={5} value={reliefPourcent} onChange={(e) => setReliefPourcent(Number(e.target.value))} aria-label="Opacité du relief" />
+              <span className="w-9 tabular-nums text-muted">{reliefPourcent} %</span>
+            </label>
+          )}
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Noms</span>
+            <select value={niveauNoms} onChange={(e) => setNiveauNoms(e.target.value as NiveauNoms)} className={selectBarre}>
+              <option value="departement">Départements</option>
+              <option value="ville">Villes (chefs-lieux)</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 pb-1.5 text-sm">
+            <input type="checkbox" checked={nomsVisibles} onChange={(e) => setAfficherNoms(e.target.checked)} />
+            Afficher les noms sur la carte
+          </label>
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Valeurs de rafales</span>
+            <select value={nombreRafales} onChange={(e) => setChoixRafales(e.target.value as NombreRafales)} className={selectBarre}>
+              {NOMBRES_RAFALES.map((n) => (
+                <option key={n.valeur} value={n.valeur}>
+                  {n.libelle}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs font-normal text-muted">Survole une rafale sur la carte : la croix rouge la retire.</span>
+            {[...rafalesRetirees].some((c) => c.startsWith(`${periode}|`)) && (
+              <button type="button" className="btn-ghost mt-1 rounded-md px-2 py-1 text-xs" onClick={() => setRafalesRetirees((r) => new Set([...r].filter((c) => !c.startsWith(`${periode}|`))))}>
+                Réafficher les rafales retirées ({[...rafalesRetirees].filter((c) => c.startsWith(`${periode}|`)).length})
+              </button>
+            )}
+          </label>
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Rafales à partir de (km/h)</span>
+            <input
+              type="number"
+              min={0}
+              max={200}
+              step={5}
+              value={seuilRafales}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setSeuilRafales(e.target.value === '' || !Number.isFinite(n) ? SEUIL_RAFALES_DEFAUT : Math.min(200, Math.max(0, n)));
+                // Changer le seuil, c'est vouloir voir toutes les rafales au-dessus (sauf si un nombre a été choisi exprès).
+                if (choixRafales == null) setChoixRafales('toutes');
+              }}
+              className={`${selectBarre} w-24`}
+            />
+          </label>
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Style du vent</span>
+            <select value={styleVent} onChange={(e) => setStyleVent(e.target.value as StyleVent)} className={selectBarre}>
+              <option value="pastille">Pastille (flèche + valeur)</option>
+              <option value="rond">Rond fléché</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 pb-1.5 text-sm">
+            <input type="checkbox" checked={afficherRessenti} onChange={(e) => setAfficherRessenti(e.target.checked)} />
+            Ressenti (windchill) avec le vent
+          </label>
         </div>
         <p className="mt-3 text-xs text-muted">
           Prévisions : {MODELES.find((m) => m.id === modele)?.libelle} ({MODELES.find((m) => m.id === modele)?.fournisseur}), paquets départementaux alertesmeteo-hub. Fond de carte et cours d'eau : © IGN (Géoplateforme, Licence ouverte).

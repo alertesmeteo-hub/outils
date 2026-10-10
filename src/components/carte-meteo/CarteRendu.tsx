@@ -4,7 +4,7 @@ import { useEffect, useId, useState, type CSSProperties, type RefObject } from '
 import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { TAILLE_TUILE_VIDE, tuileParente, tuilesVisibles, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
-import { couleurRafale } from '@/lib/carte-meteo/vent';
+import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 
 /**
  * Tuile du fond. L'IGN renvoie un aplat bleu marine quand il n'a pas d'image (hors couverture, par exemple en Espagne) :
@@ -85,6 +85,23 @@ export interface Marqueur {
   altitude?: string;
   /** Le picto est un picto de neige (l'altitude est alors modifiable dans la palette). */
   neige?: boolean;
+}
+
+/** Rafale ajoutée à la main (clic sur la carte) : pastille seule, posée où l'utilisateur l'a voulue, avec la direction du vent. */
+export interface RafaleAjoutee {
+  code: string;
+  x: number;
+  y: number;
+  /** Valeur saisie (km/h) ; la couleur de la pastille en dépend. */
+  texte: string;
+  /** D'où vient le vent (degrés, 0 = vent de nord). */
+  provenance: number;
+}
+
+/** Valeur numérique d'une rafale saisie (0 si ce n'est pas un nombre). */
+export function valeurRafaleSaisie(texte: string): number {
+  const n = Number(texte.replace(',', '.'));
+  return texte.trim() && Number.isFinite(n) ? Math.round(n) : 0;
 }
 
 /** Rafales : pastille (flèche + valeur sur une ligne) ou rond avec la valeur, dont la pointe indique où souffle le vent. */
@@ -244,6 +261,10 @@ interface Props {
   pictosSelectionnes?: Set<string>;
   onBasculerPalette: (code: string, multiple: boolean) => void;
   onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale' | 'altitude', valeur: string, partout?: boolean) => void;
+  /** Rafales ajoutées à la main, avec leur direction. */
+  rafalesAjoutees?: RafaleAjoutee[];
+  onModifierRafaleAjoutee?: (code: string, champ: 'texte' | 'provenance', valeur: string) => void;
+  onSupprimerRafaleAjoutee?: (code: string) => void;
   /** Mode « ajouter un picto » : clic sur la carte (position en pixels de la carte). */
   onClicCarte?: (x: number, y: number) => void;
   /** Supprime un picto ajouté à la main. */
@@ -321,8 +342,13 @@ export default function CarteRendu({
   onClicCarte,
   onSupprimer,
   onSupprimerRafale,
+  rafalesAjoutees = [],
+  onModifierRafaleAjoutee,
+  onSupprimerRafaleAjoutee,
 }: Props) {
   const [partout, setPartout] = useState(false);
+  /** Rafale ajoutée dont le choix de direction est ouvert. */
+  const [directionOuvertePour, setDirectionOuvertePour] = useState<string | null>(null);
   const idClip = `fleuves-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
@@ -331,7 +357,7 @@ export default function CarteRendu({
         className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''}`}
         style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
         onClick={(e) => {
-          if (!onClicCarte || (e.target as HTMLElement).closest('.cmap-marqueur, .cmap-palette')) return;
+          if (!onClicCarte || (e.target as HTMLElement).closest('.cmap-marqueur, .cmap-palette, .cmap-vent-ajoute')) return;
           const cadre = e.currentTarget.getBoundingClientRect();
           onClicCarte((e.clientX - cadre.left) / facteur, (e.clientY - cadre.top) / facteur);
         }}
@@ -412,6 +438,70 @@ export default function CarteRendu({
             </div>
           ))}
         </div>
+
+        {rafalesAjoutees.map((r) => {
+          const valeur = valeurRafaleSaisie(r.texte);
+          return (
+            <div
+              key={r.code}
+              className="cmap-vent-ajoute"
+              style={{ left: r.x, top: r.y, fontSize: 22 * echelleMarqueurs, ...(directionOuvertePour === r.code ? { zIndex: 20 } : {}) }}
+            >
+              <div
+                className="cmap-vent-place"
+                style={valeur < SEUIL_VENT_REDUIT ? { fontSize: `${ECHELLE_VENT_REDUIT}em` } : undefined}
+                title="Clic : changer la direction du vent"
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest('input, button')) return;
+                  setDirectionOuvertePour((c) => (c === r.code ? null : r.code));
+                }}
+              >
+                {onSupprimerRafaleAjoutee && (
+                  <button type="button" className="cmap-supprimer cmap-supprimer-vent cmap-sans-export" title="Retirer cette rafale" onClick={() => onSupprimerRafaleAjoutee(r.code)}>
+                    ×
+                  </button>
+                )}
+                <BadgeVent
+                  rafale={valeur}
+                  texteRafale={r.texte}
+                  onModifier={(v) => onModifierRafaleAjoutee?.(r.code, 'texte', v)}
+                  direction={angleFleche(r.provenance)}
+                  ressenti={null}
+                  style={styleVent}
+                />
+              </div>
+              {directionOuvertePour === r.code && (
+                <div className="cmap-palette cmap-palette-direction cmap-sans-export" style={r.y > HAUTEUR_CARTE - 190 ? { bottom: 28, top: 'auto' } : { top: 28, bottom: 'auto' }}>
+                  <div className="cmap-palette-separateur">Vent de</div>
+                  <div className="cmap-rose">
+                    {/* Rose des vents 3 × 3 : NO N NE / O · E / SO S SE. */}
+                    {['NO', 'N', 'NE', 'O', '', 'E', 'SO', 'S', 'SE'].map((libelle, i) => {
+                      const d = DIRECTIONS_VENT.find((v) => v.libelle === libelle);
+                      if (!d) return <span key={i} />;
+                      return (
+                        <button
+                          key={libelle}
+                          type="button"
+                          className={d.degres === r.provenance ? 'cmap-rose-choisie' : ''}
+                          title={`Vent de ${libelle}`}
+                          onClick={() => {
+                            onModifierRafaleAjoutee?.(r.code, 'provenance', String(d.degres));
+                            setDirectionOuvertePour(null);
+                          }}
+                        >
+                          <svg viewBox="-12 -12 24 24" aria-hidden>
+                            <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" transform={`rotate(${angleFleche(d.degres)})`} />
+                          </svg>
+                          <span>{libelle}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {marqueurs.map((m) => (
           <div

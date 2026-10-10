@@ -13,6 +13,18 @@ export function couleurRafale(kmh: number): { fond: string; texte: string } {
   return PALIERS.find((p) => kmh >= p.min) as (typeof PALIERS)[number];
 }
 
+/** Les 8 directions d'où peut venir un vent ajouté à la main (degrés, 0 = vent de nord). */
+export const DIRECTIONS_VENT: { libelle: string; degres: number }[] = [
+  { libelle: 'N', degres: 0 },
+  { libelle: 'NE', degres: 45 },
+  { libelle: 'E', degres: 90 },
+  { libelle: 'SE', degres: 135 },
+  { libelle: 'S', degres: 180 },
+  { libelle: 'SO', degres: 225 },
+  { libelle: 'O', degres: 270 },
+  { libelle: 'NO', degres: 315 },
+];
+
 /**
  * Angle (degrés, sens horaire depuis le haut) vers lequel pointe la flèche d'un vent venant de `degres`, au sens météo
  * (0° = vent de nord, qui souffle vers le sud : la flèche descend).
