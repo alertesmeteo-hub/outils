@@ -19,6 +19,8 @@ export interface PointInfo {
   dep: string;
   lat: number;
   lon: number;
+  /** Altitude (m) : stations d'observation (contrôle de cohérence avec les voisines). */
+  alt?: number | null;
   valeur: number;
   /** Direction d'où vient le vent (degrés) : flèche dans la pastille (rafales). */
   direction?: number | null;

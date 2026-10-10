@@ -6,6 +6,9 @@ import { getRecords, getSix, getSnapshot, obsConfigured } from '@/lib/obs/store'
 
 export const dynamic = 'force-dynamic';
 
+/** Classements glissants (sans fenêtre fixe) : durée affichée devant la date de fin. */
+const DUREES: Record<string, string> = { t: 'relevé', snow: 'relevé', rr24: '24 h', rr72: '72 h', raf24: '24 h', insol24: '24 h' };
+
 /** Calcul partagé entre visiteurs tant que les observations n'ont pas changé. */
 let cache: { cle: string; reponse: ReponseBilans } | null = null;
 
@@ -43,7 +46,7 @@ export async function GET(req: Request) {
         const r = getRanking(theme.classement);
         const lignes = buildRanking(r, stations, snap.obs, now, { secondaires: true, amateurs: false, byDept: false }, records, extra);
         cartes[theme.id] = {
-          fenetre: r.window ? r.window(w).label : `jusqu'au ${hm(now)} (heure de Paris)`,
+          fenetre: r.window ? r.window(w).label : DUREES[theme.classement] === 'relevé' ? `relevé du ${hm(now)} (heure de Paris)` : `${DUREES[theme.classement] ?? ''} jusqu'au ${hm(now)} (heure de Paris)`.trim(),
           valeurs: lignes.map((l) => [indice.get(l.station.id)!, Math.round(l.value * 10) / 10] as [number, number]).filter(([i]) => i != null),
         };
       }
