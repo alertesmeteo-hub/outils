@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useId, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { TAILLE_TUILE_VIDE, tuileParente, tuilesVisibles, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
@@ -261,6 +261,10 @@ interface Props {
   pictosSelectionnes?: Set<string>;
   onBasculerPalette: (code: string, multiple: boolean) => void;
   onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale' | 'altitude', valeur: string, partout?: boolean) => void;
+  /** Teinte de chaque département sélectionné (cartes infos : échelle de couleurs) ; sinon la teinte unie habituelle. */
+  remplissages?: Record<string, string>;
+  /** Éléments posés par-dessus la carte (cartes infos : pastilles de valeurs, légende), inclus dans l'export. */
+  children?: ReactNode;
   /** Rafales ajoutées à la main, avec leur direction. */
   rafalesAjoutees?: RafaleAjoutee[];
   onModifierRafaleAjoutee?: (code: string, champ: 'texte' | 'provenance', valeur: string) => void;
@@ -343,6 +347,8 @@ export default function CarteRendu({
   onSupprimer,
   onSupprimerRafale,
   rafalesAjoutees = [],
+  remplissages,
+  children,
   onModifierRafaleAjoutee,
   onSupprimerRafaleAjoutee,
 }: Props) {
@@ -377,7 +383,7 @@ export default function CarteRendu({
                 regions && regions.length === 0 ? (
                   <path key={c.code} d={c.d} {...TRAIT_UNI} />
                 ) : (
-                  <path key={c.code} d={c.d} {...TRAIT_SELECTION} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} />
+                  <path key={c.code} d={c.d} {...TRAIT_SELECTION} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} {...(remplissages?.[c.code] ? { fill: remplissages[c.code] } : {})} />
                 )
               )}
             </g>
@@ -438,6 +444,8 @@ export default function CarteRendu({
             </div>
           ))}
         </div>
+
+        {children}
 
         {rafalesAjoutees.map((r) => {
           const valeur = valeurRafaleSaisie(r.texte);

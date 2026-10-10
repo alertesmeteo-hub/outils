@@ -1,4 +1,5 @@
 import { COORDS_DEPARTEMENTS } from './departements-coords';
+import { ressenti } from './vent';
 
 /**
  * Modèles proposés, lus dans les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (voir `sources.ts`) :
@@ -60,6 +61,13 @@ export interface PointCarte {
   pluieApresMidi: number | null;
   nuagesJournee: number | null;
   pluieJournee: number | null;
+  /** Cartes infos : neige (mm d'eau, ~1 cm de neige par mm), risque d'orage (0 à 4, nul sans pluie), vent moyen max (km/h),
+   * visibilité minimale (km) et température ressentie minimale (°C) de la journée. Absents des anciennes réponses. */
+  neigeJournee?: number | null;
+  orageJournee?: number | null;
+  ventMaxJournee?: number | null;
+  visibiliteMin?: number | null;
+  ressentiMin?: number | null;
 }
 
 /** Codes départementaux dans l'ordre officiel (01 … 19, 2A, 2B, 21 … 95) : les clés « 10 », « 11 »… passeraient sinon devant « 01 ». */
@@ -209,6 +217,12 @@ export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateIS
     pluieApresMidi: arrondi(somme(apresMidi.map((i) => serie.pluie[i])), 1),
     nuagesJournee: arrondi(moyenne(ciel.map((i) => serie.nuages[i]))),
     pluieJournee: arrondi(somme(toute.map((i) => serie.pluie[i])), 1),
+    neigeJournee: arrondi(somme(toute.map((i) => serie.neige[i])), 1),
+    // Comme pour les pictos : sans précipitations, l'indicateur d'orage (convection) n'est pas retenu.
+    orageJournee: (somme(toute.map((i) => serie.pluie[i])) ?? 0) >= SEUIL_PLUIE_ORAGE ? maximum(toute.map((i) => serie.orage[i])) ?? 0 : 0,
+    ventMaxJournee: arrondi(maximum(toute.map((i) => serie.vent[i]))),
+    visibiliteMin: arrondi(minimum(toute.map((i) => serie.visibilite[i])), 1),
+    ressentiMin: minimum(toute.map((i) => ressenti(serie.temp[i], serie.vent[i]))),
   };
 }
 

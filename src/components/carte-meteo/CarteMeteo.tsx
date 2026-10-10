@@ -86,7 +86,7 @@ const SEUIL_RAFALES_DEFAUT = 60;
 /** Distance minimale (pixels de la carte) entre deux villes affichées en vue département. */
 const DISTANCE_MIN_VILLES = 90;
 /** Régions et départements : on laisse libres le haut (logo, date) et la gauche (moyennes). */
-const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
+export const ZONE_UTILE: Zone = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: HAUTEUR_CARTE - 30 };
 /** Département : cadré au maximum, centré sur toute la carte. */
 const ZONE_DEPARTEMENT: Zone = { gauche: 14, haut: 72, droite: LARGEUR_CARTE - 14, bas: HAUTEUR_CARTE - 34 };
 /**
@@ -103,12 +103,12 @@ const NOMBRES_RAFALES: { valeur: NombreRafales; libelle: string }[] = [
 ];
 const maximumRafales = (n: NombreRafales) => (n === 'aucune' ? 0 : n === 'toutes' ? Infinity : Number(n));
 /** France entière (Corse comprise) : quasi pleine hauteur, centrée sur la carte. */
-const LARGEUR_FRANCE = 960;
-const ZONE_FRANCE: Zone = { gauche: 0, haut: 72, droite: LARGEUR_FRANCE, bas: HAUTEUR_CARTE - 30 };
+export const LARGEUR_FRANCE = 960;
+export const ZONE_FRANCE: Zone = { gauche: 0, haut: 72, droite: LARGEUR_FRANCE, bas: HAUTEUR_CARTE - 30 };
 /** Largeur des pavés « Moyenne » (voir .cmap-moyenne dans globals.css : 162 px + bordures). */
 const LARGEUR_MOYENNES = 128;
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
-const MASQUES_FRANCE = new Set(['92', '93', '94']);
+export const MASQUES_FRANCE = new Set(['92', '93', '94']);
 
 /**
  * France entière : départements retenus par défaut (densité « Moyen »), relevés sur la carte de référence —
@@ -125,9 +125,9 @@ const GRILLE_FRANCE: Record<Densite, [number, number]> = { leger: [165, 100], mo
 
 const FRANCE_NO = versMonde(51.1, -4.8);
 const FRANCE_SE = versMonde(41.3, 9.6);
-const BOITE_FRANCE: Boite = { minX: FRANCE_NO.x, minY: FRANCE_NO.y, maxX: FRANCE_SE.x, maxY: FRANCE_SE.y };
+export const BOITE_FRANCE: Boite = { minX: FRANCE_NO.x, minY: FRANCE_NO.y, maxX: FRANCE_SE.x, maxY: FRANCE_SE.y };
 
-const FICHIERS_CONTOURS: Record<'departements' | 'regions', string> = {
+export const FICHIERS_CONTOURS: Record<'departements' | 'regions', string> = {
   departements: '/geo/departements.geojson',
   regions: '/geo/regions.geojson',
 };
@@ -214,7 +214,7 @@ function useFleuves(actif: boolean): Fleuves | null {
   return actif ? d : null;
 }
 
-function useContours(fichier: string | null): ContourBoite[] {
+export function useContours(fichier: string | null): ContourBoite[] {
   const [etat, setEtat] = useState<{ fichier: string; contours: ContourBoite[] } | null>(null);
   useEffect(() => {
     if (!fichier) return;
@@ -257,12 +257,12 @@ function construireEditions(points: PointCarte[], jeu: JeuPictos = 'emoji'): Rec
 const majPicto = (e: Edition, periode: Periode, v: string): Edition =>
   periode === 'matin' ? { ...e, pictoM: v as PictoMeteo } : periode === 'apres-midi' ? { ...e, pictoAM: v as PictoMeteo } : { ...e, pictoJ: v as PictoMeteo };
 
-const normaliser = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+export const normaliser = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 /** Coordonnées d'un point : celles de la ville (vue département) ou le centre du département. */
 const coordsDe = (p: PointCarte) => (p.lat != null && p.lon != null ? { lat: p.lat, lon: p.lon } : COORDS_DEPARTEMENTS[p.code]);
 
-function codesDeLaZone(zone: string): string[] {
+export function codesDeLaZone(zone: string): string[] {
   if (zone === 'france') return CODES_DEPARTEMENTS;
   if (zone.startsWith('reg:')) return departementsDeLaRegion(zone.slice(4));
   return [zone.slice(4)];
@@ -273,14 +273,14 @@ const nombre = (s: string): number | null => {
   return s.trim() !== '' && Number.isFinite(n) ? n : null;
 };
 
-function libelleJour(dateISO: string): string {
+export function libelleJour(dateISO: string): string {
   return new Date(`${dateISO}T12:00:00Z`)
     .toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
     .toUpperCase();
 }
 
-const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { arome: 'harmonie', harmonie: 'cep' };
-const NOM_ECHEANCE = (n: number) => (n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : `J+${n}`);
+export const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { arome: 'harmonie', harmonie: 'cep' };
+export const NOM_ECHEANCE = (n: number) => (n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : `J+${n}`);
 
 const champLabel = 'block text-sm font-medium';
 const champSelect = 'mt-1 w-full rounded-lg border border-border bg-surface p-2 text-sm';

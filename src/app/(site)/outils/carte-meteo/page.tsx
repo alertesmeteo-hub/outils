@@ -59,6 +59,9 @@ export default async function PageCarteMeteo() {
       <p className="mt-4">
         <Link href="/outils/carte-meteo/16-jours/" className="inline-block rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
           Les 16 cartes à 16 jours (CEP ou GFS) sur une seule page →
+        </Link>{' '}
+        <Link href="/outils/carte-meteo-info/" className="ml-2 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
+          Cartes infos : prévisions et bilans par thème →
         </Link>
       </p>
       <div className="mt-6">

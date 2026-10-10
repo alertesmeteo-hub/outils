@@ -41,6 +41,17 @@ export default async function AllTools() {
             </span>
           </Link>
         </li>
+        <li>
+          <Link href="/outils/carte-meteo-info/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">📊</span>
+            <span>
+              <strong className="block leading-snug">Cartes infos météo</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Toutes les cartes par thème (pluie, rafales, orages, neige…) et les bilans des stations, France, régions, départements.
+              </span>
+            </span>
+          </Link>
+        </li>
       </ul>
       <div className="mt-8"><ToolGrid tools={tools} /></div>
     </>

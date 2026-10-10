@@ -227,3 +227,20 @@ body {
 .cmap-palette-aide { font-size: 11px; color: #64748b; margin: 0 2px 6px; }
 .cmap-pied { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; z-index: 3; font-size: 21px; font-weight: 800; letter-spacing: 0.02em; color: #fff; text-shadow: 0 0 4px #000, 0 0 4px #000, 1px 1px 2px #000; pointer-events: none; }
 .cmap-titre-droite { left: auto; right: 28px; transform: none; text-align: right; }
+
+/* Cartes infos (/outils/carte-meteo-info/) : pastilles de valeurs colorées, légende et classement. */
+.cinfo-point { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; z-index: 4; line-height: 1; pointer-events: auto; }
+.cinfo-bulle { display: flex; align-items: center; gap: 0.12em; padding: 0.16em 0.42em 0.12em; border: 0.12em solid #fff; border-radius: 0.55em; box-shadow: 0 0.08em 0.35em rgba(0, 0, 0, 0.55); white-space: nowrap; }
+.cinfo-bulle strong { font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-weight: 400; font-size: 1.12em; letter-spacing: 0.01em; }
+.cinfo-bulle small { font-family: Arial, sans-serif; font-weight: 700; font-size: 0.6em; margin-left: 0.12em; }
+.cinfo-bulle svg { width: 1em; height: 1em; flex: none; }
+.cinfo-nom { margin-top: 0.12em; font-size: 0.6em; font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 3px #000, 0 0 3px #000; }
+.cinfo-encadre { position: absolute; z-index: 3; background: rgba(13, 20, 40, 0.9); border: 2px solid #f5c400; border-radius: 8px; padding: 6px 9px 7px; color: #fff; font-size: 13px; line-height: 1.2; }
+.cinfo-encadre-titre { font-family: Impact, 'Arial Narrow', sans-serif; text-transform: uppercase; font-size: 16px; letter-spacing: 0.02em; color: #f5c400; margin-bottom: 4px; }
+.cinfo-encadre ol, .cinfo-encadre ul { list-style: none; margin: 0; padding: 0; }
+.cinfo-encadre ol li { display: flex; justify-content: space-between; gap: 6px; height: 19px; align-items: center; white-space: nowrap; }
+.cinfo-encadre ol li em { font-style: normal; color: #cbd5e1; font-size: 11px; }
+.cinfo-encadre ol li strong { font-family: Impact, 'Arial Narrow Bold', sans-serif; font-weight: 400; font-size: 15px; }
+.cinfo-encadre ol li small { font-family: Arial, sans-serif; font-size: 10px; font-weight: 700; }
+.cinfo-encadre ul li { display: flex; align-items: center; gap: 7px; height: 19px; white-space: nowrap; }
+.cinfo-encadre ul li i { display: inline-block; width: 22px; height: 13px; border: 1px solid rgba(255, 255, 255, 0.85); border-radius: 3px; flex: none; }
