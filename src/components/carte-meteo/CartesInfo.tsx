@@ -76,6 +76,10 @@ const rubrique = (themes: ThemeInfo[], id: string, libelle: string, icone: strin
 /** Filtre « Thème » : la synthèse se range sous ce titre, en tête de page. */
 const ESSENTIEL = 'L’essentiel';
 
+/** Altitude maximale des stations retenues dans les bilans (0 = toutes). */
+const ALTITUDES_MAX = [0, 500, 1000, 1500, 2000];
+const ALTITUDE_MAX_DEFAUT = 1000;
+
 const legendeBarre = 'mb-1 block text-sm font-medium';
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
@@ -90,6 +94,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const [jour, setJour] = useState(0);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
   const [horizon, setHorizon] = useState<Horizon>(2050);
+  const [altitudeMax, setAltitudeMax] = useState(ALTITUDE_MAX_DEFAUT);
   /** Thème affiché (« tous » : toutes les cartes de la catégorie, rangées par thème). */
   const [groupeChoisi, setGroupeChoisi] = useState('tous');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
@@ -227,14 +232,18 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
     const resultat: Record<string, PointInfo[]> = {};
     if (!bilans) return resultat;
     for (const theme of THEMES_BILAN) {
-      const points = (bilans.cartes[theme.id]?.valeurs ?? []).map(([i, valeur]) => {
-        const [code, nomStation, dep, lat, lon, alt] = bilans.stations[i];
-        return { code, nom: nomStation, dep: depStation(dep, lat), lat, lon, alt, valeur };
-      });
+      // Stations de haute montagne écartées au-dessus de l'altitude choisie (sauf la neige au sol, qui n'existe guère qu'en montagne).
+      const plafond = theme.id === 'snow' || altitudeMax === 0 ? Infinity : altitudeMax;
+      const points = (bilans.cartes[theme.id]?.valeurs ?? [])
+        .map(([i, valeur]) => {
+          const [code, nomStation, dep, lat, lon, alt] = bilans.stations[i];
+          return { code, nom: nomStation, dep: depStation(dep, lat), lat, lon, alt, valeur };
+        })
+        .filter((p) => p.alt == null || p.alt <= plafond);
       resultat[theme.id] = theme.unite === '°' ? sansValeursAberrantes(points) : points;
     }
     return resultat;
-  }, [bilans]);
+  }, [bilans, altitudeMax]);
 
   function changerJour(j: number) {
     if (j > ECHEANCE_MAX[modele]) setModele('cep');
@@ -381,6 +390,18 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
               </label>
             </>
           )}
+          {(mode === 'bilan' || (mode === 'prevision' && jour === 0)) && (
+            <label className="text-sm font-medium">
+              <span className={legendeBarre}>Stations jusqu&apos;à</span>
+              <select value={altitudeMax} onChange={(e) => setAltitudeMax(Number(e.target.value))} className={selectBarre} title="Écarte les stations de haute montagne des bilans (sauf la neige au sol)">
+                {ALTITUDES_MAX.map((a) => (
+                  <option key={a} value={a}>
+                    {a === 0 ? 'Toutes altitudes' : `${a.toLocaleString('fr-FR')} m d'altitude`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {mode === 'climat' && (
             <fieldset>
               <legend className={legendeBarre}>Horizon</legend>
@@ -461,7 +482,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
             {mode === 'prevision'
               ? `Prévisions — ${nomZone}, ${NOM_ECHEANCE(jour).toLowerCase()} (${dateISO.split('-').reverse().join('/')}), modèle ${modeleAffiche?.libelle} (${modeleAffiche?.fournisseur}).`
               : mode === 'bilan'
-                ? `Bilans — ${nomZone}, stations Météo-France${bilans?.majA ? `, mise à jour ${new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}` : ''}.`
+                ? `Bilans — ${nomZone}, stations Météo-France${altitudeMax ? ` jusqu'à ${altitudeMax.toLocaleString('fr-FR')} m d'altitude (neige au sol : toutes)` : ''}${bilans?.majA ? `, mise à jour ${new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}` : ''}.`
                 : `Réchauffement climatique — ${nomZone}, horizon ${horizon}, trajectoire de référence TRACC (Météo-France), par rapport à 1976-2005.`}
           </p>
           {avecSynthese && (
