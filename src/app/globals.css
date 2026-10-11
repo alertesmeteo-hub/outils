@@ -193,15 +193,15 @@ body {
 /* France « Moyen » : style de la carte de référence. Picto centré sur le point, température « 15° » en gras au-dessus,
    un peu à droite (CAPTURE_FRANCE et dispositionFixe dans CarteMeteo.tsx). */
 .cmap-capture .cmap-ligne { display: block; position: relative; }
-.cmap-capture .cmap-picto { font-size: 1.25em; display: block; }
-.cmap-capture .cmap-ligne .cmap-picto-image { width: 1.25em; height: 1.25em; }
+.cmap-capture .cmap-picto { font-size: 1.13em; display: block; }
+.cmap-capture .cmap-ligne .cmap-picto-image { width: 1.13em; height: 1.13em; }
 .cmap-capture .cmap-valeurs,
-.cmap-capture .cmap-ligne-simple .cmap-valeurs { position: absolute; left: 50%; bottom: calc(100% - 0.3em); margin: 0; align-self: auto; z-index: 1; }
+.cmap-capture .cmap-ligne-simple .cmap-valeurs { position: absolute; left: calc(50% - 0.18em); bottom: calc(100% - 0.27em); margin: 0; align-self: auto; z-index: 1; }
 .cmap-capture .cmap-valeur,
 .cmap-capture .cmap-ligne-simple .cmap-valeur {
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 700;
-  font-size: 0.8em;
+  font-size: 0.72em;
   color: #222;
   text-align: right;
   height: 1em;
@@ -211,7 +211,7 @@ body {
 .cmap-degre {
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 700;
-  font-size: 0.8em;
+  font-size: 0.72em;
   line-height: 1;
   color: #222;
   text-shadow: 0 0 2px #fff, 0 0 2px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;

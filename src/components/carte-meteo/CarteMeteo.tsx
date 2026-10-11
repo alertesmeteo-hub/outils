@@ -126,7 +126,8 @@ const COEFFICIENT_FRANCE: Record<Densite, number> = { leger: 0.65, moyen: 1, ele
  * (Paris pour la petite couronne, Pyrénées-Atlantiques pour Bayonne-Biarritz). Perpignan à sa position exacte.
  */
 const CAPTURE_FRANCE: { code: string; lat: number; lon: number }[] = [
-  { code: '59', lat: 50.589, lon: 3.196 }, { code: '80', lat: 49.915, lon: 2.623 }, { code: '50', lat: 49.639, lon: -1.591 },
+  // Lille et Amiens resserrés de 2-3 px (marge du relevé) : sinon le « 13° » d'Amiens touche le picto de Lille et Amiens est repoussé.
+  { code: '59', lat: 50.631, lon: 3.196 }, { code: '80', lat: 49.852, lon: 2.623 }, { code: '50', lat: 49.639, lon: -1.591 },
   { code: '27', lat: 49.425, lon: 1.342 }, { code: '51', lat: 49.211, lon: 4.14 }, { code: '57', lat: 49.103, lon: 6.231 },
   { code: '75', lat: 48.779, lon: 2.589 }, { code: '67', lat: 48.626, lon: 7.748 }, { code: '29', lat: 48.408, lon: -4.289 },
   { code: '35', lat: 48.189, lon: -1.591 }, { code: '61', lat: 48.452, lon: 0.162 }, { code: '52', lat: 48.057, lon: 5.219 },
@@ -756,7 +757,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const moyennesGauche = 29;
     const obstacles: Rect[] = [
       { x: 29, y: 21, w: logoDroite - 29, h: hauteurLogo + 1 },
-      enFrance ? { x: largeurCarte - 28 - 420, y: 4, w: 420, h: 76 } : { x: largeurCarte / 2 - 250, y: 4, w: 500, h: 76 },
+      enFrance ? { x: largeurCarte - 28 - 410, y: 6, w: 410, h: 67 } : { x: largeurCarte / 2 - 250, y: 6, w: 500, h: 67 },
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : []),
     ];
@@ -780,10 +781,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           code: m.code,
           x: m.x,
           y: m.y,
-          gauche: 0.8 * em,
-          droite: 1.28 * em,
-          haut: (0.46 + 0.83 * lignes) * em + (nomsVisibles ? 0.9 * em : 0),
-          bas: 0.7 * em,
+          // Mesuré dans le rendu (picto 1,13 em, température 0,72 em) : picto ±0,78 em, température jusqu'à 1,23 em à droite
+          // et 1,13 em au-dessus, picto 0,73 em dessous.
+          gauche: 0.79 * em,
+          droite: 1.24 * em,
+          haut: (0.41 + 0.75 * lignes) * em + (nomsVisibles ? 0.9 * em : 0),
+          bas: 0.74 * em,
           // Villes imposées (Perpignan, Montpellier, Marseille, Paris, Lille) : jamais déplacées.
           priorite: VILLES_IMPOSEES.some((v) => v.code === m.code) ? -1 : 2,
         };
