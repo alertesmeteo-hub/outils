@@ -313,7 +313,7 @@ interface Props {
   /** Prévisions des villes d'un département déjà chargées côté serveur (carte préréglée sur un département). */
   initialVilles?: DonneesVilles | null;
   /** Réglages de départ : la carte peut être préréglée (ex. un département, demain). */
-  reglages?: { niveau?: Niveau; departement?: string; jour?: number };
+  reglages?: { niveau?: Niveau; departement?: string; jour?: number; miniMaxi?: boolean };
   /** Vignette : seulement la carte et son bouton d'export (page des 16 jours), sans les menus de réglage. */
   compact?: boolean;
 }
@@ -334,6 +334,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const jeuRef = useRef<JeuPictos>(jeuInitial);
   jeuRef.current = jeuPictos;
   const [periode, setPeriode] = useState<Periode>('apres-midi');
+  /** Après-midi : afficher aussi le mini et le maxi de la journée (picto de l'après-midi), au lieu de la T° de l'après-midi. */
+  const [miniMaxi, setMiniMaxi] = useState(reglages?.miniMaxi ?? false);
+  const miniMaxiAM = miniMaxi && periode === 'apres-midi';
   const [donnees, setDonnees] = useState<DonneesCarte | null>(initial);
   const [editions, setEditions] = useState<Record<string, Edition>>(() => ({
     ...(initial ? construireEditions(initial.points, jeuInitial) : {}),
@@ -538,7 +541,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const valeurPrincipale = (code: string): number | null => {
     const e = editions[code];
-    return e ? nombre(periode === 'matin' ? e.tempM : periode === 'apres-midi' ? e.tempAM : e.maxi) : null;
+    return e ? nombre(periode === 'matin' ? e.tempM : periode === 'apres-midi' && !miniMaxiAM ? e.tempAM : e.maxi) : null;
   };
 
   /** Rafale affichée : la valeur corrigée à la main si c'est un nombre (elle donne aussi la couleur), sinon celle du modèle. */
@@ -570,7 +573,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
    */
   // France « Moyen » (matin, après-midi) : disposition et style de la carte de référence (CAPTURE_FRANCE). La journée,
   // avec mini et maxi empilés, garde la grille habituelle (deux valeurs ne tiennent pas entre les points de la capture).
-  const modeCapture = enFrance && densite === 'moyen' && periode !== 'journee';
+  const modeCapture = enFrance && densite === 'moyen' && periode !== 'journee' && !miniMaxiAM;
   const grilleFrance = useMemo(() => {
     if (!enFrance || typeof document === 'undefined' || points.length === 0 || contoursDep.length === 0) return null;
     // « Moyen » : la disposition fixe de la carte de référence (pas de grille, pas de décalage).
@@ -698,7 +701,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const rang = new Map(candidats.map((c, i) => [c, i]));
     return points.filter((p) => gardes.has(p.code)).sort((a, b) => (rang.get(a.code) ?? -1) - (rang.get(b.code) ?? -1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, enDepartement, densite, editions, periode, codesRafales, vue, grilleFrance]);
+  }, [points, enDepartement, densite, editions, periode, codesRafales, vue, grilleFrance, miniMaxiAM]);
 
   const nomsVisibles = afficherNoms;
   const echelleMarqueurs = Math.min(enDepartement ? 1.15 : enFrance ? 1.15 : 1.2, enFrance ? 1.15 : Math.max(0.7, vue.echelle * 1.4));
@@ -733,8 +736,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         y,
         nom: niveauNoms === 'ville' ? CHEF_LIEU_PAR_DEPARTEMENT[p.code] ?? p.nom : p.nom,
         picto: (periode === 'matin' ? e?.pictoM : periode === 'apres-midi' ? e?.pictoAM : e?.pictoJ) ?? '☀️',
-        valeur: e ? (periode === 'matin' ? e.tempM : periode === 'apres-midi' ? e.tempAM : e.maxi) : '',
-        mini: periode === 'journee' ? e?.mini ?? '' : null,
+        valeur: e ? (periode === 'matin' ? e.tempM : periode === 'apres-midi' && !miniMaxiAM ? e.tempAM : e.maxi) : '',
+        mini: periode === 'journee' || miniMaxiAM ? e?.mini ?? '' : null,
         // Rafale arrondie de 5 en 5 km/h pour l'affichage.
         rafale: rafalesSignalees.has(p.code) && rafale != null && !rafalesRetirees.has(`${periode}|${p.code}`) ? rafaleAffichee(p.code, Math.round(rafale / 5) * 5) : null,
         rafaleTexte: rafalesManuelles[`${periode}|${p.code}`],
@@ -912,7 +915,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       return m.rafale != null ? { ...m, rafale: null, ressenti: null } : m;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees, miniMaxiAM]);
 
   const altitudeDe = (code: string, picto: string) => (estPictoNeige(picto) ? altitudes[`${periode}|${code}`] ?? altitudeNeige : undefined);
   const marqueursAffiches: Marqueur[] = [
@@ -964,7 +967,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       zone: groupe(() => true),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, editions, periode]);
+  }, [points, editions, periode, miniMaxiAM]);
 
   const cleMoyenne = (nom: string) => `${periode}|${zone}|${nom}`;
   const valeurMoyenne = (nom: 'nord' | 'sud' | 'zone') => {
@@ -975,7 +978,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   };
   const miniMoyenne = (nom: 'nord' | 'sud' | 'zone') => {
     const v = moyennesCalculees[nom].mini;
-    return periode === 'journee' && v != null ? String(v) : undefined;
+    return (periode === 'journee' || miniMaxiAM) && v != null ? String(v) : undefined;
   };
 
   // Seule la vue France affiche des moyennes (Nord et Sud) ; régions et départements n'en ont pas.
@@ -1038,7 +1041,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       if (!e) return prev;
       if (champ === 'picto') return { ...prev, [code]: majPicto(e, periode, valeur) };
       if (champ === 'mini') return { ...prev, [code]: { ...e, mini: valeur } };
-      return { ...prev, [code]: periode === 'matin' ? { ...e, tempM: valeur } : periode === 'apres-midi' ? { ...e, tempAM: valeur } : { ...e, maxi: valeur } };
+      return { ...prev, [code]: periode === 'matin' ? { ...e, tempM: valeur } : periode === 'apres-midi' && !miniMaxiAM ? { ...e, tempAM: valeur } : { ...e, maxi: valeur } };
     });
     if (champ === 'picto') {
       setPaletteOuvertePour(null);
@@ -1561,6 +1564,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                   />
                   Après-midi (T° et rafales)
                 </label>
+                {periode === 'apres-midi' && (
+                  <label className="text-sm">
+                    <input type="checkbox" checked={miniMaxi} onChange={(e) => setMiniMaxi(e.target.checked)} className="mr-1.5" />
+                    avec mini et maxi
+                  </label>
+                )}
                 <label className="text-sm">
                   <input
                     type="radio"

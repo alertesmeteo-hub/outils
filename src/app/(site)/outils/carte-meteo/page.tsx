@@ -38,15 +38,19 @@ export default async function PageCarteMeteo() {
   const demain = ajouterJours(aujourdhui, 1);
 
   // Si un chargement échoue ici, le composant retente côté navigateur.
-  const [france, poDemain] = await Promise.allSettled([
+  const [france, franceDemain, poDemain] = await Promise.allSettled([
     avecDelai(chargerPrevisionsCarte('arome', aujourdhui), 9000),
+    avecDelai(chargerPrevisionsCarte('arome', demain), 9000),
     avecDelai(villesAvecSecours(demain, DEPARTEMENT_PO), 9000),
   ]);
   if (france.status === 'rejected') console.error('Carte météo : France du jour indisponible', france.reason);
+  if (franceDemain.status === 'rejected') console.error('Carte météo : France de demain indisponible', franceDemain.reason);
   if (poDemain.status === 'rejected') console.error('Carte météo : Pyrénées-Orientales de demain indisponible', poDemain.reason);
 
   const initial: DonneesCarte | null =
     france.status === 'fulfilled' ? { modele: 'arome', dateISO: aujourdhui, points: france.value } : null;
+  const initialDemain: DonneesCarte | null =
+    franceDemain.status === 'fulfilled' ? { modele: 'arome', dateISO: demain, points: franceDemain.value } : null;
   const initialPO: DonneesVilles | null =
     poDemain.status === 'fulfilled' ? { modele: poDemain.value.modele, dateISO: demain, departement: DEPARTEMENT_PO, points: poDemain.value.points } : null;
 
@@ -66,6 +70,11 @@ export default async function PageCarteMeteo() {
       </p>
       <div className="mt-6">
         <CarteMeteo aujourdhui={aujourdhui} initial={initial} />
+      </div>
+
+      <h2 className="mt-12 text-2xl font-extrabold">France : demain après-midi, mini et maxi</h2>
+      <div className="mt-6">
+        <CarteMeteo aujourdhui={aujourdhui} initial={initialDemain} reglages={{ jour: 1, miniMaxi: true }} />
       </div>
 
       <h2 className="mt-12 text-2xl font-extrabold">Pyrénées-Orientales : la carte de demain</h2>
