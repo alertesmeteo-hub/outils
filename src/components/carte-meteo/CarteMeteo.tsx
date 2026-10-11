@@ -120,6 +120,26 @@ const REFERENCE_FRANCE = [
 ];
 const COEFFICIENT_FRANCE: Record<Densite, number> = { leger: 0.65, moyen: 1, eleve: 1.5 };
 
+/**
+ * France entière, densité « Moyen » : les 35 points de la carte de référence (capture fournie), à la même place. Positions
+ * relevées sur la capture (centre du picto) puis converties en lat/lon ; données du département qui contient le point
+ * (Paris pour la petite couronne, Pyrénées-Atlantiques pour Bayonne-Biarritz). Perpignan à sa position exacte.
+ */
+const CAPTURE_FRANCE: { code: string; lat: number; lon: number }[] = [
+  { code: '59', lat: 50.589, lon: 3.196 }, { code: '80', lat: 49.915, lon: 2.623 }, { code: '50', lat: 49.639, lon: -1.591 },
+  { code: '27', lat: 49.425, lon: 1.342 }, { code: '51', lat: 49.211, lon: 4.14 }, { code: '57', lat: 49.103, lon: 6.231 },
+  { code: '75', lat: 48.779, lon: 2.589 }, { code: '67', lat: 48.626, lon: 7.748 }, { code: '29', lat: 48.408, lon: -4.289 },
+  { code: '35', lat: 48.189, lon: -1.591 }, { code: '61', lat: 48.452, lon: 0.162 }, { code: '52', lat: 48.057, lon: 5.219 },
+  { code: '90', lat: 47.682, lon: 6.905 }, { code: '89', lat: 47.837, lon: 3.601 }, { code: '44', lat: 47.259, lon: -1.524 },
+  { code: '37', lat: 47.393, lon: 0.769 }, { code: '18', lat: 47.125, lon: 2.454 }, { code: '71', lat: 46.788, lon: 4.882 },
+  { code: '17', lat: 46.267, lon: -1.018 }, { code: '87', lat: 45.947, lon: 1.241 }, { code: '03', lat: 46.175, lon: 3.466 },
+  { code: '69', lat: 45.809, lon: 4.882 }, { code: '73', lat: 45.602, lon: 6.837 }, { code: '33', lat: 44.884, lon: -0.512 },
+  { code: '15', lat: 44.954, lon: 2.522 }, { code: '26', lat: 44.65, lon: 4.815 }, { code: '05', lat: 44.65, lon: 6.163 },
+  { code: '64', lat: 43.538, lon: -1.423 }, { code: '65', lat: 43.371, lon: 0.162 }, { code: '31', lat: 43.61, lon: 1.51 },
+  { code: '34', lat: 43.658, lon: 3.938 }, { code: '13', lat: 43.419, lon: 5.489 }, { code: '06', lat: 43.777, lon: 7.31 },
+  { code: '66', lat: 42.699, lon: 2.895 }, { code: '2A', lat: 42.016, lon: 8.759 },
+];
+
 /** France entière : pas de la grille (px, horizontal et vertical) sur laquelle les points sont répartis à égale distance. */
 const GRILLE_FRANCE: Record<Densite, [number, number]> = { leger: [165, 100], moyen: [126, 74], eleve: [104, 62] };
 
@@ -548,8 +568,17 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
    * donc à égale distance les uns des autres ; chaque nœud affiche les valeurs du département le plus proche encore libre.
    * Reste nul tant que les contours ne sont pas chargés (rendu serveur) : on retombe alors sur les départements de référence.
    */
+  // France « Moyen » (matin, après-midi) : disposition et style de la carte de référence (CAPTURE_FRANCE). La journée,
+  // avec mini et maxi empilés, garde la grille habituelle (deux valeurs ne tiennent pas entre les points de la capture).
+  const modeCapture = enFrance && densite === 'moyen' && periode !== 'journee';
   const grilleFrance = useMemo(() => {
     if (!enFrance || typeof document === 'undefined' || points.length === 0 || contoursDep.length === 0) return null;
+    // « Moyen » : la disposition fixe de la carte de référence (pas de grille, pas de décalage).
+    if (modeCapture) {
+      const fixe = new Map<string, { x: number; y: number }>();
+      for (const c of CAPTURE_FRANCE) if (points.some((p) => p.code === c.code)) fixe.set(c.code, versEcran(versMonde(c.lat, c.lon), vue));
+      return fixe;
+    }
     const ctx = document.createElement('canvas').getContext('2d');
     if (!ctx) return null;
     const chemins = contoursDep.map((c) => new Path2D(c.d));
@@ -609,7 +638,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       resultat.set(code, pos);
     }
     return resultat;
-  }, [enFrance, points, contoursDep, vue, densite, codesRafales, maxRafales]);
+  }, [enFrance, points, contoursDep, vue, densite, codesRafales, maxRafales, modeCapture]);
 
   /** Points affichés : les plus répartis selon la densité, plus toujours les extrêmes et les rafales à signaler. */
   const pointsAffiches = useMemo(() => {
@@ -690,10 +719,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const rafalesSignalees = enDepartement ? plusFortesRafales(maxRafales === Infinity ? pointsAffiches : reference) : codesRafales;
     // Distance (px) du centre du picto au centre du marqueur, pour les tests « sur la terre » (France : pictos plus petits).
     const decalagePicto = (enFrance ? 1.2 : 1.5) * 22 * echelleMarqueurs;
+    // France « Moyen » : points à la place exacte de la carte de référence (ni rapprochement de la terre, ni décalage).
+    const dispositionFixe = modeCapture && grilleFrance != null;
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
       const e = editions[p.code];
       const brut = grilleFrance?.get(p.code) ?? versEcran(versMonde(coordsDe(p).lat, coordsDe(p).lon), vue);
-      const { x, y } = terre ? terre.ramener(brut.x, brut.y, decalagePicto, p.code, enDepartement && p.placeExacte === true) : brut;
+      const { x, y } = terre && !dispositionFixe ? terre.ramener(brut.x, brut.y, decalagePicto, p.code, enDepartement && p.placeExacte === true) : brut;
       const rafale = rafaleDe(p);
       const v = valeurs[i];
       return {
@@ -738,6 +769,20 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const hautLigne = Math.max((m.mini != null ? 3.4 * kTemp : 2.6 * kPicto) + gros * 1.8 * kPicto, estPictoImage(m.picto) ? 2.3 * (1 + gros) * kPicto : 0);
       // La rafale n'en fait plus partie : elle est placée ensuite, là où il y a de la place, sans déplacer le picto.
       const hauteur = hautLigne * em;
+      // Disposition fixe (style de la capture) : picto centré sur le point, température au-dessus, un peu à droite.
+      if (dispositionFixe) {
+        const lignes = m.mini == null ? 1 : 2;
+        return {
+          code: m.code,
+          x: m.x,
+          y: m.y,
+          gauche: 0.95 * em,
+          droite: 1.45 * em,
+          haut: (0.8 + 0.95 * lignes) * em + (nomsVisibles ? 0.9 * em : 0),
+          bas: 0.85 * em,
+          priorite: 2,
+        };
+      }
       return {
         code: m.code,
         x: m.x,
@@ -761,15 +806,17 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       return { reduit, w: LARGEUR_VENT[styleVent] * k, h: (HAUTEUR_VENT[styleVent] + (m.ressenti != null ? HAUTEUR_RESSENTI : 0)) * k };
     };
     // France et départements : aucune position de repli en mer (le décalage anti-chevauchement reste sur la terre).
-    const places = placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em, (e, x, y) =>
-      !terre || terre.centreSurTerre(x, y, decalagePicto)
-    );
+    const places = dispositionFixe
+      ? new Map(elements.map((e) => [e.code, { x: e.x, y: e.y }]))
+      : placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em, (e, x, y) =>
+          !terre || terre.centreSurTerre(x, y, decalagePicto)
+        );
     // On s'arrête au nombre voulu : les candidats en réserve ne servent qu'à remplacer ceux qui n'ont pas trouvé de place.
     // France et régions : les extrêmes et les rafales à signaler sont toujours gardés (et comptent dans le total).
     // Vue département : après décalage anti-chevauchement, un picto qui se retrouve en mer est écarté (une ville de réserve le remplace).
     const placesOk = bruts.filter((m) => {
       const pos = places.get(m.code);
-      return pos != null && (!terre || terre.centreSurTerre(pos.x, pos.y, decalagePicto));
+      return pos != null && (dispositionFixe || !terre || terre.centreSurTerre(pos.x, pos.y, decalagePicto));
     });
     const imposes = new Set(enDepartement ? [] : placesOk.filter((m) => m.rafale != null || m.ton != null).map((m) => m.code));
     let restantes = Math.max(0, cible - imposes.size);
@@ -1101,6 +1148,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       titreADroite={enFrance}
       grosPictos={enDepartement}
       carteLocale={!enFrance}
+      styleCapture={modeCapture}
       styleVent={styleVent}
       couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}

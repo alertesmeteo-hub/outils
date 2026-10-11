@@ -190,6 +190,36 @@ body {
 /* Après-midi : la température chevauche le haut-droit du picto, comme sur la carte de référence. */
 .cmap-ligne-simple .cmap-valeurs { align-self: center; margin: 0 0 0 0.12em; position: relative; z-index: 1; }
 .cmap-ligne-simple .cmap-valeur { font-size: 1.1em; width: 1.2em; }
+.cmap-valeur-ligne { display: flex; align-items: flex-start; }
+
+/* France « Moyen » : style de la carte de référence. Picto centré sur le point, température « 15° » en gras au-dessus,
+   un peu à droite (CAPTURE_FRANCE et dispositionFixe dans CarteMeteo.tsx). */
+.cmap-capture .cmap-ligne { display: block; position: relative; }
+.cmap-capture .cmap-picto { font-size: 1.35em; display: block; }
+.cmap-capture .cmap-ligne .cmap-picto-image { width: 1.35em; height: 1.35em; }
+.cmap-capture .cmap-valeurs,
+.cmap-capture .cmap-ligne-simple .cmap-valeurs { position: absolute; left: 50%; bottom: calc(100% - 0.3em); margin: 0; align-self: auto; z-index: 1; }
+.cmap-capture .cmap-valeur,
+.cmap-capture .cmap-ligne-simple .cmap-valeur {
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  font-size: 0.92em;
+  color: #222;
+  text-align: right;
+  height: 1em;
+  line-height: 1;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+}
+.cmap-degre {
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  font-size: 0.92em;
+  line-height: 1;
+  color: #222;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+}
+.cmap-capture .cmap-chaud { color: #e5191e; }
+.cmap-capture .cmap-froid { color: #1f6fe0; }
 /* Régions et départements : températures 15 % et pictos 5 % plus grands (ECHELLE_*_LOCAL dans CarteMeteo.tsx). */
 .cmap-local .cmap-valeur { font-size: calc(1.35em * 1.15); }
 .cmap-local .cmap-ligne-simple .cmap-valeur { font-size: calc(1.1em * 1.15); }

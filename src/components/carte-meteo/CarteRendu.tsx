@@ -227,6 +227,8 @@ interface Props {
   grosPictos?: boolean;
   /** Carte de région ou de département : températures +15 % et pictos +5 % (voir `.cmap-local` dans globals.css). */
   carteLocale?: boolean;
+  /** Style de la carte de référence (France « Moyen ») : température « 15° » au-dessus du picto (voir `.cmap-capture`). */
+  styleCapture?: boolean;
   /** Présentation des rafales (pastille par défaut). */
   styleVent?: StyleVent;
   /** Couleur de la date du titre (bleu nuit par défaut, voir .cmap-date). */
@@ -326,6 +328,7 @@ export default function CarteRendu({
   titreADroite = false,
   grosPictos = false,
   carteLocale = false,
+  styleCapture = false,
   styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
@@ -535,7 +538,7 @@ export default function CarteRendu({
         {marqueurs.map((m) => (
           <div
             key={m.code}
-            className={`cmap-marqueur ${grosPictos ? 'cmap-gros' : ''} ${carteLocale ? 'cmap-local' : ''}`}
+            className={`cmap-marqueur ${grosPictos ? 'cmap-gros' : ''} ${carteLocale ? 'cmap-local' : ''} ${styleCapture ? 'cmap-capture' : ''}`}
             style={{ left: m.x, top: m.y, fontSize: 22 * echelleMarqueurs, ...(paletteOuvertePour === m.code ? { zIndex: 20 } : {}) }}
             title={m.nom}
           >
@@ -550,19 +553,27 @@ export default function CarteRendu({
                 {estPictoImage(m.picto) ? <img src={cheminPictoImage(m.picto)} alt="" className="cmap-picto-image" /> : m.picto}
               </button>
               <div className="cmap-valeurs">
-                <input
-                  className={`cmap-valeur ${m.ton === 'chaud' ? 'cmap-chaud' : m.ton === 'froid' ? 'cmap-froid' : ''} ${m.mini != null ? 'cmap-chaud' : ''}`}
-                  value={m.valeur}
-                  onChange={(e) => onModifier(m.code, 'valeur', e.target.value)}
-                  size={2}
-                />
-                {m.mini != null && (
+                <span className="cmap-valeur-ligne">
                   <input
-                    className="cmap-valeur cmap-froid"
-                    value={m.mini}
-                    onChange={(e) => onModifier(m.code, 'mini', e.target.value)}
+                    className={`cmap-valeur ${m.ton === 'chaud' ? 'cmap-chaud' : m.ton === 'froid' ? 'cmap-froid' : ''} ${m.mini != null ? 'cmap-chaud' : ''}`}
+                    value={m.valeur}
+                    onChange={(e) => onModifier(m.code, 'valeur', e.target.value)}
                     size={2}
+                    style={styleCapture ? { width: `${Math.max(1, m.valeur.length) * 0.58 + 0.05}em` } : undefined}
                   />
+                  {styleCapture && <span className={`cmap-degre ${m.ton === 'chaud' || m.mini != null ? 'cmap-chaud' : m.ton === 'froid' ? 'cmap-froid' : ''}`}>°</span>}
+                </span>
+                {m.mini != null && (
+                  <span className="cmap-valeur-ligne">
+                    <input
+                      className="cmap-valeur cmap-froid"
+                      value={m.mini}
+                      onChange={(e) => onModifier(m.code, 'mini', e.target.value)}
+                      size={2}
+                      style={styleCapture ? { width: `${Math.max(1, m.mini.length) * 0.58 + 0.05}em` } : undefined}
+                    />
+                    {styleCapture && <span className="cmap-degre cmap-froid">°</span>}
+                  </span>
                 )}
               </div>
             </div>
