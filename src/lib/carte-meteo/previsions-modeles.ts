@@ -68,7 +68,22 @@ export interface PointCarte {
   ventMaxJournee?: number | null;
   visibiliteMin?: number | null;
   ressentiMin?: number | null;
+  /** Cumuls de pluie (mm) sur 5, 10 et 16 jours à partir du jour demandé (null si la série ne couvre pas la période),
+   * et dernière échéance prise en compte (ISO UTC). Absents des anciennes réponses. */
+  pluie5j?: number | null;
+  pluie10j?: number | null;
+  pluie16j?: number | null;
+  finPrevision?: string | null;
 }
+
+/** Durées (jours) des cartes de cumul de pluie. */
+export const DUREES_CUMUL = [5, 10, 16] as const;
+export type DureeCumul = (typeof DUREES_CUMUL)[number];
+/**
+ * Part minimale de la période que la série doit couvrir pour donner un cumul : le CEP s'arrête à 15 jours (≈ 14,5 jours
+ * à partir de minuit selon le passage) ; un passage GFS publié tronqué (≈ 4 jours) ne donne pas de cumul sur 10 jours.
+ */
+const COUVERTURE_MIN_CUMUL = 0.85;
 
 /** Codes départementaux dans l'ordre officiel (01 … 19, 2A, 2B, 21 … 95) : les clés « 10 », « 11 »… passeraient sinon devant « 01 ». */
 const rang = (code: string) => (code === '2A' ? 19.1 : code === '2B' ? 19.2 : Number(code));
@@ -177,6 +192,32 @@ function ventRafaleMax(serie: Serie, indices: number[]): number | null {
   return typeof v === 'number' ? Math.round(v) : null;
 }
 
+/** Instant (ms) de minuit, heure de Paris, au début de la date locale `dateISO`. */
+function minuitParis(dateISO: string): number {
+  const minuitUTC = Date.parse(`${dateISO}T00:00:00Z`);
+  // Paris est à UTC+1 ou UTC+2 : on garde le décalage pour lequel il est bien 0 h à Paris.
+  const decalage = [1, 2].find((h) => dateHeureParis(new Date(minuitUTC - h * 3600_000).toISOString()).heure === 0) ?? 1;
+  return minuitUTC - decalage * 3600_000;
+}
+
+/** Cumuls de pluie sur 5, 10 et 16 jours à partir de minuit (Paris) de `dateISO`. */
+function cumulsPluie(serie: Serie, dateISO: string): Pick<PointCarte, 'pluie5j' | 'pluie10j' | 'pluie16j' | 'finPrevision'> {
+  const debut = minuitParis(dateISO);
+  const instants = serie.t.map((t) => Date.parse(t));
+  const cumul = (jours: number) => {
+    const fin = debut + jours * 86_400_000;
+    const indices = instants.map((t, i) => ({ t, i })).filter(({ t, i }) => t > debut && t <= fin && serie.pluie[i] != null);
+    if (!indices.length) return { valeur: null, derniere: null };
+    const derniere = indices[indices.length - 1].t;
+    return {
+      valeur: (derniere - debut) / (fin - debut) >= COUVERTURE_MIN_CUMUL ? arrondi(somme(indices.map(({ i }) => serie.pluie[i])), 1) : null,
+      derniere,
+    };
+  };
+  const [c5, c10, c16] = DUREES_CUMUL.map(cumul);
+  return { pluie5j: c5.valeur, pluie10j: c10.valeur, pluie16j: c16.valeur, finPrevision: c16.derniere != null ? new Date(c16.derniere).toISOString() : null };
+}
+
 /**
  * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h, l'après-midi de 12 h à 18 h (température : maximum de 14 h à 18 h), la journée de 7 h à 20 h pour le
  * ciel. Le minimum de la nuit n'est donné que si la série couvre le début de la journée (avant 7 h).
@@ -223,6 +264,7 @@ export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateIS
     ventMaxJournee: arrondi(maximum(toute.map((i) => serie.vent[i]))),
     visibiliteMin: arrondi(minimum(toute.map((i) => serie.visibilite[i])), 1),
     ressentiMin: minimum(toute.map((i) => ressenti(serie.temp[i], serie.vent[i]))),
+    ...cumulsPluie(serie, dateISO),
   };
 }
 

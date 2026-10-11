@@ -17,6 +17,7 @@ import {
   type ReponseBilans,
   type ThemeClimat,
   type ThemeInfo,
+  type ThemePrevision,
 } from '@/lib/carte-meteo/cartes-info';
 import CarteInfo, { type PointInfo } from './CarteInfo';
 import CarteSynthese, { type RubriqueSynthese } from './CarteSynthese';
@@ -80,6 +81,16 @@ const ESSENTIEL = 'L’essentiel';
 const ALTITUDES_MAX = [0, 500, 1000, 1500, 2000];
 const ALTITUDE_MAX_DEFAUT = 1000;
 
+/** Cumuls de pluie sur plusieurs jours : seuls le CEP et GFS vont au-delà de 2 jours (CEP par défaut). */
+const modeleDuCumul = (m: ModeleMeteo): ModeleMeteo => (m === 'gfs' ? 'gfs' : 'cep');
+
+/** « SAMEDI 11 OCTOBRE » */
+const jourCourt = (dateISO: string) =>
+  new Date(`${dateISO}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).toUpperCase();
+
+/** Date locale (Paris) d'un instant ISO, pour la fin réelle de la prévision. */
+const dateParis = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+
 const legendeBarre = 'mb-1 block text-sm font-medium';
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
@@ -103,6 +114,8 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
 
   const [previsions, setPrevisions] = useState<{ cle: string; modele: ModeleMeteo; points: (PointCarte & { dep?: string })[] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [cumuls, setCumuls] = useState<{ cle: string; modele: ModeleMeteo; points: (PointCarte & { dep?: string })[] } | null>(null);
+  const [erreurCumuls, setErreurCumuls] = useState<string | null>(null);
   const [bilans, setBilans] = useState<ReponseBilans | null>(null);
   const [erreurBilans, setErreurBilans] = useState<string | null>(null);
 
@@ -112,6 +125,8 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   // Département : ses villes ; région : les villes de chacun de ses départements ; France : un point par département.
   const requeteZone = niveau === 'departement' ? `&dep=${departement}` : niveau === 'region' ? `&deps=${codesDeLaZone(zone).join(',')}` : '';
   const cle = `${modele}|${dateISO}|${requeteZone}`;
+  const modeleCumul = modeleDuCumul(modele);
+  const cleCumul = `${modeleCumul}|${aujourdhui}|${requeteZone}`;
   const logoId = logoChoisi ?? (logoParDefaut(codesDeLaZone(zone)).id === 'aucun' ? 'alertesmeteo' : logoParDefaut(codesDeLaZone(zone)).id);
 
   useEffect(() => {
@@ -132,6 +147,21 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
       });
     return () => controleur.abort();
   }, [mode, cle, previsions?.cle, erreur, modele, dateISO, requeteZone]);
+
+  // Cumuls de pluie sur 5, 10 et 16 jours : toujours à partir d'aujourd'hui, avec le CEP (ou GFS), quel que soit le jour choisi.
+  const groupesAvecCumul = mode === 'prevision' && (groupeChoisi === 'tous' || THEMES_PREVISION.some((t) => t.cumulJours && t.groupe === groupeChoisi));
+  useEffect(() => {
+    if (!groupesAvecCumul || cumuls?.cle === cleCumul || erreurCumuls) return;
+    const controleur = new AbortController();
+    fetch(`/api/carte-meteo/previsions/?modele=${modeleCumul}&date=${aujourdhui}${requeteZone}`, { signal: controleur.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
+        return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
+      })
+      .then((json) => setCumuls({ cle: cleCumul, modele: modeleCumul, points: json.points }))
+      .catch((e: Error) => e.name !== 'AbortError' && setErreurCumuls(e.message.endsWith('.') ? e.message : `${e.message}.`));
+    return () => controleur.abort();
+  }, [groupesAvecCumul, cleCumul, cumuls?.cle, erreurCumuls, modeleCumul, aujourdhui, requeteZone]);
 
   useEffect(() => {
     // Aussi en prévision pour aujourd'hui : la synthèse prend le mini relevé cette nuit (le modèle ne couvre plus la nuit).
@@ -208,12 +238,11 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
     return resultat;
   }, [horizon, niveau, region, departement, enDepartement, climatDeps, climatCommunes]);
 
-  /** Points de prévision par thème. */
+  /** Points de prévision par thème (cumuls sur plusieurs jours : réponse du CEP ou de GFS à partir d'aujourd'hui). */
   const pointsPrevision = useMemo(() => {
     const resultat: Record<string, PointInfo[]> = {};
-    if (previsions?.cle !== cle) return resultat;
-    for (const theme of THEMES_PREVISION) {
-      resultat[theme.id] = previsions.points
+    const versPoints = (theme: ThemePrevision, points: (PointCarte & { dep?: string })[]) =>
+      points
         .filter((p) => niveau !== 'france' || !MASQUES_FRANCE.has(p.code))
         .map((p) => {
           const coords = p.lat != null && p.lon != null ? { lat: p.lat, lon: p.lon } : COORDS_DEPARTEMENTS[p.code];
@@ -223,9 +252,24 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
             : null;
         })
         .filter((p): p is NonNullable<typeof p> => p != null);
+    for (const theme of THEMES_PREVISION) {
+      const source = theme.cumulJours ? (cumuls?.cle === cleCumul ? cumuls.points : null) : previsions?.cle === cle ? previsions.points : null;
+      if (source) resultat[theme.id] = versPoints(theme, source);
     }
     return resultat;
-  }, [previsions, cle, enDepartement, departement, niveau]);
+  }, [previsions, cle, cumuls, cleCumul, enDepartement, departement, niveau]);
+
+  /** Cumuls : période réellement couverte (le CEP s'arrête à 15 jours), pour le sous-titre. */
+  const finCumuls = useMemo(() => {
+    const fins = (cumuls?.cle === cleCumul ? cumuls.points : []).map((p) => p.finPrevision).filter((f): f is string => !!f).sort();
+    return fins.length ? dateParis(fins[0]) : null;
+  }, [cumuls, cleCumul]);
+  const periodeCumul = (jours: number) => {
+    const finTheorique = ajouterJours(aujourdhui, jours - 1);
+    const fin = finCumuls && finCumuls < finTheorique ? finCumuls : finTheorique;
+    return `DU ${jourCourt(aujourdhui)} AU ${jourCourt(fin)}${fin < finTheorique ? ' (FIN DU MODÈLE)' : ''}`;
+  };
+  const modeleCumulAffiche = MODELES.find((m) => m.id === (cumuls?.cle === cleCumul ? cumuls.modele : modeleCumul))!;
 
   /** Points de bilan par thème (stations). */
   const pointsBilan = useMemo(() => {
@@ -324,6 +368,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                     onChange={() => {
                       setNiveau(valeur);
                       setErreur(null);
+                      setErreurCumuls(null);
                     }}
                     className="mr-1.5"
                   />
@@ -345,6 +390,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                   onChange={(e) => {
                     setDepartement(e.target.value);
                     setErreur(null);
+                    setErreurCumuls(null);
                   }}
                   className={selectBarre}
                   aria-label="Département"
@@ -563,7 +609,33 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
               <div className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-2">
                 {g.themes.map((theme) => (
                   <div key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">
-                    {mode === 'prevision' ? (
+                    {mode === 'prevision' && (theme as ThemePrevision).cumulJours ? (
+                      erreurCumuls ? (
+                        <p role="alert" className="flex items-center gap-3 rounded-xl border border-border bg-surface p-6 text-sm text-danger">
+                          {theme.court} : {erreurCumuls}
+                          <button type="button" onClick={() => setErreurCumuls(null)} className="rounded-lg border border-border px-3 py-1 text-sm text-text">
+                            Réessayer
+                          </button>
+                        </p>
+                      ) : cumuls?.cle !== cleCumul ? (
+                        <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">Chargement des cumuls ({modeleCumulAffiche.libelle})…</p>
+                      ) : (pointsPrevision[theme.id]?.length ?? 0) === 0 ? (
+                        <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">
+                          <span className="font-bold text-text">{theme.court}</span> : le dernier passage {modeleCumulAffiche.libelle} ne couvre pas encore toute la période
+                          {modeleCumul === 'gfs' ? ' (choisissez le CEP)' : ''}.
+                        </p>
+                      ) : (
+                        <CarteInfo
+                          theme={theme}
+                          zone={zone}
+                          points={pointsPrevision[theme.id]}
+                          sousTitre={`${periodeCumul((theme as ThemePrevision).cumulJours!)} · ${modeleCumulAffiche.libelle}`}
+                          logoId={logoId}
+                          prefixeFichier={`carte-prevision-${aujourdhui}-${normaliser(nomZone).replace(/ /g, '-')}`}
+                          contexte={`Prévision du modèle ${modeleCumulAffiche.libelle} (${modeleCumulAffiche.fournisseur}), cumul de pluie sur ${(theme as ThemePrevision).cumulJours} jours à partir d'aujourd'hui`}
+                        />
+                      )
+                    ) : mode === 'prevision' ? (
                       <CarteInfo theme={theme} zone={zone} points={pointsPrevision[theme.id] ?? []} sousTitre={libelleJour(dateISO)} logoId={logoId} prefixeFichier={prefixe} contexte={contextePrevision} />
                     ) : mode === 'bilan' ? (
                       <CarteInfo theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />

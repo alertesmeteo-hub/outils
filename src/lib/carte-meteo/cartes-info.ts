@@ -1,4 +1,4 @@
-import type { PointCarte } from './previsions-modeles';
+import type { DureeCumul, PointCarte } from './previsions-modeles';
 import type { ClimatRegion } from './climat-tracc';
 
 /**
@@ -46,6 +46,8 @@ export interface ThemePrevision extends ThemeInfo {
   valeur: (p: PointCarte) => number | null | undefined;
   /** Direction d'où vient le vent (degrés), pour la flèche des rafales. */
   direction?: (p: PointCarte) => number | null | undefined;
+  /** Cumul sur plusieurs jours à partir d'aujourd'hui : modèle à longue échéance (CEP, GFS), quel que soit le jour choisi. */
+  cumulJours?: DureeCumul;
 }
 
 /** Cartes du réchauffement climatique : fiches régionales Météo-France (TRACC) ou pluies DRIAS par commune. */
@@ -90,6 +92,20 @@ const PALIERS_PLUIE: Palier[] = [
   p(1, '#7cb6f7', NOIR, '1 à 4 mm'),
   p(0.2, '#c7e0fb', NOIR, 'Moins de 1 mm'),
   p(-Infinity, '#e5e7eb', NOIR, 'Sec', true),
+];
+
+/** Cumuls sur plusieurs jours : l'échelle journalière (100 mm et plus) saturerait en épisode cévenol. */
+const PALIERS_PLUIE_CUMUL: Palier[] = [
+  p(300, '#3b0545', BLANC, '300 mm et plus'),
+  p(200, '#6a0d83', BLANC, '200 à 299 mm'),
+  p(150, '#b5121b', BLANC, '150 à 199 mm'),
+  p(100, '#e2470f', BLANC, '100 à 149 mm'),
+  p(60, '#16307a', BLANC, '60 à 99 mm'),
+  p(40, '#1d4ed8', BLANC, '40 à 59 mm'),
+  p(20, '#3b82f6', BLANC, '20 à 39 mm'),
+  p(10, '#7cb6f7', NOIR, '10 à 19 mm'),
+  p(1, '#c7e0fb', NOIR, '1 à 9 mm'),
+  p(-Infinity, '#e5e7eb', NOIR, 'Moins de 1 mm', true),
 ];
 
 const PALIERS_RAFALES: Palier[] = [
@@ -181,6 +197,9 @@ export const THEMES_PREVISION: ThemePrevision[] = [
   { id: 'ressenti', groupe: 'Températures', titre: 'TEMPÉRATURES RESSENTIES', court: 'Ressenti (vent)', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froids', valeur: (x) => x.ressentiMin },
   { id: 'amplitude', groupe: 'Températures', titre: 'AMPLITUDE THERMIQUE', court: 'Amplitude (maxi - mini)', unite: '°', decimales: 0, paliers: PALIERS_AMPLITUDE, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => (x.maxi != null && x.mini != null ? x.maxi - x.mini : null) },
   { id: 'pluie', groupe: 'Pluie', titre: 'CUMULS DE PLUIE', court: 'Cumuls de pluie', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluieJournee },
+  { id: 'pluie-5j', groupe: 'Pluie', cumulJours: 5, titre: 'CUMULS DE PLUIE SUR 5 JOURS', court: 'Pluie sur 5 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie5j },
+  { id: 'pluie-10j', groupe: 'Pluie', cumulJours: 10, titre: 'CUMULS DE PLUIE SUR 10 JOURS', court: 'Pluie sur 10 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie10j },
+  { id: 'pluie-16j', groupe: 'Pluie', cumulJours: 16, titre: 'CUMULS DE PLUIE SUR 16 JOURS', court: 'Pluie sur 16 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie16j },
   { id: 'rafales', groupe: 'Vent', titre: 'RAFALES MAXIMALES', court: 'Rafales maximales', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafaleJournee, direction: (x) => x.directionRafaleJournee },
   { id: 'vent', groupe: 'Vent', titre: 'VENT MOYEN MAXIMAL', court: 'Vent moyen', unite: 'km/h', decimales: 0, paliers: PALIERS_VENT_MOYEN, ordre: 'desc', titreTop: 'Les plus ventés', valeur: (x) => x.ventMaxJournee },
   { id: 'orages', groupe: 'Orages et neige', titre: 'RISQUE D’ORAGE', court: 'Risque d’orage', unite: '', decimales: 0, paliers: PALIERS_ORAGE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => x.orageJournee, texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
