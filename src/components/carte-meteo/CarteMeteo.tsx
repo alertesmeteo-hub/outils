@@ -713,11 +713,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const reference = enDepartement ? pointsAffiches.slice(0, cible) : pointsAffiches;
     const valeurs = pointsAffiches.map((p) => valeurPrincipale(p.code));
     const numeriques = reference.map((p) => valeurPrincipale(p.code)).filter((v): v is number => v != null);
-    // Plus chaud / plus froid : seulement s'ils sont uniques (si tout est à égalité, rien ne se détache).
+    // Maxi en rouge, mini en bleu : toutes les villes à la valeur la plus haute (ou la plus basse), même à égalité ;
+    // rien ne se détache seulement si toutes les valeurs sont égales.
     const max = numeriques.length > 1 ? Math.max(...numeriques) : null;
     const min = numeriques.length > 1 ? Math.min(...numeriques) : null;
-    const plusChaud = max != null && numeriques.filter((v) => v === max).length === 1 ? max : null;
-    const plusFroid = min != null && numeriques.filter((v) => v === min).length === 1 ? min : null;
+    const plusChaud = max != null && max !== min ? max : null;
+    const plusFroid = min != null && max !== min ? min : null;
     // Toutes les rafales : y compris celles des villes de réserve, qui peuvent remplacer une ville sans place.
     const rafalesSignalees = enDepartement ? plusFortesRafales(maxRafales === Infinity ? pointsAffiches : reference) : codesRafales;
     // Distance (px) du centre du picto au centre du marqueur, pour les tests « sur la terre » (France : pictos plus petits).
@@ -755,7 +756,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const moyennesGauche = 29;
     const obstacles: Rect[] = [
       { x: 29, y: 21, w: logoDroite - 29, h: hauteurLogo + 1 },
-      enFrance ? { x: largeurCarte - 28 - 380, y: 8, w: 380, h: 68 } : { x: largeurCarte / 2 - 230, y: 8, w: 460, h: 68 },
+      enFrance ? { x: largeurCarte - 28 - 420, y: 4, w: 420, h: 76 } : { x: largeurCarte / 2 - 250, y: 4, w: 500, h: 76 },
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : []),
     ];
@@ -779,11 +780,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           code: m.code,
           x: m.x,
           y: m.y,
-          gauche: 0.95 * em,
-          droite: 1.45 * em,
-          haut: (0.8 + 0.95 * lignes) * em + (nomsVisibles ? 0.9 * em : 0),
-          bas: 0.85 * em,
-          priorite: 2,
+          gauche: 0.8 * em,
+          droite: 1.28 * em,
+          haut: (0.46 + 0.83 * lignes) * em + (nomsVisibles ? 0.9 * em : 0),
+          bas: 0.7 * em,
+          // Villes imposées (Perpignan, Montpellier, Marseille, Paris, Lille) : jamais déplacées.
+          priorite: VILLES_IMPOSEES.some((v) => v.code === m.code) ? -1 : 2,
         };
       }
       return {
@@ -809,8 +811,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       return { reduit, w: LARGEUR_VENT[styleVent] * k, h: (HAUTEUR_VENT[styleVent] + (m.ressenti != null ? HAUTEUR_RESSENTI : 0)) * k };
     };
     // France et départements : aucune position de repli en mer (le décalage anti-chevauchement reste sur la terre).
+    // Disposition fixe : chaque point reste à sa place de la carte de référence, sauf s'il touche un voisin ; il est alors
+    // décalé du strict nécessaire (3,2 em au plus), sans test « sur la terre » (les points de la capture sont déjà sur terre).
     const places = dispositionFixe
-      ? new Map(elements.map((e) => [e.code, { x: e.x, y: e.y }]))
+      ? placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, 3.2 * em)
       : placerSansChevauchement(elements, obstacles, { largeur: largeurCarte, hauteur: HAUTEUR_CARTE }, (enDepartement ? 4 : 2.4) * em, (e, x, y) =>
           !terre || terre.centreSurTerre(x, y, decalagePicto)
         );

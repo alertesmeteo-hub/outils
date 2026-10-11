@@ -86,16 +86,14 @@ body {
   z-index: 3;
 }
 
-.cmap-titre { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); white-space: nowrap; text-align: center; z-index: 3; font-family: Impact, 'Arial Narrow', sans-serif; text-transform: uppercase; }
-.cmap-date {
-  font-size: 34px;
-  line-height: 1.05;
-  letter-spacing: 0.01em;
-  /* Bleu nuit liseré blanc : lisible sur le relief comme sur le fond uni. */
-  color: #0b2e59;
-  text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 0 3px 8px rgba(0, 0, 0, 0.45);
+/* Titre : bandeau clair arrondi, texte bleu nuit sans contour (lisible sur le relief comme sur le fond uni). */
+.cmap-titre {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); white-space: nowrap; text-align: center; z-index: 3;
+  font-family: Impact, 'Arial Narrow', sans-serif; text-transform: uppercase;
+  padding: 4px 16px 5px; border-radius: 10px; background: rgba(255, 255, 255, 0.9); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
-.cmap-sous-titre { font-size: 23px; line-height: 1.1; color: #0b2e59; text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff; }
+.cmap-date { font-size: 32px; line-height: 1.05; letter-spacing: 0.02em; color: #0b2e59; }
+.cmap-sous-titre { font-size: 19px; line-height: 1.1; letter-spacing: 0.04em; color: #2a4f80; }
 
 .cmap-moyennes { position: absolute; left: 29px; top: 340px; display: flex; flex-direction: column; gap: 8px; z-index: 3; }
 .cmap-moyenne { background: rgba(13, 20, 40, 0.92); border: 2px solid #f5c400; border-radius: 8px; padding: 4px 10px 3px; text-align: center; min-width: 120px; }
@@ -195,15 +193,15 @@ body {
 /* France « Moyen » : style de la carte de référence. Picto centré sur le point, température « 15° » en gras au-dessus,
    un peu à droite (CAPTURE_FRANCE et dispositionFixe dans CarteMeteo.tsx). */
 .cmap-capture .cmap-ligne { display: block; position: relative; }
-.cmap-capture .cmap-picto { font-size: 1.35em; display: block; }
-.cmap-capture .cmap-ligne .cmap-picto-image { width: 1.35em; height: 1.35em; }
+.cmap-capture .cmap-picto { font-size: 1.25em; display: block; }
+.cmap-capture .cmap-ligne .cmap-picto-image { width: 1.25em; height: 1.25em; }
 .cmap-capture .cmap-valeurs,
 .cmap-capture .cmap-ligne-simple .cmap-valeurs { position: absolute; left: 50%; bottom: calc(100% - 0.3em); margin: 0; align-self: auto; z-index: 1; }
 .cmap-capture .cmap-valeur,
 .cmap-capture .cmap-ligne-simple .cmap-valeur {
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 700;
-  font-size: 0.92em;
+  font-size: 0.8em;
   color: #222;
   text-align: right;
   height: 1em;
@@ -213,13 +211,14 @@ body {
 .cmap-degre {
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 700;
-  font-size: 0.92em;
+  font-size: 0.8em;
   line-height: 1;
   color: #222;
   text-shadow: 0 0 2px #fff, 0 0 2px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
 }
-.cmap-capture .cmap-chaud { color: #e5191e; }
-.cmap-capture .cmap-froid { color: #1f6fe0; }
+/* Plus chaud en rouge, plus froid en bleu (et maxi / mini) : plus spécifique que la couleur noire ci-dessus. */
+.cmap-capture .cmap-valeur.cmap-chaud, .cmap-capture .cmap-ligne-simple .cmap-valeur.cmap-chaud, .cmap-capture .cmap-degre.cmap-chaud { color: #e5191e; }
+.cmap-capture .cmap-valeur.cmap-froid, .cmap-capture .cmap-ligne-simple .cmap-valeur.cmap-froid, .cmap-capture .cmap-degre.cmap-froid { color: #1f6fe0; }
 /* Régions et départements : températures 15 % et pictos 5 % plus grands (ECHELLE_*_LOCAL dans CarteMeteo.tsx). */
 .cmap-local .cmap-valeur { font-size: calc(1.35em * 1.15); }
 .cmap-local .cmap-ligne-simple .cmap-valeur { font-size: calc(1.1em * 1.15); }
