@@ -91,10 +91,11 @@ body {
   font-size: 34px;
   line-height: 1.05;
   letter-spacing: 0.01em;
-  color: #22c55e;
-  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 3px 8px rgba(0, 0, 0, 0.6);
+  /* Bleu nuit liseré blanc : lisible sur le relief comme sur le fond uni. */
+  color: #0b2e59;
+  text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 0 3px 8px rgba(0, 0, 0, 0.45);
 }
-.cmap-sous-titre { font-size: 23px; line-height: 1.1; color: #fff; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+.cmap-sous-titre { font-size: 23px; line-height: 1.1; color: #0b2e59; text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff; }
 
 .cmap-moyennes { position: absolute; left: 29px; top: 340px; display: flex; flex-direction: column; gap: 8px; z-index: 3; }
 .cmap-moyenne { background: rgba(13, 20, 40, 0.92); border: 2px solid #f5c400; border-radius: 8px; padding: 4px 10px 3px; text-align: center; min-width: 120px; }

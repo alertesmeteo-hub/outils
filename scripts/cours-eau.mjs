@@ -1,12 +1,14 @@
 // Génère public/geo/cours-eau.json : les principaux cours d'eau de France métropolitaine, par nom, depuis la BD TOPO de
 // l'IGN (Géoplateforme, WFS sans clé, Licence ouverte), simplifiés. L'attribut « importance » de la BD TOPO ne
-// reflète pas la taille des rivières : on retient donc une liste de noms, répartie en trois niveaux
-// (1 = grands fleuves, 2 = grandes rivières, 3 = rivières locales affichées seulement sur les vues zoomées).
+// reflète pas la taille des rivières : on retient donc une liste de noms, répartie en quatre niveaux
+// (0 = les quatre grands fleuves, 1 = autres fleuves, 2 = grandes rivières, 3 = rivières locales).
+// Le choix « Fleuves : faible / moyen / dense » de la carte s'appuie sur ces niveaux.
 //   node scripts/cours-eau.mjs
 import { writeFileSync } from 'node:fs';
 
 const NIVEAUX = {
-  1: ['Loire', 'Seine', 'Rhône', 'Garonne', 'Gironde', 'Dordogne', 'Marne', 'Saône', 'Meuse', 'Moselle', 'Rhin'],
+  0: ['Loire', 'Seine', 'Rhône', 'Garonne', 'Gironde'],
+  1: ['Dordogne', 'Marne', 'Saône', 'Meuse', 'Moselle', 'Rhin'],
   2: [
     'Oise', 'Yonne', 'Allier', 'Cher', 'Lot', 'Tarn', 'Durance', 'Charente', 'Vienne', 'Somme', 'Aisne', 'Aube', 'Orne', 'Eure',
     'Sarthe', 'Mayenne', 'Maine', 'Loir', 'Indre', 'Creuse', 'Aveyron', 'Adour', 'Isère', 'Doubs', 'Ill', 'Aude', 'Hérault', 'Vilaine',
@@ -59,7 +61,7 @@ function simplifier(points, tol) {
 /** Variantes de toponyme dans la BD TOPO : « la Loire », « le Rhône », « l'Allier », « Gave de Pau »… */
 const variantes = (nom) => [nom, `le ${nom}`, `la ${nom}`, `l'${nom}`, `les ${nom}`];
 
-const lignes = { 1: [], 2: [], 3: [] };
+const lignes = { 0: [], 1: [], 2: [], 3: [] };
 const vus = new Set();
 for (const [niveau, noms] of Object.entries(NIVEAUX)) {
   const liste = [...new Set(noms.flatMap(variantes))].map((n) => `'${n.replace(/'/g, "''")}'`).join(',');

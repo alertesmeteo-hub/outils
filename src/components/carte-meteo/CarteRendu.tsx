@@ -229,9 +229,13 @@ interface Props {
   carteLocale?: boolean;
   /** Présentation des rafales (pastille par défaut). */
   styleVent?: StyleVent;
-  /** Couleur de la date du titre (vert par défaut, voir .cmap-date). */
+  /** Couleur de la date du titre (bleu nuit par défaut, voir .cmap-date). */
   couleurTitre?: string;
   fleuves?: Fleuves | null;
+  /** Densité des cours d'eau : faible = les quatre grands fleuves, moyen = fleuves et grandes rivières, dense = tout. */
+  densiteFleuves?: DensiteFleuves;
+  /** Opacité des cours d'eau (0 à 1). */
+  opaciteFleuves?: number;
   /** Fond relief satellite ; sinon fond bleu uni. */
   afficherRelief?: boolean;
   /** Part du relief qui transparaît à travers la teinte du territoire (0 à 1) quand « Reliefs » est coché. */
@@ -303,10 +307,14 @@ function stylePalette(x: number, y: number, em: number, largeur: number): CSSPro
 
 
 export interface Fleuves {
+  /** Loire, Seine, Rhône, Garonne-Gironde. */
+  d0: string;
   d1: string;
   d2: string;
   d3: string;
 }
+
+export type DensiteFleuves = 'faible' | 'moyen' | 'dense';
 
 const COURS_EAU = { fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke' } as const;
 
@@ -321,6 +329,8 @@ export default function CarteRendu({
   styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
+  densiteFleuves = 'faible',
+  opaciteFleuves = 1,
   afficherRelief = true,
   reliefVisible = 0.28,
   vue,
@@ -392,14 +402,25 @@ export default function CarteRendu({
                 <clipPath id={idClip}>
                   {departements.filter((c) => selection.has(c.code)).map((c) => <path key={c.code} d={c.d} />)}
                 </clipPath>
-                {/* Fleuves et grandes rivières ; les rivières secondaires seulement quand la carte est zoomée (départements). */}
-                <g clipPath={`url(#${idClip})`}>
-                  {vue.echelle >= 1.2 && <path d={fleuves.d3} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={2.4} />}
-                  {vue.echelle >= 1.2 && <path d={fleuves.d3} {...COURS_EAU} stroke="#2f62c9" strokeWidth={1.1} />}
-                  <path d={fleuves.d2} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 3.2 : 2.2} />
-                  <path d={fleuves.d2} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 1.7 : 1.1} />
-                  <path d={fleuves.d1} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 4.4 : 3.2} />
-                  <path d={fleuves.d1} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 2.4 : 1.8} />
+                {/* Faible : les quatre grands fleuves. Moyen : fleuves et grandes rivières, plus les rivières locales quand la
+                    carte est zoomée (départements). Dense : tous les cours d'eau, même sur la France. */}
+                <g clipPath={`url(#${idClip})`} opacity={opaciteFleuves}>
+                  {(densiteFleuves === 'dense' || (densiteFleuves === 'moyen' && vue.echelle >= 1.2)) && (
+                    <>
+                      <path d={fleuves.d3} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 2.4 : 1.8} />
+                      <path d={fleuves.d3} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 1.1 : 0.8} />
+                    </>
+                  )}
+                  {densiteFleuves !== 'faible' && (
+                    <>
+                      <path d={fleuves.d2} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 3.2 : 2.2} />
+                      <path d={fleuves.d2} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 1.7 : 1.1} />
+                      <path d={fleuves.d1} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 4.4 : 3.2} />
+                      <path d={fleuves.d1} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 2.4 : 1.8} />
+                    </>
+                  )}
+                  <path d={fleuves.d0} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 4.4 : 3.2} />
+                  <path d={fleuves.d0} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 2.4 : 1.8} />
                 </g>
               </>
             )}

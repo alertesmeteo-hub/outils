@@ -25,7 +25,7 @@ import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMet
 import CarteRendu, {
   ECHELLE_VENT_REDUIT,
   LARGEUR_VENT,
-  SEUIL_VENT_REDUIT, type Fleuves, HAUTEUR_CARTE, HAUTEUR_RESSENTI, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent, valeurRafaleSaisie } from './CarteRendu';
+  SEUIL_VENT_REDUIT, type Fleuves, type DensiteFleuves, HAUTEUR_CARTE, HAUTEUR_RESSENTI, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent, valeurRafaleSaisie } from './CarteRendu';
 
 type Periode = 'matin' | 'apres-midi' | 'journee';
 type NiveauNoms = 'departement' | 'ville';
@@ -181,7 +181,7 @@ let promesseFleuves: Promise<Fleuves> | null = null;
 
 /** Cours d'eau principaux (public/geo/cours-eau.json, généré par scripts/cours-eau.mjs) en tracés SVG « monde ». */
 function chargerFleuves(): Promise<Fleuves> {
-  promesseFleuves ??= fetch('/geo/cours-eau.json')
+  promesseFleuves ??= fetch('/geo/cours-eau.json?v=2') // v2 : niveau 0 (quatre grands fleuves)
     .then((r) => r.json())
     .then((g: Record<string, [number, number][][]>) => {
       const tracer = (lignes: [number, number][][] = []) =>
@@ -195,7 +195,7 @@ function chargerFleuves(): Promise<Fleuves> {
               .join('')
           )
           .join('');
-      return { d1: tracer(g['1']), d2: tracer(g['2']), d3: tracer(g['3']) };
+      return { d0: tracer(g['0']), d1: tracer(g['1']), d2: tracer(g['2']), d3: tracer(g['3']) };
     });
   promesseFleuves.catch(() => (promesseFleuves = null));
   return promesseFleuves;
@@ -356,6 +356,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [modeMultiple, setModeMultiple] = useState(false);
   const [pied, setPied] = useState('www.alertes-meteo.com');
   const [afficherFleuves, setAfficherFleuves] = useState(true);
+  const [densiteFleuves, setDensiteFleuves] = useState<DensiteFleuves>('faible');
+  const [opaciteFleuves, setOpaciteFleuves] = useState(100);
   const [afficherFleches, setAfficherFleches] = useState(true);
   const [afficherRelief, setAfficherRelief] = useState(true);
   const [reliefPourcent, setReliefPourcent] = useState(28);
@@ -1062,6 +1064,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       facteur={facteur}
       largeur={largeurCarte}
       fleuves={fleuves}
+      densiteFleuves={densiteFleuves}
+      opaciteFleuves={opaciteFleuves / 100}
       afficherRelief={afficherRelief}
       reliefVisible={reliefPourcent / 100}
       vue={vue}
@@ -1572,6 +1576,22 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <input type="checkbox" checked={afficherFleuves} onChange={(e) => setAfficherFleuves(e.target.checked)} />
             Fleuves
           </label>
+          {afficherFleuves && (
+            <>
+              <label className="flex items-center gap-2 pb-1.5 text-sm">
+                <select value={densiteFleuves} onChange={(e) => setDensiteFleuves(e.target.value as DensiteFleuves)} className={selectBarre} aria-label="Densité des fleuves">
+                  <option value="faible">Faible (4 grands fleuves)</option>
+                  <option value="moyen">Moyen</option>
+                  <option value="dense">Dense</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-2 pb-1.5 text-sm">
+                Opacité des fleuves
+                <input type="range" min={10} max={100} step={5} value={opaciteFleuves} onChange={(e) => setOpaciteFleuves(Number(e.target.value))} aria-label="Opacité des fleuves" />
+                <span className="w-9 tabular-nums text-muted">{opaciteFleuves} %</span>
+              </label>
+            </>
+          )}
           <label className="flex items-center gap-2 pb-1.5 text-sm">
             <input type="checkbox" checked={afficherRelief} onChange={(e) => setAfficherRelief(e.target.checked)} />
             Reliefs
