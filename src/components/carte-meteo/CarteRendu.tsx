@@ -369,6 +369,8 @@ export default function CarteRendu({
   /** Rafale ajoutée dont le choix de direction est ouvert. */
   const [directionOuvertePour, setDirectionOuvertePour] = useState<string | null>(null);
   const idClip = `fleuves-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const degres = styleCapture || carteLocale;
+  const largeurValeur = (v: string) => `${Math.max(1, v.length) * (styleCapture ? 0.58 : 0.54) + 0.05}em`;
   return (
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
@@ -535,6 +537,8 @@ export default function CarteRendu({
           );
         })}
 
+        {/* « ° » après chaque température : style de la capture (Arial gras, 0,58 em par chiffre) et cartes de région ou de
+            département (Impact, 0,54 em par chiffre) ; la case de saisie prend la largeur du nombre pour que « ° » le suive. */}
         {marqueurs.map((m) => (
           <div
             key={m.code}
@@ -559,9 +563,9 @@ export default function CarteRendu({
                     value={m.valeur}
                     onChange={(e) => onModifier(m.code, 'valeur', e.target.value)}
                     size={2}
-                    style={styleCapture ? { width: `${Math.max(1, m.valeur.length) * 0.58 + 0.05}em` } : undefined}
+                    style={degres ? { width: largeurValeur(m.valeur) } : undefined}
                   />
-                  {styleCapture && <span className={`cmap-degre ${m.ton === 'chaud' || m.mini != null ? 'cmap-chaud' : m.ton === 'froid' ? 'cmap-froid' : ''}`}>°</span>}
+                  {degres && <span className={`cmap-degre ${m.ton === 'chaud' || m.mini != null ? 'cmap-chaud' : m.ton === 'froid' ? 'cmap-froid' : ''}`}>°</span>}
                 </span>
                 {m.mini != null && (
                   <span className="cmap-valeur-ligne">
@@ -570,9 +574,9 @@ export default function CarteRendu({
                       value={m.mini}
                       onChange={(e) => onModifier(m.code, 'mini', e.target.value)}
                       size={2}
-                      style={styleCapture ? { width: `${Math.max(1, m.mini.length) * 0.58 + 0.05}em` } : undefined}
+                      style={degres ? { width: largeurValeur(m.mini) } : undefined}
                     />
-                    {styleCapture && <span className="cmap-degre cmap-froid">°</span>}
+                    {degres && <span className="cmap-degre cmap-froid">°</span>}
                   </span>
                 )}
               </div>

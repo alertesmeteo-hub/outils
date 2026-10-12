@@ -216,6 +216,13 @@ body {
   color: #222;
   text-shadow: 0 0 2px #fff, 0 0 2px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
 }
+/* Régions et départements : « ° » en Impact, à la taille de la température (règles .cmap-local .cmap-valeur ci-dessus). */
+.cmap-local .cmap-degre { font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-weight: normal; line-height: 1; color: #111; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff; font-size: calc(1.35em * 1.15); }
+.cmap-local .cmap-ligne-simple .cmap-degre { font-size: calc(1.1em * 1.15); }
+.cmap-local.cmap-gros .cmap-degre { font-size: calc(1.35em * 1.15 * 1.07); }
+.cmap-local.cmap-gros .cmap-ligne-simple .cmap-degre { font-size: calc(1.1em * 1.15 * 1.07); }
+.cmap-local .cmap-degre.cmap-chaud { color: #e5191e; }
+.cmap-local .cmap-degre.cmap-froid { color: #1f6fe0; }
 /* Plus chaud en rouge, plus froid en bleu (et maxi / mini) : plus spécifique que la couleur noire ci-dessus. */
 .cmap-capture .cmap-valeur.cmap-chaud, .cmap-capture .cmap-ligne-simple .cmap-valeur.cmap-chaud, .cmap-capture .cmap-degre.cmap-chaud { color: #e5191e; }
 .cmap-capture .cmap-valeur.cmap-froid, .cmap-capture .cmap-ligne-simple .cmap-valeur.cmap-froid, .cmap-capture .cmap-degre.cmap-froid { color: #1f6fe0; }

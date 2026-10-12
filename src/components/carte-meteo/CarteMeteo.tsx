@@ -768,7 +768,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       // Régions et départements : températures 15 % et pictos 5 % plus grands (`.cmap-local`).
       const kPicto = enFrance ? 1 : ECHELLE_PICTO_LOCAL;
       const kTemp = enFrance ? 1 : enDepartement ? ECHELLE_TEMP_DEPARTEMENT : ECHELLE_TEMP_LOCAL;
-      const largeurLigne = 2.35 * (1 + gros) * kPicto + (m.mini == null ? 1.85 : 2.55) * kTemp;
+      // Régions et départements : « ° » après la température (+0,4 em sur une ligne simple).
+      const largeurLigne = 2.35 * (1 + gros) * kPicto + (m.mini == null ? (enFrance ? 1.85 : 2.25) : 2.55) * kTemp;
       const demiLargeur = (Math.max(largeurLigne * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
       const hautLigne = Math.max((m.mini != null ? 3.4 * kTemp : 2.6 * kPicto) + gros * 1.8 * kPicto, estPictoImage(m.picto) ? 2.3 * (1 + gros) * kPicto : 0);
