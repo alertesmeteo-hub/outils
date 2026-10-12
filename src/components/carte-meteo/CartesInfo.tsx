@@ -127,7 +127,9 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const cle = `${modele}|${dateISO}|${requeteZone}`;
   const modeleCumul = modeleDuCumul(modele);
   const cleCumul = `${modeleCumul}|${aujourdhui}|${requeteZone}`;
-  const logoId = logoChoisi ?? (logoParDefaut(codesDeLaZone(zone)).id === 'aucun' ? 'alertesmeteo' : logoParDefaut(codesDeLaZone(zone)).id);
+  // Cartes de France : pas de logo par défaut (www.alertes-meteo.com figure déjà en bas) ; régions et départements : AlertesMétéo ou Météo Pays Catalan (66).
+  const logoId =
+    logoChoisi ?? (niveau === 'france' ? 'aucun' : logoParDefaut(codesDeLaZone(zone)).id === 'aucun' ? 'alertesmeteo' : logoParDefaut(codesDeLaZone(zone)).id);
 
   useEffect(() => {
     if (mode !== 'prevision' || previsions?.cle === cle || erreur) return;
