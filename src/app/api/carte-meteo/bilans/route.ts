@@ -3,6 +3,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { THEMES_BILAN, type ReponseBilans } from '@/lib/carte-meteo/cartes-info';
 import { buildRanking, getRanking, windows } from '@/lib/obs/rankings';
 import { getRecords, getSix, getSnapshot, obsConfigured } from '@/lib/obs/store';
+import { extremesDuMois } from '@/lib/carte-meteo/extremes-mois';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +43,19 @@ export async function GET(req: Request) {
       const stations = snap.stations.filter((s) => s.lat != null && s.lon != null && s.kind !== 'amateur');
       const indice = new Map(stations.map((s, i) => [s.id, i]));
       const cartes: ReponseBilans['cartes'] = {};
+      // Maxi et mini du mois : archive quotidienne des stations (indisponible = cartes vides, le reste des bilans s'affiche).
+      const mois = THEMES_BILAN.some((t) => t.mois)
+        ? await extremesDuMois(now, stations.map((s) => ({ id: s.id, lat: s.lat!, lon: s.lon!, alt: s.alt ?? null })))
+        : null;
       for (const theme of THEMES_BILAN) {
+        if (theme.mois) {
+          const valeurs = mois?.[theme.mois];
+          cartes[theme.id] = {
+            fenetre: mois?.periode ?? '',
+            valeurs: valeurs ? [...valeurs].map(([id, v]) => [indice.get(id)!, Math.round(v * 10) / 10] as [number, number]).filter(([i]) => i != null) : [],
+          };
+          continue;
+        }
         const r = getRanking(theme.classement);
         const lignes = buildRanking(r, stations, snap.obs, now, { secondaires: true, amateurs: false, byDept: false }, records, extra);
         cartes[theme.id] = {

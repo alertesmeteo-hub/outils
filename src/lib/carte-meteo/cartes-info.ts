@@ -60,8 +60,10 @@ export interface ThemeClimat extends ThemeInfo {
 }
 
 export interface ThemeBilan extends ThemeInfo {
-  /** Identifiant du classement des stations (src/lib/obs/rankings.ts). */
+  /** Identifiant du classement des stations (src/lib/obs/rankings.ts) ; vide pour les cartes du mois. */
   classement: string;
+  /** Maximale (tx) ou minimale (tn) du mois en cours, lue dans l'archive quotidienne (voir extremes-mois.ts). */
+  mois?: 'tx' | 'tn';
 }
 
 const p = (min: number, fond: string, texte: string, libelle: string, neutre = false): Palier => ({ min, fond, texte, libelle, neutre });
@@ -216,6 +218,8 @@ export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'tx-prov', groupe: 'Températures', classement: 'tx-prov', titre: 'MAXIMALES DU JOUR (PROVISOIRES)', court: 'Maximales du jour', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-prov', groupe: 'Températures', classement: 'tn-prov', titre: 'MINIMALES DE LA NUIT (PROVISOIRES)', court: 'Minimales de cette nuit', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 't', groupe: 'Températures', classement: 't', titre: 'TEMPÉRATURES DU MOMENT', court: 'Températures du moment', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tx-mois', groupe: 'Températures du mois', classement: '', mois: 'tx', titre: 'MAXIMALES DU MOIS', court: 'Maxi du mois', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tn-mois', groupe: 'Températures du mois', classement: '', mois: 'tn', titre: 'MINIMALES DU MOIS', court: 'Mini du mois', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 'n-tx', groupe: 'Écarts à la normale', classement: 'n-tx', titre: 'MAXIMALES : ÉCART À LA NORMALE', court: 'Écart des maximales', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
   { id: 'n-tn', groupe: 'Écarts à la normale', classement: 'n-tn', titre: 'MINIMALES : ÉCART À LA NORMALE', court: 'Écart des minimales', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
   { id: 'rr6', groupe: 'Pluie', classement: 'rr6', titre: 'PLUIE DEPUIS CE MATIN', court: 'Pluie depuis ce matin', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
