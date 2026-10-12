@@ -7,6 +7,7 @@ import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr
 import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
+import { saisieAcceptee } from '@/lib/carte-meteo/limites';
 import { DIRECTIONS_VENT, angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
@@ -1024,6 +1025,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }
 
   function modifier(code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale' | 'altitude', valeur: string, partout = false) {
+    // Saisie hors limites (température hors de -25 à 47 °C, rafale au-delà de 250 km/h) : refusée, la valeur précédente reste.
+    if ((champ === 'valeur' || champ === 'mini') && !saisieAcceptee(valeur, 'temperature')) return;
+    if (champ === 'rafale' && !saisieAcceptee(valeur, 'vent')) return;
     if (champ === 'rafale') {
       setRafalesManuelles((r) => ({ ...r, [`${periode}|${code}`]: valeur }));
       return;
@@ -1141,6 +1145,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       onClicCarte={enExport ? undefined : modeAjout ? ajouterPicto : modeAjoutRafale ? ajouterRafale : undefined}
       rafalesAjoutees={rafalesAjoutees.filter((r) => r.zone === zone).map((r) => ({ code: `rafale:${r.id}`, x: r.x, y: r.y, texte: r.texte, provenance: r.provenance }))}
       onModifierRafaleAjoutee={(code, champ, valeur) =>
+        (champ !== 'texte' || saisieAcceptee(valeur, 'vent')) &&
         setRafalesAjoutees((liste) =>
           liste.map((r) => (`rafale:${r.id}` !== code ? r : champ === 'texte' ? { ...r, texte: valeur } : { ...r, provenance: Number(valeur) }))
         )
@@ -1170,7 +1175,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       styleVent={styleVent}
       couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
-      onModifierMoyenne={(id, v) => setMoyennesManuelles((m) => ({ ...m, [cleMoyenne(id)]: v }))}
+      onModifierMoyenne={(id, v) => saisieAcceptee(v, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne(id)]: v }))}
       paletteOuvertePour={paletteOuvertePour}
       pictosSelectionnes={enExport ? undefined : pictosSelectionnes}
       onBasculerPalette={(code, multiple) => {
@@ -1292,7 +1297,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                       type="text"
                       inputMode="numeric"
                       value={rafaleNouvelle}
-                      onChange={(e) => setRafaleNouvelle(e.target.value)}
+                      onChange={(e) => saisieAcceptee(e.target.value, 'vent') && setRafaleNouvelle(e.target.value)}
                       className="mt-0.5 block w-16 rounded-md border border-border bg-surface p-1 text-sm"
                     />
                   </label>
@@ -1393,7 +1398,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 <input
                   type="text"
                   value={valeurMoyenne('nord')}
-                  onChange={(e) => setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('nord')]: e.target.value }))}
+                  onChange={(e) => saisieAcceptee(e.target.value, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('nord')]: e.target.value }))}
                   className={champInput}
                 />
               </label>
@@ -1402,7 +1407,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 <input
                   type="text"
                   value={valeurMoyenne('sud')}
-                  onChange={(e) => setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('sud')]: e.target.value }))}
+                  onChange={(e) => saisieAcceptee(e.target.value, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('sud')]: e.target.value }))}
                   className={champInput}
                 />
               </label>

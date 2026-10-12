@@ -5,7 +5,7 @@ import { ajusterVue, unirBoites, versEcran, versMonde, type Zone } from '@/lib/c
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
-import { palierDe, texteInfo, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
+import { palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
 import { BOITE_FRANCE, FICHIERS_CONTOURS, codesDeLaZone, normaliser, useContours } from './CarteMeteo';
 import type { PointInfo } from './CarteInfo';
@@ -46,7 +46,7 @@ const TAILLE = 17;
 
 const trier = (r: RubriqueSynthese, zone: Set<string>) =>
   r.points
-    .filter((p) => zone.has(p.dep) && Number.isFinite(p.valeur) && !palierDe(r.theme.paliers, p.valeur).neutre)
+    .filter((p) => zone.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(r.theme, p.valeur) && !palierDe(r.theme.paliers, p.valeur).neutre)
     .sort((a, b) => (r.theme.ordre === 'desc' ? b.valeur - a.valeur : a.valeur - b.valeur) || a.nom.localeCompare(b.nom, 'fr'));
 
 /**

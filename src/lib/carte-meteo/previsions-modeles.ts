@@ -1,5 +1,6 @@
 import { COORDS_DEPARTEMENTS } from './departements-coords';
 import { ressenti } from './vent';
+import { temperaturePlausible, ventPlausible } from './limites';
 
 /**
  * Modèles proposés, lus dans les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (voir `sources.ts`) :
@@ -222,7 +223,14 @@ function cumulsPluie(serie: Serie, dateISO: string): Pick<PointCarte, 'pluie5j' 
  * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h, l'après-midi de 12 h à 18 h (température : maximum de 14 h à 18 h), la journée de 7 h à 20 h pour le
  * ciel. Le minimum de la nuit n'est donné que si la série couvre le début de la journée (avant 7 h).
  */
-export function pointDepuisSerie(code: string, nom: string, serie: Serie, dateISO: string): PointCarte {
+export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateISO: string): PointCarte {
+  // Températures hors de -25 à 47 °C et vents au-delà de 250 km/h : erreurs du modèle, jamais affichées.
+  const serie: Serie = {
+    ...brute,
+    temp: brute.temp.map((v) => (v != null && temperaturePlausible(v) ? v : null)),
+    rafale: brute.rafale.map((v) => (v != null && ventPlausible(v) ? v : null)),
+    vent: brute.vent.map((v) => (v != null && ventPlausible(v) ? v : null)),
+  };
   const locaux = serie.t.map(dateHeureParis);
   const jour = locaux.map((l, i) => ({ ...l, i })).filter((l) => l.date === dateISO);
   const matin = jour.filter((l) => l.heure >= 6 && l.heure <= 11).map((l) => l.i);

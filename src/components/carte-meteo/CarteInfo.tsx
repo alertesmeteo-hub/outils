@@ -7,7 +7,7 @@ import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { angleFleche } from '@/lib/carte-meteo/vent';
-import { palierDe, texteInfo, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
+import { palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
 import { BOITE_FRANCE, FICHIERS_CONTOURS, LARGEUR_FRANCE, ZONE_FRANCE, ZONE_UTILE, codesDeLaZone, normaliser, useContours } from './CarteMeteo';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
@@ -89,7 +89,10 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const logoUrl = logo?.fichier || null;
   const hauteurLogo = logoUrl ? (zone === 'dep:66' && logoId.startsWith('pays-catalan') ? 150 : 83) : 0;
 
-  const dansZone = useMemo(() => points.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur)), [points, selection]);
+  const dansZone = useMemo(
+    () => points.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur)),
+    [points, selection, theme]
+  );
   // Du « meilleur » (le plus chaud, le plus arrosé…) au moins remarquable.
   const tries = useMemo(
     () => [...dansZone].sort((a, b) => (theme.ordre === 'desc' ? b.valeur - a.valeur : a.valeur - b.valeur) || a.nom.localeCompare(b.nom, 'fr')),

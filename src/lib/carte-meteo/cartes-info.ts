@@ -1,5 +1,6 @@
 import type { DureeCumul, PointCarte } from './previsions-modeles';
 import type { ClimatRegion } from './climat-tracc';
+import { temperaturePlausible, ventPlausible } from './limites';
 
 /**
  * Cartes « infos » (/outils/carte-meteo-info/) : une carte par thème, valeurs en pastilles colorées et départements
@@ -331,6 +332,13 @@ export interface ClimatDepartements {
 }
 /** Communes d'un département (public/climat/communes/<dep>.json) : [insee, nom, lat, lon, puis les valeurs comme ci-dessus]. */
 export type ClimatCommune = [string, string, number, number, ...(number | null)[]];
+
+/** Températures (hors écarts et projections signées) et vents : valeurs hors limites écartées de toutes les cartes. */
+export function valeurPlausible(theme: ThemeInfo, v: number): boolean {
+  if (theme.unite === '°' && !theme.signe) return temperaturePlausible(v);
+  if (theme.unite === 'km/h') return ventPlausible(v);
+  return true;
+}
 
 export const palierDe = (paliers: Palier[], v: number): Palier => paliers.find((x) => v >= x.min) ?? paliers[paliers.length - 1];
 
