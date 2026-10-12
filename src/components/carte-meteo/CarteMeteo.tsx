@@ -83,6 +83,8 @@ const COULEUR_TITRE_PO = '#ff8c1a';
 const HAUTEUR_LOGO = 83;
 const HAUTEUR_LOGO_PO = 150;
 const SEUIL_RAFALES_DEFAUT = 60;
+/** Vue département : rafales signalées dès 35 km/h par défaut (les villes sont proches, les rafales plus faibles). */
+const SEUIL_RAFALES_DEPARTEMENT = 35;
 /** Distance minimale (pixels de la carte) entre deux villes affichées en vue département. */
 const DISTANCE_MIN_VILLES = 90;
 /** Régions et départements : on laisse libres le haut (logo, date) et la gauche (moyennes). */
@@ -348,7 +350,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [fond, setFond] = useState<FondContours>('aucun');
   const [niveauNoms, setNiveauNoms] = useState<NiveauNoms>('departement');
   const [afficherNoms, setAfficherNoms] = useState(false);
-  const [seuilRafales, setSeuilRafales] = useState(SEUIL_RAFALES_DEFAUT);
+  /** Seuil des rafales saisi à la main ; sinon celui par défaut de la zone (voir seuilRafales). */
+  const [seuilChoisi, setSeuilChoisi] = useState<number | null>(null);
   const [choixRafales, setChoixRafales] = useState<NombreRafales | null>(null);
   const [styleVent, setStyleVent] = useState<StyleVent>('pastille');
   const [afficherRessenti, setAfficherRessenti] = useState(false);
@@ -394,6 +397,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const zone = niveau === 'france' ? 'france' : niveau === 'region' ? `reg:${region}` : `dep:${departement}`;
   const enDepartement = niveau === 'departement';
+  const seuilRafales = seuilChoisi ?? (enDepartement ? SEUIL_RAFALES_DEPARTEMENT : SEUIL_RAFALES_DEFAUT);
   const nombreRafales: NombreRafales = choixRafales ?? (enDepartement ? 'toutes' : '4');
   const maxRafales = maximumRafales(nombreRafales);
   const dateISO = ajouterJours(aujourdhui, jour);
@@ -1705,7 +1709,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               value={seuilRafales}
               onChange={(e) => {
                 const n = Number(e.target.value);
-                setSeuilRafales(e.target.value === '' || !Number.isFinite(n) ? SEUIL_RAFALES_DEFAUT : Math.min(200, Math.max(0, n)));
+                setSeuilChoisi(e.target.value === '' || !Number.isFinite(n) ? null : Math.min(200, Math.max(0, n)));
                 // Changer le seuil, c'est vouloir voir toutes les rafales au-dessus (sauf si un nombre a été choisi exprès).
                 if (choixRafales == null) setChoixRafales('toutes');
               }}
