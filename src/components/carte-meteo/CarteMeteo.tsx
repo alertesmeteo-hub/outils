@@ -383,7 +383,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [modeMultiple, setModeMultiple] = useState(false);
   const [pied, setPied] = useState('www.alertes-meteo.com');
   const [afficherFleuves, setAfficherFleuves] = useState(true);
-  const [densiteFleuves, setDensiteFleuves] = useState<DensiteFleuves>('faible');
+  /** Densité choisie dans le menu ; null = par défaut selon la zone (voir densiteFleuves). */
+  const [densiteChoisie, setDensiteFleuves] = useState<DensiteFleuves | null>(null);
   const [opaciteFleuves, setOpaciteFleuves] = useState(100);
   const [afficherFleches, setAfficherFleches] = useState(true);
   const [afficherRelief, setAfficherRelief] = useState(true);
@@ -398,6 +399,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const zone = niveau === 'france' ? 'france' : niveau === 'region' ? `reg:${region}` : `dep:${departement}`;
   const enDepartement = niveau === 'departement';
   const seuilRafales = seuilChoisi ?? (enDepartement ? SEUIL_RAFALES_DEPARTEMENT : SEUIL_RAFALES_DEFAUT);
+  // Département : tous les fleuves et les principales rivières (Têt, Tech, Agly pour le 66) ; France et région : les quatre grands fleuves.
+  const densiteFleuves: DensiteFleuves = densiteChoisie ?? (enDepartement ? 'moyen' : 'faible');
   const nombreRafales: NombreRafales = choixRafales ?? (enDepartement ? 'toutes' : '4');
   const maxRafales = maximumRafales(nombreRafales);
   const dateISO = ajouterJours(aujourdhui, jour);
@@ -1650,7 +1653,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               <label className="flex items-center gap-2 pb-1.5 text-sm">
                 <select value={densiteFleuves} onChange={(e) => setDensiteFleuves(e.target.value as DensiteFleuves)} className={selectBarre} aria-label="Densité des fleuves">
                   <option value="faible">Faible (4 grands fleuves)</option>
-                  <option value="moyen">Moyen</option>
+                  <option value="moyen">Moyen (fleuves et rivières en département)</option>
                   <option value="dense">Dense</option>
                 </select>
               </label>
