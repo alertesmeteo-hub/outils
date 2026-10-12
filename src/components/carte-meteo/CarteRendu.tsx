@@ -412,20 +412,20 @@ export default function CarteRendu({
                 <g clipPath={`url(#${idClip})`} opacity={opaciteFleuves}>
                   {(densiteFleuves === 'dense' || (densiteFleuves === 'moyen' && vue.echelle >= 1.2)) && (
                     <>
-                      <path d={fleuves.d3} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 2.4 : 1.8} />
-                      <path d={fleuves.d3} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 1.1 : 0.8} />
+                      <path d={fleuves.d3} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 4 : 1.8} />
+                      <path d={fleuves.d3} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 2.2 : 0.8} />
                     </>
                   )}
                   {densiteFleuves !== 'faible' && (
                     <>
-                      <path d={fleuves.d2} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 3.2 : 2.2} />
-                      <path d={fleuves.d2} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 1.7 : 1.1} />
-                      <path d={fleuves.d1} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 4.4 : 3.2} />
-                      <path d={fleuves.d1} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 2.4 : 1.8} />
+                      <path d={fleuves.d2} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 4.8 : 2.2} />
+                      <path d={fleuves.d2} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 2.8 : 1.1} />
+                      <path d={fleuves.d1} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
+                      <path d={fleuves.d1} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 3.6 : 1.8} />
                     </>
                   )}
-                  <path d={fleuves.d0} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 4.4 : 3.2} />
-                  <path d={fleuves.d0} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 2.4 : 1.8} />
+                  <path d={fleuves.d0} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
+                  <path d={fleuves.d0} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 3.6 : 1.8} />
                 </g>
               </>
             )}
