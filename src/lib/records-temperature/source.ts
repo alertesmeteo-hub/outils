@@ -1,6 +1,6 @@
 import 'server-only';
-import type { DisponibiliteJours, JourRecords } from './types';
-import { estDate, estObjet, jourDepuis, nombre, texte, type Json } from './conversion';
+import type { DisponibiliteJours, JourRecords, MenacesRecords } from './types';
+import { estDate, estObjet, jourDepuis, menacesDepuis, nombre, texte, type Json } from './conversion';
 
 /**
  * Lecture des fichiers publiés par le pipeline alertesmeteo-hub/harmonie-knmi (branche « observations », dossier records_temperature) :
@@ -8,9 +8,12 @@ import { estDate, estObjet, jourDepuis, nombre, texte, type Json } from './conve
  *  - live.json : jour en cours (relevés horaires Météo-France, valeurs provisoires) ;
  *  - provisional/AAAA-MM-JJ.json : jours récents que les données quotidiennes contrôlées ne couvrent pas encore ;
  *  - archive/AAAA-MM.json : mois archivés (2 à 12 Mo), lus une fois puis découpés jour par jour.
+ * Records menacés : menaces.json de la branche records-menaces-data (prévisions de nos modèles comparées aux records, toutes les 3 heures).
  * Aucun appel depuis le navigateur : tout passe par le serveur, avec cache mémoire.
  */
 const BASE = (process.env.RECORDS_TEMPERATURE_URL || 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-knmi/observations/records_temperature').replace(/\/$/, '');
+const BASE_MENACES = (process.env.RECORDS_MENACES_URL || 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-knmi/records-menaces-data').replace(/\/$/, '');
+const TTL_MENACES_MS = 5 * 60_000;
 const DELAI_PETIT_MS = 20_000;
 const DELAI_ARCHIVE_MS = 90_000;
 const TTL_DIRECT_MS = 2 * 60_000;
@@ -24,28 +27,29 @@ const memoire = new Map<string, { a: number; v: unknown }>();
 const enCours = new Map<string, Promise<unknown>>();
 
 /** JSON d'un petit fichier (index, live, jours provisoires) : cache mémoire de quelques minutes, dernière valeur conservée si le réseau échoue. */
-async function lirePetit(chemin: string): Promise<Json | null> {
-  const m = memoire.get(chemin);
-  if (m && Date.now() - m.a < TTL_DIRECT_MS) return m.v as Json | null;
-  let p = enCours.get(chemin) as Promise<Json | null> | undefined;
+async function lirePetit(chemin: string, base = BASE, ttl = TTL_DIRECT_MS): Promise<Json | null> {
+  const cle = `${base}/${chemin}`;
+  const m = memoire.get(cle);
+  if (m && Date.now() - m.a < ttl) return m.v as Json | null;
+  let p = enCours.get(cle) as Promise<Json | null> | undefined;
   if (!p) {
     p = (async () => {
       try {
-        const res = await fetch(`${BASE}/${chemin}`, { cache: 'no-store', signal: AbortSignal.timeout(DELAI_PETIT_MS) });
+        const res = await fetch(cle, { cache: 'no-store', signal: AbortSignal.timeout(DELAI_PETIT_MS) });
         if (res.status === 404) {
-          memoire.set(chemin, { a: Date.now(), v: null });
+          memoire.set(cle, { a: Date.now(), v: null });
           return null;
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const v = await res.json();
         const json = estObjet(v) ? v : null;
-        memoire.set(chemin, { a: Date.now(), v: json });
+        memoire.set(cle, { a: Date.now(), v: json });
         return json;
       } finally {
-        enCours.delete(chemin);
+        enCours.delete(cle);
       }
     })();
-    enCours.set(chemin, p);
+    enCours.set(cle, p);
   }
   try {
     return await p;
@@ -133,4 +137,14 @@ export async function chargerJour(date?: string): Promise<JourRecords | null> {
   }
   const jours = await chargerMois(cible.slice(0, 7));
   return jours?.get(cible) ?? null;
+}
+
+/** Records menacés (prévisions de nos modèles comparées aux records) pour aujourd'hui et les jours suivants ; null si le fichier est absent. */
+export async function chargerMenaces(): Promise<MenacesRecords | null> {
+  const menaces = menacesDepuis(await lirePetit('menaces.json', BASE_MENACES, TTL_MENACES_MS));
+  if (!menaces) return null;
+  // Un fichier ancien (pipeline arrêté) ne doit pas présenter comme « demain » un jour déjà passé : on écarte les jours échus.
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const jours = menaces.jours.filter((j) => j.date >= aujourdhui);
+  return jours.length > 0 ? { ...menaces, jours } : null;
 }

@@ -16,7 +16,23 @@ export interface RecordRef {
   date: string;
 }
 
-/** Station dont la valeur du jour bat un record (`battus`) ou s'en approche à moins de 1 °C (`proches`). */
+/** Prévision d'une station (page « records menacés ») : ce que disent les modèles, après correction d'altitude et du biais récent. */
+export interface PrevisionStation {
+  /** Température prévue par chaque modèle (identifiant du modèle -> °C). */
+  modeles: Record<string, number>;
+  min: number;
+  max: number;
+  /** Nombre de modèles retenus pour cette station. */
+  n: number;
+  /** Correction médiane déjà appliquée aux modèles (°C retranchés, > 0 si les modèles étaient trop chauds). */
+  biais: number;
+}
+
+/**
+ * Station dont la valeur du jour bat un record (`battus`) ou s'en approche à moins de 1 °C (`proches`).
+ * Pour un jour prévu : `battus` = records que la médiane des modèles atteint (« probable »), `proches` = records dont elle est proche
+ * ou qu'un modèle atteint (« possible »), `valeur` = médiane des modèles.
+ */
 export interface Evenement {
   id: string;
   nom: string;
@@ -38,6 +54,8 @@ export interface Evenement {
   ecarts: Partial<Record<Portee, number>>;
   records: Partial<Record<Portee, RecordRef>>;
   provisoire: boolean;
+  /** Présent seulement pour un jour prévu. */
+  prevision?: PrevisionStation;
 }
 
 export interface JourRecords {
@@ -52,8 +70,32 @@ export interface JourRecords {
   /** « 1re quinzaine » ou « 2e quinzaine ». */
   quinzaine: string;
   evenements: Evenement[];
-  /** Nombre de stations avec une valeur ce jour-là. */
+  /** Nombre de stations avec une valeur ce jour-là (ou, pour un jour prévu, avec une prévision). */
   stations: number;
+  /** Jour prévu par nos modèles (records menacés) et non mesuré. */
+  prevision?: boolean;
+  /** Incertitude (°C) retenue pour une prévision de ce jour : sépare « probable » de « possible ». */
+  sigma?: number;
+}
+
+export interface ModelePrevision {
+  id: string;
+  nom: string;
+  /** Premier et dernier échantillons de la prévision lue (ISO UTC). */
+  debut: string | null;
+  fin: string | null;
+  genere: string | null;
+}
+
+/** Records menacés les prochains jours : prévisions de nos modèles comparées aux records à battre (fichier menaces.json du pipeline). */
+export interface MenacesRecords {
+  /** Instant de génération du fichier (ISO UTC). */
+  genere: string | null;
+  modeles: ModelePrevision[];
+  /** Jours prévus, du plus proche au plus lointain. */
+  jours: JourRecords[];
+  /** Jours d'écarts prévu − mesuré pris en compte pour corriger les modèles (0 = prévisions brutes). */
+  joursDeCorrection: number;
 }
 
 export interface DisponibiliteJours {

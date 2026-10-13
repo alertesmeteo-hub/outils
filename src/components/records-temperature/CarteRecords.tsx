@@ -74,10 +74,10 @@ interface Props {
   sousTitre: string;
 }
 
-function Marqueur({ e, x, y, r, choisie }: { e: Evenement; x: number; y: number; r: number; choisie: boolean }) {
+function Marqueur({ e, x, y, r, choisie, prevision }: { e: Evenement; x: number; y: number; r: number; choisie: boolean; prevision: boolean }) {
   const c = categorie(e);
   const couleur = teinte(e.famille, c);
-  const nom = `${e.nom} (${e.dep}) : ${degresCourt(e.valeur)} — ${libelle(e)}`;
+  const nom = `${e.nom} (${e.dep}) : ${degresCourt(e.valeur)}${prevision ? ' prévus' : ''} — ${libelle(e, prevision)}`;
   let forme;
   if (c === 'absolu') {
     const t = r * 1.55;
@@ -167,7 +167,8 @@ const CarteRecords = forwardRef<HTMLDivElement, Props>(function CarteRecords({ e
 
   const compteurs = useMemo(() => compter(evenements), [evenements]);
   const proches = compteurs.heat.proches + compteurs.cold.proches + compteurs.tropical.proches;
-  const heure = jour?.provisoire ? heureParis(jour.derniereObservation) : null;
+  const prevision = jour?.prevision === true;
+  const heure = jour?.provisoire && !prevision ? heureParis(jour.derniereObservation) : null;
 
   const tailleTexte = 11 * Math.min(1.5, k);
 
@@ -176,7 +177,7 @@ const CarteRecords = forwardRef<HTMLDivElement, Props>(function CarteRecords({ e
       <div
         ref={ref}
         role="img"
-        aria-label={jour ? `Carte des records de température du ${dateLongue(jour.date)} : ${points.length} station${points.length > 1 ? 's' : ''}` : 'Carte des records de température'}
+        aria-label={jour ? `Carte des records de température ${prevision ? 'menacés' : ''} du ${dateLongue(jour.date)} : ${points.length} station${points.length > 1 ? 's' : ''}`.replace('  ', ' ') : 'Carte des records de température'}
         style={{
           position: 'relative',
           width: largeur,
@@ -206,7 +207,7 @@ const CarteRecords = forwardRef<HTMLDivElement, Props>(function CarteRecords({ e
                 onSelection(`${p.e.famille}:${p.e.id}`);
               }}
             >
-              <Marqueur e={p.e} x={p.x} y={p.y} r={p.r} choisie={selection === `${p.e.famille}:${p.e.id}`} />
+              <Marqueur e={p.e} x={p.x} y={p.y} r={p.r} choisie={selection === `${p.e.famille}:${p.e.id}`} prevision={prevision} />
             </g>
           ))}
           {points.map((p) =>
@@ -233,11 +234,11 @@ const CarteRecords = forwardRef<HTMLDivElement, Props>(function CarteRecords({ e
 
         {/* Titre */}
         <div style={{ position: 'absolute', top: 12, left: compact ? 10 : 18, maxWidth: 420, padding: '8px 14px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.93)', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.1em', color: '#b3261e' }}>RECORDS DE TEMPÉRATURE EN DIRECT</div>
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.1em', color: '#b3261e' }}>{prevision ? 'RECORDS DE TEMPÉRATURE MENACÉS' : 'RECORDS DE TEMPÉRATURE EN DIRECT'}</div>
           <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.15, color: '#0b2e59' }}>{jour ? majuscule(dateLongue(jour.date)) : '—'}</div>
           <div style={{ fontSize: 12.5, color: '#334155' }}>
             {sousTitre}
-            {jour?.provisoire ? ` · valeurs provisoires${heure ? ` à ${heure}` : ''}` : jour ? ' · données contrôlées' : ''}
+            {prevision ? ' · prévision de nos modèles' : jour?.provisoire ? ` · valeurs provisoires${heure ? ` à ${heure}` : ''}` : jour ? ' · données contrôlées' : ''}
           </div>
         </div>
 
@@ -252,9 +253,11 @@ const CarteRecords = forwardRef<HTMLDivElement, Props>(function CarteRecords({ e
               <div style={{ fontSize: 11, fontWeight: 700, color: '#475569' }}>{nom}</div>
               <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.05, color: COULEURS[f].absolu }}>{compteurs[f].records}</div>
               <div style={{ fontSize: 10.5, color: '#475569' }}>
-                record{compteurs[f].records > 1 ? 's' : ''} battu{compteurs[f].records > 1 ? 's' : ''}
+                {prevision
+                  ? `record${compteurs[f].records > 1 ? 's' : ''} probable${compteurs[f].records > 1 ? 's' : ''}`
+                  : `record${compteurs[f].records > 1 ? 's' : ''} battu${compteurs[f].records > 1 ? 's' : ''}`}
               </div>
-              <div style={{ fontSize: 10.5, color: '#475569' }}>{compteurs[f].proches} à 1 °C</div>
+              <div style={{ fontSize: 10.5, color: '#475569' }}>{prevision ? `${compteurs[f].proches} possible${compteurs[f].proches > 1 ? 's' : ''}` : `${compteurs[f].proches} à 1 °C`}</div>
             </div>
           ))}
         </div>
@@ -262,19 +265,19 @@ const CarteRecords = forwardRef<HTMLDivElement, Props>(function CarteRecords({ e
         {/* Légende */}
         {compact ? (
           <div style={{ position: 'absolute', left: 10, right: 10, bottom: 30, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px 12px', padding: '5px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.93)', boxShadow: '0 2px 8px rgba(0,0,0,0.25)', fontSize: 11.5, color: '#1f2937' }}>
-            <span style={{ fontWeight: 800 }}>Records battus :</span>
+            <span style={{ fontWeight: 800 }}>{prevision ? 'Records probables :' : 'Records battus :'}</span>
             <span>◆ absolu</span>
             <span>● du mois</span>
             <span>● quinzaine</span>
             <span>• du jour</span>
-            <span>○ à 1 °C</span>
+            <span>{prevision ? '○ possible' : '○ à 1 °C'}</span>
             <span style={{ fontWeight: 700, color: COULEURS.heat.mensuel }}>● chaleur</span>
             <span style={{ fontWeight: 700, color: COULEURS.cold.mensuel }}>● froid</span>
             <span style={{ fontWeight: 700, color: COULEURS.tropical.mensuel }}>● nuit tropicale</span>
           </div>
         ) : (
         <div style={{ position: 'absolute', left: 18, bottom: 34, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.93)', boxShadow: '0 2px 8px rgba(0,0,0,0.25)', fontSize: 12, color: '#1f2937', lineHeight: 1.55 }}>
-          <div style={{ fontWeight: 800, marginBottom: 2 }}>Records battus</div>
+          <div style={{ fontWeight: 800, marginBottom: 2 }}>{prevision ? 'Records probables' : 'Records battus'}</div>
           {(
             [
               ['absolu', 'Absolu'],
@@ -298,7 +301,7 @@ const CarteRecords = forwardRef<HTMLDivElement, Props>(function CarteRecords({ e
             <svg width={18} height={14} aria-hidden>
               <circle cx={9} cy={7} r={4.5} fill="#fff" stroke="#374151" strokeWidth={2} />
             </svg>
-            À 1 °C d’un record
+            {prevision ? 'Record possible' : 'À 1 °C d’un record'}
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 4, fontWeight: 700 }}>
             <span style={{ color: COULEURS.heat.mensuel }}>● Chaleur</span>
@@ -312,7 +315,11 @@ const CarteRecords = forwardRef<HTMLDivElement, Props>(function CarteRecords({ e
         {/* Pied */}
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 24, padding: '0 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15,23,42,0.82)', color: '#e2e8f0', fontSize: 11.5 }}>
           <span style={{ fontWeight: 700 }}>www.alertes-meteo.com</span>
-          <span>Source : Météo-France, Licence Ouverte Etalab 2.0 · records depuis le début des mesures de chaque station</span>
+          <span>
+            {prevision
+              ? 'Prévisions AROME, ARPEGE, ICON, CEP · records Météo-France (Licence Ouverte Etalab 2.0) depuis le début des mesures de chaque station'
+              : 'Source : Météo-France, Licence Ouverte Etalab 2.0 · records depuis le début des mesures de chaque station'}
+          </span>
         </div>
       </div>
     </div>

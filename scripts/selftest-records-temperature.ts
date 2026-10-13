@@ -1,8 +1,8 @@
 /** Tests de /outils/records-temperature : catégories, libellés, filtres, tris, conversion des fichiers du pipeline, zones. */
-import { estDate, evenementDepuis, jourDepuis } from '../src/lib/records-temperature/conversion';
+import { estDate, evenementDepuis, jourDepuis, menacesDepuis } from '../src/lib/records-temperature/conversion';
 import {
-  ajouterJours, anneesEntre, ancienneteRecord, categorie, categories, compter, dateCourte, dateLongue, degres, degresCourt, estEgale, filtrer,
-  FILTRES_PAR_DEFAUT, heureParis, libelle, majuscule, normaliser, porteePrincipale, synthese, trier,
+  ajouterJours, ANNEES_SERIE_LONGUE, anneesEntre, ancienneteRecord, categorie, categories, compter, dateCourte, dateLongue, degres, degresCourt, ecartAuRecord,
+  detailProbables, estEgale, filtrer, FILTRES_PAR_DEFAUT, heureParis, libelle, majuscule, niveau, normaliser, porteeAffichee, porteePrincipale, synthese, syntheseMenaces, trier,
 } from '../src/lib/records-temperature/logique';
 import type { Categorie, Evenement } from '../src/lib/records-temperature/types';
 import { contoursDeDep, depDeContour, DEPARTEMENTS, nomDepartement, regionDeDep, REGIONS } from '../src/lib/records-temperature/zones';
@@ -101,6 +101,53 @@ eq('régions : 13 régions métropolitaines dont la Corse', REGIONS.length === 1
 eq('départements : 95 codes, Corse = 20', DEPARTEMENTS.length === 95 && DEPARTEMENTS.some((d) => d.code === '20') && !DEPARTEMENTS.some((d) => d.code === '2A') && !DEPARTEMENTS.some((d) => d.code === '99'), String(DEPARTEMENTS.length));
 eq('région d’un département', regionDeDep('66') === 'Occitanie' && regionDeDep('20') === 'Corse' && regionDeDep('75') === 'Île-de-France');
 eq('nom d’un département', nomDepartement('66') === 'Pyrénées-Orientales' && nomDepartement('20') === 'Corse');
+
+
+// --- Records menacés (prévisions de nos modèles comparées aux records) ---
+const prevu = (p: Partial<Evenement> & Pick<Evenement, 'famille'>) => evt({ provisoire: true, ...p });
+eq('libellé prévu : record du mois probable', libelle(prevu({ famille: 'cold', battus: ['monthly', 'daily'], ecarts: { monthly: -0.3 } }), true) === 'Record de froid du mois probable', libelle(prevu({ famille: 'cold', battus: ['monthly'] }), true));
+eq('libellé prévu : record absolu probable (égalité comprise)', libelle(prevu({ famille: 'heat', battus: ['absolute'], ecarts: { absolute: 0 } }), true) === 'Record absolu de chaleur probable');
+eq('libellé prévu : record du jour possible', libelle(prevu({ famille: 'heat', proches: ['daily'] }), true) === 'Record de chaleur du jour possible');
+eq('libellé prévu : record absolu possible', libelle(prevu({ famille: 'tropical', proches: ['absolute'] }), true) === 'Record absolu de nuit chaude possible');
+eq('libellé observé inchangé', libelle(prevu({ famille: 'heat', proches: ['daily'] })) === 'À 1 °C du record du jour');
+eq('niveau : probable si un record est atteint, sinon possible', niveau({ battus: ['daily'] }) === 'probable' && niveau({ battus: [] }) === 'possible');
+eq('période affichée : la plus forte battue, sinon la première proche', porteeAffichee({ battus: ['daily', 'monthly'], proches: [] }) === 'monthly' && porteeAffichee({ battus: [], proches: ['daily', 'monthly'] }) === 'monthly' && porteeAffichee({ battus: [], proches: [] }) === null);
+eq('écart au record : dépassé, atteint, à x °C', ecartAuRecord({ battus: ['daily'], proches: [], ecarts: { daily: -1.24 } }) === 'dépasse le record de 1,2°C'
+  && ecartAuRecord({ battus: ['daily'], proches: [], ecarts: { daily: 0 } }) === 'atteint le record'
+  && ecartAuRecord({ battus: [], proches: ['monthly'], ecarts: { monthly: 0.84 } }) === 'à 0,8°C du record'
+  && ecartAuRecord({ battus: [], proches: [], ecarts: {} }) === null);
+eq('série longue : 30 ans', ANNEES_SERIE_LONGUE === 30);
+
+const brutMenace = {
+  id: '66136001', name: 'PERPIGNAN', lat: 42.74, lon: 2.87, altitude: 42, opening_year: 1924, principal: true, department_code: '66', value: 5.1, kind: 'cold',
+  flags: ['daily'], near: ['monthly'], records: { monthly: { value: 4.6, date: '1974-10-28' }, daily: { value: 5.2, date: '1993-10-14' } }, deltas: { monthly: 0.5, daily: -0.1 }, provisional: true,
+  forecast: { models: { arome: 4.9, arpege: 5.4, icon: 'x', cep: 5.0 }, min: 4.9, max: 5.4, n: 3, bias: 0.6 },
+};
+const ep = evenementDepuis(brutMenace, 'cold');
+eq('prévision : modèles, fourchette et correction lus', !!ep && ep.prevision?.n === 3 && ep.prevision.min === 4.9 && ep.prevision.max === 5.4 && ep.prevision.biais === 0.6 && Object.keys(ep.prevision.modeles).join() === 'arome,arpege,cep', JSON.stringify(ep?.prevision));
+eq('prévision : bloc absent ou incohérent ignoré', evenementDepuis({ ...brutMenace, forecast: undefined }, 'cold')?.prevision === undefined && evenementDepuis({ ...brutMenace, forecast: { models: {}, min: 1, max: 2, n: 1 } }, 'cold')?.prevision === undefined && evenementDepuis({ ...brutMenace, forecast: { models: { a: 1 }, min: 'x', max: 2, n: 1 } }, 'cold')?.prevision === undefined);
+
+const brutJour = (date: string, extra: object = {}) => ({ date, provisional: true, source: 'Prévisions', fortnight_label: '1re quinzaine', stations_with_values: 1800, events: { heat: [], cold: [brutMenace], tropical: [] }, ...extra });
+const m = menacesDepuis({
+  generated_at: '2026-10-13T08:23:41Z', models: [{ id: 'arome', nom: 'AROME', debut: '2026-10-13T03:00:00Z', fin: '2026-10-15T03:00:00Z', genere: '2026-10-13T06:03:00Z' }, { id: 'x' }, 'pas un modèle'],
+  correction: { jours: 2 }, days: { '2026-10-15': brutJour('2026-10-15', { sigma: 2 }), '2026-10-14': brutJour('2026-10-14', { sigma: 1.8 }), '2026-10-16': { events: {} } },
+});
+eq('menaces : jours triés, prévus et provisoires', !!m && m.jours.map((j) => j.date).join() === '2026-10-14,2026-10-15' && m.jours.every((j) => j.prevision === true && j.provisoire), JSON.stringify(m?.jours.map((j) => j.date)));
+eq('menaces : incertitude, modèles et correction', !!m && m.jours[0].sigma === 1.8 && m.jours[1].sigma === 2 && m.modeles.length === 1 && m.modeles[0].nom === 'AROME' && m.joursDeCorrection === 2 && m.genere === '2026-10-13T08:23:41Z');
+eq('menaces : événements des jours convertis', !!m && m.jours[0].evenements.length === 1 && m.jours[0].evenements[0].prevision?.n === 3);
+eq('menaces : fichier vide ou invalide refusé', menacesDepuis(null) === null && menacesDepuis({ days: {} }) === null && menacesDepuis({ days: { a: { events: {} } } }) === null && menacesDepuis('x') === null);
+
+const jourPrevu = { date: '2026-10-14', provisoire: true, prevision: true, source: 't', genere: null, derniereObservation: null, quinzaine: '1re quinzaine', stations: 1800, evenements: [
+  prevu({ famille: 'cold', id: 'a', battus: ['daily'] }), prevu({ famille: 'cold', id: 'b', battus: ['monthly'] }), prevu({ famille: 'heat', id: 'c', battus: ['daily'] }), prevu({ famille: 'cold', id: 'd', proches: ['daily'] }), prevu({ famille: 'cold', id: 'e', proches: ['daily'] }),
+] };
+eq('synthèse prévue : probables par famille et autres stations possibles', syntheseMenaces(jourPrevu) === 'Le mercredi 14 octobre 2026 : 1 station de chaleur et 2 stations de froid devraient battre un record de température (prévision des modèles). Les plus marquants : 1 record du mois. 2 autres stations pourraient en battre un.', syntheseMenaces(jourPrevu));
+eq('détail des probables : records du mois et de la quinzaine, jamais celui du jour', detailProbables([prevu({ famille: 'heat', id: 'a', battus: ['monthly', 'daily'] }), prevu({ famille: 'heat', id: 'b', battus: ['fortnight'] }), prevu({ famille: 'cold', id: 'c', battus: ['fortnight', 'daily'] }), prevu({ famille: 'cold', id: 'd', battus: ['daily'] }), prevu({ famille: 'cold', id: 'e', proches: ['monthly'] })]) === '1 record du mois, 2 de la quinzaine', String(detailProbables([prevu({ famille: 'heat', id: 'b', battus: ['fortnight'] })])));
+eq('détail des probables : seulement la quinzaine, ou rien', detailProbables([prevu({ famille: 'heat', id: 'b', battus: ['fortnight'] }), prevu({ famille: 'heat', id: 'c', battus: ['fortnight'] })]) === '2 records de la quinzaine' && detailProbables([prevu({ famille: 'heat', id: 'd', battus: ['daily'] })]) === null && detailProbables([prevu({ famille: 'heat', id: 'x', battus: ['absolute', 'daily'] })]) === '1 record absolu');
+eq('synthèse prévue : périmètre et records marquants', syntheseMenaces({ ...jourPrevu, evenements: [prevu({ famille: 'heat', id: 'a', battus: ['monthly'] }), prevu({ famille: 'heat', id: 'b', battus: ['daily'] })] }, undefined, 'Occitanie, stations de 30 ans de mesures et plus') === 'Le mercredi 14 octobre 2026 (Occitanie, stations de 30 ans de mesures et plus) : 2 stations de chaleur devraient battre un record de température (prévision des modèles). Les plus marquants : 1 record du mois.');
+eq('synthèse prévue : un seul record', syntheseMenaces({ ...jourPrevu, evenements: [prevu({ famille: 'tropical', id: 'f', battus: ['daily'] })] }) === 'Le mercredi 14 octobre 2026 : 1 nuit tropicale devrait battre un record de température (prévision des modèles).');
+eq('synthèse prévue : seulement des records possibles', syntheseMenaces({ ...jourPrevu, evenements: [prevu({ famille: 'cold', id: 'g', proches: ['daily'] })] }) === 'Le mercredi 14 octobre 2026, les modèles n’annoncent pas de record avec assez de certitude ; 1 station pourrait pourtant en battre un.');
+eq('synthèse prévue : rien', syntheseMenaces({ ...jourPrevu, evenements: [] }) === 'Le mercredi 14 octobre 2026, les modèles n’annoncent aucun record de température.');
+eq('filtre des séries longues : ouverture avant 1996 en 2026', filtrer([prevu({ famille: 'cold', id: 'h', ouverture: 1990, proches: ['daily'] }), prevu({ famille: 'cold', id: 'i', ouverture: 2010, proches: ['daily'] }), prevu({ famille: 'cold', id: 'j', ouverture: null, proches: ['daily'] })], { ...FILTRES_PAR_DEFAUT, ouvertureMax: 2026 - ANNEES_SERIE_LONGUE }).map((x) => x.id).join() === 'h');
 
 if (fail) { console.error(`\n${fail} test(s) en échec`); process.exit(1); }
 console.log('\nrecords-temperature : tous les tests passent');

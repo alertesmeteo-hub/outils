@@ -1,5 +1,5 @@
 import { prettyStationName } from '../obs/meteofrance';
-import type { Evenement, Famille, JourRecords, Portee, PorteeProche, RecordRef } from './types';
+import type { Evenement, Famille, JourRecords, MenacesRecords, ModelePrevision, Portee, PorteeProche, PrevisionStation, RecordRef } from './types';
 import { regionDeDep } from './zones';
 
 /** Conversion des fichiers du pipeline (JSON publiés par harmonie-knmi) vers les types de la page : fonctions pures, testées. */
@@ -18,6 +18,23 @@ function recordRef(v: unknown): RecordRef | null {
   const value = nombre(v.value);
   const date = texte(v.date);
   return value !== null && date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? { value, date } : null;
+}
+
+/** Bloc `forecast` d'un événement prévu (modèles, fourchette, correction appliquée) ; undefined s'il manque ou est incohérent. */
+function previsionDepuis(f: unknown): PrevisionStation | undefined {
+  if (!estObjet(f)) return undefined;
+  const modeles: Record<string, number> = {};
+  if (estObjet(f.models)) {
+    for (const [id, v] of Object.entries(f.models)) {
+      const t = nombre(v);
+      if (t !== null) modeles[id] = t;
+    }
+  }
+  const min = nombre(f.min);
+  const max = nombre(f.max);
+  const n = nombre(f.n);
+  if (min === null || max === null || n === null || Object.keys(modeles).length === 0) return undefined;
+  return { modeles, min, max, n, biais: nombre(f.bias) ?? 0 };
 }
 
 export function evenementDepuis(b: unknown, famille: Famille): Evenement | null {
@@ -41,6 +58,7 @@ export function evenementDepuis(b: unknown, famille: Famille): Evenement | null 
     if (ecart !== null) ecarts[p] = ecart;
   }
   const dep = texte(b.department_code) ?? id.slice(0, 2);
+  const prevision = previsionDepuis(b.forecast);
   return {
     id,
     nom: prettyStationName(texte(b.name) ?? id),
@@ -58,6 +76,7 @@ export function evenementDepuis(b: unknown, famille: Famille): Evenement | null 
     ecarts,
     records,
     provisoire: b.provisional === true,
+    ...(prevision ? { prevision } : {}),
   };
 }
 
@@ -94,3 +113,25 @@ export const estDate = (s: string) => {
   return Number(m[1]) >= 1900 && d.toISOString().slice(0, 10) === s;
 };
 
+
+/** Fichier menaces.json du pipeline (prévisions de nos modèles comparées aux records) -> MenacesRecords ; null s'il ne contient aucun jour exploitable. */
+export function menacesDepuis(brut: unknown): MenacesRecords | null {
+  if (!estObjet(brut) || !estObjet(brut.days)) return null;
+  const jours: JourRecords[] = [];
+  for (const d of Object.values(brut.days)) {
+    const j = jourDepuis(d, brut);
+    if (!j) continue;
+    const sigma = estObjet(d) ? nombre(d.sigma) : null;
+    jours.push({ ...j, provisoire: true, prevision: true, ...(sigma !== null ? { sigma } : {}) });
+  }
+  if (jours.length === 0) return null;
+  jours.sort((a, b) => a.date.localeCompare(b.date));
+  const modeles: ModelePrevision[] = (Array.isArray(brut.models) ? brut.models : []).flatMap((m): ModelePrevision[] => {
+    if (!estObjet(m)) return [];
+    const id = texte(m.id);
+    const nom = texte(m.nom);
+    return id && nom ? [{ id, nom, debut: texte(m.debut), fin: texte(m.fin), genere: texte(m.genere) }] : [];
+  });
+  const correction = estObjet(brut.correction) ? brut.correction : {};
+  return { genere: texte(brut.generated_at), modeles, jours, joursDeCorrection: nombre(correction.jours) ?? 0 };
+}

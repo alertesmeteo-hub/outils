@@ -64,15 +64,47 @@ const PERIODE: Record<Portee, string> = { absolute: 'absolu', monthly: 'du mois'
 const PERIODE_PROCHE: Record<PorteeProche, string> = { absolute: 'absolu', monthly: 'du mois', daily: 'du jour' };
 const NATURE: Record<Famille, string> = { heat: 'de chaleur', cold: 'de froid', tropical: 'de nuit chaude' };
 
-/** « Record de chaleur du mois battu », « Record absolu de froid égalé », « À 1 °C du record du jour »… */
-export function libelle(e: Pick<Evenement, 'famille' | 'battus' | 'proches' | 'ecarts'>): string {
+/**
+ * « Record de chaleur du mois battu », « Record absolu de froid égalé », « À 1 °C du record du jour »…
+ * Pour un jour prévu (`prevision`) : « Record de chaleur du mois probable », « Record du jour de froid possible »…
+ */
+export function libelle(e: Pick<Evenement, 'famille' | 'battus' | 'proches' | 'ecarts'>, prevision = false): string {
   const portee = porteePrincipale(e);
   if (portee) {
     const sujet = portee === 'absolute' ? `Record absolu ${NATURE[e.famille]}` : `Record ${NATURE[e.famille]} ${PERIODE[portee]}`;
-    return `${sujet} ${estEgale(e) ? 'égalé' : 'battu'}`;
+    return prevision ? `${sujet} probable` : `${sujet} ${estEgale(e) ? 'égalé' : 'battu'}`;
   }
   const proche = PORTEES_PROCHES.find((p) => e.proches.includes(p.portee));
+  if (prevision) {
+    if (!proche) return 'Record possible';
+    return proche.portee === 'absolute' ? `Record absolu ${NATURE[e.famille]} possible` : `Record ${NATURE[e.famille]} ${PERIODE_PROCHE[proche.portee]} possible`;
+  }
   return proche ? `À 1 °C du record ${PERIODE_PROCHE[proche.portee]}` : 'À proximité d’un record';
+}
+
+/** Records menacés : « probable » quand la médiane des modèles atteint un record, « possible » quand elle en est proche ou qu'un modèle l'atteint. */
+export type Niveau = 'probable' | 'possible';
+export const niveau = (e: Pick<Evenement, 'battus'>): Niveau => (e.battus.length > 0 ? 'probable' : 'possible');
+
+/** Seuil des séries « longues » (années de mesures) : en dessous, les records de la station n'ont guère de portée. */
+export const ANNEES_SERIE_LONGUE = 30;
+
+/** Période affichée d'un événement : la plus forte période dont le record est atteint, sinon la première période proche (absolu, mois, jour). */
+export function porteeAffichee(e: Pick<Evenement, 'battus' | 'proches'>): Portee | null {
+  const principale = porteePrincipale(e);
+  if (principale) return principale;
+  for (const { portee } of PORTEES_PROCHES) if (e.proches.includes(portee)) return portee;
+  return null;
+}
+
+/** « dépasse le record de 1,2°C », « atteint le record », « à 0,8°C du record » : valeur (ou prévision) par rapport au record de la période affichée. */
+export function ecartAuRecord(e: Pick<Evenement, 'battus' | 'proches' | 'ecarts'>): string | null {
+  const portee = porteeAffichee(e);
+  const ecart = portee ? e.ecarts[portee] : undefined;
+  if (ecart === undefined) return null;
+  const v = Math.abs(ecart).toFixed(1).replace('.', ',');
+  if (ecart <= 0) return Math.abs(ecart) < 0.05 ? 'atteint le record' : `dépasse le record de ${v}°C`;
+  return `à ${v}°C du record`;
 }
 
 /** Nombre d'années entre la date d'un record et celle du jour (dates AAAA-MM-JJ) ; null si une date est invalide. */
@@ -216,6 +248,45 @@ export function heureParis(iso: string | null): string | null {
   const h = p.find((x) => x.type === 'hour')?.value ?? '00';
   const mn = p.find((x) => x.type === 'minute')?.value ?? '00';
   return `${h} h ${mn}`;
+}
+
+/** « 1 record du mois, 15 de la quinzaine » : records probables les plus marquants (le record du jour n'est pas détaillé), ou null s'il n'y en a pas. */
+export function detailProbables(evenements: readonly Evenement[]): string | null {
+  const n = { absolu: 0, mensuel: 0, quinzaine: 0 };
+  for (const e of evenements) {
+    const c = categorie(e);
+    if (e.battus.length > 0 && (c === 'absolu' || c === 'mensuel' || c === 'quinzaine')) n[c] += 1;
+  }
+  const morceaux: string[] = [];
+  if (n.absolu) morceaux.push(`${n.absolu} record${n.absolu > 1 ? 's' : ''} absolu${n.absolu > 1 ? 's' : ''}`);
+  if (n.mensuel) morceaux.push(`${n.mensuel} record${n.mensuel > 1 ? 's' : ''} du mois`);
+  if (n.quinzaine) morceaux.push(morceaux.length ? `${n.quinzaine} de la quinzaine` : `${n.quinzaine} record${n.quinzaine > 1 ? 's' : ''} de la quinzaine`);
+  return morceaux.length ? morceaux.join(', ') : null;
+}
+
+/**
+ * Phrase de synthèse d'un jour prévu (records menacés). `precision` : périmètre des stations comptées (« stations de 30 ans de mesures et plus, Occitanie »),
+ * écrit entre parenthèses après la date.
+ */
+export function syntheseMenaces(jour: JourRecords, c: Record<Famille, Compteur> = compter(jour.evenements), precision = ''): string {
+  const part = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? plusieurs : un}`;
+  const morceaux: string[] = [];
+  if (c.heat.records) morceaux.push(part(c.heat.records, 'station de chaleur', 'stations de chaleur'));
+  if (c.cold.records) morceaux.push(part(c.cold.records, 'station de froid', 'stations de froid'));
+  if (c.tropical.records) morceaux.push(part(c.tropical.records, 'nuit tropicale', 'nuits tropicales'));
+  const total = c.heat.records + c.cold.records + c.tropical.records;
+  const possibles = c.heat.proches + c.cold.proches + c.tropical.proches;
+  const debut = `Le ${dateLongue(jour.date)}${precision ? ` (${precision})` : ''}`;
+  if (total === 0) {
+    return possibles
+      ? `${debut}, les modèles n’annoncent pas de record avec assez de certitude ; ${part(possibles, 'station pourrait', 'stations pourraient')} pourtant en battre un.`
+      : `${debut}, les modèles n’annoncent aucun record de température.`;
+  }
+  const liste = morceaux.length > 1 ? `${morceaux.slice(0, -1).join(', ')} et ${morceaux[morceaux.length - 1]}` : morceaux[0];
+  const autres = possibles ? ` ${part(possibles, 'autre station pourrait', 'autres stations pourraient')} en battre un.` : '';
+  const marquants = detailProbables(jour.evenements);
+  const detail = marquants ? ` Les plus marquants : ${marquants}.` : '';
+  return `${debut} : ${liste} ${total > 1 ? 'devraient' : 'devrait'} battre un record de température (prévision des modèles).${detail}${autres}`;
 }
 
 /** Phrase de synthèse d'un jour (page et texte alternatif de la carte). */
