@@ -57,10 +57,12 @@ export async function GET(req: Request) {
       for (const theme of THEMES_BILAN) {
         if (theme.mois) {
           const valeurs = mois?.valeurs[theme.mois];
+          // Carte « de plaine » : stations d'altitude connue jusqu'à theme.altMax.
+          const garder = (id: string) => theme.altMax == null || ((alt) => alt != null && alt <= theme.altMax!)(stations[indice.get(id) ?? -1]?.alt);
           cartes[theme.id] = {
             // Écarts : la référence est donnée avec la période (« octobre 2026 · normales 1991-2020 »).
             fenetre: mois ? `${mois.periode}${theme.mois.startsWith('n') ? ' · normales 1991-2020' : ''}` : '',
-            valeurs: valeurs ? [...valeurs].map(([id, v]) => [indice.get(id)!, Math.round(v * 10) / 10] as [number, number]).filter(([i]) => i != null) : [],
+            valeurs: valeurs ? [...valeurs].filter(([id]) => garder(id)).map(([id, v]) => [indice.get(id)!, Math.round(v * 10) / 10] as [number, number]).filter(([i]) => i != null) : [],
           };
           continue;
         }

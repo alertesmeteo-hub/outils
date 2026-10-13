@@ -65,6 +65,8 @@ export interface ThemeBilan extends ThemeInfo {
   classement: string;
   /** Bilan du mois (températures, pluie, ensoleillement, vent, écarts aux normales), lu dans l'archive du VPS (voir extremes-mois.ts). */
   mois?: CleMois;
+  /** Stations retenues jusqu'à cette altitude (m) : carte « de plaine », sans les stations de montagne. */
+  altMax?: number;
 }
 
 const p = (min: number, fond: string, texte: string, libelle: string, neutre = false): Palier => ({ min, fond, texte, libelle, neutre });
@@ -274,6 +276,7 @@ export const THEMES_BILAN: ThemeBilan[] = [
   // Bilan du mois : la période (« OCTOBRE 2026 », « DU 1ER AU 13 OCTOBRE 2026 ») est le sous-titre de chaque carte.
   { id: 'tx-mois', groupe: 'Bilan du mois', classement: '', mois: 'tx', titre: 'TEMPÉRATURE MAXIMALE LA PLUS HAUTE', court: 'Maxi la plus haute', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-mois', groupe: 'Bilan du mois', classement: '', mois: 'tn', titre: 'TEMPÉRATURE MINIMALE LA PLUS BASSE', court: 'Mini la plus basse', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'tn-plaine-mois', groupe: 'Bilan du mois', classement: '', mois: 'tn', altMax: 200, titre: 'MINIMALE LA PLUS BASSE EN PLAINE (200 M MAXI)', court: 'Mini la plus basse (plaine 200 m)', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 'txm-mois', groupe: 'Bilan du mois', classement: '', mois: 'txm', titre: 'MOYENNE DES MAXIMALES', court: 'Moyenne des maxi', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tnm-mois', groupe: 'Bilan du mois', classement: '', mois: 'tnm', titre: 'MOYENNE DES MINIMALES', court: 'Moyenne des mini', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 'ntx-mois', groupe: 'Bilan du mois', classement: '', mois: 'ntx', titre: 'MAXIMALES : ÉCART À LA NORMALE', court: 'Écart des maxi', unite: '°', decimales: 1, paliers: PALIERS_ECART_MOIS, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
