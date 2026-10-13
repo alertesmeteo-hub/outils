@@ -191,17 +191,18 @@ body {
 .cmap-valeur-ligne { display: flex; align-items: flex-start; }
 
 /* France « Moyen » : style de la carte de référence. Picto centré sur le point, température « 15° » en gras au-dessus,
-   un peu à droite (CAPTURE_FRANCE et dispositionFixe dans CarteMeteo.tsx). */
+   un peu à droite (CAPTURE_FRANCE et dispositionFixe dans CarteMeteo.tsx). Pictos et températures 30 % plus grands que la
+   référence (ECHELLE_CAPTURE_FRANCE dans CarteMeteo.tsx). */
 .cmap-capture .cmap-ligne { display: block; position: relative; }
-.cmap-capture .cmap-picto { font-size: 1.13em; display: block; }
-.cmap-capture .cmap-ligne .cmap-picto-image { width: 1.13em; height: 1.13em; }
+.cmap-capture .cmap-picto { font-size: calc(1.13em * 1.3); display: block; }
+.cmap-capture .cmap-ligne .cmap-picto-image { width: calc(1.13em * 1.3); height: calc(1.13em * 1.3); }
 .cmap-capture .cmap-valeurs,
-.cmap-capture .cmap-ligne-simple .cmap-valeurs { position: absolute; left: calc(50% - 0.18em); bottom: calc(100% - 0.27em); margin: 0; align-self: auto; z-index: 1; }
+.cmap-capture .cmap-ligne-simple .cmap-valeurs { position: absolute; left: calc(50% - 0.18em * 1.3); bottom: calc(100% - 0.27em * 1.3); margin: 0; align-self: auto; z-index: 1; }
 .cmap-capture .cmap-valeur,
 .cmap-capture .cmap-ligne-simple .cmap-valeur {
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 700;
-  font-size: 0.72em;
+  font-size: calc(0.72em * 1.3);
   color: #222;
   text-align: right;
   height: 1em;
@@ -224,6 +225,7 @@ body {
 .cmap-local .cmap-degre.cmap-chaud { color: #e5191e; }
 .cmap-local .cmap-degre.cmap-froid { color: #1f6fe0; }
 /* Plus chaud en rouge, plus froid en bleu (et maxi / mini) : plus spécifique que la couleur noire ci-dessus. */
+.cmap-capture .cmap-degre { font-size: calc(0.72em * 1.3); }
 .cmap-capture .cmap-valeur.cmap-chaud, .cmap-capture .cmap-ligne-simple .cmap-valeur.cmap-chaud, .cmap-capture .cmap-degre.cmap-chaud { color: #e5191e; }
 .cmap-capture .cmap-valeur.cmap-froid, .cmap-capture .cmap-ligne-simple .cmap-valeur.cmap-froid, .cmap-capture .cmap-degre.cmap-froid { color: #1f6fe0; }
 /* Régions et départements : températures 15 % et pictos 5 % plus grands (ECHELLE_*_LOCAL dans CarteMeteo.tsx). */
