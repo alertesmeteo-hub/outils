@@ -9,7 +9,7 @@ import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { angleFleche } from '@/lib/carte-meteo/vent';
 import { palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
-import { BOITE_FRANCE, FICHIERS_CONTOURS, LARGEUR_FRANCE, ZONE_FRANCE, ZONE_UTILE, codesDeLaZone, normaliser, useContours } from './CarteMeteo';
+import { BOITE_FRANCE, FICHIERS_CONTOURS, LARGEUR_FRANCE, ZONE_FRANCE, ZONE_UTILE, codesDeLaZone, normaliser, useContours, useFleuves } from './CarteMeteo';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { statsDe } from '@/lib/carte-meteo/texte-ia';
 import { useTexteIA } from './TexteIA';
@@ -56,6 +56,7 @@ const PAR_DEPARTEMENT = { france: 1, region: 4, departement: Infinity };
 const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 
 export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '' }: Props) {
+  const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
@@ -284,7 +285,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         carteRef={carteRef}
         facteur={facteur}
         largeur={largeur}
-        fleuves={null}
+        fleuves={fleuves}
+        // Comme la carte météo : les quatre grands fleuves en France et en région, fleuves et rivières principales en département.
+        densiteFleuves={zone.startsWith('dep:') ? 'moyen' : 'faible'}
         afficherRelief
         reliefVisible={0.22}
         vue={vue}

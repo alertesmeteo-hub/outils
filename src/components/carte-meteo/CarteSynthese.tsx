@@ -7,7 +7,7 @@ import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
-import { BOITE_FRANCE, FICHIERS_CONTOURS, codesDeLaZone, normaliser, useContours } from './CarteMeteo';
+import { BOITE_FRANCE, FICHIERS_CONTOURS, codesDeLaZone, normaliser, useContours, useFleuves } from './CarteMeteo';
 import type { PointInfo } from './CarteInfo';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { statsDe } from '@/lib/carte-meteo/texte-ia';
@@ -54,6 +54,7 @@ const trier = (r: RubriqueSynthese, zone: Set<string>) =>
  * des cinq premiers de chaque phénomène et les trois premiers pointés sur la carte.
  */
 export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoId, nomFichier, contexte = '' }: Props) {
+  const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
@@ -180,7 +181,9 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
         carteRef={carteRef}
         facteur={facteur}
         largeur={largeur}
-        fleuves={null}
+        fleuves={fleuves}
+        // Comme la carte météo : quatre grands fleuves en France et en région, fleuves et rivières principales en département.
+        densiteFleuves={zone.startsWith('dep:') ? 'moyen' : 'faible'}
         afficherRelief
         reliefVisible={0.22}
         vue={vue}

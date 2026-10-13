@@ -227,7 +227,7 @@ function chargerFleuves(): Promise<Fleuves> {
   return promesseFleuves;
 }
 
-function useFleuves(actif: boolean): Fleuves | null {
+export function useFleuves(actif: boolean): Fleuves | null {
   const [d, setD] = useState<Fleuves | null>(null);
   useEffect(() => {
     if (!actif) return;

@@ -25,6 +25,9 @@ import { MASQUES_FRANCE, NOM_ECHEANCE, SECOURS, codesDeLaZone, libelleJour, norm
 
 type Mode = 'prevision' | 'bilan' | 'climat';
 
+/** Groupe des cartes du mois (voir THEMES_BILAN) : bouton « Bilan du mois ». */
+const GROUPE_MOIS = 'Bilan du mois';
+
 const MODES: [Mode, string][] = [
   ['prevision', 'Prévisions'],
   ['bilan', 'Bilans (observations)'],
@@ -348,16 +351,28 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                 <button
                   key={valeur}
                   type="button"
-                  aria-pressed={mode === valeur}
+                  aria-pressed={mode === valeur && !(valeur === 'bilan' && groupeChoisi === GROUPE_MOIS)}
                   onClick={() => {
                     setMode(valeur);
                     setGroupeChoisi('tous');
                   }}
-                  className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === valeur ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+                  className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === valeur && !(valeur === 'bilan' && groupeChoisi === GROUPE_MOIS) ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
                 >
                   {libelle}
                 </button>
               ))}
+              {/* Raccourci : les bilans, limités aux cartes du mois (maxi, mini, pluie, soleil), avec le menu « Mois ». */}
+              <button
+                type="button"
+                aria-pressed={mode === 'bilan' && groupeChoisi === GROUPE_MOIS}
+                onClick={() => {
+                  setMode('bilan');
+                  setGroupeChoisi(GROUPE_MOIS);
+                }}
+                className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === 'bilan' && groupeChoisi === GROUPE_MOIS ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+              >
+                Bilan du mois
+              </button>
             </div>
           </fieldset>
           <fieldset>
