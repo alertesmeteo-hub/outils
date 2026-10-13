@@ -67,6 +67,12 @@ function sansValeursAberrantes(points: PointInfo[]): PointInfo[] {
   });
 }
 
+/** « Octobre 2026 » pour « 2026-10 ». */
+const libelleMoisCourt = (m: string) => {
+  const nom = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, 15)).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return nom.charAt(0).toUpperCase() + nom.slice(1);
+};
+
 /** Rubrique de la carte « l'essentiel » à partir d'un thème (prévision ou bilan). */
 const rubrique = (themes: ThemeInfo[], id: string, libelle: string, icone: string, points: Record<string, PointInfo[]>): RubriqueSynthese => ({
   libelle,
@@ -118,6 +124,8 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const [erreurCumuls, setErreurCumuls] = useState<string | null>(null);
   const [bilans, setBilans] = useState<ReponseBilans | null>(null);
   const [erreurBilans, setErreurBilans] = useState<string | null>(null);
+  /** Mois des cartes « Bilan du mois » (AAAA-MM) ; null = mois en cours. Le reste des bilans ne dépend pas du mois. */
+  const [moisBilan, setMoisBilan] = useState<string | null>(null);
 
   const zone = niveau === 'france' ? 'france' : niveau === 'region' ? `reg:${region}` : `dep:${departement}`;
   const enDepartement = niveau === 'departement';
@@ -169,7 +177,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
     // Aussi en prévision pour aujourd'hui : la synthèse prend le mini relevé cette nuit (le modèle ne couvre plus la nuit).
     if (!(mode === 'bilan' || (mode === 'prevision' && jour === 0)) || bilans || erreurBilans) return;
     const controleur = new AbortController();
-    fetch('/api/carte-meteo/bilans/', { signal: controleur.signal })
+    fetch(`/api/carte-meteo/bilans/${moisBilan ? `?mois=${moisBilan}` : ''}`, { signal: controleur.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Observations momentanément indisponibles.');
         return r.json() as Promise<ReponseBilans>;
@@ -177,7 +185,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
       .then(setBilans)
       .catch((e: Error) => e.name !== 'AbortError' && setErreurBilans(e.message));
     return () => controleur.abort();
-  }, [mode, jour, bilans, erreurBilans]);
+  }, [mode, jour, bilans, erreurBilans, moisBilan]);
 
   // Réchauffement climatique : pluies DRIAS par département (France, région) et par commune (département).
   useEffect(() => {
@@ -449,6 +457,29 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                 {ALTITUDES_MAX.map((a) => (
                   <option key={a} value={a}>
                     {a === 0 ? 'Toutes altitudes' : `${a.toLocaleString('fr-FR')} m d'altitude`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {mode === 'bilan' && bilans?.mois && bilans.mois.disponibles.length > 1 && (
+            <label className="text-sm font-medium">
+              <span className={legendeBarre}>Mois</span>
+              <select
+                value={moisBilan ?? bilans.mois.affiche}
+                onChange={(e) => {
+                  // Nouvelle requête : les cartes du mois changent (le reste des bilans est identique).
+                  setMoisBilan(e.target.value === bilans.mois!.courant ? null : e.target.value);
+                  setBilans(null);
+                  setErreurBilans(null);
+                }}
+                className={selectBarre}
+                title="Mois des cartes « Bilan du mois »"
+              >
+                {[...bilans.mois.disponibles].reverse().map((m) => (
+                  <option key={m} value={m}>
+                    {libelleMoisCourt(m)}
+                    {m === bilans.mois!.courant ? ' (en cours)' : ''}
                   </option>
                 ))}
               </select>

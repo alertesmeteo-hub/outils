@@ -3,15 +3,15 @@ import { rateLimit } from '@/lib/rate-limit';
 import { THEMES_BILAN, type ReponseBilans } from '@/lib/carte-meteo/cartes-info';
 import { buildRanking, getRanking, windows } from '@/lib/obs/rankings';
 import { getRecords, getSix, getSnapshot, obsConfigured } from '@/lib/obs/store';
-import { extremesDuMois } from '@/lib/carte-meteo/extremes-mois';
+import { bilanDuMois, moisDisponibles } from '@/lib/carte-meteo/extremes-mois';
 
 export const dynamic = 'force-dynamic';
 
 /** Classements glissants (sans fenêtre fixe) : durée affichée devant la date de fin. */
 const DUREES: Record<string, string> = { t: 'relevé', snow: 'relevé', rr24: '24 h', rr72: '72 h', raf24: '24 h', insol24: '24 h' };
 
-/** Calcul partagé entre visiteurs tant que les observations n'ont pas changé. */
-let cache: { cle: string; reponse: ReponseBilans } | null = null;
+/** Calcul partagé entre visiteurs tant que les observations n'ont pas changé (une entrée par mois demandé). */
+const caches = new Map<string, { cle: string; reponse: ReponseBilans }>();
 
 const hm = (ms: number) =>
   new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(ms));
@@ -36,7 +36,13 @@ export async function GET(req: Request) {
     }
     if (!now) return NextResponse.json({ erreur: 'Observations momentanément indisponibles.' }, { status: 503 });
 
+    // Cartes du mois : ?mois=AAAA-MM parmi les mois de l'archive (défaut : le mois en cours) ; le reste des bilans est identique.
+    const disponibles = moisDisponibles(now);
+    const courant = disponibles[disponibles.length - 1];
+    const demande = new URL(req.url).searchParams.get('mois');
+    const moisAffiche = demande && disponibles.includes(demande) ? demande : courant;
     const cle = `${snap.updatedAt}|${now}`;
+    let cache = caches.get(moisAffiche);
     if (cache?.cle !== cle) {
       const w = windows(now);
       const extra = { six: getSix(), rafH: snap.rafH };
@@ -45,7 +51,7 @@ export async function GET(req: Request) {
       const cartes: ReponseBilans['cartes'] = {};
       // Maxi et mini du mois : archive quotidienne des stations (indisponible = cartes vides, le reste des bilans s'affiche).
       const mois = THEMES_BILAN.some((t) => t.mois)
-        ? await extremesDuMois(now, stations.map((s) => ({ id: s.id, lat: s.lat!, lon: s.lon!, alt: s.alt ?? null })))
+        ? await bilanDuMois(moisAffiche, now, stations.map((s) => ({ id: s.id, lat: s.lat!, lon: s.lon!, alt: s.alt ?? null })))
         : null;
       for (const theme of THEMES_BILAN) {
         if (theme.mois) {
@@ -69,8 +75,10 @@ export async function GET(req: Request) {
           majA: snap.updatedAt,
           stations: stations.map((s) => [s.id, s.name, s.dept, s.lat!, s.lon!, s.alt ?? null]),
           cartes,
+          mois: { affiche: moisAffiche, courant, disponibles },
         },
       };
+      caches.set(moisAffiche, cache);
     }
     return NextResponse.json(cache.reponse, { headers: { 'Cache-Control': 'public, max-age=300' } });
   } catch (erreur) {

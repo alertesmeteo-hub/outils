@@ -62,8 +62,8 @@ export interface ThemeClimat extends ThemeInfo {
 export interface ThemeBilan extends ThemeInfo {
   /** Identifiant du classement des stations (src/lib/obs/rankings.ts) ; vide pour les cartes du mois. */
   classement: string;
-  /** Maximale (tx) ou minimale (tn) du mois en cours, lue dans l'archive quotidienne (voir extremes-mois.ts). */
-  mois?: 'tx' | 'tn';
+  /** Bilan du mois (maxi, mini, cumul de pluie ou d'ensoleillement), lu dans l'archive quotidienne (voir extremes-mois.ts). */
+  mois?: 'tx' | 'tn' | 'rr' | 'insol';
 }
 
 const p = (min: number, fond: string, texte: string, libelle: string, neutre = false): Palier => ({ min, fond, texte, libelle, neutre });
@@ -180,6 +180,17 @@ const PALIERS_SOLEIL: Palier[] = [
   p(-Infinity, '#64748b', BLANC, 'Moins d’1 h'),
 ];
 
+/** Ensoleillement cumulé sur un mois (heures). */
+const PALIERS_SOLEIL_MOIS: Palier[] = [
+  p(300, '#d97706', NOIR, '300 h et plus'),
+  p(250, '#f59e0b', NOIR, '250 à 299 h'),
+  p(200, '#fbbf24', NOIR, '200 à 249 h'),
+  p(150, '#fde68a', NOIR, '150 à 199 h'),
+  p(100, '#e2e8f0', NOIR, '100 à 149 h'),
+  p(50, '#94a3b8', NOIR, '50 à 99 h'),
+  p(-Infinity, '#64748b', BLANC, 'Moins de 50 h'),
+];
+
 const PALIERS_ECART: Palier[] = [
   p(8, '#67001f', BLANC, '+8° et plus'),
   p(5, '#c1121f', BLANC, '+5 à +7°'),
@@ -218,8 +229,10 @@ export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'tx-prov', groupe: 'Températures', classement: 'tx-prov', titre: 'MAXIMALES DU JOUR (PROVISOIRES)', court: 'Maximales du jour', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-prov', groupe: 'Températures', classement: 'tn-prov', titre: 'MINIMALES DE LA NUIT (PROVISOIRES)', court: 'Minimales de cette nuit', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 't', groupe: 'Températures', classement: 't', titre: 'TEMPÉRATURES DU MOMENT', court: 'Températures du moment', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
-  { id: 'tx-mois', groupe: 'Températures du mois', classement: '', mois: 'tx', titre: 'MAXIMALES DU MOIS', court: 'Maxi du mois', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
-  { id: 'tn-mois', groupe: 'Températures du mois', classement: '', mois: 'tn', titre: 'MINIMALES DU MOIS', court: 'Mini du mois', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'tx-mois', groupe: 'Bilan du mois', classement: '', mois: 'tx', titre: 'MAXIMALES DU MOIS', court: 'Maxi du mois', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tn-mois', groupe: 'Bilan du mois', classement: '', mois: 'tn', titre: 'MINIMALES DU MOIS', court: 'Mini du mois', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'rr-mois', groupe: 'Bilan du mois', classement: '', mois: 'rr', titre: 'PLUIE DU MOIS', court: 'Pluie du mois', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'insol-mois', groupe: 'Bilan du mois', classement: '', mois: 'insol', titre: 'ENSOLEILLEMENT DU MOIS', court: 'Soleil du mois', unite: 'h', decimales: 0, paliers: PALIERS_SOLEIL_MOIS, ordre: 'desc', titreTop: 'Les plus ensoleillés' },
   { id: 'n-tx', groupe: 'Écarts à la normale', classement: 'n-tx', titre: 'MAXIMALES : ÉCART À LA NORMALE', court: 'Écart des maximales', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
   { id: 'n-tn', groupe: 'Écarts à la normale', classement: 'n-tn', titre: 'MINIMALES : ÉCART À LA NORMALE', court: 'Écart des minimales', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
   { id: 'rr6', groupe: 'Pluie', classement: 'rr6', titre: 'PLUIE DEPUIS CE MATIN', court: 'Pluie depuis ce matin', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
@@ -359,6 +372,8 @@ export function texteInfo(theme: ThemeInfo, v: number): string {
 /** Réponse : stations (une fois) et, par carte, les valeurs [indice de station, valeur] et la période couverte. */
 export interface ReponseBilans {
   majA: string | null;
+  /** Cartes du mois : mois affiché et mois disponibles dans l'archive (AAAA-MM, du plus ancien au plus récent). */
+  mois?: { affiche: string; courant: string; disponibles: string[] };
   /** [id, nom, département, lat, lon, altitude] */
   stations: [string, string, string, number, number, number | null][];
   cartes: Record<string, { fenetre: string; valeurs: [number, number][] }>;
