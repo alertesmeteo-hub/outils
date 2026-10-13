@@ -7,7 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx scripts/selftest.ts",
+    "test": "tsx scripts/selftest.ts && tsx scripts/selftest-records-temperature.ts",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy"

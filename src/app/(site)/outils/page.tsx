@@ -52,6 +52,17 @@ export default async function AllTools() {
             </span>
           </Link>
         </li>
+        <li>
+          <Link href="/outils/records-temperature/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">🌡️</span>
+            <span>
+              <strong className="block leading-snug">Records de température en direct</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Stations qui battent un record de chaleur, de froid ou de nuit tropicale (absolu, du mois, du jour), France entière, archives jour par jour, export en JPG.
+              </span>
+            </span>
+          </Link>
+        </li>
       </ul>
       <div className="mt-8"><ToolGrid tools={tools} /></div>
     </>
