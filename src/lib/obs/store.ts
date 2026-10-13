@@ -274,7 +274,9 @@ export async function getSnapshot(): Promise<ObsSnapshot> {
 const CLIMATO_URL = (process.env.CLIMATO_DATA_URL ?? 'https://raw.githubusercontent.com/alertesmeteo-hub/climato/data').replace(/\/$/, '');
 const CLIMATO_FILE = path.join(DIR, 'climato-records.json');
 const CLIMATO_TTL = 7 * 24 * 3600_000;
-let climato: { at: string; data: Record<string, StationRecords> } | null = null;
+/** Format du cache : à changer quand fromClimato lit de nouveaux champs (v2 : normales de pluie et d'ensoleillement). */
+const CLIMATO_VERSION = 2;
+let climato: { at: string; v?: number; data: Record<string, StationRecords> } | null = null;
 let climatoRunning: Promise<void> | null = null;
 
 async function refreshClimato() {
@@ -300,7 +302,7 @@ async function refreshClimato() {
     }
   };
   await Promise.all(Array.from({ length: 8 }, worker));
-  climato = { at: new Date().toISOString(), data };
+  climato = { at: new Date().toISOString(), v: CLIMATO_VERSION, data };
   await mkdir(DIR, { recursive: true });
   await writeFile(CLIMATO_FILE, JSON.stringify(climato));
   console.log(`[obs] normales et records (climato) : ${Object.keys(data).length} stations`);
@@ -311,7 +313,7 @@ async function getClimato(): Promise<Record<string, StationRecords>> {
   if (!climato) {
     try { climato = JSON.parse(await readFile(CLIMATO_FILE, 'utf8')); } catch { /* premier lancement */ }
   }
-  const stale = !climato || Date.now() - Date.parse(climato.at) > CLIMATO_TTL;
+  const stale = !climato || climato.v !== CLIMATO_VERSION || Date.now() - Date.parse(climato.at) > CLIMATO_TTL;
   // Attendre que la liste des stations soit connue pour ne télécharger que les stations utiles.
   if (stale && !climatoRunning && (await load()).stations.length) {
     climatoRunning = refreshClimato().catch((e) => console.error('[obs] climato :', (e as Error).message)).finally(() => { climatoRunning = null; });

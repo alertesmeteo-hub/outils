@@ -313,6 +313,8 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
   const groupes = parGroupe(themes);
   const groupesAffiches = groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
+  /** Nom affiché d'un groupe : le bilan du mois porte le nom du mois choisi (« Octobre 2026 »). */
+  const nomGroupe = (groupe: string) => (groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe);
   const avecSynthese = mode !== 'climat' && (groupeChoisi === 'tous' || groupeChoisi === ESSENTIEL);
   const chargement =
     mode === 'prevision'
@@ -520,7 +522,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
               {mode !== 'climat' && <option value={ESSENTIEL}>{ESSENTIEL} (maxi, mini, rafales, pluie)</option>}
               {groupes.map((g) => (
                 <option key={g.groupe} value={g.groupe}>
-                  {g.groupe} ({g.themes.length})
+                  {nomGroupe(g.groupe)} ({g.themes.length})
                 </option>
               ))}
             </select>
@@ -547,7 +549,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
           )}
           {groupesAffiches.map((g) => (
             <div key={g.groupe} className="flex flex-wrap items-center gap-1.5">
-              <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{g.groupe}</span>
+              <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{nomGroupe(g.groupe)}</span>
               {g.themes.map((t) => (
                 <a key={t.id} href={`#carte-${t.id}`} className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
                   {t.court}
@@ -653,7 +655,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
           )}
           {groupesAffiches.map((g) => (
             <section key={g.groupe} className="mt-8">
-              <h2 className="border-b border-border pb-1 text-xl font-extrabold">{g.groupe}</h2>
+              <h2 className="border-b border-border pb-1 text-xl font-extrabold">{nomGroupe(g.groupe)}</h2>
               <div className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-2">
                 {g.themes.map((theme) => (
                   <div key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">

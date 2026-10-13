@@ -49,15 +49,17 @@ export async function GET(req: Request) {
       const stations = snap.stations.filter((s) => s.lat != null && s.lon != null && s.kind !== 'amateur');
       const indice = new Map(stations.map((s, i) => [s.id, i]));
       const cartes: ReponseBilans['cartes'] = {};
-      // Maxi et mini du mois : archive quotidienne des stations (indisponible = cartes vides, le reste des bilans s'affiche).
+      // Bilan du mois : archive des stations sur le VPS (indisponible = cartes vides, le reste des bilans s'affiche).
+      // Département = 2 premiers chiffres du numéro de station (nom des fichiers horaires de l'archive, « 20 » pour la Corse).
       const mois = THEMES_BILAN.some((t) => t.mois)
-        ? await bilanDuMois(moisAffiche, now, stations.map((s) => ({ id: s.id, lat: s.lat!, lon: s.lon!, alt: s.alt ?? null })))
+        ? await bilanDuMois(moisAffiche, now, stations.map((s) => ({ id: s.id, lat: s.lat!, lon: s.lon!, alt: s.alt ?? null, dep: s.id.slice(0, 2) })), records)
         : null;
       for (const theme of THEMES_BILAN) {
         if (theme.mois) {
-          const valeurs = mois?.[theme.mois];
+          const valeurs = mois?.valeurs[theme.mois];
           cartes[theme.id] = {
-            fenetre: mois?.periode ?? '',
+            // Écarts : la référence est donnée avec la période (« octobre 2026 · normales 1991-2020 »).
+            fenetre: mois ? `${mois.periode}${theme.mois.startsWith('n') ? ' · normales 1991-2020' : ''}` : '',
             valeurs: valeurs ? [...valeurs].map(([id, v]) => [indice.get(id)!, Math.round(v * 10) / 10] as [number, number]).filter(([i]) => i != null) : [],
           };
           continue;

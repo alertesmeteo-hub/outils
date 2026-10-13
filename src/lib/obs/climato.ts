@@ -7,7 +7,7 @@ import type { RecordValue, StationRecords } from './types';
 
 type Month = {
   mois: number;
-  tx_moy?: number | null; tn_moy?: number | null;
+  tx_moy?: number | null; tn_moy?: number | null; rr_moy?: number | null; insol_moy?: number | null;
   tx_record?: number | null; tx_record_date?: string | null;
   tn_record?: number | null; tn_record_date?: string | null;
   rr_record?: number | null; rr_record_date?: string | null;
@@ -29,7 +29,7 @@ export function fromClimato(n: ClimatoNormales): StationRecords | null {
   const out: StationRecords = { monthly: {}, normals: {}, absolute: {} };
   for (const m of n.months) {
     const k = String(m.mois);
-    out.normals![k] = { tx: m.tx_moy ?? undefined, tn: m.tn_moy ?? undefined };
+    out.normals![k] = { tx: m.tx_moy ?? undefined, tn: m.tn_moy ?? undefined, rr: m.rr_moy ?? undefined, insol: m.insol_moy ?? undefined };
     const set = { tx: rec(m.tx_record, m.tx_record_date, m.mois), tn: rec(m.tn_record, m.tn_record_date, m.mois), rr24: rec(m.rr_record, m.rr_record_date, m.mois) };
     out.monthly![k] = set;
     // Record absolu = extrême des records mensuels (garde la date complète).

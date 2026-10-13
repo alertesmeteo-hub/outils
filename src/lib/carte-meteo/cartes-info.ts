@@ -1,4 +1,5 @@
 import type { DureeCumul, PointCarte } from './previsions-modeles';
+import type { CleMois } from './extremes-mois';
 import type { ClimatRegion } from './climat-tracc';
 import { temperaturePlausible, ventPlausible } from './limites';
 
@@ -62,8 +63,8 @@ export interface ThemeClimat extends ThemeInfo {
 export interface ThemeBilan extends ThemeInfo {
   /** Identifiant du classement des stations (src/lib/obs/rankings.ts) ; vide pour les cartes du mois. */
   classement: string;
-  /** Bilan du mois (maxi, mini, cumul de pluie ou d'ensoleillement), lu dans l'archive quotidienne (voir extremes-mois.ts). */
-  mois?: 'tx' | 'tn' | 'rr' | 'insol';
+  /** Bilan du mois (températures, pluie, ensoleillement, vent, écarts aux normales), lu dans l'archive du VPS (voir extremes-mois.ts). */
+  mois?: CleMois;
 }
 
 const p = (min: number, fond: string, texte: string, libelle: string, neutre = false): Palier => ({ min, fond, texte, libelle, neutre });
@@ -191,6 +192,47 @@ const PALIERS_SOLEIL_MOIS: Palier[] = [
   p(-Infinity, '#64748b', BLANC, 'Moins de 50 h'),
 ];
 
+/** Écart d'une moyenne mensuelle de température à sa normale : plus fin que l'écart d'un jour (un mois à +3° est remarquable). */
+const PALIERS_ECART_MOIS: Palier[] = [
+  p(4, '#67001f', BLANC, '+4° et plus'),
+  p(3, '#b2182b', BLANC, '+3 à +3,9°'),
+  p(2, '#d6604d', BLANC, '+2 à +2,9°'),
+  p(1, '#f4a582', NOIR, '+1 à +1,9°'),
+  p(-1, '#e5e7eb', NOIR, 'Proche de la normale (±1°)'),
+  p(-2, '#92c5de', NOIR, '-1 à -1,9°'),
+  p(-3, '#4393c3', BLANC, '-2 à -2,9°'),
+  p(-Infinity, '#2166ac', BLANC, '-3° et moins'),
+];
+
+/** Pluie du mois rapportée à la normale (%). */
+const PALIERS_ECART_PLUIE: Palier[] = [
+  p(100, '#16307a', BLANC, 'Plus du double (+100 %)'),
+  p(50, '#1d4ed8', BLANC, '+50 à +99 %'),
+  p(20, '#7cb6f7', NOIR, '+20 à +49 %'),
+  p(-20, '#e5e7eb', NOIR, 'Proche de la normale (±20 %)'),
+  p(-50, '#fdb863', NOIR, '-20 à -49 %'),
+  p(-75, '#e08214', NOIR, '-50 à -74 %'),
+  p(-Infinity, '#b35806', BLANC, '-75 % et plus'),
+];
+
+/** Ensoleillement du mois rapporté à la normale (%). */
+const PALIERS_ECART_SOLEIL: Palier[] = [
+  p(30, '#d97706', NOIR, '+30 % et plus'),
+  p(10, '#fbbf24', NOIR, '+10 à +29 %'),
+  p(-10, '#e5e7eb', NOIR, 'Proche de la normale (±10 %)'),
+  p(-30, '#94a3b8', NOIR, '-10 à -29 %'),
+  p(-Infinity, '#64748b', BLANC, '-30 % et plus'),
+];
+
+/** Vent moyen sur un mois (moyenne des relevés horaires, km/h). */
+const PALIERS_VENT_MOIS: Palier[] = [
+  p(30, '#e5191e', BLANC, '30 km/h et plus'),
+  p(20, '#ff8c1a', NOIR, '20 à 29 km/h'),
+  p(15, '#f5c400', NOIR, '15 à 19 km/h'),
+  p(10, '#2f7de1', BLANC, '10 à 14 km/h'),
+  p(-Infinity, '#94a3b8', NOIR, 'Moins de 10 km/h', true),
+];
+
 const PALIERS_ECART: Palier[] = [
   p(8, '#67001f', BLANC, '+8° et plus'),
   p(5, '#c1121f', BLANC, '+5 à +7°'),
@@ -229,10 +271,19 @@ export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'tx-prov', groupe: 'Températures', classement: 'tx-prov', titre: 'MAXIMALES DU JOUR (PROVISOIRES)', court: 'Maximales du jour', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-prov', groupe: 'Températures', classement: 'tn-prov', titre: 'MINIMALES DE LA NUIT (PROVISOIRES)', court: 'Minimales de cette nuit', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 't', groupe: 'Températures', classement: 't', titre: 'TEMPÉRATURES DU MOMENT', court: 'Températures du moment', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
-  { id: 'tx-mois', groupe: 'Bilan du mois', classement: '', mois: 'tx', titre: 'MAXIMALES DU MOIS', court: 'Maxi du mois', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
-  { id: 'tn-mois', groupe: 'Bilan du mois', classement: '', mois: 'tn', titre: 'MINIMALES DU MOIS', court: 'Mini du mois', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
-  { id: 'rr-mois', groupe: 'Bilan du mois', classement: '', mois: 'rr', titre: 'PLUIE DU MOIS', court: 'Pluie du mois', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés' },
-  { id: 'insol-mois', groupe: 'Bilan du mois', classement: '', mois: 'insol', titre: 'ENSOLEILLEMENT DU MOIS', court: 'Soleil du mois', unite: 'h', decimales: 0, paliers: PALIERS_SOLEIL_MOIS, ordre: 'desc', titreTop: 'Les plus ensoleillés' },
+  // Bilan du mois : la période (« OCTOBRE 2026 », « DU 1ER AU 13 OCTOBRE 2026 ») est le sous-titre de chaque carte.
+  { id: 'tx-mois', groupe: 'Bilan du mois', classement: '', mois: 'tx', titre: 'TEMPÉRATURE MAXIMALE LA PLUS HAUTE', court: 'Maxi la plus haute', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tn-mois', groupe: 'Bilan du mois', classement: '', mois: 'tn', titre: 'TEMPÉRATURE MINIMALE LA PLUS BASSE', court: 'Mini la plus basse', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'txm-mois', groupe: 'Bilan du mois', classement: '', mois: 'txm', titre: 'MOYENNE DES MAXIMALES', court: 'Moyenne des maxi', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tnm-mois', groupe: 'Bilan du mois', classement: '', mois: 'tnm', titre: 'MOYENNE DES MINIMALES', court: 'Moyenne des mini', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'ntx-mois', groupe: 'Bilan du mois', classement: '', mois: 'ntx', titre: 'MAXIMALES : ÉCART À LA NORMALE', court: 'Écart des maxi', unite: '°', decimales: 1, paliers: PALIERS_ECART_MOIS, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
+  { id: 'ntn-mois', groupe: 'Bilan du mois', classement: '', mois: 'ntn', titre: 'MINIMALES : ÉCART À LA NORMALE', court: 'Écart des mini', unite: '°', decimales: 1, paliers: PALIERS_ECART_MOIS, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
+  { id: 'rr-mois', groupe: 'Bilan du mois', classement: '', mois: 'rr', titre: 'CUMUL DE PLUIE', court: 'Pluie', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'nrr-mois', groupe: 'Bilan du mois', classement: '', mois: 'nrr', titre: 'PLUIE : ÉCART À LA NORMALE', court: 'Écart de la pluie', unite: '%', decimales: 0, paliers: PALIERS_ECART_PLUIE, ordre: 'desc', titreTop: 'Les plus excédentaires', signe: true },
+  { id: 'insol-mois', groupe: 'Bilan du mois', classement: '', mois: 'insol', titre: 'ENSOLEILLEMENT', court: 'Ensoleillement', unite: 'h', decimales: 0, paliers: PALIERS_SOLEIL_MOIS, ordre: 'desc', titreTop: 'Les plus ensoleillés' },
+  { id: 'ninsol-mois', groupe: 'Bilan du mois', classement: '', mois: 'ninsol', titre: 'ENSOLEILLEMENT : ÉCART À LA NORMALE', court: 'Écart de l’ensoleillement', unite: '%', decimales: 0, paliers: PALIERS_ECART_SOLEIL, ordre: 'desc', titreTop: 'Les plus excédentaires', signe: true },
+  { id: 'raf-mois', groupe: 'Bilan du mois', classement: '', mois: 'raf', titre: 'RAFALE MAXIMALE', court: 'Rafales', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes' },
+  { id: 'vent-mois', groupe: 'Bilan du mois', classement: '', mois: 'vent', titre: 'VENT MOYEN', court: 'Vent moyen', unite: 'km/h', decimales: 0, paliers: PALIERS_VENT_MOIS, ordre: 'desc', titreTop: 'Les plus ventés' },
   { id: 'n-tx', groupe: 'Écarts à la normale', classement: 'n-tx', titre: 'MAXIMALES : ÉCART À LA NORMALE', court: 'Écart des maximales', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
   { id: 'n-tn', groupe: 'Écarts à la normale', classement: 'n-tn', titre: 'MINIMALES : ÉCART À LA NORMALE', court: 'Écart des minimales', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
   { id: 'rr6', groupe: 'Pluie', classement: 'rr6', titre: 'PLUIE DEPUIS CE MATIN', court: 'Pluie depuis ce matin', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },

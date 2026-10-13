@@ -151,6 +151,7 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   // Normales et records du dépôt climato (fiche Météo-France de Marignane)
   const cl = fromClimato(marignane as never)!;
   eq('climato : normale TX janvier Marignane = 11,8 °C', cl.normals?.['1']?.tx === 11.8);
+  eq('climato : normales de pluie (47,1 mm) et d’ensoleillement (147,9 h) en janvier', cl.normals?.['1']?.rr === 47.1 && cl.normals?.['1']?.insol === 147.9);
   eq('climato : record TX janvier 19,9 °C le 2024-01-24', cl.monthly?.['1']?.tx?.v === 19.9 && cl.monthly?.['1']?.tx?.d === '2024-01-24');
   eq('climato : record absolu TX = 40,5 °C, TN = −16,8 °C (1956)', cl.absolute?.tx?.v === 40.5 && cl.absolute?.tn?.v === -16.8 && cl.absolute?.tn?.d.startsWith('1956'), JSON.stringify(cl.absolute));
 

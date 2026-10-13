@@ -52,7 +52,8 @@ export type RecordValue = { v: number; d: string };
 export type RecordSet = { tx?: RecordValue; tn?: RecordValue; rr24?: RecordValue };
 /** Records d'une station : mensuels (clé "1"…"12") et absolus. */
 /** Normales mensuelles (moyennes climatologiques des TX et TN, °C). */
-export type Normals = { tx?: number; tn?: number };
+/** Normales mensuelles 1991-2020 : TX et TN moyennes (°C), cumul de pluie (mm) et d'ensoleillement (h) du mois. */
+export type Normals = { tx?: number; tn?: number; rr?: number; insol?: number };
 export type StationRecords = { monthly?: Record<string, RecordSet>; absolute?: RecordSet; normals?: Record<string, Normals> };
 
 /** Observation au pas de 6 minutes (paquet v2). */
