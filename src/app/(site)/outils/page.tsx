@@ -63,6 +63,17 @@ export default async function AllTools() {
             </span>
           </Link>
         </li>
+        <li>
+          <Link href="/outils/nuits-tropicales/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">🌙</span>
+            <span>
+              <strong className="block leading-snug">Nuits tropicales</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Nombre de nuits à 20 °C et plus cette année, station par station, évolution depuis 1950 et historique de chaque station.
+              </span>
+            </span>
+          </Link>
+        </li>
       </ul>
       <div className="mt-8"><ToolGrid tools={tools} /></div>
     </>
