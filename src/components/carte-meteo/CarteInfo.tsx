@@ -141,9 +141,18 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   );
   // Titre de l'encadré sur deux lignes s'il dépasse la largeur (≈ 9 px par lettre en 16 px condensé).
   const hauteurTop = top.length && !theme.sansTop ? 34 + top.length * 19 + (theme.titreTop.length * 9 > largeurTop - 18 ? 18 : 0) : 0;
+  // Sans logo, le titre prend le coin en haut à gauche (sinon : à droite en France, centré en région et en département).
+  const titreAGauche = !logoUrl;
+  // Bandeau du titre : Impact 32 px (≈ 15,5 px par lettre) et sous-titre 19 px (≈ 10 px par lettre), plus les marges.
+  const largeurTitre = Math.round(Math.max(theme.titre.length * 15.5, sousTitre.length * 10) + 34);
+  const rectTitre: Rect = titreAGauche
+    ? { x: MARGE_COLONNE, y: 6, w: largeurTitre, h: 76 }
+    : enFrance
+      ? { x: largeur - 28 - 430, y: 6, w: 430, h: 76 }
+      : { x: largeur / 2 - 320, y: 6, w: 640, h: 76 };
   const rectTop: Rect = enFrance
-    ? { x: largeur - MARGE_COLONNE - largeurTop, y: 96, w: largeurTop, h: hauteurTop }
-    : { x: MARGE_COLONNE, y: logoUrl ? 21 + hauteurLogo + 14 : 24, w: largeurTop, h: hauteurTop };
+    ? { x: largeur - MARGE_COLONNE - largeurTop, y: titreAGauche ? 24 : 96, w: largeurTop, h: hauteurTop }
+    : { x: MARGE_COLONNE, y: logoUrl ? 21 + hauteurLogo + 14 : rectTitre.y + rectTitre.h + 14, w: largeurTop, h: hauteurTop };
   // Légende ajustée à son plus long libellé (pastille de couleur + texte en 13 px).
   const largeurLegende = Math.max(118, Math.round(48 + Math.max(...legende.map((x) => x.libelle.length)) * 6.7));
   const rectLegende: Rect = { x: MARGE_COLONNE, y: HAUTEUR_CARTE - 44 - hauteurLegende, w: largeurLegende, h: hauteurLegende };
@@ -220,9 +229,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           priorite: codesTop.has(e.p.code) ? 0 : 1,
         };
       });
-    const titre: Rect = enFrance ? { x: largeur - 28 - 430, y: 6, w: 430, h: 76 } : { x: largeur / 2 - 320, y: 6, w: 640, h: 76 };
     const obstacles: Rect[] = [
-      titre,
+      rectTitre,
       { x: largeur / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 },
       rectLegende,
       ...(hauteurTop ? [rectTop] : []),
@@ -237,7 +245,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       .filter((e) => e.priorite === 0 || restantes-- > 0)
       .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte]);
+  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte, sousTitre]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -303,7 +311,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         logoFondBlanc={logo?.fondBlanc !== false}
         hauteurLogo={hauteurLogo || undefined}
         pied="www.alertes-meteo.com"
-        titreADroite={enFrance}
+        titreADroite={enFrance && !titreAGauche}
+        titreGauche={titreAGauche ? MARGE_COLONNE : undefined}
         moyennes={[]}
         paletteOuvertePour={null}
         pictosSelectionnes={AUCUN}
