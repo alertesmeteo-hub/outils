@@ -223,6 +223,8 @@ interface Props {
   pied?: string;
   /** Date et sous-titre alignés en haut à droite (vue France) au lieu d'être centrés. */
   titreADroite?: boolean;
+  /** Date et sous-titre alignés à gauche, à cette position (px de la carte) : carte de France. */
+  titreGauche?: number;
   /** Pictos plus grands (vue département). */
   grosPictos?: boolean;
   /** Carte de région ou de département : températures +15 % et pictos +5 % (voir `.cmap-local` dans globals.css). */
@@ -326,6 +328,7 @@ export default function CarteRendu({
   largeur = LARGEUR_CARTE,
   pied = '',
   titreADroite = false,
+  titreGauche,
   grosPictos = false,
   carteLocale = false,
   styleCapture = false,
@@ -442,7 +445,10 @@ export default function CarteRendu({
           />
         )}
 
-        <div className={`cmap-titre ${titreADroite ? 'cmap-titre-droite' : ''}`}>
+        <div
+          className={`cmap-titre ${titreGauche != null ? 'cmap-titre-gauche' : titreADroite ? 'cmap-titre-droite' : ''}`}
+          style={titreGauche != null ? { left: titreGauche } : undefined}
+        >
           <div className="cmap-date" style={couleurTitre ? { color: couleurTitre } : undefined}>{titre}</div>
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
         </div>

@@ -491,6 +491,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const logoFondBlanc = !logoPersonnalise && LOGOS_PRESETS.find((l) => l.id === logoId)?.fondBlanc !== false;
   const logoUrl = logoPersonnalise ?? (LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier || null);
   const hauteurLogo = zone === 'dep:66' ? HAUTEUR_LOGO_PO : HAUTEUR_LOGO;
+  /** Carte de France : date et sous-titre en haut à gauche, logo en haut à droite. */
+  const xTitreFrance = 28;
+  const largeurLogo = Math.max(205, hauteurLogo);
 
   const enFrance = zone === 'france';
   const largeurCarte = enFrance ? LARGEUR_FRANCE : LARGEUR_CARTE;
@@ -766,8 +769,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const logoDroite = 29 + Math.max(205, hauteurLogo);
     const moyennesGauche = 29;
     const obstacles: Rect[] = [
-      { x: 29, y: 21, w: logoDroite - 29, h: hauteurLogo + 1 },
-      enFrance ? { x: largeurCarte - 28 - 410, y: 6, w: 410, h: 67 } : { x: largeurCarte / 2 - 250, y: 6, w: 500, h: 67 },
+      enFrance ? { x: largeurCarte - 28 - largeurLogo, y: 21, w: largeurLogo, h: hauteurLogo + 1 } : { x: 29, y: 21, w: logoDroite - 29, h: hauteurLogo + 1 },
+      enFrance ? { x: xTitreFrance, y: 6, w: 410, h: 67 } : { x: largeurCarte / 2 - 250, y: 6, w: 500, h: 67 },
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : []),
     ];
@@ -933,7 +936,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       return m.rafale != null ? { ...m, rafale: null, ressenti: null } : m;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees, miniMaxiAM]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees, miniMaxiAM, xTitreFrance]);
 
   const altitudeDe = (code: string, picto: string) => (estPictoNeige(picto) ? altitudes[`${periode}|${code}`] ?? altitudeNeige : undefined);
   const marqueursAffiches: Marqueur[] = [
@@ -1170,7 +1173,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       logoFondBlanc={logoFondBlanc}
       hauteurLogo={hauteurLogo}
       pied={pied}
-      titreADroite={enFrance}
+      titreGauche={enFrance ? xTitreFrance : undefined}
+      logoDroite={enFrance ? largeurCarte - 28 : null}
       grosPictos={enDepartement}
       carteLocale={!enFrance}
       styleCapture={modeCapture}

@@ -266,6 +266,8 @@ body {
 .cmap-palette-aide { font-size: 11px; color: #64748b; margin: 0 2px 6px; }
 .cmap-pied { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; z-index: 3; font-size: 21px; font-weight: 800; letter-spacing: 0.02em; color: #fff; text-shadow: 0 0 4px #000, 0 0 4px #000, 1px 1px 2px #000; pointer-events: none; }
 .cmap-titre-droite { left: auto; right: 28px; transform: none; text-align: right; }
+/* Carte de France : date et sous-titre en haut à gauche (position donnée par CarteRendu). */
+.cmap-titre-gauche { transform: none; text-align: left; }
 
 /* Cartes infos (/outils/carte-meteo-info/) : pastilles de valeurs colorées, légende et classement. */
 .cinfo-point { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; z-index: 4; line-height: 1; pointer-events: auto; }
