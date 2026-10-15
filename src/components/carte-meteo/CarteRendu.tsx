@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type { Vue } from '@/lib/carte-meteo/projection-france';
-import { TAILLE_TUILE_VIDE, tuileParente, tuilesVisibles, type Tuile } from '@/lib/carte-meteo/tuiles';
+import { MATRICE_RELIEF, TAILLE_TUILE_VIDE, coucheParDefaut, tuileParente, tuilesVisibles, type Couche, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 
@@ -10,7 +10,7 @@ import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/v
  * Tuile du fond. L'IGN renvoie un aplat bleu marine quand il n'a pas d'image (hors couverture, par exemple en Espagne) :
  * on le détecte à sa taille minuscule et on le remplace par la tuile du zoom inférieur qui contient la zone (moins nette, mais réelle).
  */
-function TuileFond({ t }: { t: Tuile }) {
+function TuileFond({ t, couche }: { t: Tuile; couche: Couche }) {
   const [source, setSource] = useState<Tuile>(t);
   const idDecoupe = `tuile${useId().replace(/:/g, '')}`;
   useEffect(() => {
@@ -22,9 +22,10 @@ function TuileFond({ t }: { t: Tuile }) {
         .then((b) => b?.size ?? 0)
         .catch(() => 0);
     (async () => {
-      if ((await poids(t.url)) >= TAILLE_TUILE_VIDE) return;
+      // Le relief NASA couvre toute la Terre : rien à remplacer.
+      if (couche !== 'ortho' || (await poids(t.url)) >= TAILLE_TUILE_VIDE) return;
       for (const niveaux of [1, 2, 3]) {
-        const parent = tuileParente('ortho', t, niveaux);
+        const parent = tuileParente(couche, t, niveaux);
         if (!parent) return;
         if ((await poids(parent.url)) >= TAILLE_TUILE_VIDE) {
           if (!annule) setSource(parent);
@@ -244,6 +245,8 @@ interface Props {
   afficherRelief?: boolean;
   /** Part du relief qui transparaît à travers la teinte du territoire (0 à 1) quand « Reliefs » est coché. */
   reliefVisible?: number;
+  /** Fond de carte ; par défaut, relief NASA pour la France et les régions, photos IGN pour les départements. */
+  fond?: Couche;
   vue: Vue;
   departements: Contour[];
   regions: Contour[] | null;
@@ -339,6 +342,7 @@ export default function CarteRendu({
   opaciteFleuves = 1,
   afficherRelief = true,
   reliefVisible = 0.28,
+  fond,
   vue,
   departements,
   regions,
@@ -372,6 +376,8 @@ export default function CarteRendu({
   /** Rafale ajoutée dont le choix de direction est ouvert. */
   const [directionOuvertePour, setDirectionOuvertePour] = useState<string | null>(null);
   const idClip = `fleuves-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const idFiltreFond = `${idClip}-fond`;
+  const couche = fond ?? coucheParDefaut(vue);
   const degres = styleCapture || carteLocale;
   const largeurValeur = (v: string) => `${Math.max(1, v.length) * (styleCapture ? 0.58 : 0.54) + 0.05}em`;
   return (
@@ -388,10 +394,18 @@ export default function CarteRendu({
       >
         <svg className="cmap-svg" viewBox={`0 0 ${largeur} ${HAUTEUR_CARTE}`} width={largeur} height={HAUTEUR_CARTE}>
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
-            {/* Fond : photographies aériennes IGN. Léger chevauchement (+0,6) pour éviter les joints entre tuiles. */}
-            {tuilesVisibles('ortho', vue, largeur, HAUTEUR_CARTE).map((t) => (
-              <TuileFond key={t.cle} t={t} />
-            ))}
+            {/* Fond : relief NASA (couleurs recalées) ou photographies aériennes IGN. Léger chevauchement (+0,6) pour éviter
+                les joints entre tuiles. Filtre en attributs SVG (et en sRGB) pour qu'il passe dans l'export JPG. */}
+            {couche === 'relief' && (
+              <filter id={idFiltreFond} colorInterpolationFilters="sRGB">
+                <feColorMatrix type="matrix" values={MATRICE_RELIEF} />
+              </filter>
+            )}
+            <g filter={couche === 'relief' ? `url(#${idFiltreFond})` : undefined}>
+              {tuilesVisibles(couche, vue, largeur, HAUTEUR_CARTE).map((t) => (
+                <TuileFond key={t.cle} t={t} couche={couche} />
+              ))}
+            </g>
             {departements.filter((c) => !selection.has(c.code)).map((c) => (
               <path key={c.code} d={c.d} {...TRAIT_HORS_SELECTION} {...(regions ? { stroke: 'none' } : {})} />
             ))}
@@ -557,7 +571,8 @@ export default function CarteRendu({
               <button
                 type="button"
                 className={`cmap-picto ${pictosSelectionnes?.has(m.code) ? 'cmap-picto-selectionne' : ''}`}
-                title="Clic : changer l'icône · Ctrl/Maj + clic : en sélectionner plusieurs"
+                // Le nom de la ville en tête : ce titre remplace celui du marqueur au survol du picto.
+                title={`${m.nom ? `${m.nom}\n` : ''}Clic : changer l'icône · Ctrl/Maj + clic : en sélectionner plusieurs`}
                 onClick={(e) => onBasculerPalette(m.code, e.ctrlKey || e.shiftKey || e.metaKey)}
               >
                 {estPictoImage(m.picto) ? <img src={cheminPictoImage(m.picto)} alt="" className="cmap-picto-image" /> : m.picto}

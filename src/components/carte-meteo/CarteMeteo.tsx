@@ -12,6 +12,7 @@ import { DIRECTIONS_VENT, angleFleche, ressenti as calculerRessenti } from '@/li
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
+import { CREDITS_COUCHES, LIBELLES_COUCHES, coucheParDefaut, type Couche } from '@/lib/carte-meteo/tuiles';
 import {
   LATITUDE_SEUIL_NORD_SUD,
   ajusterVue,
@@ -49,7 +50,7 @@ const DENSITES: Record<Densite, { libelle: string; part: number; villes: number 
 };
 /** Vue département : nombre de villes ajusté pour certains départements (écart par rapport à `villes` de la densité). */
 const AJUSTEMENT_VILLES: Record<string, Partial<Record<Densite, number>>> = {
-  '66': { moyen: -4 },
+  '66': { leger: 1, moyen: -3 }, // +1 en léger et moyen : Rivesaltes, gardée d'office (sources.ts)
 };
 
 export interface DonneesCarte {
@@ -392,6 +393,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [afficherFleches, setAfficherFleches] = useState(true);
   const [afficherRelief, setAfficherRelief] = useState(true);
   const [reliefPourcent, setReliefPourcent] = useState(28);
+  /** Fond de carte choisi ; nul = selon le zoom (relief NASA pour la France et les régions, photos IGN pour un département). */
+  const [fondChoisi, setFondChoisi] = useState<Couche | null>(null);
   const [enExport, setEnExport] = useState(false);
   const [erreurExport, setErreurExport] = useState<string | null>(null);
 
@@ -485,6 +488,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     if (zone.startsWith('dep:')) return ajusterVue(boite, ZONE_DEPARTEMENT, 0.02);
     return ajusterVue(boite, ZONE_UTILE);
   }, [contoursDep, selection, zone]);
+  const couche = fondChoisi ?? coucheParDefaut(vue);
 
   const logoDefaut = useMemo(() => logoParDefaut(codes), [codes]);
   const logoId = logoPresetId ?? logoDefaut.id;
@@ -774,7 +778,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : []),
     ];
-    const elements = bruts.map((m) => {
+    const elements = bruts.map((m, i) => {
       // Dimensions mesurées dans le rendu : picto ≈ 2,35 em de large + température ≈ 2,4 em ; 1,8 em de haut
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
       const gros = enDepartement ? 0.6 : 0; // pictos 1,6 fois plus grands : +1,4 em de large, +1,1 em de haut
@@ -818,7 +822,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         // venteuse prend la place d'une autre et des pictos disparaissent dès qu'on affiche les rafales).
         // France : les villes imposées (Perpignan, Montpellier, Marseille, Paris, Lille) sont placées en tout premier, à leur place :
         // elles ne sont jamais écartées ni repoussées par un picto voisin.
-        priorite: enDepartement ? (m.ton != null ? 1 : 2) : enFrance && VILLES_IMPOSEES.some((v) => v.code === m.code) ? -1 : m.rafale != null && Number.isFinite(maxRafales) ? 0 : m.ton != null || m.rafale != null ? 1 : 2,
+        // Département : une ville de réserve à la valeur extrême ne passe pas devant les villes visées (Opoul-Périllos à 19°
+        // prenait la place de Rivesaltes et du Barcarès, puis était elle-même coupée au nombre voulu).
+        priorite: enDepartement ? (m.ton != null && i < cible ? 1 : 2) : enFrance && VILLES_IMPOSEES.some((v) => v.code === m.code) ? -1 : m.rafale != null && Number.isFinite(maxRafales) ? 0 : m.ton != null || m.rafale != null ? 1 : 2,
       };
     });
     // Taille de la pastille de rafale d'un marqueur (plus petite sous SEUIL_VENT_REDUIT).
@@ -1142,6 +1148,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       opaciteFleuves={opaciteFleuves / 100}
       afficherRelief={afficherRelief}
       reliefVisible={reliefPourcent / 100}
+      fond={couche}
       vue={vue}
       departements={departementsAffiches}
       regions={regionsAffichees}
@@ -1675,6 +1682,16 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </label>
             </>
           )}
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Fond de carte</span>
+            <select value={couche} onChange={(e) => setFondChoisi(e.target.value as Couche)} className={selectBarre}>
+              {(Object.keys(LIBELLES_COUCHES) as Couche[]).map((c) => (
+                <option key={c} value={c}>
+                  {LIBELLES_COUCHES[c]}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex items-center gap-2 pb-1.5 text-sm">
             <input type="checkbox" checked={afficherRelief} onChange={(e) => setAfficherRelief(e.target.checked)} />
             Reliefs
@@ -1743,7 +1760,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           </label>
         </div>
         <p className="mt-3 text-xs text-muted">
-          Prévisions : {MODELES.find((m) => m.id === modele)?.libelle} ({MODELES.find((m) => m.id === modele)?.fournisseur}), paquets départementaux alertesmeteo-hub. Fond de carte et cours d'eau : © IGN (Géoplateforme, Licence ouverte).
+          Prévisions : {MODELES.find((m) => m.id === modele)?.libelle} ({MODELES.find((m) => m.id === modele)?.fournisseur}), paquets départementaux alertesmeteo-hub. Fond de carte : {CREDITS_COUCHES[couche]}. Cours d'eau : © IGN (Géoplateforme, Licence ouverte).
           Contours : IGN Admin Express (Licence ouverte Etalab).{enDepartement && ' Communes : prévisions au point de commune.'}
         </p>
       </div>

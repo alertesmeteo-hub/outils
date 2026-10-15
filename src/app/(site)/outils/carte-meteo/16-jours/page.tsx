@@ -93,7 +93,7 @@ export default async function PageSeizeJours({ searchParams }: { searchParams: P
       )}
 
       <p className="mt-8 text-xs text-muted">
-        Prévisions : {infos.libelle} ({infos.fournisseur}), paquets départementaux publiés par alertesmeteo-hub. Fond de carte : © IGN (Géoplateforme,
+        Prévisions : {infos.libelle} ({infos.fournisseur}), paquets départementaux publiés par alertesmeteo-hub. Fond de carte : NASA Blue Marble (domaine public) ou © IGN (Géoplateforme,
         Licence ouverte). Contours : IGN Admin Express. Au-delà de quelques jours, les prévisions d&apos;un modèle déterministe sont de moins en moins fiables.
       </p>
     </>

@@ -81,7 +81,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleMeteo, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v9';
+const VERSION_CACHE = 'v10';
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -190,7 +190,7 @@ function repartir<T extends { lat: number; lon: number }>(liste: T[], n: number)
  */
 const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[]; exactes?: string[]; centres?: Record<string, [number, number]> }> = {
   '66': {
-    garder: ['Ille-sur-Têt', 'Bourg-Madame', 'Le Barcarès', 'Saint-Cyprien'],
+    garder: ['Ille-sur-Têt', 'Bourg-Madame', 'Le Barcarès', 'Saint-Cyprien', 'Rivesaltes'],
     ecarter: ['Corbère', 'Osséja', 'Caudiès-de-Fenouillèdes'],
     exactes: ['Prats-de-Mollo-la-Preste', 'Banyuls-sur-Mer'],
     centres: { 'Prats-de-Mollo-la-Preste': [42.4044, 2.4794], 'Banyuls-sur-Mer': [42.4833, 3.1289] },

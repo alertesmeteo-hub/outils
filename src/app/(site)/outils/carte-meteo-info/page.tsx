@@ -41,7 +41,7 @@ export default function PageCartesInfo() {
           classements
         </Link>
         . Réchauffement climatique : fiches régionales Météo-France « Quel climat futur ? » (trajectoire TRACC, référence 1976-2005) et, pour les
-        pluies, médiane multi-modèles DRIAS (Météo-France / CNRM) par commune, moyennée par département. Fond de carte : © IGN (Géoplateforme, Licence ouverte) ; contours : IGN Admin Express (Licence ouverte Etalab).
+        pluies, médiane multi-modèles DRIAS (Météo-France / CNRM) par commune, moyennée par département. Fond de carte : NASA Blue Marble (domaine public) ou © IGN (Géoplateforme, Licence ouverte) ; contours : IGN Admin Express (Licence ouverte Etalab).
       </p>
     </>
   );
