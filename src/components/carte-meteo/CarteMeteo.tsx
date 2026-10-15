@@ -41,8 +41,6 @@ const ECHELLE_PICTO_LOCAL = 1.05;
 const ECHELLE_TEMP_LOCAL = 1.15;
 /** Départements : températures encore 7 % plus grandes (`.cmap-local.cmap-gros` dans globals.css). */
 const ECHELLE_TEMP_DEPARTEMENT = ECHELLE_TEMP_LOCAL * 1.07;
-/** France « Moyen » (style de la carte de référence) : pictos et températures 30 % plus grands (`.cmap-capture` dans globals.css). */
-const ECHELLE_CAPTURE_FRANCE = 1.3;
 const DENSITES: Record<Densite, { libelle: string; part: number; villes: number }> = {
   leger: { libelle: 'Léger', part: 0.3, villes: 7 },
   moyen: { libelle: 'Moyen', part: 0.6, villes: 14 },
@@ -142,10 +140,37 @@ const CAPTURE_FRANCE: { code: string; lat: number; lon: number }[] = [
   { code: '17', lat: 46.267, lon: -1.018 }, { code: '87', lat: 45.947, lon: 1.241 }, { code: '03', lat: 46.175, lon: 3.466 },
   { code: '69', lat: 45.809, lon: 4.882 }, { code: '73', lat: 45.602, lon: 6.837 }, { code: '33', lat: 44.884, lon: -0.512 },
   { code: '15', lat: 44.954, lon: 2.522 }, { code: '26', lat: 44.65, lon: 4.815 }, { code: '05', lat: 44.65, lon: 6.163 },
-  { code: '64', lat: 43.538, lon: -1.423 }, { code: '65', lat: 43.371, lon: 0.162 }, { code: '31', lat: 43.61, lon: 1.51 },
+  // Hautes-Pyrénées sur Tarbes et Haute-Garonne sur Toulouse (le relevé de la capture les mettait entre les deux villes).
+  { code: '64', lat: 43.538, lon: -1.423 }, { code: '65', lat: 43.233, lon: 0.078 }, { code: '31', lat: 43.605, lon: 1.444 },
   { code: '34', lat: 43.658, lon: 3.938 }, { code: '13', lat: 43.419, lon: 5.489 }, { code: '06', lat: 43.777, lon: 7.31 },
   { code: '66', lat: 42.699, lon: 2.895 }, { code: '2A', lat: 42.016, lon: 8.759 },
 ];
+
+/** France « Léger » : une partie des points de la carte de référence, à la même place (un tous les ~150 km). */
+const LEGER_FRANCE = new Set([
+  '59', '50', '75', '67', '29', '52', '44', '37', '18', '71', '17', '87', '69', '73', '33', '15', '26', '64', '31', '34', '13', '06', '66', '2A',
+]);
+
+/**
+ * France « Élevé » : les points de la carte de référence, plus des chefs-lieux dans les vides (par ordre d'intérêt).
+ * Pictos un peu plus petits (ECHELLE_FRANCE_ELEVE) ; un ajout qui ne trouve pas de place près de sa ville est écarté.
+ */
+const AJOUTS_ELEVE: { code: string; lat: number; lon: number }[] = [
+  { code: '40', lat: 43.89, lon: -0.5 }, { code: '47', lat: 44.203, lon: 0.616 }, { code: '12', lat: 44.35, lon: 2.575 },
+  { code: '2B', lat: 42.697, lon: 9.45 }, { code: '56', lat: 47.658, lon: -2.76 }, { code: '14', lat: 49.183, lon: -0.371 },
+  { code: '86', lat: 46.58, lon: 0.34 }, { code: '24', lat: 45.184, lon: 0.721 }, { code: '21', lat: 47.322, lon: 5.041 },
+  { code: '38', lat: 45.188, lon: 5.725 }, { code: '04', lat: 44.092, lon: 6.236 }, { code: '11', lat: 43.213, lon: 2.351 },
+  { code: '85', lat: 46.67, lon: -1.426 }, { code: '22', lat: 48.514, lon: -2.765 }, { code: '08', lat: 49.773, lon: 4.72 },
+  { code: '68', lat: 48.079, lon: 7.358 }, { code: '43', lat: 45.043, lon: 3.885 }, { code: '46', lat: 44.448, lon: 1.441 },
+  { code: '16', lat: 45.649, lon: 0.156 }, { code: '10', lat: 48.297, lon: 4.074 }, { code: '72', lat: 48.006, lon: 0.199 },
+  { code: '45', lat: 47.903, lon: 1.909 }, { code: '02', lat: 49.564, lon: 3.62 }, { code: '30', lat: 43.837, lon: 4.36 },
+  { code: '84', lat: 43.949, lon: 4.806 }, { code: '63', lat: 45.778, lon: 3.087 }, { code: '54', lat: 48.692, lon: 6.184 },
+  { code: '09', lat: 42.965, lon: 1.607 }, { code: '01', lat: 46.205, lon: 5.226 },
+];
+const CODES_AJOUTS_ELEVE = new Set(AJOUTS_ELEVE.map((a) => a.code));
+/** Taille des marqueurs de la carte de France (em = 22 px × cette échelle) ; plus petite en « Élevé » pour loger les ajouts. */
+const ECHELLE_FRANCE = 1.15;
+const ECHELLE_FRANCE_ELEVE = 0.9;
 
 /** France entière : pas de la grille (px, horizontal et vertical) sur laquelle les points sont répartis à égale distance. */
 const GRILLE_FRANCE: Record<Densite, [number, number]> = { leger: [165, 100], moyen: [126, 74], eleve: [104, 62] };
@@ -589,15 +614,17 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
    * donc à égale distance les uns des autres ; chaque nœud affiche les valeurs du département le plus proche encore libre.
    * Reste nul tant que les contours ne sont pas chargés (rendu serveur) : on retombe alors sur les départements de référence.
    */
-  // France « Moyen » (matin, après-midi) : disposition et style de la carte de référence (CAPTURE_FRANCE). La journée,
-  // avec mini et maxi empilés, garde la grille habituelle (deux valeurs ne tiennent pas entre les points de la capture).
-  const modeCapture = enFrance && densite === 'moyen' && periode !== 'journee' && !miniMaxiAM;
+  // France (matin, après-midi) : disposition et style de la carte de référence (CAPTURE_FRANCE ; une partie en « Léger »,
+  // des ajouts en « Élevé »). La journée, avec mini et maxi empilés, garde la grille habituelle (deux valeurs ne tiennent pas
+  // entre les points de la capture).
+  const modeCapture = enFrance && periode !== 'journee' && !miniMaxiAM;
   const grilleFrance = useMemo(() => {
     if (!enFrance || typeof document === 'undefined' || points.length === 0 || contoursDep.length === 0) return null;
-    // « Moyen » : la disposition fixe de la carte de référence (pas de grille, pas de décalage).
+    // Disposition fixe de la carte de référence (pas de grille). L'ordre compte : il est aussi celui du placement.
     if (modeCapture) {
       const fixe = new Map<string, { x: number; y: number }>();
-      for (const c of CAPTURE_FRANCE) if (points.some((p) => p.code === c.code)) fixe.set(c.code, versEcran(versMonde(c.lat, c.lon), vue));
+      const liste = densite === 'leger' ? CAPTURE_FRANCE.filter((c) => LEGER_FRANCE.has(c.code)) : densite === 'eleve' ? [...CAPTURE_FRANCE, ...AJOUTS_ELEVE] : CAPTURE_FRANCE;
+      for (const c of liste) if (points.some((p) => p.code === c.code)) fixe.set(c.code, versEcran(versMonde(c.lat, c.lon), vue));
       return fixe;
     }
     const ctx = document.createElement('canvas').getContext('2d');
@@ -664,7 +691,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Points affichés : les plus répartis selon la densité, plus toujours les extrêmes et les rafales à signaler. */
   const pointsAffiches = useMemo(() => {
     if (points.length === 0) return points;
-    if (grilleFrance) return points.filter((p) => grilleFrance.has(p.code));
+    if (grilleFrance) {
+      // Dans l'ordre de la grille : en « Élevé », les points de référence sont placés avant les ajouts.
+      const rang = new Map([...grilleFrance.keys()].map((code, i) => [code, i]));
+      return points.filter((p) => grilleFrance.has(p.code)).sort((a, b) => rang.get(a.code)! - rang.get(b.code)!);
+    }
     const reglage = DENSITES[densite];
     // Vue département : les plus grandes villes, en écartant celles trop proches d'une ville déjà choisie (leurs
     // pictos se chevaucheraient). On garde la plus grande distance minimale qui permet d'atteindre le nombre voulu.
@@ -722,7 +753,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }, [points, enDepartement, densite, editions, periode, codesRafales, vue, grilleFrance, miniMaxiAM]);
 
   const nomsVisibles = afficherNoms;
-  const echelleMarqueurs = Math.min(enDepartement ? 1.15 : enFrance ? 1.15 : 1.2, enFrance ? 1.15 : Math.max(0.7, vue.echelle * 1.4));
+  const echelleFrance = modeCapture && densite === 'eleve' ? ECHELLE_FRANCE_ELEVE : ECHELLE_FRANCE;
+  const echelleMarqueurs = enFrance ? echelleFrance : Math.min(enDepartement ? 1.15 : 1.2, Math.max(0.7, vue.echelle * 1.4));
 
   const marqueurs: Marqueur[] = useMemo(() => {
     const reglage = DENSITES[densite];
@@ -795,18 +827,26 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       // Disposition fixe (style de la capture) : picto centré sur le point, température au-dessus, un peu à droite.
       if (dispositionFixe) {
         const lignes = m.mini == null ? 1 : 2;
+        const hautTexte = (1.32 + 0.98 * (lignes - 1)) * em + (nomsVisibles ? 0.9 * em : 0);
         return {
           code: m.code,
           x: m.x,
           y: m.y,
-          // Mesuré dans le rendu (picto 1,13 em, température 0,72 em) : picto ±0,78 em, température jusqu'à 1,23 em à droite
-          // et 1,13 em au-dessus, picto 0,73 em dessous ; le tout agrandi de ECHELLE_CAPTURE_FRANCE.
-          gauche: 0.79 * ECHELLE_CAPTURE_FRANCE * em,
-          droite: 1.24 * ECHELLE_CAPTURE_FRANCE * em,
-          haut: (0.41 + 0.75 * lignes) * ECHELLE_CAPTURE_FRANCE * em + (nomsVisibles ? 0.9 * em : 0),
-          bas: 0.74 * ECHELLE_CAPTURE_FRANCE * em,
+          // Mesuré dans le rendu (picto 1,13 em, température 0,72 em, agrandis de 30 % par `.cmap-capture`) : dessin du picto
+          // ±0,74 em ; température de -0,22 à 1,27 em (« ° » compris) en x, de 1,32 à 0,42 em au-dessus du centre.
+          gauche: 0.74 * em,
+          droite: 1.27 * em,
+          haut: hautTexte,
+          bas: 0.74 * em,
+          // Forme en « L » : un voisin peut se loger sous la température ou au-dessus du picto à gauche (avec le seul rectangle
+          // englobant, la moitié des points de la carte de référence étaient repoussés, jusqu'à 80 px, ou écartés).
+          parties: [
+            { gauche: 0.74 * em, haut: 0.74 * em, droite: 0.74 * em, bas: 0.74 * em },
+            { gauche: 0.22 * em, haut: hautTexte, droite: 1.27 * em, bas: -0.42 * em },
+          ],
           // Villes imposées (Perpignan, Montpellier, Marseille, Paris, Lille) : jamais déplacées.
-          priorite: VILLES_IMPOSEES.some((v) => v.code === m.code) ? -1 : 2,
+          // Villes ajoutées en « Élevé » : après les points de référence, et seulement près de leur ville.
+          priorite: VILLES_IMPOSEES.some((v) => v.code === m.code) ? -1 : CODES_AJOUTS_ELEVE.has(m.code) ? 3 : 2,
         };
       }
       return {

@@ -14,8 +14,16 @@ export interface ElementAPlacer {
   haut: number;
   droite: number;
   bas: number;
-  /** Plus petit = placé en premier (donc jamais déplacé ni écarté avant les autres). */
+  /**
+   * Plus petit = placé en premier (donc jamais déplacé ni écarté avant les autres). Au-delà de 2 (points secondaires, ex.
+   * villes ajoutées à la carte de France « Élevé ») : placé en dernier et décalé de peu, sinon écarté.
+   */
   priorite: number;
+  /**
+   * Forme réelle, si le rectangle englobant est trop grossier (picto + température en « L ») : morceaux, autour du centre,
+   * testés à la place du rectangle. Un voisin peut alors se loger dans le creux du « L ».
+   */
+  parties?: { gauche: number; haut: number; droite: number; bas: number }[];
 }
 
 const MARGE = 3;
@@ -59,18 +67,21 @@ export function placerSansChevauchement(
   const decalagesPrioritaires = genererDecalages(decalageMax * 3, 15);
   // Priorité négative (villes imposées de la carte de France) : même portée, mais vers le nord d'abord.
   const decalagesImposes = genererDecalages(decalageMax * 3, 15, true);
+  // Points secondaires : un tiers de la portée seulement (loin de sa ville, un point n'a plus de sens).
+  const decalagesSecondaires = genererDecalages(decalageMax / 3, 2);
 
   const occupes: Rect[] = [...obstacles];
   const places = new Map<string, { x: number; y: number }>();
   const ordre = elements.map((e, i) => ({ e, i })).sort((a, b) => a.e.priorite - b.e.priorite || a.i - b.i);
 
   for (const { e } of ordre) {
-    for (const [dx, dy] of e.priorite < 0 ? decalagesImposes : e.priorite === 0 ? decalagesPrioritaires : decalages) {
+    for (const [dx, dy] of e.priorite < 0 ? decalagesImposes : e.priorite === 0 ? decalagesPrioritaires : e.priorite > 2 ? decalagesSecondaires : decalages) {
       const rect: Rect = { x: e.x + dx - e.gauche, y: e.y + dy - e.haut, w: e.gauche + e.droite, h: e.haut + e.bas };
       if (rect.x < 2 || rect.y < 2 || rect.x + rect.w > limites.largeur - 2 || rect.y + rect.h > limites.hauteur - 2) continue;
       if (valide && !valide(e, e.x + dx, e.y + dy)) continue;
-      if (occupes.some((o) => seChevauchent(rect, o))) continue;
-      occupes.push(rect);
+      const morceaux = e.parties?.map((p) => ({ x: e.x + dx - p.gauche, y: e.y + dy - p.haut, w: p.gauche + p.droite, h: p.haut + p.bas })) ?? [rect];
+      if (morceaux.some((m) => occupes.some((o) => seChevauchent(m, o)))) continue;
+      occupes.push(...morceaux);
       places.set(e.code, { x: e.x + dx, y: e.y + dy });
       break;
     }
