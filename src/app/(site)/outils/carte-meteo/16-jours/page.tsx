@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import CarteMeteo, { type DonneesCarte } from '@/components/carte-meteo/CarteMeteo';
-import { aujourdhuiParis, ajouterJours, estModele, MODELES, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
+import { aujourdhuiParis, ajouterJours, estModele, MODELES, type ModeleSource } from '@/lib/carte-meteo/previsions-modeles';
 import { chargerPrevisionsCarteJours } from '@/lib/carte-meteo/sources';
 
 // La date « du jour » doit être celle de la requête ; les fichiers de prévisions sont mis en cache côté serveur.
@@ -15,11 +15,11 @@ export const metadata: Metadata = {
 };
 
 const NOMBRE_DE_CARTES = 16;
-const MODELES_LONGUE_ECHEANCE: ModeleMeteo[] = ['cep', 'gfs'];
+const MODELES_LONGUE_ECHEANCE: ModeleSource[] = ['cep', 'gfs'];
 
 export default async function PageSeizeJours({ searchParams }: { searchParams: Promise<{ modele?: string }> }) {
   const { modele: demande } = await searchParams;
-  const modele: ModeleMeteo = estModele(demande ?? null) && MODELES_LONGUE_ECHEANCE.includes(demande as ModeleMeteo) ? (demande as ModeleMeteo) : 'cep';
+  const modele: ModeleSource = estModele(demande ?? null) && MODELES_LONGUE_ECHEANCE.includes(demande as ModeleSource) ? (demande as ModeleSource) : 'cep';
   const infos = MODELES.find((m) => m.id === modele)!;
 
   const aujourdhui = aujourdhuiParis();

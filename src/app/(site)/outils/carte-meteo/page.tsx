@@ -20,10 +20,10 @@ const DEPARTEMENT_PO = '66';
 const avecDelai = <T,>(promesse: Promise<T>, ms: number) =>
   Promise.race([promesse, new Promise<T>((_, rejeter) => setTimeout(() => rejeter(new Error('délai dépassé')), ms))]);
 
-/** Villes d'un département : AROME, puis Harmonie, puis CEP si le modèle précédent n'a pas le jour demandé. */
+/** Villes d'un département : moyenne des modèles, puis AROME, Harmonie, CEP si le précédent n'a pas le jour demandé. */
 async function villesAvecSecours(dateISO: string, dep: string): Promise<{ modele: ModeleMeteo; points: PointCarte[] }> {
   let derniere: unknown = null;
-  for (const modele of ['arome', 'harmonie', 'cep'] as const) {
+  for (const modele of ['moyenne', 'arome', 'harmonie', 'cep'] as const) {
     try {
       return { modele, points: await chargerPrevisionsVilles(modele, dateISO, dep) };
     } catch (e) {
@@ -83,7 +83,7 @@ export default async function PageCarteMeteo() {
           aujourdhui={aujourdhui}
           initial={null}
           initialVilles={initialPO}
-          reglages={{ niveau: 'departement', departement: DEPARTEMENT_PO, jour: 1 }}
+          reglages={{ niveau: 'departement', departement: DEPARTEMENT_PO, jour: 1, modele: 'moyenne' }}
         />
       </div>
     </>

@@ -436,7 +436,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
               <fieldset>
                 <legend className={legendeBarre}>Modèle</legend>
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
-                  {MODELES.filter((m) => !m.departements).map((m) => (
+                  {MODELES.filter((m) => !m.departements && !m.vueDepartement).map((m) => (
                     <label key={m.id} className="text-sm">
                       <input
                         type="radio"

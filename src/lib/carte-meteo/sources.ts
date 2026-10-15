@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { COORDS_DEPARTEMENTS } from './departements-coords';
 import { DEPARTEMENTS_FR } from './departements-fr';
 import { ALTITUDE_MAX_VILLE_FRANCE, VILLES_FRANCE } from './villes-france';
-import { CODES_DEPARTEMENTS, pointDepuisSerie, type ModeleMeteo, type PointCarte, type Serie } from './previsions-modeles';
+import { CODES_DEPARTEMENTS, MODELES_MOYENNE, modeleDisponible, pointDepuisSerie, type ModeleMeteo, type ModeleSource, type PointCarte, type Serie } from './previsions-modeles';
 
 /**
  * Prévisions de la carte météo : les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (branche `data`),
@@ -17,14 +17,14 @@ import { CODES_DEPARTEMENTS, pointDepuisSerie, type ModeleMeteo, type PointCarte
  * Aucun service tiers : on lit ces fichiers, on n'en garde que ce qui sert (un point par département, ~30 villes par département)
  * et on le met en cache (mémoire + disque) tant que le passage du modèle n'a pas changé.
  */
-const BASES: Record<ModeleMeteo, string> = {
+const BASES: Record<ModeleSource, string> = {
   arome: 'https://raw.githubusercontent.com/alertesmeteo-hub/arome-meteofrance/data',
   harmonie: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie/data',
   harmonie2km: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-dmi-2km/data',
   cep: 'https://raw.githubusercontent.com/alertesmeteo-hub/cep/data',
   gfs: 'https://raw.githubusercontent.com/alertesmeteo-hub/gfs/data',
 };
-const LIBELLES: Record<ModeleMeteo, string> = {
+const LIBELLES: Record<ModeleSource, string> = {
   arome: 'AROME 0,01° (Météo-France)',
   harmonie: 'HARMONIE-AROME (KNMI)',
   harmonie2km: 'HARMONIE DINI 2 km (DMI)',
@@ -84,7 +84,7 @@ interface FichierDepartement {
 const memoire = new Map<string, Extrait>();
 /** Lectures en cours : plusieurs requêtes simultanées pour le même département n'ouvrent qu'un seul téléchargement. */
 const enCours = new Map<string, Promise<Extrait>>();
-const indexCourant = new Map<ModeleMeteo, { t: number; runTime: string }>();
+const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
 const VERSION_CACHE = 'v11';
@@ -118,7 +118,7 @@ async function recuperer(url: string, delaiMs: number): Promise<Response> {
 }
 
 /** Passage du modèle en cours (run_time de l'index) ; en cas d'échec on garde le dernier connu. */
-async function passageCourant(modele: ModeleMeteo): Promise<string | null> {
+async function passageCourant(modele: ModeleSource): Promise<string | null> {
   const connu = indexCourant.get(modele);
   if (connu && Date.now() - connu.t < VALIDITE_INDEX_MS) return connu.runTime;
   try {
@@ -274,7 +274,7 @@ async function ecrireDisque(cle: string, extrait: Extrait): Promise<void> {
 }
 
 /** Extrait d'un département pour le passage courant du modèle (mémoire, puis disque, puis dépôt GitHub). */
-function extraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> {
+function extraitDepartement(modele: ModeleSource, dep: string): Promise<Extrait> {
   const cle = `${modele}-${dep}`;
   const deja = enCours.get(cle);
   if (deja) return deja;
@@ -283,7 +283,7 @@ function extraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> 
   return lecture;
 }
 
-async function lireExtraitDepartement(modele: ModeleMeteo, dep: string): Promise<Extrait> {
+async function lireExtraitDepartement(modele: ModeleSource, dep: string): Promise<Extrait> {
   const cle = `${modele}-${dep}-${VERSION_CACHE}`;
   const runTime = await passageCourant(modele);
   const enMemoire = memoire.get(cle);
@@ -327,7 +327,7 @@ async function enParallele<T, R>(liste: T[], limite: number, tache: (x: T) => Pr
 
 /** Prévisions des 96 départements pour un modèle et plusieurs jours (une seule lecture des fichiers) : null pour un jour sans donnée. */
 export async function chargerPrevisionsCarteJours(
-  modele: ModeleMeteo,
+  modele: ModeleSource,
   datesISO: string[],
   apresMidiSeulement = false
 ): Promise<Record<string, PointCarte[] | null>> {
@@ -354,6 +354,7 @@ export async function chargerPrevisionsCarteJours(
 
 /** Prévisions des 96 départements pour un modèle et un jour (un point par département). */
 export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: string): Promise<PointCarte[]> {
+  if (modele === 'moyenne') throw new Error('La moyenne des modèles est réservée à la vue département');
   const points = (await chargerPrevisionsCarteJours(modele, [dateISO], true))[dateISO];
   if (!points) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO}`);
   return points;
@@ -361,9 +362,34 @@ export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: strin
 
 /** Prévisions des principales communes d'un département (vue « département »). */
 export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: string, dep: string): Promise<PointCarte[]> {
+  if (modele === 'moyenne') return chargerPrevisionsVillesMoyenne(dateISO, dep);
   const extrait = await extraitDepartement(modele, dep);
   const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO), lat: v.lat, lon: v.lon, ...(v.prioritaire ? { prioritaire: true } : {}), ...(v.placeExacte ? { placeExacte: true } : {}) }));
   const valides = points.filter((p) => p.tempApresMidi != null);
   if (!valides.length) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO} (département ${dep})`);
   return valides;
+}
+
+/** Températures d'un point (les autres valeurs viennent du modèle de référence). */
+const CHAMPS_TEMPERATURE = ['mini', 'maxi', 'tempMatin', 'tempApresMidi'] as const;
+
+/**
+ * « Moyenne des modèles » : les villes du premier modèle disponible (AROME, puis Harmonie…), dont il garde pictos, nuages,
+ * pluie et vent ; chaque température est la moyenne des modèles qui ont cette ville pour ce jour (CEP et GFS au pas de
+ * 3 h comptent comme les autres). Un modèle sans donnée ce jour-là est simplement laissé de côté.
+ */
+async function chargerPrevisionsVillesMoyenne(dateISO: string, dep: string): Promise<PointCarte[]> {
+  const modeles = MODELES_MOYENNE.filter((m) => modeleDisponible(m, dep));
+  const resultats = await Promise.allSettled(modeles.map((m) => chargerPrevisionsVilles(m, dateISO, dep)));
+  const listes = resultats.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+  if (!listes.length) throw new Error(`Moyenne des modèles : aucune donnée pour le ${dateISO} (département ${dep})`);
+  const parModele = listes.map((liste) => new Map(liste.map((p) => [p.code, p])));
+  return listes[0].map((base) => {
+    const point: PointCarte = { ...base };
+    for (const champ of CHAMPS_TEMPERATURE) {
+      const valeurs = parModele.map((m) => m.get(base.code)?.[champ]).filter((v): v is number => typeof v === 'number');
+      point[champ] = valeurs.length ? Math.round((valeurs.reduce((a, b) => a + b, 0) / valeurs.length) * 10) / 10 : null;
+    }
+    return point;
+  });
 }

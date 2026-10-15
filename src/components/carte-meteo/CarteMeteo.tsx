@@ -349,7 +349,8 @@ interface Props {
   /** Prévisions des villes d'un département déjà chargées côté serveur (carte préréglée sur un département). */
   initialVilles?: DonneesVilles | null;
   /** Réglages de départ : la carte peut être préréglée (ex. un département, demain). */
-  reglages?: { niveau?: Niveau; departement?: string; jour?: number; miniMaxi?: boolean };
+  /** `modele` : modèle par défaut au-delà d'aujourd'hui (ex. « Moyenne des modèles » pour la carte des Pyrénées-Orientales). */
+  reglages?: { niveau?: Niveau; departement?: string; jour?: number; miniMaxi?: boolean; modele?: ModeleMeteo };
   /** Vignette : seulement la carte et son bouton d'export (page des 16 jours), sans les menus de réglage. */
   compact?: boolean;
 }
@@ -452,14 +453,16 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       setErreur(null);
       return;
     }
-    if (modeleTouche || (modele !== 'arome' && modele !== 'harmonie2km')) return;
-    // Par défaut : Harmonie 2 km aujourd'hui sur le 66 (le plus fin), AROME les autres jours et ailleurs.
-    const defaut = jour === 0 ? modeleParDefautJ0(depVue) : 'arome';
+    if (modeleTouche || !['arome', 'harmonie2km', 'moyenne'].includes(modele)) return;
+    // Par défaut : Harmonie 2 km aujourd'hui sur le 66 (le plus fin) ; les autres jours, le modèle des réglages de la carte
+    // (moyenne des modèles pour celle des Pyrénées-Orientales) s'il est disponible, sinon AROME.
+    const reglage = reglages?.modele && modeleDisponible(reglages.modele, depVue) ? reglages.modele : 'arome';
+    const defaut = jour === 0 ? modeleParDefautJ0(depVue) : reglage;
     if (modele !== defaut) {
       setModele(defaut);
       setErreur(null);
     }
-  }, [depVue, jour, modele, modeleTouche]);
+  }, [depVue, jour, modele, modeleTouche, reglages?.modele]);
 
   useEffect(() => {
     if (enDepartement || aJour || erreur) return;

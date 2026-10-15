@@ -9,9 +9,15 @@ import { temperaturePlausible, ventPlausible } from './limites';
  *   - cep : CEP, modèle du Centre européen (ECMWF IFS), pas de 3 h, 15 jours ;
  *   - gfs : GFS de la NOAA, pas de 3 h, 15 jours.
  */
-export type ModeleMeteo = 'arome' | 'harmonie2km' | 'harmonie' | 'cep' | 'gfs';
+export type ModeleMeteo = 'moyenne' | 'arome' | 'harmonie2km' | 'harmonie' | 'cep' | 'gfs';
+/** Modèles qui ont leurs propres fichiers de prévision (tous sauf la moyenne). */
+export type ModeleSource = Exclude<ModeleMeteo, 'moyenne'>;
+/** Modèles moyennés par « Moyenne des modèles » (Harmonie 2 km seulement là où il est publié). */
+export const MODELES_MOYENNE: ModeleSource[] = ['arome', 'harmonie2km', 'harmonie', 'cep', 'gfs'];
 
-export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string; departements?: string[] }[] = [
+export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string; departements?: string[]; vueDepartement?: boolean }[] = [
+  // Températures moyennées sur les modèles disponibles ; pictos, nuages et vent d'AROME. Vue département seulement.
+  { id: 'moyenne', libelle: 'Moyenne des modèles', fournisseur: 'T° : AROME, Harmonie, CEP, GFS', vueDepartement: true },
   { id: 'arome', libelle: 'AROME', fournisseur: 'Météo-France' },
   // HARMONIE DINI du DMI à 2 km, publié pour les Pyrénées-Orientales seulement (dépôt harmonie-dmi-2km).
   { id: 'harmonie2km', libelle: 'Harmonie 2 km', fournisseur: 'DMI', departements: ['66'] },
@@ -24,8 +30,10 @@ export const estModele = (v: string | null): v is ModeleMeteo => MODELES.some((m
 
 /** Modèle publié pour cette zone ? (`dep` : département de la vue département, nul pour la France ou une région). */
 export const modeleDisponible = (id: ModeleMeteo, dep: string | null): boolean => {
-  const couverture = MODELES.find((m) => m.id === id)?.departements;
-  return !couverture || (dep != null && couverture.includes(dep));
+  const m = MODELES.find((x) => x.id === id);
+  if (!m) return false;
+  if (m.vueDepartement && dep == null) return false;
+  return !m.departements || (dep != null && m.departements.includes(dep));
 };
 
 /** Modèle par défaut d'un département pour aujourd'hui : le plus fin disponible (Harmonie 2 km pour le 66), sinon AROME. */
@@ -35,7 +43,7 @@ export const modeleParDefautJ0 = (dep: string | null): ModeleMeteo => (modeleDis
  * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. Les modèles à 48-60 h ne couvrent pas
  * l'après-midi de J+2 ; le CEP et GFS vont jusqu'à 15 jours (J+15 n'a des données que selon l'heure du passage).
  */
-export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { arome: 1, harmonie2km: 1, harmonie: 1, cep: 15, gfs: 15 };
+export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, harmonie2km: 1, harmonie: 1, cep: 15, gfs: 15 };
 
 /** Un point par département métropolitain (ou par ville), avec les valeurs de l'après-midi (12 h-18 h) et de la journée. */
 export interface PointCarte {
