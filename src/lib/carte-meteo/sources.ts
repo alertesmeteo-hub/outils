@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { COORDS_DEPARTEMENTS } from './departements-coords';
 import { DEPARTEMENTS_FR } from './departements-fr';
+import { ALTITUDE_MAX_VILLE_FRANCE, VILLES_FRANCE } from './villes-france';
 import { CODES_DEPARTEMENTS, pointDepuisSerie, type ModeleMeteo, type PointCarte, type Serie } from './previsions-modeles';
 
 /**
@@ -51,7 +52,9 @@ interface Ville {
 
 interface Extrait {
   runTime: string;
+  /** Point du département sur la carte de France : la ville de VILLES_FRANCE, sinon la commune près du centre. */
   chef: Serie;
+  chefCommune: { nom: string; lat: number; lon: number };
   villes: Ville[];
 }
 
@@ -81,7 +84,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleMeteo, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v10';
+const VERSION_CACHE = 'v11';
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -222,7 +225,10 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
   const altitude = (pointId: number) => fichier.points?.[pointId]?.[3] ?? 0;
   const basses = communes.filter((x) => altitude(x.pointId) <= ALTITUDE_MAX_FRANCE);
   const plusBasse = communes.reduce((a, b) => (altitude(b.pointId) < altitude(a.pointId) ? b : a));
-  const chefCommune = basses.length === 0 ? plusBasse : centre ? basses.reduce((a, b) => (distance(centre, b) < distance(centre, a) ? b : a)) : basses[0];
+  const auCentre = basses.length === 0 ? plusBasse : centre ? basses.reduce((a, b) => (distance(centre, b) < distance(centre, a) ? b : a)) : basses[0];
+  // Ville du picto de la carte de France (Marseille, Toulouse…), sauf si son point de grille est trop haut.
+  const nommee = communes.find((x) => x.nom === VILLES_FRANCE[dep] && altitude(x.pointId) <= ALTITUDE_MAX_VILLE_FRANCE);
+  const chefCommune = nommee ?? auCentre;
 
   const retouche = VILLES_RETOUCHEES[dep];
   const gardees = communes.filter((x) => retouche?.garder?.includes(x.nom));
@@ -237,7 +243,12 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     ...(gardees.includes(v) ? { prioritaire: true } : {}),
     ...(gardees.includes(v) || retouche?.exactes?.includes(v.nom) ? { placeExacte: true } : {}),
   }));
-  return { runTime, chef: serieDuPoint(fichier, c, chefCommune.pointId), villes };
+  return {
+    runTime,
+    chef: serieDuPoint(fichier, c, chefCommune.pointId),
+    chefCommune: { nom: chefCommune.nom, lat: chefCommune.lat, lon: chefCommune.lon },
+    villes,
+  };
 }
 
 async function lireDisque(cle: string): Promise<Extrait | null> {
@@ -327,7 +338,8 @@ export async function chargerPrevisionsCarteJours(
       return;
     }
     for (const date of datesISO) {
-      const point = pointDepuisSerie(dep, DEPARTEMENTS_FR[dep] ?? dep, r.value.chef, date);
+      const { nom: ville, lat, lon } = r.value.chefCommune;
+      const point = { ...pointDepuisSerie(dep, DEPARTEMENTS_FR[dep] ?? dep, r.value.chef, date), ville, lat, lon };
       if (point.tempApresMidi != null || (!apresMidiSeulement && point.maxi != null)) (sortie[date] as PointCarte[]).push(point);
     }
   });

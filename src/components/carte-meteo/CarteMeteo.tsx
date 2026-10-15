@@ -132,23 +132,27 @@ const COEFFICIENT_FRANCE: Record<Densite, number> = { leger: 0.65, moyen: 1, ele
 const CAPTURE_FRANCE: { code: string; lat: number; lon: number }[] = [
   // Lille et Amiens resserrés de 2-3 px (marge du relevé) : sinon le « 13° » d'Amiens touche le picto de Lille et Amiens est repoussé.
   { code: '59', lat: 50.631, lon: 3.196 }, { code: '80', lat: 49.852, lon: 2.623 }, { code: '50', lat: 49.639, lon: -1.591 },
-  { code: '27', lat: 49.425, lon: 1.342 }, { code: '51', lat: 49.211, lon: 4.14 }, { code: '57', lat: 49.103, lon: 6.231 },
+  // Rouen (Seine-Maritime) : le point de la capture était dans l'Eure, entre Rouen et Les Andelys.
+  { code: '76', lat: 49.443, lon: 1.099 }, { code: '51', lat: 49.211, lon: 4.14 }, { code: '57', lat: 49.103, lon: 6.231 },
   { code: '75', lat: 48.779, lon: 2.589 }, { code: '67', lat: 48.626, lon: 7.748 }, { code: '29', lat: 48.408, lon: -4.289 },
   { code: '35', lat: 48.189, lon: -1.591 }, { code: '61', lat: 48.452, lon: 0.162 }, { code: '52', lat: 48.057, lon: 5.219 },
   { code: '90', lat: 47.682, lon: 6.905 }, { code: '89', lat: 47.837, lon: 3.601 }, { code: '44', lat: 47.259, lon: -1.524 },
   { code: '37', lat: 47.393, lon: 0.769 }, { code: '18', lat: 47.125, lon: 2.454 }, { code: '71', lat: 46.788, lon: 4.882 },
   { code: '17', lat: 46.267, lon: -1.018 }, { code: '87', lat: 45.947, lon: 1.241 }, { code: '03', lat: 46.175, lon: 3.466 },
-  { code: '69', lat: 45.809, lon: 4.882 }, { code: '73', lat: 45.602, lon: 6.837 }, { code: '33', lat: 44.884, lon: -0.512 },
+  { code: '69', lat: 45.809, lon: 4.882 }, { code: '73', lat: 45.665, lon: 6.41 }, { code: '33', lat: 44.884, lon: -0.512 },
   { code: '15', lat: 44.954, lon: 2.522 }, { code: '26', lat: 44.65, lon: 4.815 }, { code: '05', lat: 44.65, lon: 6.163 },
   // Hautes-Pyrénées sur Tarbes et Haute-Garonne sur Toulouse (le relevé de la capture les mettait entre les deux villes).
   { code: '64', lat: 43.538, lon: -1.423 }, { code: '65', lat: 43.233, lon: 0.078 }, { code: '31', lat: 43.605, lon: 1.444 },
-  { code: '34', lat: 43.658, lon: 3.938 }, { code: '13', lat: 43.419, lon: 5.489 }, { code: '06', lat: 43.777, lon: 7.31 },
+  { code: '34', lat: 43.658, lon: 3.938 }, { code: '13', lat: 43.296, lon: 5.37 }, { code: '06', lat: 43.777, lon: 7.31 },
   { code: '66', lat: 42.699, lon: 2.895 }, { code: '2A', lat: 42.016, lon: 8.759 },
 ];
 
-/** France « Léger » : une partie des points de la carte de référence, à la même place (un tous les ~150 km). */
+/**
+ * France « Léger » : 24 points répartis de façon homogène parmi ceux de « Moyen » et d'« Élevé » (au moins 120 km entre
+ * deux pictos, aucun endroit à plus de 125 km d'un picto), grandes villes comprises.
+ */
 const LEGER_FRANCE = new Set([
-  '59', '50', '75', '67', '29', '52', '44', '37', '18', '71', '17', '87', '69', '73', '33', '15', '26', '64', '31', '34', '13', '06', '66', '2A',
+  '59', '50', '76', '75', '08', '57', '67', '29', '61', '52', '44', '18', '86', '69', '33', '15', '05', '64', '31', '34', '13', '06', '66', '2A',
 ]);
 
 /**
@@ -165,7 +169,7 @@ const AJOUTS_ELEVE: { code: string; lat: number; lon: number }[] = [
   { code: '16', lat: 45.649, lon: 0.156 }, { code: '10', lat: 48.297, lon: 4.074 }, { code: '72', lat: 48.006, lon: 0.199 },
   { code: '45', lat: 47.903, lon: 1.909 }, { code: '02', lat: 49.564, lon: 3.62 }, { code: '30', lat: 43.837, lon: 4.36 },
   { code: '84', lat: 43.949, lon: 4.806 }, { code: '63', lat: 45.778, lon: 3.087 }, { code: '54', lat: 48.692, lon: 6.184 },
-  { code: '09', lat: 42.965, lon: 1.607 }, { code: '01', lat: 46.205, lon: 5.226 },
+  { code: '09', lat: 42.965, lon: 1.607 }, { code: '01', lat: 46.205, lon: 5.226 }, { code: '27', lat: 49.018, lon: 1.141 },
 ];
 const CODES_AJOUTS_ELEVE = new Set(AJOUTS_ELEVE.map((a) => a.code));
 /** Taille des marqueurs de la carte de France (em = 22 px × cette échelle) ; plus petite en « Élevé » pour loger les ajouts. */
@@ -623,7 +627,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // Disposition fixe de la carte de référence (pas de grille). L'ordre compte : il est aussi celui du placement.
     if (modeCapture) {
       const fixe = new Map<string, { x: number; y: number }>();
-      const liste = densite === 'leger' ? CAPTURE_FRANCE.filter((c) => LEGER_FRANCE.has(c.code)) : densite === 'eleve' ? [...CAPTURE_FRANCE, ...AJOUTS_ELEVE] : CAPTURE_FRANCE;
+      const liste = densite === 'leger' ? [...CAPTURE_FRANCE, ...AJOUTS_ELEVE].filter((c) => LEGER_FRANCE.has(c.code)) : densite === 'eleve' ? [...CAPTURE_FRANCE, ...AJOUTS_ELEVE] : CAPTURE_FRANCE;
       for (const c of liste) if (points.some((p) => p.code === c.code)) fixe.set(c.code, versEcran(versMonde(c.lat, c.lon), vue));
       return fixe;
     }
@@ -785,7 +789,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         code: p.code,
         x,
         y,
-        nom: niveauNoms === 'ville' ? CHEF_LIEU_PAR_DEPARTEMENT[p.code] ?? p.nom : p.nom,
+        nom: niveauNoms === 'ville' ? p.ville ?? CHEF_LIEU_PAR_DEPARTEMENT[p.code] ?? p.nom : p.nom,
+        // Carte de France : la ville du picto, puis le département (« Marseille — Bouches-du-Rhône »).
+        infoBulle: p.ville && p.ville !== p.nom ? `${p.ville} — ${p.nom}` : undefined,
         picto: (periode === 'matin' ? e?.pictoM : periode === 'apres-midi' ? e?.pictoAM : e?.pictoJ) ?? '☀️',
         valeur: e ? (periode === 'matin' ? e.tempM : periode === 'apres-midi' && !miniMaxiAM ? e.tempAM : e.maxi) : '',
         mini: periode === 'journee' || miniMaxiAM ? e?.mini ?? '' : null,

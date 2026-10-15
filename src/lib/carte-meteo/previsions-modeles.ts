@@ -30,7 +30,9 @@ export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { arome: 1, harmonie: 1
 export interface PointCarte {
   code: string;
   nom: string;
-  /** Renseignées pour les villes (vue département) ; les départements utilisent COORDS_DEPARTEMENTS. */
+  /** Carte de France : commune dont viennent les valeurs du département (info-bulle, noms « Villes »). */
+  ville?: string;
+  /** Position de la commune (ville en vue département, commune représentative sinon) ; à défaut COORDS_DEPARTEMENTS. */
   lat?: number;
   lon?: number;
   /** Ville à toujours afficher en vue département. */

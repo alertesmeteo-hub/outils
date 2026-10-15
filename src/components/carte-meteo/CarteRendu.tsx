@@ -63,6 +63,8 @@ export interface Marqueur {
   x: number;
   y: number;
   nom: string;
+  /** Texte de l'info-bulle s'il diffère du nom (carte de France : ville du picto et département). */
+  infoBulle?: string;
   picto: PictoMeteo;
   /** Valeur principale (T° de l'après-midi, ou maximum de la journée). */
   valeur: string;
@@ -564,7 +566,7 @@ export default function CarteRendu({
             key={m.code}
             className={`cmap-marqueur ${grosPictos ? 'cmap-gros' : ''} ${carteLocale ? 'cmap-local' : ''} ${styleCapture ? 'cmap-capture' : ''}`}
             style={{ left: m.x, top: m.y, fontSize: 22 * echelleMarqueurs, ...(paletteOuvertePour === m.code ? { zIndex: 20 } : {}) }}
-            title={m.nom}
+            title={m.infoBulle ?? m.nom}
           >
             {afficherNoms && <div className="cmap-nom">{m.nom}</div>}
             <div className={`cmap-ligne ${m.mini == null ? 'cmap-ligne-simple' : ''}`}>
@@ -572,7 +574,7 @@ export default function CarteRendu({
                 type="button"
                 className={`cmap-picto ${pictosSelectionnes?.has(m.code) ? 'cmap-picto-selectionne' : ''}`}
                 // Le nom de la ville en tête : ce titre remplace celui du marqueur au survol du picto.
-                title={`${m.nom ? `${m.nom}\n` : ''}Clic : changer l'icône · Ctrl/Maj + clic : en sélectionner plusieurs`}
+                title={`${m.infoBulle ?? m.nom ? `${m.infoBulle ?? m.nom}\n` : ''}Clic : changer l'icône · Ctrl/Maj + clic : en sélectionner plusieurs`}
                 onClick={(e) => onBasculerPalette(m.code, e.ctrlKey || e.shiftKey || e.metaKey)}
               >
                 {estPictoImage(m.picto) ? <img src={cheminPictoImage(m.picto)} alt="" className="cmap-picto-image" /> : m.picto}
