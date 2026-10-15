@@ -12,6 +12,7 @@ import { CODES_DEPARTEMENTS, pointDepuisSerie, type ModeleMeteo, type PointCarte
  * un fichier JSON par département avec, pour chaque commune, la prévision pas à pas :
  *   - AROME 0,01° de Météo-France (arome-meteofrance), pas horaire sur 48 h ;
  *   - HARMONIE-AROME du KNMI (harmonie), pas horaire sur 60 h ;
+ *   - HARMONIE DINI 2 km du DMI (harmonie-dmi-2km), pas horaire sur 60 h, Pyrénées-Orientales seulement ;
  *   - CEP, ECMWF IFS (cep), et GFS de la NOAA (gfs), pas de 3 h sur 15 jours.
  * Aucun service tiers : on lit ces fichiers, on n'en garde que ce qui sert (un point par département, ~30 villes par département)
  * et on le met en cache (mémoire + disque) tant que le passage du modèle n'a pas changé.
@@ -19,12 +20,14 @@ import { CODES_DEPARTEMENTS, pointDepuisSerie, type ModeleMeteo, type PointCarte
 const BASES: Record<ModeleMeteo, string> = {
   arome: 'https://raw.githubusercontent.com/alertesmeteo-hub/arome-meteofrance/data',
   harmonie: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie/data',
+  harmonie2km: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-dmi-2km/data',
   cep: 'https://raw.githubusercontent.com/alertesmeteo-hub/cep/data',
   gfs: 'https://raw.githubusercontent.com/alertesmeteo-hub/gfs/data',
 };
 const LIBELLES: Record<ModeleMeteo, string> = {
   arome: 'AROME 0,01° (Météo-France)',
   harmonie: 'HARMONIE-AROME (KNMI)',
+  harmonie2km: 'HARMONIE DINI 2 km (DMI)',
   cep: 'CEP (ECMWF IFS)',
   gfs: 'GFS (NOAA)',
 };
@@ -210,7 +213,8 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     wind_speed_kmh: indice(cols, 'wind_speed_kmh'),
     wind_gust_kmh: indice(cols, 'wind_gust_kmh'),
     visibility_km: indice(cols, 'visibility_km'),
-    thunder_risk_code: indice(cols, 'thunder_risk_code'),
+    // Absente du HARMONIE DINI du DMI : pas de risque d'orage (valeurs nulles).
+    thunder_risk_code: cols.indexOf('thunder_risk_code'),
     snowfall_mm: indice(cols, 'snowfall_mm'),
   };
   const communes = fichier.communes

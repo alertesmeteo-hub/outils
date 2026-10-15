@@ -23,7 +23,7 @@ import {
   type Boite,
   type Zone,
 } from '@/lib/carte-meteo/projection-france';
-import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
+import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, modeleDisponible, modeleParDefautJ0, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import CarteRendu, {
   ECHELLE_VENT_REDUIT,
   LARGEUR_VENT,
@@ -335,7 +335,7 @@ export function libelleJour(dateISO: string): string {
     .toUpperCase();
 }
 
-export const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { arome: 'harmonie', harmonie: 'cep' };
+export const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { harmonie2km: 'arome', arome: 'harmonie', harmonie: 'cep' };
 export const NOM_ECHEANCE = (n: number) => (n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : `J+${n}`);
 
 const champLabel = 'block text-sm font-medium';
@@ -358,6 +358,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const idCarte = useId();
   const nom = (base: string) => `${base}-${idCarte}`;
   const [modele, setModele] = useState<ModeleMeteo>(initial?.modele ?? initialVilles?.modele ?? 'arome');
+  /** Modèle choisi à la main (ou imposé par un repli) : le modèle par défaut du jour ne le remplace plus. */
+  const [modeleTouche, setModeleTouche] = useState(false);
   const [jour, setJour] = useState(reglages?.jour ?? 0);
   const [niveau, setNiveau] = useState<Niveau>(reglages?.niveau ?? 'france');
   const [region, setRegion] = useState(REGIONS_FR[0]);
@@ -441,6 +443,23 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const dateISO = ajouterJours(aujourdhui, jour);
   const aJour = donnees?.modele === modele && donnees.dateISO === dateISO;
   const villesAJour = donneesVilles?.modele === modele && donneesVilles.dateISO === dateISO && donneesVilles.departement === departement;
+  const depVue = enDepartement ? departement : null;
+
+  useEffect(() => {
+    // Modèle non publié pour cette zone (Harmonie 2 km hors du 66, ou en France / région) : AROME.
+    if (!modeleDisponible(modele, depVue)) {
+      setModele('arome');
+      setErreur(null);
+      return;
+    }
+    if (modeleTouche || (modele !== 'arome' && modele !== 'harmonie2km')) return;
+    // Par défaut : Harmonie 2 km aujourd'hui sur le 66 (le plus fin), AROME les autres jours et ailleurs.
+    const defaut = jour === 0 ? modeleParDefautJ0(depVue) : 'arome';
+    if (modele !== defaut) {
+      setModele(defaut);
+      setErreur(null);
+    }
+  }, [depVue, jour, modele, modeleTouche]);
 
   useEffect(() => {
     if (enDepartement || aJour || erreur) return;
@@ -461,7 +480,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         if (e.name === 'AbortError') return;
         // AROME (18 h) et Harmonie (60 h) n'ont pas toujours le jour demandé : on passe au modèle suivant, puis au CEP.
         const suivant = SECOURS[modele];
-        if (e.message.startsWith('Pas de prévision') && suivant) setModele(suivant);
+        if (e.message.startsWith('Pas de prévision') && suivant) {
+          setModele(suivant);
+          // Le modèle par défaut (Harmonie 2 km aujourd'hui sur le 66) ne doit pas être reproposé aussitôt.
+          setModeleTouche(true);
+        }
         else setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
@@ -485,7 +508,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         if (e.name === 'AbortError') return;
         // AROME (18 h) et Harmonie (60 h) n'ont pas toujours le jour demandé : on passe au modèle suivant, puis au CEP.
         const suivant = SECOURS[modele];
-        if (e.message.startsWith('Pas de prévision') && suivant) setModele(suivant);
+        if (e.message.startsWith('Pas de prévision') && suivant) {
+          setModele(suivant);
+          // Le modèle par défaut (Harmonie 2 km aujourd'hui sur le 66) ne doit pas être reproposé aussitôt.
+          setModeleTouche(true);
+        }
         else setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
@@ -1068,6 +1095,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   function changerModele(m: ModeleMeteo) {
     setModele(m);
+    setModeleTouche(true);
     setJour((j) => Math.min(j, ECHEANCE_MAX[m]));
     setErreur(null);
     setTitreManuel(null);
@@ -1541,7 +1569,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <fieldset>
               <legend className={legendeBarre}>Modèle</legend>
               <div className="flex flex-wrap gap-x-3 gap-y-1">
-                {MODELES.map((m) => (
+                {MODELES.filter((m) => modeleDisponible(m.id, depVue)).map((m) => (
                   <label key={m.id} className="text-sm" title={`${m.libelle} — ${m.fournisseur}`}>
                     <input type="radio" name={nom('modele')} checked={modele === m.id} onChange={() => changerModele(m.id)} className="mr-1.5" />
                     {m.libelle} ({m.fournisseur})

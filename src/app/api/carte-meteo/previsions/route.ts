@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
-import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, estModele, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
+import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, estModele, modeleDisponible, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
 import { chargerPrevisionsCarte, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
 
 /**
- * GET /api/carte-meteo/previsions/?modele=arome|harmonie|cep|gfs&date=YYYY-MM-DD[&dep=29 | &deps=29,22,35,56]
+ * GET /api/carte-meteo/previsions/?modele=arome|harmonie2km|harmonie|cep|gfs&date=YYYY-MM-DD[&dep=29 | &deps=29,22,35,56]
  * Sans `dep` : prévisions de tous les départements métropolitains ; avec `dep` : de ses principales villes ;
  * avec `deps` (cartes infos d'une région, 13 départements au plus) : les villes de chacun, avec leur département (`dep`).
  * Prévisions AROME (Météo-France) ou CEP (ECMWF) lues dans les paquets départementaux publiés sur GitHub
@@ -32,6 +32,10 @@ export async function GET(req: Request) {
   }
 
   const deps = url.searchParams.get('deps');
+  // Modèle publié pour quelques départements seulement (Harmonie 2 km : le 66) : pas de carte de France ni de région.
+  if (!modeleDisponible(modele, dep) || (deps !== null && deps.split(',').some((d) => !modeleDisponible(modele, d)))) {
+    return NextResponse.json({ erreur: "Ce modèle n'est pas disponible pour cette zone." }, { status: 400 });
+  }
   if (deps !== null) {
     const liste = [...new Set(deps.split(','))];
     if (liste.length === 0 || liste.length > 13 || liste.some((d) => !CODES_DEPARTEMENTS.includes(d))) {

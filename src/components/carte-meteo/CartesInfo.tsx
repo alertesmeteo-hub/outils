@@ -436,7 +436,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
               <fieldset>
                 <legend className={legendeBarre}>Modèle</legend>
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
-                  {MODELES.map((m) => (
+                  {MODELES.filter((m) => !m.departements).map((m) => (
                     <label key={m.id} className="text-sm">
                       <input
                         type="radio"

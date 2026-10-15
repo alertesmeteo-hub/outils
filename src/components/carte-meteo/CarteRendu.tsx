@@ -294,6 +294,8 @@ interface Props {
 // CSS des éléments SVG, les tracés sortiraient noirs et sans contour.
 const TRAIT_COMMUN = { vectorEffect: 'non-scaling-stroke', strokeLinejoin: 'round' } as const;
 const TRAIT_SELECTION = { ...TRAIT_COMMUN, fill: '#8f9ee8', fillOpacity: 0.9, stroke: '#ffffff', strokeOpacity: 0.7, strokeWidth: 0.9 };
+// Carte de France : 96 départements, des traits plus fins et plus transparents (le blanc l'emportait sur le fond).
+const TRAIT_SELECTION_FRANCE = { ...TRAIT_SELECTION, strokeOpacity: 0.32, strokeWidth: 0.6 };
 const TRAIT_HORS_SELECTION = { ...TRAIT_COMMUN, fill: '#061428', fillOpacity: 0.38, stroke: '#ffffff', strokeOpacity: 0.25, strokeWidth: 0.6 };
 const TRAIT_REGION = { ...TRAIT_COMMUN, fill: 'none', stroke: '#ffffff', strokeOpacity: 0.95, strokeWidth: 2.2 };
 // Sans contours : remplissage opaque et trait de la même couleur, pour que les départements voisins forment une
@@ -417,7 +419,7 @@ export default function CarteRendu({
                 regions && regions.length === 0 ? (
                   <path key={c.code} d={c.d} {...TRAIT_UNI} />
                 ) : (
-                  <path key={c.code} d={c.d} {...TRAIT_SELECTION} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} {...(remplissages?.[c.code] ? { fill: remplissages[c.code] } : {})} />
+                  <path key={c.code} d={c.d} {...(carteLocale ? TRAIT_SELECTION : TRAIT_SELECTION_FRANCE)} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} {...(remplissages?.[c.code] ? { fill: remplissages[c.code] } : {})} />
                 )
               )}
             </g>
