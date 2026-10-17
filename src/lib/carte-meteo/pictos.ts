@@ -69,16 +69,25 @@ export const PICTOS_IMAGES: PictoImage[] = NUMEROS_PICTOS.map((n) => ({
   label: LABELS_PICTOS_IMAGES[n] ?? `Picto ${n}`,
 }));
 
-/** Meteocons (Bas Milius, licence MIT) : icônes météo libres de droits, stockées dans public/pictos-meteocons/. */
+/**
+ * Meteocons (Bas Milius, licence MIT) : icônes météo libres de droits, stockées dans public/pictos-meteocons/.
+ * « ciel-voile » (soleil derrière un voile de nuages hauts) est dessiné dans le même style à partir de leur soleil :
+ * le jeu n'a que des variantes « brume » (haze), qui ne rendent pas un ciel voilé.
+ */
 const METEOCONS: [string, string][] = [
   ['clear-day', 'Soleil'],
+  ['ciel-voile', 'Ciel voilé'],
+  ['mostly-clear-day', 'Peu nuageux'],
   ['partly-cloudy-day', 'Éclaircies'],
-  ['overcast-day', 'Nuageux, soleil voilé'],
+  ['overcast-day', 'Nuageux'],
   ['cloudy', 'Nuages'],
   ['overcast', 'Couvert'],
   ['mist', 'Brume'],
   ['fog', 'Brouillard'],
   ['haze', 'Brume sèche'],
+  ['haze-day', 'Soleil et brume'],
+  ['partly-cloudy-day-haze', 'Éclaircies et brume'],
+  ['fog-day', 'Brouillard et soleil'],
   ['dust', 'Poussières'],
   ['smoke', 'Fumée'],
   ['wind', 'Vent'],
@@ -119,6 +128,11 @@ export const PICTOS_METEOCONS: PictoImage[] = METEOCONS.map(([nom, label]) => ({
 }));
 
 export type PictoMeteo = (typeof PICTOS_METEO)[number] | PictoImage['id'];
+
+/** Pictos proposés avec les emojis par défaut, qui n'ont pas d'équivalent emoji (ciel voilé). */
+export const PICTOS_DEFAUT_IMAGES: PictoImage[] = PICTOS_METEOCONS.filter((p) => p.id === 'mc:ciel-voile');
+/** Ciel voilé : picto utilisé aussi avec les emojis (aucun emoji n'en donne l'idée). */
+export const PICTO_VOILE: PictoMeteo = 'mc:ciel-voile';
 
 export const PICTO_DEFAUT: PictoMeteo = '☀️';
 
@@ -203,6 +217,8 @@ export interface EntreePicto {
   nuages: number | null;
   pluie: number | null;
   temperature: number | null;
+  /** Ciel voilé : nuages hauts (cirrus) en nombre, peu de nuages bas et moyens (voir pointDepuisSerie). */
+  voile?: boolean;
 }
 
 const CODES_NEIGE = [71, 73, 75, 77, 85, 86];
@@ -230,6 +246,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
       if (mm >= 2) return ciel < 75 ? 'mc:partly-cloudy-day-rain' : 'mc:rain';
       return ciel < 75 ? 'mc:partly-cloudy-day-drizzle' : 'mc:drizzle';
     }
+    if (e.voile) return PICTO_VOILE;
     if (ciel < 20) return 'mc:clear-day';
     if (ciel < 45) return 'mc:partly-cloudy-day';
     if (ciel < 75) return 'mc:overcast-day';
@@ -251,6 +268,8 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
     return ciel < 75 ? (images ? 'img:17' : '🌦️') : images ? 'img:4' : '🌧️';
   }
 
+  // Voile de nuages hauts : le soleil passe, mais le ciel n'est ni dégagé ni nuageux (pas d'équivalent dans le jeu d'images).
+  if (e.voile && !images) return PICTO_VOILE;
   if (ciel < 20) return images ? 'img:1' : '☀️';
   if (ciel < 45) return images ? 'img:1' : '🌤️';
   if (ciel < 75) return images ? 'img:3' : '⛅';

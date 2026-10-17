@@ -10,7 +10,7 @@ import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement'
 import { saisieAcceptee } from '@/lib/carte-meteo/limites';
 import { DIRECTIONS_VENT, angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
-import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { PICTOS_METEO, PICTOS_DEFAUT_IMAGES, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { CREDITS_COUCHES, LIBELLES_COUCHES, coucheParDefaut, type Couche } from '@/lib/carte-meteo/tuiles';
 import {
@@ -290,9 +290,9 @@ const texte = (v: number | null) => (v == null ? '' : String(Math.round(v)));
 /** Pictos de l'après-midi et de la journée d'un point, d'après la nébulosité et les précipitations de la période. */
 function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoM: PictoMeteo; pictoAM: PictoMeteo; pictoJ: PictoMeteo } {
   return {
-    pictoM: pictoDepuisPrevision({ code: p.codeMatin, nuages: p.nuagesMatin, pluie: p.pluieMatin, temperature: p.tempMatin }, jeu),
-    pictoAM: pictoDepuisPrevision({ code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: p.pluieApresMidi, temperature: p.tempApresMidi }, jeu),
-    pictoJ: pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: p.pluieJournee, temperature: p.maxi }, jeu),
+    pictoM: pictoDepuisPrevision({ code: p.codeMatin, nuages: p.nuagesMatin, pluie: p.pluieMatin, temperature: p.tempMatin, voile: p.voileMatin }, jeu),
+    pictoAM: pictoDepuisPrevision({ code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: p.pluieApresMidi, temperature: p.tempApresMidi, voile: p.voileApresMidi }, jeu),
+    pictoJ: pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: p.pluieJournee, temperature: p.maxi, voile: p.voileJournee }, jeu),
   };
 }
 
@@ -1456,7 +1456,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                       {picto}
                     </button>
                   ))}
-                  {[...PICTOS_IMAGES, ...PICTOS_METEOCONS].map((picto) => (
+                  {/* Avec les emojis : le ciel voilé, qui n'a pas d'emoji. */}
+                  {[...PICTOS_DEFAUT_IMAGES, ...PICTOS_IMAGES, ...PICTOS_METEOCONS.filter((p) => !PICTOS_DEFAUT_IMAGES.includes(p))].map((picto) => (
                     <button key={picto.id} type="button" title={picto.label} className="rounded p-1 hover:bg-bg" onClick={() => appliquerALaSelection(picto.id)}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={picto.fichier} alt={picto.label} className="h-8 w-8 object-contain" />

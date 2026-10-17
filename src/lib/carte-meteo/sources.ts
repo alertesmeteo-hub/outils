@@ -69,6 +69,10 @@ interface Extrait {
 }
 
 interface Colonnes {
+  /** Nuages bas, moyens et hauts : -1 si le modèle ne les publie pas. */
+  cloud_low_pct: number;
+  cloud_mid_pct: number;
+  cloud_high_pct: number;
   temperature_c: number;
   precipitation_mm: number;
   cloud_cover_pct: number;
@@ -94,7 +98,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v12'; // v12 : communes de montagne
+const VERSION_CACHE = 'v13'; // v13 : nuages bas, moyens et hauts (ciel voilé)
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -165,6 +169,16 @@ function serieDuPoint(fichier: FichierDepartement, c: Colonnes, pointId: number)
     temp: etapes.map(([, v]) => valeur(v, c.temperature_c)),
     pluie: etapes.map(([, v]) => valeur(v, c.precipitation_mm)),
     nuages: etapes.map(([, v]) => valeur(v, c.cloud_cover_pct)),
+    ...(c.cloud_high_pct >= 0 && c.cloud_low_pct >= 0 && c.cloud_mid_pct >= 0
+      ? {
+          nuagesHauts: etapes.map(([, v]) => valeur(v, c.cloud_high_pct)),
+          nuagesBasMoyens: etapes.map(([, v]) => {
+            const bas = valeur(v, c.cloud_low_pct);
+            const moyens = valeur(v, c.cloud_mid_pct);
+            return bas == null || moyens == null ? null : Math.max(bas, moyens);
+          }),
+        }
+      : {}),
     direction: etapes.map(([, v]) => valeur(v, c.wind_direction_deg)),
     vent: etapes.map(([, v]) => valeur(v, c.wind_speed_kmh)),
     rafale: etapes.map(([, v]) => valeur(v, c.wind_gust_kmh)),
@@ -222,6 +236,9 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     visibility_km: indice(cols, 'visibility_km'),
     // Absente du HARMONIE DINI du DMI : pas de risque d'orage (valeurs nulles).
     thunder_risk_code: cols.indexOf('thunder_risk_code'),
+    cloud_low_pct: cols.indexOf('cloud_low_pct'),
+    cloud_mid_pct: cols.indexOf('cloud_mid_pct'),
+    cloud_high_pct: cols.indexOf('cloud_high_pct'),
     snowfall_mm: indice(cols, 'snowfall_mm'),
   };
   const communes = fichier.communes

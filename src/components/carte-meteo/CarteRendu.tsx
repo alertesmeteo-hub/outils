@@ -3,7 +3,7 @@
 import { useEffect, useId, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { MATRICE_RELIEF, TAILLE_TUILE_VIDE, coucheParDefaut, tuileParente, tuilesVisibles, type Couche, type Tuile } from '@/lib/carte-meteo/tuiles';
-import { PICTOS_METEO, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { PICTOS_METEO, PICTOS_DEFAUT_IMAGES, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 
 /**
@@ -653,6 +653,12 @@ export default function CarteRendu({
                   {PICTOS_METEO.map((picto) => (
                     <button key={picto} type="button" onClick={() => onModifier(m.code, 'picto', picto, partout)}>
                       {picto}
+                    </button>
+                  ))}
+                  {/* Ciel voilé : pas d'emoji, une image proposée avec les pictos par défaut. */}
+                  {PICTOS_DEFAUT_IMAGES.map((picto) => (
+                    <button key={picto.id} type="button" title={picto.label} onClick={() => onModifier(m.code, 'picto', picto.id, partout)}>
+                      <img src={picto.fichier} alt={picto.label} className="cmap-picto-image" />
                     </button>
                   ))}
                 </div>

@@ -60,6 +60,10 @@ export interface PointCarte {
   placeExacte?: boolean;
   /** Cartes de montagne : altitude (m) du point de grille du modèle. */
   altitude?: number;
+  /** Ciel voilé (nuages hauts sans nuages bas ni moyens) le matin, l'après-midi et sur la journée. Absents des anciennes réponses. */
+  voileMatin?: boolean;
+  voileApresMidi?: boolean;
+  voileJournee?: boolean;
   mini: number | null;
   maxi: number | null;
   tempMatin: number | null;
@@ -128,6 +132,9 @@ export interface Serie {
   orage: (number | null)[];
   neige: (number | null)[];
   visibilite: (number | null)[];
+  /** Nébulosité des nuages hauts et la plus forte des nuages bas et moyens (%), pour le ciel voilé ; absentes de certains modèles. */
+  nuagesHauts?: (number | null)[];
+  nuagesBasMoyens?: (number | null)[];
 }
 
 const FORMAT_PARIS = new Intl.DateTimeFormat('en-CA', {
@@ -190,6 +197,18 @@ function codePeriode(serie: Serie, indices: number[]): number | null {
   const vis = nombres(indices.map((i) => serie.visibilite[i]));
   if (vis.length && Math.min(...vis) < 1) return 45;
   return null;
+}
+
+/** Seuils du ciel voilé : nuages hauts (cirrus, cirrostratus) en moyenne, et au plus ce peu de nuages bas et moyens. */
+const VOILE_HAUTS_MIN = 50;
+const VOILE_BAS_MOYENS_MAX = 30;
+
+/** Ciel voilé sur la période : beaucoup de nuages hauts, peu de nuages bas et moyens (le soleil passe à travers le voile). */
+function voilePeriode(serie: Serie, indices: number[]): boolean {
+  if (!serie.nuagesHauts || !serie.nuagesBasMoyens) return false;
+  const hauts = moyenne(indices.map((i) => serie.nuagesHauts![i]));
+  const bas = moyenne(indices.map((i) => serie.nuagesBasMoyens![i]));
+  return hauts != null && bas != null && hauts >= VOILE_HAUTS_MIN && bas <= VOILE_BAS_MOYENS_MAX;
 }
 
 /** Indice de l'échéance de la rafale maximale parmi `indices` (-1 si aucune rafale connue). */
@@ -296,6 +315,9 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
     visibiliteMin: arrondi(minimum(toute.map((i) => serie.visibilite[i])), 1),
     ressentiMin: minimum(toute.map((i) => ressenti(serie.temp[i], serie.vent[i]))),
     ...cumulsPluie(serie, dateISO),
+    voileMatin: voilePeriode(serie, matin),
+    voileApresMidi: voilePeriode(serie, apresMidi),
+    voileJournee: voilePeriode(serie, ciel),
   };
 }
 
