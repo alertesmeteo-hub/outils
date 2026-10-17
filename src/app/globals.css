@@ -183,6 +183,8 @@ body {
 .cmap-palette button { background: none; border: none; font-size: 20px; line-height: 1; cursor: pointer; padding: 3px; border-radius: 4px; }
 .cmap-palette button:hover { background: #e2e8f0; }
 .cmap-palette .cmap-picto-image { width: 30px; height: 30px; }
+/* Ciel voilé au milieu des emojis : taille d'un emoji (les règles des jeux d'images l'agrandissent jusqu'à 2,2 fois en département). */
+.cmap-marqueur .cmap-ligne .cmap-picto .cmap-picto-image.cmap-picto-defaut { width: 1.25em; height: 1.25em; }
 
 
 /* Après-midi : la température chevauche le haut-droit du picto, comme sur la carte de référence. */

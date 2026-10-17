@@ -1262,6 +1262,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       grosPictos={enDepartement}
       carteLocale={!enFrance}
       styleCapture={modeCapture}
+      pictosEmoji={jeuPictos === 'emoji'}
       styleVent={styleVent}
       couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}

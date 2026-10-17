@@ -234,6 +234,8 @@ interface Props {
   carteLocale?: boolean;
   /** Style de la carte de référence (France « Moyen ») : température « 15° » au-dessus du picto (voir `.cmap-capture`). */
   styleCapture?: boolean;
+  /** Carte en emojis : le ciel voilé (image) prend la taille d'un emoji au lieu de celle des jeux d'images. */
+  pictosEmoji?: boolean;
   /** Présentation des rafales (pastille par défaut). */
   styleVent?: StyleVent;
   /** Couleur de la date du titre (bleu nuit par défaut, voir .cmap-date). */
@@ -339,6 +341,7 @@ export default function CarteRendu({
   grosPictos = false,
   carteLocale = false,
   styleCapture = false,
+  pictosEmoji = false,
   styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
@@ -579,7 +582,15 @@ export default function CarteRendu({
                 title={`${m.infoBulle ?? m.nom ? `${m.infoBulle ?? m.nom}\n` : ''}Clic : changer l'icône · Ctrl/Maj + clic : en sélectionner plusieurs`}
                 onClick={(e) => onBasculerPalette(m.code, e.ctrlKey || e.shiftKey || e.metaKey)}
               >
-                {estPictoImage(m.picto) ? <img src={cheminPictoImage(m.picto)} alt="" className="cmap-picto-image" /> : m.picto}
+                {estPictoImage(m.picto) ? (
+                  <img
+                    src={cheminPictoImage(m.picto)}
+                    alt=""
+                    className={`cmap-picto-image ${pictosEmoji && PICTOS_DEFAUT_IMAGES.some((p) => p.id === m.picto) ? 'cmap-picto-defaut' : ''}`}
+                  />
+                ) : (
+                  m.picto
+                )}
               </button>
               <div className="cmap-valeurs">
                 <span className="cmap-valeur-ligne">
