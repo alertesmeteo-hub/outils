@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
@@ -54,6 +55,8 @@ const PLAFOND = { france: 48, region: 36, departement: 24 };
 const PAR_DEPARTEMENT = { france: 1, region: 4, departement: Infinity };
 
 const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
+/** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
+const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
 export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '' }: Props) {
   const fleuves = useFleuves(true);
@@ -62,6 +65,46 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const [facteur, setFacteur] = useState(1);
   const [enExport, setEnExport] = useState(false);
   const [erreurExport, setErreurExport] = useState<string | null>(null);
+
+  // Édition à la main : valeurs corrigées ou retirées (par point), titres réécrits ; null = texte d'origine.
+  const [edition, setEdition] = useState(false);
+  const [corrections, setCorrections] = useState<Record<string, number>>({});
+  const [retires, setRetires] = useState<Set<string>>(() => new Set());
+  const [titreSaisi, setTitreSaisi] = useState<string | null>(null);
+  const [sousTitreSaisi, setSousTitreSaisi] = useState<string | null>(null);
+  const [titreTopSaisi, setTitreTopSaisi] = useState<string | null>(null);
+  // Nouvelles données (autre jour, autre mois…) : les corrections ne s'appliquent plus.
+  useEffect(() => {
+    setCorrections({});
+    setRetires(new Set());
+  }, [points]);
+  const titre = titreSaisi ?? theme.titre;
+  const sousTitreAffiche = sousTitreSaisi ?? sousTitre;
+  const titreTop = titreTopSaisi ?? theme.titreTop;
+  const pointsCorriges = useMemo(
+    () => points.filter((p) => !retires.has(p.code)).map((p) => (corrections[p.code] != null ? { ...p, valeur: corrections[p.code] } : p)),
+    [points, corrections, retires]
+  );
+  const modifiee = Object.keys(corrections).length > 0 || retires.size > 0 || titreSaisi != null || sousTitreSaisi != null || titreTopSaisi != null;
+  function retablir() {
+    setCorrections({});
+    setRetires(new Set());
+    setTitreSaisi(null);
+    setSousTitreSaisi(null);
+    setTitreTopSaisi(null);
+  }
+  /** Valeur saisie dans une pastille : nombre (virgule acceptée) et plausible, sinon la saisie est ignorée. */
+  function corriger(code: string, texte: string, origine: number) {
+    const v = Number(texte.replace(',', '.').replace(/[^0-9.+-]/g, ''));
+    if (texte.trim() === '' || !Number.isFinite(v) || !valeurPlausible(theme, v)) return;
+    setCorrections((c) => {
+      const suite = { ...c };
+      const initiale = points.find((p) => p.code === code)?.valeur ?? origine;
+      if (v === initiale) delete suite[code];
+      else suite[code] = v;
+      return suite;
+    });
+  }
 
   const enFrance = zone === 'france';
   const enDepartement = zone.startsWith('dep:');
@@ -91,8 +134,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const hauteurLogo = logoUrl ? (zone === 'dep:66' && logoId.startsWith('pays-catalan') ? 150 : 83) : 0;
 
   const dansZone = useMemo(
-    () => points.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur)),
-    [points, selection, theme]
+    () => pointsCorriges.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur)),
+    [pointsCorriges, selection, theme]
   );
   // Du « meilleur » (le plus chaud, le plus arrosé…) au moins remarquable.
   const tries = useMemo(
@@ -140,11 +183,11 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     ...top.map((p) => Math.round(34 + Math.min(17, p.nom.length) * 7 + (enDepartement || theme.maille ? 0 : 30) + texteInfo(theme, p.valeur).length * 9 + (uniteVisible ? 30 : 0)))
   );
   // Titre de l'encadré sur deux lignes s'il dépasse la largeur (≈ 9 px par lettre en 16 px condensé).
-  const hauteurTop = top.length && !theme.sansTop ? 34 + top.length * 19 + (theme.titreTop.length * 9 > largeurTop - 18 ? 18 : 0) : 0;
+  const hauteurTop = top.length && !theme.sansTop ? 34 + top.length * 19 + (titreTop.length * 9 > largeurTop - 18 ? 18 : 0) : 0;
   // Sans logo, le titre prend le coin en haut à gauche (sinon : à droite en France, centré en région et en département).
   const titreAGauche = !logoUrl;
   // Bandeau du titre : Impact 32 px (≈ 15,5 px par lettre) et sous-titre 19 px (≈ 10 px par lettre), plus les marges.
-  const largeurTitre = Math.round(Math.max(theme.titre.length * 15.5, sousTitre.length * 10) + 34);
+  const largeurTitre = Math.round(Math.max(titre.length * 15.5, sousTitreAffiche.length * 10) + 34);
   const rectTitre: Rect = titreAGauche
     ? { x: MARGE_COLONNE, y: 6, w: largeurTitre, h: 76 }
     : enFrance
@@ -166,8 +209,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         ? null
         : {
             type: contexte,
-            titre: theme.titre,
-            periode: sousTitre,
+            titre,
+            periode: sousTitreAffiche,
             zone: nomZone,
             source: contexte,
             rubriques: [
@@ -245,11 +288,14 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       .filter((e) => e.priorite === 0 || restantes-- > 0)
       .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte, sousTitre]);
+  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte, largeurTitre]);
 
   async function exporter() {
     if (!carteRef.current) return;
     setErreurExport(null);
+    // Les champs de saisie ne sont pas exportés : la carte repasse en affichage le temps de la capture.
+    const enEdition = edition;
+    if (enEdition) flushSync(() => setEdition(false));
     setEnExport(true);
     try {
       await exporterEnJpg(carteRef.current, `${prefixeFichier}-${normaliser(theme.court).replace(/ /g, '-')}`, largeur, HAUTEUR_CARTE);
@@ -258,6 +304,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       setErreurExport("L'export a échoué (fond de carte injoignable ?). Réessayez dans un instant.");
     } finally {
       setEnExport(false);
+      if (enEdition) setEdition(true);
     }
   }
 
@@ -279,6 +326,14 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         <p className="text-base font-bold">{theme.court}</p>
         <div className="flex gap-2">
           {texteIA.bouton}
+          <button
+            type="button"
+            aria-pressed={edition}
+            onClick={() => setEdition((e) => !e)}
+            className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${edition ? 'border-primary bg-primary text-white' : 'border-border'}`}
+          >
+            {edition ? 'Terminer' : 'Modifier'}
+          </button>
           <button type="button" onClick={exporter} disabled={enExport || contoursDep.length === 0} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
             {enExport ? 'Export…' : 'Exporter en JPG'}
           </button>
@@ -288,6 +343,33 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreurExport}
         </p>
+      )}
+      {edition && (
+        <div className="mb-2 grid gap-2 rounded-lg border border-border bg-surface p-3 text-sm sm:grid-cols-3">
+          <label className="flex flex-col gap-1 font-medium">
+            Titre
+            <input value={titre} onChange={(e) => setTitreSaisi(e.target.value.toUpperCase())} className="rounded-md border border-border bg-bg p-1.5 font-normal" />
+          </label>
+          <label className="flex flex-col gap-1 font-medium">
+            Sous-titre
+            <input value={sousTitreAffiche} onChange={(e) => setSousTitreSaisi(e.target.value.toUpperCase())} className="rounded-md border border-border bg-bg p-1.5 font-normal" />
+          </label>
+          {!theme.sansTop && (
+            <label className="flex flex-col gap-1 font-medium">
+              Titre du classement
+              <input value={titreTop} onChange={(e) => setTitreTopSaisi(e.target.value)} className="rounded-md border border-border bg-bg p-1.5 font-normal" />
+            </label>
+          )}
+          <div className="flex flex-wrap items-center gap-3 sm:col-span-3">
+            <p className="flex-1 text-xs text-muted">
+              Cliquez sur une valeur de la carte pour la corriger (Entrée pour valider, Échap pour annuler) ; la croix rouge la retire. Le classement, les
+              couleurs et la légende suivent.
+            </p>
+            <button type="button" onClick={retablir} disabled={!modifiee} className="rounded-lg border border-border px-3 py-1.5 font-medium disabled:opacity-50">
+              Rétablir les valeurs
+            </button>
+          </div>
+        </div>
       )}
       <CarteRendu
         carteRef={carteRef}
@@ -305,8 +387,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         marqueurs={[]}
         echelleMarqueurs={1}
         afficherNoms={false}
-        titre={theme.titre}
-        sousTitre={sousTitre}
+        titre={titre}
+        sousTitre={sousTitreAffiche}
         logoUrl={logoUrl}
         logoFondBlanc={logo?.fondBlanc !== false}
         hauteurLogo={hauteurLogo || undefined}
@@ -330,10 +412,42 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
                     <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" fill={palier.texte} transform={`rotate(${angleFleche(p.direction)})`} />
                   </svg>
                 )}
-                <strong>{texteInfo(theme, p.valeur)}</strong>
+                {edition ? (
+                  <input
+                    // Nouvelle clé à chaque valeur validée : le champ repart de la valeur affichée.
+                    key={`${p.code}-${p.valeur}`}
+                    className="cinfo-saisie"
+                    defaultValue={saisieDe(theme, p.valeur)}
+                    style={{ width: `${Math.max(1.6, saisieDe(theme, p.valeur).length * 0.62 + 0.3)}em` }}
+                    inputMode="decimal"
+                    aria-label={`Valeur pour ${p.nom}`}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onBlur={(e) => corriger(p.code, e.currentTarget.value, p.valeur)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.currentTarget.blur();
+                      if (e.key === 'Escape') {
+                        e.currentTarget.value = saisieDe(theme, p.valeur);
+                        e.currentTarget.blur();
+                      }
+                    }}
+                  />
+                ) : (
+                  <strong>{texteInfo(theme, p.valeur)}</strong>
+                )}
                 {uniteVisible && <small>{uniteVisible}</small>}
               </div>
               {enDepartement && <div className="cinfo-nom">{p.nom}</div>}
+              {edition && (
+                <button
+                  type="button"
+                  className="cmap-supprimer cmap-sans-export"
+                  title={`Retirer ${p.nom}`}
+                  aria-label={`Retirer ${p.nom}`}
+                  onClick={() => setRetires((r) => new Set(r).add(p.code))}
+                >
+                  ×
+                </button>
+              )}
             </div>
           );
         })}
@@ -342,7 +456,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
 
         {hauteurTop > 0 && (
           <div className="cinfo-encadre" style={{ left: rectTop.x, top: rectTop.y, width: rectTop.w }}>
-            <div className="cinfo-encadre-titre">{theme.titreTop}</div>
+            <div className="cinfo-encadre-titre">{titreTop}</div>
             <ol>
               {top.map((p, i) => (
                 <li key={p.code}>
