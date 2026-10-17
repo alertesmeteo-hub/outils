@@ -37,6 +37,9 @@ const VILLES_PAR_DEPARTEMENT = 30;
 /** Altitude maximale (m) du point qui représente un département sur la carte de France. */
 const ALTITUDE_MAX_FRANCE = 500;
 const CANDIDATES_VILLES = 100;
+/** Cartes de montagne : communes dont le point du modèle est à cette altitude (m) ou plus, quelques-unes par département. */
+const ALTITUDE_MONTAGNE = 1000;
+const VILLES_MONTAGNE_PAR_DEPARTEMENT = 8;
 /** Durée pendant laquelle on ne redemande pas l'index (passage du modèle) au dépôt. */
 const VALIDITE_INDEX_MS = 5 * 60_000;
 const CONCURRENCE = 6;
@@ -51,6 +54,8 @@ interface Ville {
   prioritaire?: boolean;
   /** Picto au plus près de la ville même en bord de frontière ou de côte (retouche manuelle). */
   placeExacte?: boolean;
+  /** Altitude du point du modèle (communes de montagne). */
+  altitude?: number;
 }
 
 interface Extrait {
@@ -59,6 +64,8 @@ interface Extrait {
   chef: Serie;
   chefCommune: { nom: string; lat: number; lon: number };
   villes: Ville[];
+  /** Communes de montagne (point du modèle à 1 000 m ou plus), la plus peuplée d'abord ; vide hors montagne. */
+  montagne: Ville[];
 }
 
 interface Colonnes {
@@ -87,7 +94,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v11';
+const VERSION_CACHE = 'v12'; // v12 : communes de montagne
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -247,11 +254,22 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     ...(gardees.includes(v) ? { prioritaire: true } : {}),
     ...(gardees.includes(v) || retouche?.exactes?.includes(v.nom) ? { placeExacte: true } : {}),
   }));
+  // Montagne : les communes les plus peuplées au-dessus de 1 000 m (stations, villages), bien réparties sur les massifs.
+  const hautes = communes.filter((x) => altitude(x.pointId) >= ALTITUDE_MONTAGNE).slice(0, CANDIDATES_VILLES);
+  const montagne = repartir(hautes, VILLES_MONTAGNE_PAR_DEPARTEMENT).map((v) => ({
+    code: v.code,
+    nom: v.nom,
+    lat: v.lat,
+    lon: v.lon,
+    serie: serieDuPoint(fichier, c, v.pointId),
+    altitude: Math.round(altitude(v.pointId) / 10) * 10,
+  }));
   return {
     runTime,
     chef: serieDuPoint(fichier, c, chefCommune.pointId),
     chefCommune: { nom: chefCommune.nom, lat: chefCommune.lat, lon: chefCommune.lon },
     villes,
+    montagne,
   };
 }
 
@@ -392,4 +410,26 @@ async function chargerPrevisionsVillesMoyenne(dateISO: string, dep: string): Pro
     }
     return point;
   });
+}
+
+/**
+ * Cartes de montagne : communes dont le point du modèle est à 1 000 m ou plus. France : la plus peuplée de chaque département
+ * de montagne ; département : jusqu'à 8 communes réparties sur ses massifs. Départements sans montagne : aucun point.
+ */
+export async function chargerPrevisionsMontagne(modele: ModeleMeteo, dateISO: string, deps: string[] | null): Promise<(PointCarte & { dep: string })[]> {
+  const liste = deps ?? CODES_DEPARTEMENTS;
+  // La moyenne des modèles n'existe qu'en vue département (villes) : la montagne prend alors AROME.
+  const source: ModeleSource = modele === 'moyenne' ? 'arome' : modele;
+  const resultats = await enParallele(liste, CONCURRENCE, (dep) => extraitDepartement(source, dep));
+  const points: (PointCarte & { dep: string })[] = [];
+  resultats.forEach((r, i) => {
+    if (r.status === 'rejected') return;
+    const villes = deps ? r.value.montagne : r.value.montagne.slice(0, 1);
+    for (const v of villes) {
+      const p = pointDepuisSerie(v.code, v.nom, v.serie, dateISO);
+      if (p.maxi != null) points.push({ ...p, lat: v.lat, lon: v.lon, altitude: v.altitude, dep: liste[i] });
+    }
+  });
+  if (resultats.every((r) => r.status === 'rejected')) throw new Error(`${LIBELLES[source]} : aucun département disponible`);
+  return points;
 }

@@ -152,6 +152,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     if (enDepartement) return undefined;
     const parDep = new Map<string, number[]>();
     for (const p of dansZone) {
+      // Palier neutre affiché (« 0 cm » en montagne) : pas de teinte pour autant.
+      if (theme.neutresVisibles && palierDe(theme.paliers, p.valeur).neutre) continue;
       const liste = parDep.get(p.dep) ?? [];
       liste.push(p.valeur);
       parDep.set(p.dep, liste);
@@ -242,7 +244,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     // Candidats : les plus marquants de chaque département (un seul en vue France), et les extrêmes de la zone.
     const parDep = new Map<string, number>();
     const candidats = tries.filter((p) => {
-      if (palierDe(theme.paliers, p.valeur).neutre) return false;
+      if (palierDe(theme.paliers, p.valeur).neutre && !theme.neutresVisibles) return false;
       const n = parDep.get(p.dep) ?? 0;
       parDep.set(p.dep, n + 1);
       return n < PAR_DEPARTEMENT[niveau];

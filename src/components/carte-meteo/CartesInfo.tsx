@@ -125,6 +125,8 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const [erreur, setErreur] = useState<string | null>(null);
   const [cumuls, setCumuls] = useState<{ cle: string; modele: ModeleMeteo; points: (PointCarte & { dep?: string })[] } | null>(null);
   const [erreurCumuls, setErreurCumuls] = useState<string | null>(null);
+  const [montagne, setMontagne] = useState<{ cle: string; points: (PointCarte & { dep?: string })[] } | null>(null);
+  const [erreurMontagne, setErreurMontagne] = useState<string | null>(null);
   const [bilans, setBilans] = useState<ReponseBilans | null>(null);
   const [erreurBilans, setErreurBilans] = useState<string | null>(null);
   /** Mois des cartes « Bilan du mois » (AAAA-MM) ; null = mois en cours. Le reste des bilans ne dépend pas du mois. */
@@ -138,6 +140,8 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const cle = `${modele}|${dateISO}|${requeteZone}`;
   const modeleCumul = modeleDuCumul(modele);
   const cleCumul = `${modeleCumul}|${aujourdhui}|${requeteZone}`;
+  // Montagne : même modèle et même jour que les autres cartes, points au-dessus de 1 000 m.
+  const cleMontagne = `${modele}|${dateISO}|${requeteZone}|montagne`;
   // Cartes de France : pas de logo par défaut (www.alertes-meteo.com figure déjà en bas) ; régions et départements : AlertesMétéo ou Météo Pays Catalan (66).
   const logoId =
     logoChoisi ?? (niveau === 'france' ? 'aucun' : logoParDefaut(codesDeLaZone(zone)).id === 'aucun' ? 'alertesmeteo' : logoParDefaut(codesDeLaZone(zone)).id);
@@ -175,6 +179,21 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
       .catch((e: Error) => e.name !== 'AbortError' && setErreurCumuls(e.message.endsWith('.') ? e.message : `${e.message}.`));
     return () => controleur.abort();
   }, [groupesAvecCumul, cleCumul, cumuls?.cle, erreurCumuls, modeleCumul, aujourdhui, requeteZone]);
+
+  // Cartes de montagne (neige, maxi) : communes au-dessus de 1 000 m, requête à part (les autres cartes utilisent des points de plaine).
+  const groupesAvecMontagne = mode === 'prevision' && (groupeChoisi === 'tous' || THEMES_PREVISION.some((t) => t.montagne && t.groupe === groupeChoisi));
+  useEffect(() => {
+    if (!groupesAvecMontagne || montagne?.cle === cleMontagne || erreurMontagne) return;
+    const controleur = new AbortController();
+    fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}${requeteZone}&montagne=1`, { signal: controleur.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
+        return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
+      })
+      .then((json) => setMontagne({ cle: cleMontagne, points: json.points }))
+      .catch((e: Error) => e.name !== 'AbortError' && setErreurMontagne(e.message.endsWith('.') ? e.message : `${e.message}.`));
+    return () => controleur.abort();
+  }, [groupesAvecMontagne, cleMontagne, montagne?.cle, erreurMontagne, modele, dateISO, requeteZone]);
 
   useEffect(() => {
     // Aussi en prévision pour aujourd'hui : la synthèse prend le mini relevé cette nuit (le modèle ne couvre plus la nuit).
@@ -266,11 +285,21 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
         })
         .filter((p): p is NonNullable<typeof p> => p != null);
     for (const theme of THEMES_PREVISION) {
-      const source = theme.cumulJours ? (cumuls?.cle === cleCumul ? cumuls.points : null) : previsions?.cle === cle ? previsions.points : null;
+      const source = theme.cumulJours
+        ? cumuls?.cle === cleCumul
+          ? cumuls.points
+          : null
+        : theme.montagne
+          ? montagne?.cle === cleMontagne
+            ? montagne.points
+            : null
+          : previsions?.cle === cle
+            ? previsions.points
+            : null;
       if (source) resultat[theme.id] = versPoints(theme, source);
     }
     return resultat;
-  }, [previsions, cle, cumuls, cleCumul, enDepartement, departement, niveau]);
+  }, [previsions, cle, cumuls, cleCumul, montagne, cleMontagne, enDepartement, departement, niveau]);
 
   /** Cumuls : période réellement couverte (le CEP s'arrête à 15 jours), pour le sous-titre. */
   const finCumuls = useMemo(() => {
@@ -290,7 +319,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
     if (!bilans) return resultat;
     for (const theme of THEMES_BILAN) {
       // Stations de haute montagne écartées au-dessus de l'altitude choisie (sauf la neige au sol, qui n'existe guère qu'en montagne).
-      const plafond = theme.id === 'snow' || altitudeMax === 0 ? Infinity : altitudeMax;
+      const plafond = theme.id === 'snow' || theme.neigeMontagne || altitudeMax === 0 ? Infinity : altitudeMax;
       const points = (bilans.cartes[theme.id]?.valeurs ?? [])
         .map(([i, valeur]) => {
           const [code, nomStation, dep, lat, lon, alt] = bilans.stations[i];
@@ -685,8 +714,27 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                           contexte={`Prévision du modèle ${modeleCumulAffiche.libelle} (${modeleCumulAffiche.fournisseur}), cumul de pluie sur ${(theme as ThemePrevision).cumulJours} jours à partir d'aujourd'hui`}
                         />
                       )
+                    ) : mode === 'prevision' && (theme as ThemePrevision).montagne && (erreurMontagne || montagne?.cle !== cleMontagne) ? (
+                      erreurMontagne ? (
+                        <p role="alert" className="flex items-center gap-3 rounded-xl border border-border bg-surface p-6 text-sm text-danger">
+                          {theme.court} : {erreurMontagne}
+                          <button type="button" onClick={() => setErreurMontagne(null)} className="rounded-lg border border-border px-3 py-1 text-sm text-text">
+                            Réessayer
+                          </button>
+                        </p>
+                      ) : (
+                        <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">Chargement des points de montagne…</p>
+                      )
                     ) : mode === 'prevision' ? (
-                      <CarteInfo theme={theme} zone={zone} points={pointsPrevision[theme.id] ?? []} sousTitre={libelleJour(dateISO)} logoId={logoId} prefixeFichier={prefixe} contexte={contextePrevision} />
+                      <CarteInfo
+                        theme={theme}
+                        zone={zone}
+                        points={pointsPrevision[theme.id] ?? []}
+                        sousTitre={(theme as ThemePrevision).montagne ? `${libelleJour(dateISO)} · 1 000 M ET PLUS` : libelleJour(dateISO)}
+                        logoId={logoId}
+                        prefixeFichier={prefixe}
+                        contexte={(theme as ThemePrevision).montagne ? `${contextePrevision}, communes de montagne (point du modèle à 1 000 m ou plus)` : contextePrevision}
+                      />
                     ) : mode === 'bilan' ? (
                       <CarteInfo theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
                     ) : (

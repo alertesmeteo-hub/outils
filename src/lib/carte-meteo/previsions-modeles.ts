@@ -58,6 +58,8 @@ export interface PointCarte {
   prioritaire?: boolean;
   /** Vue département : picto au plus près de la ville même en bord de frontière ou de côte. */
   placeExacte?: boolean;
+  /** Cartes de montagne : altitude (m) du point de grille du modèle. */
+  altitude?: number;
   mini: number | null;
   maxi: number | null;
   tempMatin: number | null;

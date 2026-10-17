@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, estModele, modeleDisponible, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
-import { chargerPrevisionsCarte, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
+import { chargerPrevisionsCarte, chargerPrevisionsMontagne, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
 
 /**
  * GET /api/carte-meteo/previsions/?modele=arome|harmonie2km|harmonie|cep|gfs&date=YYYY-MM-DD[&dep=29 | &deps=29,22,35,56]
@@ -36,6 +36,22 @@ export async function GET(req: Request) {
   if (!modeleDisponible(modele, dep) || (deps !== null && deps.split(',').some((d) => !modeleDisponible(modele, d)))) {
     return NextResponse.json({ erreur: "Ce modèle n'est pas disponible pour cette zone." }, { status: 400 });
   }
+
+  // Cartes de montagne (neige, maxi) : communes au-dessus de 1 000 m, de la France, d'une région ou d'un département.
+  if (url.searchParams.get('montagne') === '1') {
+    const liste = dep ? [dep] : deps ? [...new Set(deps.split(','))] : null;
+    if (liste && (liste.length > 13 || liste.some((d) => !CODES_DEPARTEMENTS.includes(d)))) {
+      return NextResponse.json({ erreur: 'Départements invalides.' }, { status: 400 });
+    }
+    try {
+      const points = await chargerPrevisionsMontagne(modele, date, liste);
+      return NextResponse.json({ modele, date, montagne: true, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
+    } catch (erreur) {
+      console.error('Erreur carte météo (montagne)', erreur);
+      return NextResponse.json({ erreur: 'Prévisions momentanément indisponibles' }, { status: 503 });
+    }
+  }
+
   if (deps !== null) {
     const liste = [...new Set(deps.split(','))];
     if (liste.length === 0 || liste.length > 13 || liste.some((d) => !CODES_DEPARTEMENTS.includes(d))) {

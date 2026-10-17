@@ -42,6 +42,8 @@ export interface ThemeInfo {
   groupe: string;
   /** Valeurs données par région (projections climatiques) : une étiquette par région, classement des régions. */
   maille?: 'region';
+  /** Pastilles affichées même pour le palier neutre (« 0 cm » en montagne), qui reste hors classement et sans teinte. */
+  neutresVisibles?: boolean;
 }
 
 export interface ThemePrevision extends ThemeInfo {
@@ -50,6 +52,8 @@ export interface ThemePrevision extends ThemeInfo {
   direction?: (p: PointCarte) => number | null | undefined;
   /** Cumul sur plusieurs jours à partir d'aujourd'hui : modèle à longue échéance (CEP, GFS), quel que soit le jour choisi. */
   cumulJours?: DureeCumul;
+  /** Points de montagne (communes au-dessus de 1 000 m), lus à part (?montagne=1). */
+  montagne?: boolean;
 }
 
 /** Cartes du réchauffement climatique : fiches régionales Météo-France (TRACC) ou pluies DRIAS par commune. */
@@ -65,6 +69,10 @@ export interface ThemeBilan extends ThemeInfo {
   classement: string;
   /** Bilan du mois (températures, pluie, ensoleillement, vent, écarts aux normales), lu dans l'archive du VPS (voir extremes-mois.ts). */
   mois?: CleMois;
+  /** Il y a un an : maximale relevée le même jour l'an dernier (dépôt climato), ou écart de la maximale d'hier à celle-ci. */
+  anPasse?: 'tx' | 'ecart';
+  /** Neige au sol des stations de montagne (1 000 m et plus), y compris celles sans neige (0 cm). */
+  neigeMontagne?: boolean;
   /** Stations retenues jusqu'à cette altitude (m) : carte « de plaine », sans les stations de montagne. */
   altMax?: number;
 }
@@ -246,6 +254,8 @@ const PALIERS_ECART: Palier[] = [
 ];
 
 const PALIERS_NEIGE_SOL: Palier[] = PALIERS_NEIGE.map((x) => (x.neutre ? { ...x, libelle: 'Pas de neige au sol' } : x));
+/** Montagne : « 0 cm » s'affiche aussi (où il n'y a pas encore de neige), en gris (thèmes avec neutresVisibles). */
+const PALIERS_NEIGE_MONTAGNE: Palier[] = PALIERS_NEIGE.map((x) => (x.neutre ? { ...x, fond: '#94a3b8', libelle: 'Pas de neige' } : x));
 
 /** Cartes de prévision (paquets des modèles AROME, Harmonie, CEP, GFS). */
 export const THEMES_PREVISION: ThemePrevision[] = [
@@ -262,6 +272,8 @@ export const THEMES_PREVISION: ThemePrevision[] = [
   { id: 'vent', groupe: 'Vent', titre: 'VENT MOYEN MAXIMAL', court: 'Vent moyen', unite: 'km/h', decimales: 0, paliers: PALIERS_VENT_MOYEN, ordre: 'desc', titreTop: 'Les plus ventés', valeur: (x) => x.ventMaxJournee },
   { id: 'orages', groupe: 'Orages et neige', titre: 'RISQUE D’ORAGE', court: 'Risque d’orage', unite: '', decimales: 0, paliers: PALIERS_ORAGE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => x.orageJournee, texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'neige', groupe: 'Orages et neige', titre: 'NEIGE FRAÎCHE', court: 'Neige', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE, ordre: 'desc', titreTop: 'Les plus enneigés', valeur: (x) => x.neigeJournee },
+  { id: 'neige-montagne', groupe: 'Montagne', montagne: true, neutresVisibles: true, titre: 'NEIGE FRAÎCHE EN MONTAGNE', court: 'Neige en montagne', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_MONTAGNE, ordre: 'desc', titreTop: 'Les plus enneigées', valeur: (x) => x.neigeJournee },
+  { id: 'tmax-montagne', groupe: 'Montagne', montagne: true, titre: 'MAXIMALES EN MONTAGNE', court: 'Maxi en montagne', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus douces', valeur: (x) => x.maxi },
   { id: 'nuages', groupe: 'Ciel et brouillard', titre: 'COUVERTURE NUAGEUSE', court: 'Nuages et soleil', unite: '%', decimales: 0, paliers: PALIERS_NUAGES, ordre: 'asc', titreTop: 'Les plus ensoleillés', valeur: (x) => x.nuagesJournee },
   { id: 'brouillard', groupe: 'Ciel et brouillard', titre: 'BROUILLARD ET VISIBILITÉ', court: 'Brouillard', unite: 'km', decimales: 1, paliers: PALIERS_VISIBILITE, ordre: 'asc', titreTop: 'Visibilité la plus faible', valeur: (x) => x.visibiliteMin },
 ];
@@ -295,6 +307,10 @@ export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'rr72', groupe: 'Pluie', classement: 'rr72', titre: 'PLUIE SUR 72 HEURES', court: 'Pluie 72 h', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
   { id: 'raf24', groupe: 'Vent', classement: 'raf24', titre: 'RAFALES MAXIMALES', court: 'Rafales 24 h', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes' },
   { id: 'insol24', groupe: 'Soleil et neige', classement: 'insol24', titre: 'ENSOLEILLEMENT', court: 'Soleil 24 h', unite: 'h', decimales: 1, paliers: PALIERS_SOLEIL, ordre: 'desc', titreTop: 'Les plus ensoleillés' },
+  { id: 'snow-montagne', groupe: 'Montagne', classement: '', neigeMontagne: true, neutresVisibles: true, titre: 'NEIGE AU SOL EN MONTAGNE', court: 'Neige au sol en montagne', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_MONTAGNE, ordre: 'desc', titreTop: 'Les plus enneigées' },
+  { id: 'tx-hier', groupe: 'Il y a un an', classement: 'tx-fin', titre: 'TEMPÉRATURES MAXIMALES', court: 'Maxi d’hier', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tx-an', groupe: 'Il y a un an', classement: '', anPasse: 'tx', titre: 'MAXIMALES IL Y A UN AN', court: 'Maxi il y a un an', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tx-ecart-an', groupe: 'Il y a un an', classement: '', anPasse: 'ecart', titre: 'MAXIMALES : ÉCART À L’AN DERNIER', court: 'Écart à l’an dernier', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus en hausse', signe: true },
   { id: 'snow', groupe: 'Soleil et neige', classement: 'snow', titre: 'HAUTEUR DE NEIGE AU SOL', court: 'Neige au sol', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_SOL, ordre: 'desc', titreTop: 'Les plus enneigés' },
 ];
 
