@@ -69,8 +69,8 @@ export interface ThemeBilan extends ThemeInfo {
   classement: string;
   /** Bilan du mois (températures, pluie, ensoleillement, vent, écarts aux normales), lu dans l'archive du VPS (voir extremes-mois.ts). */
   mois?: CleMois;
-  /** Il y a un an : maximale relevée le même jour l'an dernier (dépôt climato), ou écart de la maximale d'hier à celle-ci. */
-  anPasse?: 'tx' | 'ecart';
+  /** Il y a un an : maximale ou minimale relevée le même jour l'an dernier (dépôt climato), ou écart de la valeur récente à celle-ci. */
+  anPasse?: { champ: 'tx' | 'tn'; ecart?: boolean };
   /** Neige au sol des stations de montagne (1 000 m et plus), y compris celles sans neige (0 cm). */
   neigeMontagne?: boolean;
   /** Stations retenues jusqu'à cette altitude (m) : carte « de plaine », sans les stations de montagne. */
@@ -309,8 +309,11 @@ export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'insol24', groupe: 'Soleil et neige', classement: 'insol24', titre: 'ENSOLEILLEMENT', court: 'Soleil 24 h', unite: 'h', decimales: 1, paliers: PALIERS_SOLEIL, ordre: 'desc', titreTop: 'Les plus ensoleillés' },
   { id: 'snow-montagne', groupe: 'Montagne', classement: '', neigeMontagne: true, neutresVisibles: true, titre: 'NEIGE AU SOL EN MONTAGNE', court: 'Neige au sol en montagne', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_MONTAGNE, ordre: 'desc', titreTop: 'Les plus enneigées' },
   { id: 'tx-hier', groupe: 'Il y a un an', classement: 'tx-fin', titre: 'TEMPÉRATURES MAXIMALES', court: 'Maxi d’hier', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
-  { id: 'tx-an', groupe: 'Il y a un an', classement: '', anPasse: 'tx', titre: 'MAXIMALES IL Y A UN AN', court: 'Maxi il y a un an', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
-  { id: 'tx-ecart-an', groupe: 'Il y a un an', classement: '', anPasse: 'ecart', titre: 'MAXIMALES : ÉCART À L’AN DERNIER', court: 'Écart à l’an dernier', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus en hausse', signe: true },
+  { id: 'tx-an', groupe: 'Il y a un an', classement: '', anPasse: { champ: 'tx' }, titre: 'MAXIMALES IL Y A UN AN', court: 'Maxi il y a un an', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tx-ecart-an', groupe: 'Il y a un an', classement: '', anPasse: { champ: 'tx', ecart: true }, titre: 'MAXIMALES : ÉCART À L’AN DERNIER', court: 'Écart des maxi', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus en hausse', signe: true },
+  { id: 'tn-hier', groupe: 'Il y a un an', classement: 'tn-fin', titre: 'TEMPÉRATURES MINIMALES', court: 'Mini de la nuit dernière', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'tn-an', groupe: 'Il y a un an', classement: '', anPasse: { champ: 'tn' }, titre: 'MINIMALES IL Y A UN AN', court: 'Mini il y a un an', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'tn-ecart-an', groupe: 'Il y a un an', classement: '', anPasse: { champ: 'tn', ecart: true }, titre: 'MINIMALES : ÉCART À L’AN DERNIER', court: 'Écart des mini', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus en hausse', signe: true },
   { id: 'snow', groupe: 'Soleil et neige', classement: 'snow', titre: 'HAUTEUR DE NEIGE AU SOL', court: 'Neige au sol', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_SOL, ordre: 'desc', titreTop: 'Les plus enneigés' },
 ];
 
