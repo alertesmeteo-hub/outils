@@ -149,7 +149,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     if (valeursDepartements) {
       return Object.fromEntries(Object.entries(valeursDepartements).map(([dep, v]) => [dep, palierDe(theme.paliers, v).fond]));
     }
-    if (enDepartement) return undefined;
+    if (enDepartement || theme.sansTeinte) return undefined;
     const parDep = new Map<string, number[]>();
     for (const p of dansZone) {
       // Palier neutre affiché (« 0 cm » en montagne) : pas de teinte pour autant.
@@ -198,6 +198,13 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const rectTop: Rect = enFrance
     ? { x: largeur - MARGE_COLONNE - largeurTop, y: titreAGauche ? 24 : 96, w: largeurTop, h: hauteurTop }
     : { x: MARGE_COLONNE, y: logoUrl ? 21 + hauteurLogo + 14 : rectTitre.y + rectTitre.h + 14, w: largeurTop, h: hauteurTop };
+  // Seuils comptés (chaleur) : un encadré sous le classement, « N sur M ont atteint ou dépassé … ».
+  const comptes = theme.seuils?.map((s) => ({ ...s, n: dansZone.filter((p) => p.valeur >= s.valeur).length })) ?? [];
+  const hauteurSeuils = comptes.length ? 30 + comptes.length * 36 : 0;
+  const largeurSeuils = 250;
+  const rectSeuils: Rect = enFrance
+    ? { x: largeur - MARGE_COLONNE - largeurSeuils, y: rectTop.y + (hauteurTop ? hauteurTop + 10 : 0), w: largeurSeuils, h: hauteurSeuils }
+    : { x: MARGE_COLONNE, y: rectTop.y + (hauteurTop ? hauteurTop + 10 : 0), w: largeurSeuils, h: hauteurSeuils };
   // Légende ajustée à son plus long libellé (pastille de couleur + texte en 13 px).
   const largeurLegende = Math.max(118, Math.round(48 + Math.max(...legende.map((x) => x.libelle.length)) * 6.7));
   const rectLegende: Rect = { x: MARGE_COLONNE, y: HAUTEUR_CARTE - 44 - hauteurLegende, w: largeurLegende, h: hauteurLegende };
@@ -236,7 +243,10 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   );
   const cleTexte = texteIA.rect ? `${texteIA.rect.y}|${texteIA.rect.h}` : '';
 
-  const taille = enFrance ? 16 : enDepartement ? 19 : 17;
+  // « Toutes les stations » : pastilles plus petites pour en placer le plus possible.
+  const taille = theme.toutes ? (enFrance ? 10 : 13) : enFrance ? 16 : enDepartement ? 19 : 17;
+  const plafond = theme.toutes ? 500 : PLAFOND[niveau];
+  const parDepartementMax = theme.toutes ? Infinity : PAR_DEPARTEMENT[niveau];
   const avecFleche = (p: PointInfo) => p.direction != null && Number.isFinite(p.direction);
 
   const places = useMemo(() => {
@@ -247,7 +257,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       if (palierDe(theme.paliers, p.valeur).neutre && !theme.neutresVisibles) return false;
       const n = parDep.get(p.dep) ?? 0;
       parDep.set(p.dep, n + 1);
-      return n < PAR_DEPARTEMENT[niveau];
+      return n < parDepartementMax;
     });
     for (const p of top) if (!candidats.includes(p)) candidats.push(p);
     const ecran = candidats.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > 0 && e.x < largeur && e.y > 0 && e.y < HAUTEUR_CARTE);
@@ -256,7 +266,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     const codesTop = new Set(top.map((p) => p.code));
     const elements = ecran
       .sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0))
-      .slice(0, PLAFOND[niveau] * 2)
+      .slice(0, plafond * 2)
       .map((e) => {
         const texte = texteInfo(theme, e.p.valeur);
         const largeurBulle = (texte.length * 0.56 + (uniteVisible ? uniteVisible.length * 0.42 + 0.25 : 0) + 0.95 + (avecFleche(e.p) ? 1.05 : 0)) * taille;
@@ -279,18 +289,20 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       { x: largeur / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 },
       rectLegende,
       ...(hauteurTop ? [rectTop] : []),
+      ...(hauteurSeuils ? [rectSeuils] : []),
       ...(logoUrl ? [{ x: 29, y: 21, w: 240, h: hauteurLogo }] : []),
       ...(texteIA.rect ? [texteIA.rect] : []),
     ];
-    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * 0.9);
+    // Toutes les stations : une pastille peut s'écarter un peu plus de sa station pour trouver une place libre.
+    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * (theme.toutes ? 1.6 : 0.9));
     const parCode = new Map(ecran.map((e) => [e.p.code, e.p]));
-    let restantes = PLAFOND[niveau];
+    let restantes = plafond;
     return elements
       .filter((e) => positions.has(e.code))
       .filter((e) => e.priorite === 0 || restantes-- > 0)
       .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte, largeurTitre]);
+  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -473,6 +485,17 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
                 </li>
               ))}
             </ol>
+          </div>
+        )}
+
+        {hauteurSeuils > 0 && (
+          <div className="cinfo-encadre cinfo-seuils" style={{ left: rectSeuils.x, top: rectSeuils.y, width: rectSeuils.w }}>
+            <div className="cinfo-encadre-titre">Stations</div>
+            {comptes.map((c) => (
+              <p key={c.valeur}>
+                <strong>{c.n.toLocaleString('fr-FR')}</strong> sur {dansZone.length.toLocaleString('fr-FR')} ont atteint ou dépassé le {c.libelle}.
+              </p>
+            ))}
           </div>
         )}
 

@@ -275,6 +275,9 @@ body {
 .cinfo-point { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; z-index: 4; line-height: 1; pointer-events: auto; }
 .cinfo-bulle { display: flex; align-items: center; gap: 0.12em; padding: 0.16em 0.42em 0.12em; border: 0.12em solid #fff; border-radius: 0.55em; box-shadow: 0 0.08em 0.35em rgba(0, 0, 0, 0.55); white-space: nowrap; }
 .cinfo-bulle strong { font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-weight: 400; font-size: 1.12em; letter-spacing: 0.01em; }
+/* Encadré des seuils (carte « Chaleur ») : deux phrases courtes. */
+.cinfo-seuils p { margin: 2px 0 6px; font-size: 13px; line-height: 1.25; white-space: normal; }
+.cinfo-seuils strong { font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-weight: 400; font-size: 17px; }
 /* Cartes infos en mode « Modifier » : valeur saisie dans la pastille, à la même police que le nombre affiché. */
 .cinfo-saisie { background: transparent; border: none; padding: 0; margin: 0; color: inherit; text-align: center; font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-size: 1.12em; letter-spacing: 0.01em; line-height: 1; cursor: text; }
 .cinfo-saisie:focus { outline: 2px solid #ffd21a; outline-offset: 1px; border-radius: 3px; }

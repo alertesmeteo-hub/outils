@@ -44,6 +44,12 @@ export interface ThemeInfo {
   maille?: 'region';
   /** Pastilles affichées même pour le palier neutre (« 0 cm » en montagne), qui reste hors classement et sans teinte. */
   neutresVisibles?: boolean;
+  /** Toutes les stations qui dépassent le palier neutre (pas seulement une par département), en pastilles plus petites. */
+  toutes?: boolean;
+  /** Départements non teintés (carte de points seuls). */
+  sansTeinte?: boolean;
+  /** Seuils comptés dans un encadré : « 123 sur 1 708 stations ont atteint ou dépassé 25 °C ». */
+  seuils?: { valeur: number; libelle: string }[];
 }
 
 export interface ThemePrevision extends ThemeInfo {
@@ -120,6 +126,15 @@ const PALIERS_PLUIE_CUMUL: Palier[] = [
   p(10, '#7cb6f7', NOIR, '10 à 19 mm'),
   p(1, '#c7e0fb', NOIR, '1 à 9 mm'),
   p(-Infinity, '#e5e7eb', NOIR, 'Moins de 1 mm', true),
+];
+
+/** Chaleur : seules les maximales de 25 °C et plus sont affichées (seuils de chaleur et de forte chaleur). */
+const PALIERS_CHALEUR: Palier[] = [
+  p(35, '#b5121b', BLANC, '35° et plus'),
+  p(30, '#ef4444', BLANC, '30 à 34,9°'),
+  p(28, '#f97316', NOIR, '28 à 29,9°'),
+  p(25, '#fdae61', NOIR, '25 à 27,9°'),
+  p(-Infinity, '#e5e7eb', NOIR, 'Moins de 25°', true),
 ];
 
 const PALIERS_RAFALES: Palier[] = [
@@ -281,6 +296,7 @@ export const THEMES_PREVISION: ThemePrevision[] = [
 /** Cartes de bilan (observations des stations Météo-France, mêmes fenêtres que les classements). */
 export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'tx-fin', groupe: 'Températures', classement: 'tx-fin', titre: 'TEMPÉRATURES MAXIMALES', court: 'Maximales de la veille', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tx-chaleur', groupe: 'Températures', classement: 'tx-fin', toutes: true, sansTeinte: true, seuils: [{ valeur: 25, libelle: 'seuil de chaleur (25 °C)' }, { valeur: 30, libelle: 'seuil de forte chaleur (30 °C)' }], titre: 'MAXIMALES DE 25 °C ET PLUS', court: 'Chaleur (25 °C et plus)', unite: '°', decimales: 1, paliers: PALIERS_CHALEUR, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-fin', groupe: 'Températures', classement: 'tn-fin', titre: 'TEMPÉRATURES MINIMALES', court: 'Minimales de la nuit', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 'tx-prov', groupe: 'Températures', classement: 'tx-prov', titre: 'MAXIMALES DU JOUR (PROVISOIRES)', court: 'Maximales du jour', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-prov', groupe: 'Températures', classement: 'tn-prov', titre: 'MINIMALES DE LA NUIT (PROVISOIRES)', court: 'Minimales de cette nuit', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
