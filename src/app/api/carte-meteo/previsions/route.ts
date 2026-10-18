@@ -26,6 +26,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ erreur: 'Date invalide (de la veille à J+' + ECHEANCE_MAX[modele] + ' pour ce modèle).' }, { status: 400 });
   }
 
+  // Pluie sur une période : du jour `date` au jour `fin` inclus (cartes infos), dans l'échéance du modèle.
+  const fin = url.searchParams.get('fin') ?? undefined;
+  if (fin !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(fin) || fin < date || fin > ajouterJours(aujourdhui, ECHEANCE_MAX[modele]))) {
+    return NextResponse.json({ erreur: 'Période invalide pour ce modèle.' }, { status: 400 });
+  }
+
   const dep = url.searchParams.get('dep');
   if (dep !== null && !CODES_DEPARTEMENTS.includes(dep)) {
     return NextResponse.json({ erreur: 'Département inconnu.' }, { status: 400 });
@@ -57,7 +63,7 @@ export async function GET(req: Request) {
     if (liste.length === 0 || liste.length > 13 || liste.some((d) => !CODES_DEPARTEMENTS.includes(d))) {
       return NextResponse.json({ erreur: 'Départements invalides.' }, { status: 400 });
     }
-    const resultats = await Promise.allSettled(liste.map((d) => chargerPrevisionsVilles(modele, date, d)));
+    const resultats = await Promise.allSettled(liste.map((d) => chargerPrevisionsVilles(modele, date, d, fin)));
     const points = resultats.flatMap((r, i) => (r.status === 'fulfilled' ? r.value.map((p) => ({ ...p, dep: liste[i] })) : []));
     if (points.length === 0) {
       const sansDonnee = resultats.some((r) => r.status === 'rejected' && r.reason instanceof Error && r.reason.message.includes('aucune donnée'));
@@ -71,7 +77,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const points = dep ? await chargerPrevisionsVilles(modele, date, dep) : await chargerPrevisionsCarte(modele, date);
+    const points = dep ? await chargerPrevisionsVilles(modele, date, dep, fin) : await chargerPrevisionsCarte(modele, date, fin);
     return NextResponse.json({ modele, date, dep, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
   } catch (erreur) {
     const sansDonnee = erreur instanceof Error && erreur.message.includes('aucune donnée');

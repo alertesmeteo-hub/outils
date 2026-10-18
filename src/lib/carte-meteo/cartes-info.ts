@@ -60,6 +60,8 @@ export interface ThemePrevision extends ThemeInfo {
   cumulJours?: DureeCumul;
   /** Points de montagne (communes au-dessus de 1 000 m), lus à part (?montagne=1). */
   montagne?: boolean;
+  /** Pluie sur la période choisie sur la page (« du … au … »), avec le modèle choisi, lue à part (?fin=). */
+  periode?: boolean;
 }
 
 /** Cartes du réchauffement climatique : fiches régionales Météo-France (TRACC) ou pluies DRIAS par commune. */
@@ -280,9 +282,11 @@ export const THEMES_PREVISION: ThemePrevision[] = [
   { id: 'ressenti', groupe: 'Températures', titre: 'TEMPÉRATURES RESSENTIES', court: 'Ressenti (vent)', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froids', valeur: (x) => x.ressentiMin },
   { id: 'amplitude', groupe: 'Températures', titre: 'AMPLITUDE THERMIQUE', court: 'Amplitude (maxi - mini)', unite: '°', decimales: 0, paliers: PALIERS_AMPLITUDE, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => (x.maxi != null && x.mini != null ? x.maxi - x.mini : null) },
   { id: 'pluie', groupe: 'Pluie', titre: 'CUMULS DE PLUIE', court: 'Cumuls de pluie', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluieJournee },
+  { id: 'pluie-3j', groupe: 'Pluie', cumulJours: 3, titre: 'CUMULS DE PLUIE SUR 3 JOURS', court: 'Pluie sur 3 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie3j },
   { id: 'pluie-5j', groupe: 'Pluie', cumulJours: 5, titre: 'CUMULS DE PLUIE SUR 5 JOURS', court: 'Pluie sur 5 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie5j },
   { id: 'pluie-10j', groupe: 'Pluie', cumulJours: 10, titre: 'CUMULS DE PLUIE SUR 10 JOURS', court: 'Pluie sur 10 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie10j },
   { id: 'pluie-16j', groupe: 'Pluie', cumulJours: 16, titre: 'CUMULS DE PLUIE SUR 16 JOURS', court: 'Pluie sur 16 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie16j },
+  { id: 'pluie-periode', groupe: 'Pluie', periode: true, titre: 'CUMULS DE PLUIE SUR LA PÉRIODE', court: 'Pluie sur une période', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluiePeriode },
   { id: 'rafales', groupe: 'Vent', titre: 'RAFALES MAXIMALES', court: 'Rafales maximales', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafaleJournee, direction: (x) => x.directionRafaleJournee },
   { id: 'vent', groupe: 'Vent', titre: 'VENT MOYEN MAXIMAL', court: 'Vent moyen', unite: 'km/h', decimales: 0, paliers: PALIERS_VENT_MOYEN, ordre: 'desc', titreTop: 'Les plus ventés', valeur: (x) => x.ventMaxJournee },
   { id: 'orages', groupe: 'Orages et neige', titre: 'RISQUE D’ORAGE', court: 'Risque d’orage', unite: '', decimales: 0, paliers: PALIERS_ORAGE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => x.orageJournee, texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },

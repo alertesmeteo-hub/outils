@@ -96,16 +96,20 @@ export interface PointCarte {
   ventMaxJournee?: number | null;
   visibiliteMin?: number | null;
   ressentiMin?: number | null;
-  /** Cumuls de pluie (mm) sur 5, 10 et 16 jours à partir du jour demandé (null si la série ne couvre pas la période),
+  /** Cumuls de pluie (mm) sur 3, 5, 10 et 16 jours à partir du jour demandé (null si la série ne couvre pas la période),
    * et dernière échéance prise en compte (ISO UTC). Absents des anciennes réponses. */
+  pluie3j?: number | null;
   pluie5j?: number | null;
   pluie10j?: number | null;
   pluie16j?: number | null;
   finPrevision?: string | null;
+  /** Pluie sur une période choisie (du jour demandé au jour `fin` inclus, ?fin=) et dernière échéance prise en compte. */
+  pluiePeriode?: number | null;
+  finPeriode?: string | null;
 }
 
 /** Durées (jours) des cartes de cumul de pluie. */
-export const DUREES_CUMUL = [5, 10, 16] as const;
+export const DUREES_CUMUL = [3, 5, 10, 16] as const;
 export type DureeCumul = (typeof DUREES_CUMUL)[number];
 /**
  * Part minimale de la période que la série doit couvrir pour donner un cumul : le CEP s'arrête à 15 jours (≈ 14,5 jours
@@ -243,29 +247,41 @@ function minuitParis(dateISO: string): number {
   return minuitUTC - decalage * 3600_000;
 }
 
-/** Cumuls de pluie sur 5, 10 et 16 jours à partir de minuit (Paris) de `dateISO`. */
-function cumulsPluie(serie: Serie, dateISO: string): Pick<PointCarte, 'pluie5j' | 'pluie10j' | 'pluie16j' | 'finPrevision'> {
-  const debut = minuitParis(dateISO);
-  const instants = serie.t.map((t) => Date.parse(t));
-  const cumul = (jours: number) => {
-    const fin = debut + jours * 86_400_000;
-    const indices = instants.map((t, i) => ({ t, i })).filter(({ t, i }) => t > debut && t <= fin && serie.pluie[i] != null);
-    if (!indices.length) return { valeur: null, derniere: null };
-    const derniere = indices[indices.length - 1].t;
-    return {
-      valeur: (derniere - debut) / (fin - debut) >= COUVERTURE_MIN_CUMUL ? arrondi(somme(indices.map(({ i }) => serie.pluie[i])), 1) : null,
-      derniere,
-    };
+/** Pluie (mm) entre deux instants (ms), si la série couvre assez de la période ; `derniere` : dernière échéance comptée. */
+function cumulEntre(serie: Serie, debut: number, fin: number): { valeur: number | null; derniere: number | null } {
+  const indices = serie.t.map((t, i) => ({ t: Date.parse(t), i })).filter(({ t, i }) => t > debut && t <= fin && serie.pluie[i] != null);
+  if (!indices.length) return { valeur: null, derniere: null };
+  const derniere = indices[indices.length - 1].t;
+  return {
+    valeur: (derniere - debut) / (fin - debut) >= COUVERTURE_MIN_CUMUL ? arrondi(somme(indices.map(({ i }) => serie.pluie[i])), 1) : null,
+    derniere,
   };
-  const [c5, c10, c16] = DUREES_CUMUL.map(cumul);
-  return { pluie5j: c5.valeur, pluie10j: c10.valeur, pluie16j: c16.valeur, finPrevision: c16.derniere != null ? new Date(c16.derniere).toISOString() : null };
+}
+
+/** Cumuls de pluie sur 3, 5, 10 et 16 jours à partir de minuit (Paris) de `dateISO`. */
+function cumulsPluie(serie: Serie, dateISO: string): Pick<PointCarte, 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'finPrevision'> {
+  const debut = minuitParis(dateISO);
+  const [c3, c5, c10, c16] = DUREES_CUMUL.map((jours) => cumulEntre(serie, debut, debut + jours * 86_400_000));
+  return {
+    pluie3j: c3.valeur,
+    pluie5j: c5.valeur,
+    pluie10j: c10.valeur,
+    pluie16j: c16.valeur,
+    finPrevision: c16.derniere != null ? new Date(c16.derniere).toISOString() : null,
+  };
+}
+
+/** Pluie sur une période choisie : de minuit (Paris) de `dateISO` à minuit après `finISO` (jour de fin compris). */
+function pluieSurPeriode(serie: Serie, dateISO: string, finISO: string): Pick<PointCarte, 'pluiePeriode' | 'finPeriode'> {
+  const c = cumulEntre(serie, minuitParis(dateISO), minuitParis(ajouterJours(finISO, 1)));
+  return { pluiePeriode: c.valeur, finPeriode: c.derniere != null ? new Date(c.derniere).toISOString() : null };
 }
 
 /**
  * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h, l'après-midi de 12 h à 18 h (température : maximum de 14 h à 18 h), la journée de 7 h à 20 h pour le
  * ciel. Le minimum de la nuit n'est donné que si la série couvre le début de la journée (avant 7 h).
  */
-export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateISO: string): PointCarte {
+export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateISO: string, finPeriode?: string): PointCarte {
   // Températures hors de -25 à 47 °C et vents au-delà de 250 km/h : erreurs du modèle, jamais affichées.
   const serie: Serie = {
     ...brute,
@@ -315,6 +331,7 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
     visibiliteMin: arrondi(minimum(toute.map((i) => serie.visibilite[i])), 1),
     ressentiMin: minimum(toute.map((i) => ressenti(serie.temp[i], serie.vent[i]))),
     ...cumulsPluie(serie, dateISO),
+    ...(finPeriode ? pluieSurPeriode(serie, dateISO, finPeriode) : {}),
     voileMatin: voilePeriode(serie, matin),
     voileApresMidi: voilePeriode(serie, apresMidi),
     voileJournee: voilePeriode(serie, ciel),

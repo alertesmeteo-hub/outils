@@ -364,7 +364,9 @@ async function enParallele<T, R>(liste: T[], limite: number, tache: (x: T) => Pr
 export async function chargerPrevisionsCarteJours(
   modele: ModeleSource,
   datesISO: string[],
-  apresMidiSeulement = false
+  apresMidiSeulement = false,
+  /** Pluie sur une période : du jour demandé à ce jour (inclus), voir pointDepuisSerie. */
+  finPeriode?: string
 ): Promise<Record<string, PointCarte[] | null>> {
   const resultats = await enParallele(CODES_DEPARTEMENTS, CONCURRENCE, (dep) => extraitDepartement(modele, dep));
   const sortie: Record<string, PointCarte[] | null> = Object.fromEntries(datesISO.map((d) => [d, [] as PointCarte[] | null]));
@@ -378,7 +380,7 @@ export async function chargerPrevisionsCarteJours(
     }
     for (const date of datesISO) {
       const { nom: ville, lat, lon } = r.value.chefCommune;
-      const point = { ...pointDepuisSerie(dep, DEPARTEMENTS_FR[dep] ?? dep, r.value.chef, date), ville, lat, lon };
+      const point = { ...pointDepuisSerie(dep, DEPARTEMENTS_FR[dep] ?? dep, r.value.chef, date, finPeriode), ville, lat, lon };
       if (point.tempApresMidi != null || (!apresMidiSeulement && point.maxi != null)) (sortie[date] as PointCarte[]).push(point);
     }
   });
@@ -388,18 +390,18 @@ export async function chargerPrevisionsCarteJours(
 }
 
 /** Prévisions des 96 départements pour un modèle et un jour (un point par département). */
-export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: string): Promise<PointCarte[]> {
+export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: string, finPeriode?: string): Promise<PointCarte[]> {
   if (modele === 'moyenne') throw new Error('La moyenne des modèles est réservée à la vue département');
-  const points = (await chargerPrevisionsCarteJours(modele, [dateISO], true))[dateISO];
+  const points = (await chargerPrevisionsCarteJours(modele, [dateISO], true, finPeriode))[dateISO];
   if (!points) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO}`);
   return points;
 }
 
 /** Prévisions des principales communes d'un département (vue « département »). */
-export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: string, dep: string): Promise<PointCarte[]> {
+export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: string, dep: string, finPeriode?: string): Promise<PointCarte[]> {
   if (modele === 'moyenne') return chargerPrevisionsVillesMoyenne(dateISO, dep);
   const extrait = await extraitDepartement(modele, dep);
-  const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO), lat: v.lat, lon: v.lon, ...(v.prioritaire ? { prioritaire: true } : {}), ...(v.placeExacte ? { placeExacte: true } : {}) }));
+  const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO, finPeriode), lat: v.lat, lon: v.lon, ...(v.prioritaire ? { prioritaire: true } : {}), ...(v.placeExacte ? { placeExacte: true } : {}) }));
   const valides = points.filter((p) => p.tempApresMidi != null);
   if (!valides.length) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO} (département ${dep})`);
   return valides;
