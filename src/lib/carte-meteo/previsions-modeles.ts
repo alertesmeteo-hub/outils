@@ -103,8 +103,14 @@ export interface PointCarte {
   pluie10j?: number | null;
   pluie16j?: number | null;
   finPrevision?: string | null;
-  /** Pluie sur une période choisie (du jour demandé au jour `fin` inclus, ?fin=) et dernière échéance prise en compte. */
+  /** Période choisie (du jour demandé au jour `fin` inclus, ?fin=) : pluie et neige cumulées, rafale la plus forte (et sa
+   * direction), maximale la plus haute et minimale la plus basse ; dernière échéance prise en compte. */
   pluiePeriode?: number | null;
+  neigePeriode?: number | null;
+  rafalePeriode?: number | null;
+  directionRafalePeriode?: number | null;
+  maxiPeriode?: number | null;
+  miniPeriode?: number | null;
   finPeriode?: string | null;
 }
 
@@ -271,10 +277,32 @@ function cumulsPluie(serie: Serie, dateISO: string): Pick<PointCarte, 'pluie3j' 
   };
 }
 
-/** Pluie sur une période choisie : de minuit (Paris) de `dateISO` à minuit après `finISO` (jour de fin compris). */
-function pluieSurPeriode(serie: Serie, dateISO: string, finISO: string): Pick<PointCarte, 'pluiePeriode' | 'finPeriode'> {
-  const c = cumulEntre(serie, minuitParis(dateISO), minuitParis(ajouterJours(finISO, 1)));
-  return { pluiePeriode: c.valeur, finPeriode: c.derniere != null ? new Date(c.derniere).toISOString() : null };
+/**
+ * Valeurs sur une période choisie, de minuit (Paris) de `dateISO` à minuit après `finISO` (jour de fin compris) : cumuls de
+ * pluie et de neige, rafale la plus forte, maximale la plus haute et minimale la plus basse. Comme les cumuls, chaque valeur
+ * n'est donnée que si la série couvre au moins 85 % de la période.
+ */
+function valeursSurPeriode(
+  serie: Serie,
+  dateISO: string,
+  finISO: string
+): Pick<PointCarte, 'pluiePeriode' | 'neigePeriode' | 'rafalePeriode' | 'directionRafalePeriode' | 'maxiPeriode' | 'miniPeriode' | 'finPeriode'> {
+  const debut = minuitParis(dateISO);
+  const fin = minuitParis(ajouterJours(finISO, 1));
+  const indices = serie.t.map((t, i) => ({ t: Date.parse(t), i })).filter(({ t }) => t > debut && t <= fin);
+  const derniere = indices.length ? indices[indices.length - 1].t : null;
+  const couvert = derniere != null && (derniere - debut) / (fin - debut) >= COUVERTURE_MIN_CUMUL;
+  const de = (champ: (number | null)[]) => indices.map(({ i }) => champ[i]);
+  const rafale = indiceRafaleMax(serie, indices.map(({ i }) => i));
+  return {
+    pluiePeriode: cumulEntre(serie, debut, fin).valeur,
+    neigePeriode: couvert ? arrondi(somme(de(serie.neige)), 1) : null,
+    rafalePeriode: couvert && rafale >= 0 ? arrondi(serie.rafale[rafale]) : null,
+    directionRafalePeriode: couvert ? directionRafaleMax(serie, indices.map(({ i }) => i)) : null,
+    maxiPeriode: couvert ? arrondi(maximum(de(serie.temp)), 1) : null,
+    miniPeriode: couvert ? arrondi(minimum(de(serie.temp)), 1) : null,
+    finPeriode: derniere != null ? new Date(derniere).toISOString() : null,
+  };
 }
 
 /**
@@ -331,7 +359,7 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
     visibiliteMin: arrondi(minimum(toute.map((i) => serie.visibilite[i])), 1),
     ressentiMin: minimum(toute.map((i) => ressenti(serie.temp[i], serie.vent[i]))),
     ...cumulsPluie(serie, dateISO),
-    ...(finPeriode ? pluieSurPeriode(serie, dateISO, finPeriode) : {}),
+    ...(finPeriode ? valeursSurPeriode(serie, dateISO, finPeriode) : {}),
     voileMatin: voilePeriode(serie, matin),
     voileApresMidi: voilePeriode(serie, apresMidi),
     voileJournee: voilePeriode(serie, ciel),

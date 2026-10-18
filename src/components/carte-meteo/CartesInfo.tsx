@@ -536,7 +536,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                 </select>
               </label>
               <fieldset>
-                <legend className={legendeBarre}>Pluie sur une période</legend>
+                <legend className={legendeBarre}>Période (cartes « sur une période »)</legend>
                 <div className="flex items-center gap-2 text-sm">
                   du
                   <select
@@ -547,7 +547,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                       setErreurPeriode(null);
                     }}
                     className={selectBarre}
-                    aria-label="Premier jour de la période de pluie"
+                    aria-label="Premier jour de la période"
                   >
                     {Array.from({ length: jourMax + 1 }, (_, n) => (
                       <option key={n} value={n}>
@@ -563,7 +563,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                       setErreurPeriode(null);
                     }}
                     className={selectBarre}
-                    aria-label="Dernier jour de la période de pluie"
+                    aria-label="Dernier jour de la période"
                   >
                     {Array.from({ length: jourMax + 1 }, (_, n) => n)
                       .filter((n) => n >= debutPeriode)
@@ -804,7 +804,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                           </button>
                         </p>
                       ) : (
-                        <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">Chargement de la pluie sur la période…</p>
+                        <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">Chargement des valeurs sur la période…</p>
                       )
                     ) : mode === 'prevision' && (theme as ThemePrevision).montagne && (erreurMontagne || montagne?.cle !== cleMontagne) ? (
                       erreurMontagne ? (

@@ -60,7 +60,7 @@ export interface ThemePrevision extends ThemeInfo {
   cumulJours?: DureeCumul;
   /** Points de montagne (communes au-dessus de 1 000 m), lus à part (?montagne=1). */
   montagne?: boolean;
-  /** Pluie sur la période choisie sur la page (« du … au … »), avec le modèle choisi, lue à part (?fin=). */
+  /** Valeur sur la période choisie sur la page (« du … au … »), avec le modèle choisi, lue à part (?fin=). */
   periode?: boolean;
 }
 
@@ -277,6 +277,8 @@ const PALIERS_NEIGE_MONTAGNE: Palier[] = PALIERS_NEIGE.map((x) => (x.neutre ? { 
 /** Cartes de prévision (paquets des modèles AROME, Harmonie, CEP, GFS). */
 export const THEMES_PREVISION: ThemePrevision[] = [
   { id: 'tmax', groupe: 'Températures', titre: 'TEMPÉRATURES MAXIMALES', court: 'Températures maximales', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes', valeur: (x) => x.maxi },
+  { id: 'tmax-periode', groupe: 'Températures', periode: true, titre: 'MAXIMALES SUR LA PÉRIODE', court: 'Maxi sur une période', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes', valeur: (x) => x.maxiPeriode },
+  { id: 'tmin-periode', groupe: 'Températures', periode: true, titre: 'MINIMALES SUR LA PÉRIODE', court: 'Mini sur une période', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides', valeur: (x) => x.miniPeriode },
   { id: 'tmin', groupe: 'Températures', titre: 'TEMPÉRATURES MINIMALES', court: 'Températures minimales', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides', valeur: (x) => x.mini },
   { id: 'tmatin', groupe: 'Températures', titre: 'TEMPÉRATURES DU MATIN', court: 'Températures du matin', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus fraîches', valeur: (x) => x.tempMatin },
   { id: 'ressenti', groupe: 'Températures', titre: 'TEMPÉRATURES RESSENTIES', court: 'Ressenti (vent)', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froids', valeur: (x) => x.ressentiMin },
@@ -288,9 +290,11 @@ export const THEMES_PREVISION: ThemePrevision[] = [
   { id: 'pluie-16j', groupe: 'Pluie', cumulJours: 16, titre: 'CUMULS DE PLUIE SUR 16 JOURS', court: 'Pluie sur 16 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie16j },
   { id: 'pluie-periode', groupe: 'Pluie', periode: true, titre: 'CUMULS DE PLUIE SUR LA PÉRIODE', court: 'Pluie sur une période', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluiePeriode },
   { id: 'rafales', groupe: 'Vent', titre: 'RAFALES MAXIMALES', court: 'Rafales maximales', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafaleJournee, direction: (x) => x.directionRafaleJournee },
+  { id: 'rafales-periode', groupe: 'Vent', periode: true, titre: 'RAFALES MAXIMALES SUR LA PÉRIODE', court: 'Rafales sur une période', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafalePeriode, direction: (x) => x.directionRafalePeriode },
   { id: 'vent', groupe: 'Vent', titre: 'VENT MOYEN MAXIMAL', court: 'Vent moyen', unite: 'km/h', decimales: 0, paliers: PALIERS_VENT_MOYEN, ordre: 'desc', titreTop: 'Les plus ventés', valeur: (x) => x.ventMaxJournee },
   { id: 'orages', groupe: 'Orages et neige', titre: 'RISQUE D’ORAGE', court: 'Risque d’orage', unite: '', decimales: 0, paliers: PALIERS_ORAGE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => x.orageJournee, texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'neige', groupe: 'Orages et neige', titre: 'NEIGE FRAÎCHE', court: 'Neige', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE, ordre: 'desc', titreTop: 'Les plus enneigés', valeur: (x) => x.neigeJournee },
+  { id: 'neige-periode', groupe: 'Orages et neige', periode: true, titre: 'NEIGE FRAÎCHE SUR LA PÉRIODE', court: 'Neige sur une période', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE, ordre: 'desc', titreTop: 'Les plus enneigés', valeur: (x) => x.neigePeriode },
   { id: 'neige-montagne', groupe: 'Montagne', montagne: true, neutresVisibles: true, titre: 'NEIGE FRAÎCHE EN MONTAGNE', court: 'Neige en montagne', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_MONTAGNE, ordre: 'desc', titreTop: 'Les plus enneigées', valeur: (x) => x.neigeJournee },
   { id: 'tmax-montagne', groupe: 'Montagne', montagne: true, titre: 'MAXIMALES EN MONTAGNE', court: 'Maxi en montagne', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus douces', valeur: (x) => x.maxi },
   { id: 'nuages', groupe: 'Ciel et brouillard', titre: 'COUVERTURE NUAGEUSE', court: 'Nuages et soleil', unite: '%', decimales: 0, paliers: PALIERS_NUAGES, ordre: 'asc', titreTop: 'Les plus ensoleillés', valeur: (x) => x.nuagesJournee },
