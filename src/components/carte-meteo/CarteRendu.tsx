@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as PointerEventReact, type ReactNode, type RefObject } from 'react';
 import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { MATRICE_RELIEF, TAILLE_TUILE_VIDE, coucheParDefaut, tuileParente, tuilesVisibles, type Couche, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_METEO, PICTOS_DEFAUT_IMAGES, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
@@ -284,6 +284,9 @@ interface Props {
   rafalesAjoutees?: RafaleAjoutee[];
   onModifierRafaleAjoutee?: (code: string, champ: 'texte' | 'provenance', valeur: string) => void;
   onSupprimerRafaleAjoutee?: (code: string) => void;
+  /** Déplacement à la souris : rafale ajoutée (position sur la carte) ou pastille du modèle (décalage par rapport à sa ville). */
+  onDeplacerRafaleAjoutee?: (code: string, x: number, y: number) => void;
+  onDeplacerRafale?: (code: string, dx: number, dy: number) => void;
   /** Mode « ajouter un picto » : clic sur la carte (position en pixels de la carte). */
   onClicCarte?: (x: number, y: number) => void;
   /** Supprime un picto ajouté à la main. */
@@ -378,6 +381,8 @@ export default function CarteRendu({
   children,
   onModifierRafaleAjoutee,
   onSupprimerRafaleAjoutee,
+  onDeplacerRafaleAjoutee,
+  onDeplacerRafale,
 }: Props) {
   const [partout, setPartout] = useState(false);
   /** Rafale ajoutée dont le choix de direction est ouvert. */
@@ -387,6 +392,40 @@ export default function CarteRendu({
   const couche = fond ?? coucheParDefaut(vue);
   const degres = styleCapture || carteLocale;
   const largeurValeur = (v: string) => `${Math.max(1, v.length) * (styleCapture ? 0.58 : 0.54) + 0.05}em`;
+
+  // Pastilles de vent déplaçables à la souris (ou au doigt) : le déplacement ne commence qu'au-delà de 3 px, un simple clic garde
+  // son rôle (saisir la valeur, changer la direction). Positions en pixels de la carte (le cadre est mis à l'échelle par `facteur`).
+  const glisser = useRef<{ sx: number; sy: number; x0: number; y0: number; bouge: boolean; champ: HTMLInputElement | null; deplacer: (x: number, y: number) => void } | null>(null);
+  const vientDeGlisser = useRef(false);
+  const debutGlisser = (e: PointerEventReact<HTMLDivElement>, x0: number, y0: number, deplacer?: (x: number, y: number) => void) => {
+    // Le nombre (champ de saisie) sert aussi de prise : sans mouvement, on lui rend la main pour le modifier (voir finGlisser).
+    if (!deplacer || e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+    e.preventDefault(); // pas de sélection de texte pendant le geste
+    e.currentTarget.setPointerCapture(e.pointerId);
+    glisser.current = { sx: e.clientX, sy: e.clientY, x0, y0, bouge: false, champ: (e.target as HTMLElement).closest('input'), deplacer };
+  };
+  const pendantGlisser = (e: PointerEventReact<HTMLDivElement>) => {
+    const g = glisser.current;
+    if (!g) return;
+    const dx = (e.clientX - g.sx) / facteur;
+    const dy = (e.clientY - g.sy) / facteur;
+    if (!g.bouge && Math.hypot(dx, dy) < 3) return;
+    if (!g.bouge) (document.activeElement as HTMLElement | null)?.blur?.(); // on déplace : on quitte la saisie du nombre
+    g.bouge = true;
+    g.deplacer(Math.round(g.x0 + dx), Math.round(g.y0 + dy));
+  };
+  const finGlisser = (e: PointerEventReact<HTMLDivElement>) => {
+    const g = glisser.current;
+    if (!g) return;
+    glisser.current = null;
+    vientDeGlisser.current = g.bouge;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    // Simple clic sur le nombre : le pointeur retenu l'a empêché de recevoir le clic, on lui donne la main.
+    if (!g.bouge && g.champ) {
+      g.champ.focus();
+      g.champ.select();
+    }
+  };
   return (
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
@@ -509,10 +548,19 @@ export default function CarteRendu({
               style={{ left: r.x, top: r.y, fontSize: 22 * echelleMarqueurs, ...(directionOuvertePour === r.code ? { zIndex: 20 } : {}) }}
             >
               <div
-                className="cmap-vent-place"
+                className={`cmap-vent-place ${onDeplacerRafaleAjoutee ? 'cmap-vent-mobile' : ''}`}
                 style={valeur < SEUIL_VENT_REDUIT ? { fontSize: `${ECHELLE_VENT_REDUIT}em` } : undefined}
-                title="Clic : changer la direction du vent"
+                title="Clic : changer la direction du vent · glisser : déplacer"
+                onPointerDown={(e) => debutGlisser(e, r.x, r.y, onDeplacerRafaleAjoutee && ((x, y) => onDeplacerRafaleAjoutee(r.code, x, y)))}
+                onPointerMove={pendantGlisser}
+                onPointerUp={finGlisser}
+                onPointerCancel={finGlisser}
                 onClick={(e) => {
+                  // Fin d'un déplacement : pas d'ouverture de la rose des vents.
+                  if (vientDeGlisser.current) {
+                    vientDeGlisser.current = false;
+                    return;
+                  }
                   if ((e.target as HTMLElement).closest('input, button')) return;
                   setDirectionOuvertePour((c) => (c === r.code ? null : r.code));
                 }}
@@ -626,12 +674,17 @@ export default function CarteRendu({
             )}
             {m.rafale != null && (
               <div
-                className="cmap-vent-place"
+                className={`cmap-vent-place ${onDeplacerRafale ? 'cmap-vent-mobile' : ''}`}
                 style={{
                   left: `calc(50% + ${m.vent?.dx ?? 0}px)`,
                   top: `calc(50% + ${m.vent?.dy ?? 0}px)`,
                   ...(m.ventReduit ? { fontSize: `${ECHELLE_VENT_REDUIT}em` } : {}),
                 }}
+                title={onDeplacerRafale ? 'Glisser : déplacer la rafale' : undefined}
+                onPointerDown={(e) => debutGlisser(e, m.vent?.dx ?? 0, m.vent?.dy ?? 0, onDeplacerRafale && ((dx, dy) => onDeplacerRafale(m.code, dx, dy)))}
+                onPointerMove={pendantGlisser}
+                onPointerUp={finGlisser}
+                onPointerCancel={finGlisser}
               >
               {onSupprimerRafale && (
                 <button type="button" className="cmap-supprimer cmap-supprimer-vent cmap-sans-export" title="Retirer cette rafale" onClick={() => onSupprimerRafale(m.code)}>

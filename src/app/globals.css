@@ -135,6 +135,9 @@ body {
 /* Indicateur de rafale placé à part du picto (le picto reste à sa place, la pastille se met où il y a de la place). */
 .cmap-vent-place { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; z-index: 2; }
 .cmap-vent-place .cmap-vent { margin-top: 0; }
+/* Pastille de vent déplaçable à la souris ou au doigt (pas de défilement de la page pendant le geste). */
+.cmap-vent-mobile { cursor: grab; touch-action: none; user-select: none; }
+.cmap-vent-mobile:active { cursor: grabbing; }
 .cmap-vent {
   display: flex;
   align-items: center;

@@ -400,6 +400,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [rafalesManuelles, setRafalesManuelles] = useState<Record<string, string>>({});
   /** Rafales retirées à la main (clé « période|code »). */
   const [rafalesRetirees, setRafalesRetirees] = useState<Set<string>>(new Set());
+  /** Pastilles de rafale déplacées à la main : décalage par rapport à leur ville, par « période|ville ». */
+  const [ventsDeplaces, setVentsDeplaces] = useState<Record<string, { dx: number; dy: number }>>({});
   /** Pictos ajoutés à la main (clic sur la carte), propres à chaque zone. */
   /** Pictos du modèle retirés à la main (croix au survol), par zone : `zone|code`. Pas de ville de remplacement. */
   const [pictosRetires, setPictosRetires] = useState<Set<string>>(new Set());
@@ -478,6 +480,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         setMoyennesManuelles({});
         setRafalesManuelles({});
         setRafalesRetirees(new Set());
+        setVentsDeplaces({});
       })
       .catch((e: Error) => {
         if (e.name === 'AbortError') return;
@@ -505,6 +508,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         setDonneesVilles({ modele, dateISO, departement, points: json.points });
         setRafalesManuelles({});
         setRafalesRetirees(new Set());
+        setVentsDeplaces({});
         setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
       })
       .catch((e: Error) => {
@@ -1024,7 +1028,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const marqueursAffiches: Marqueur[] = [
     ...marqueurs
       .filter((m) => !pictosRetires.has(`${zone}|${m.code}`))
-      .map((m) => ({ ...m, neige: estPictoNeige(m.picto), altitude: altitudeDe(m.code, m.picto) })),
+      .map((m) => ({
+        ...m,
+        neige: estPictoNeige(m.picto),
+        altitude: altitudeDe(m.code, m.picto),
+        // Pastille de rafale déplacée à la main : sa position remplace celle du placement automatique.
+        ...(m.vent && ventsDeplaces[`${periode}|${m.code}`] ? { vent: ventsDeplaces[`${periode}|${m.code}`] } : {}),
+      })),
     ...ajouts
       .filter((a) => a.zone === zone)
       .map((a) => ({
@@ -1240,6 +1250,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         )
       }
       onSupprimerRafaleAjoutee={enExport ? undefined : (code) => setRafalesAjoutees((liste) => liste.filter((r) => `rafale:${r.id}` !== code))}
+      onDeplacerRafaleAjoutee={
+        enExport ? undefined : (code, x, y) => setRafalesAjoutees((liste) => liste.map((r) => (`rafale:${r.id}` === code ? { ...r, x, y } : r)))
+      }
+      onDeplacerRafale={enExport ? undefined : (code, dx, dy) => setVentsDeplaces((v) => ({ ...v, [`${periode}|${code}`]: { dx, dy } }))}
       onSupprimerRafale={enExport ? undefined : (code) => setRafalesRetirees((r) => new Set(r).add(`${periode}|${code}`))}
       onSupprimer={
         enExport
@@ -1556,6 +1570,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               setMoyennesManuelles({});
         setRafalesManuelles({});
         setRafalesRetirees(new Set());
+        setVentsDeplaces({});
               setTitreManuel(null);
               setSousTitreManuel(null);
             }}
