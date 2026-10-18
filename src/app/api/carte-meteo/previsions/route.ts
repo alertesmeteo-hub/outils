@@ -50,7 +50,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ erreur: 'Départements invalides.' }, { status: 400 });
     }
     try {
-      const points = await chargerPrevisionsMontagne(modele, date, liste);
+      const points = await chargerPrevisionsMontagne(modele, date, liste, fin);
       return NextResponse.json({ modele, date, montagne: true, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
     } catch (erreur) {
       console.error('Erreur carte météo (montagne)', erreur);

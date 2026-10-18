@@ -435,7 +435,13 @@ async function chargerPrevisionsVillesMoyenne(dateISO: string, dep: string): Pro
  * Cartes de montagne : communes dont le point du modèle est à 1 000 m ou plus. France : la plus peuplée de chaque département
  * de montagne ; département : jusqu'à 8 communes réparties sur ses massifs. Départements sans montagne : aucun point.
  */
-export async function chargerPrevisionsMontagne(modele: ModeleMeteo, dateISO: string, deps: string[] | null): Promise<(PointCarte & { dep: string })[]> {
+export async function chargerPrevisionsMontagne(
+  modele: ModeleMeteo,
+  dateISO: string,
+  deps: string[] | null,
+  /** Valeurs sur une période (du jour demandé à ce jour inclus), voir pointDepuisSerie. */
+  finPeriode?: string
+): Promise<(PointCarte & { dep: string })[]> {
   const liste = deps ?? CODES_DEPARTEMENTS;
   // La moyenne des modèles n'existe qu'en vue département (villes) : la montagne prend alors AROME.
   const source: ModeleSource = modele === 'moyenne' ? 'arome' : modele;
@@ -445,7 +451,7 @@ export async function chargerPrevisionsMontagne(modele: ModeleMeteo, dateISO: st
     if (r.status === 'rejected') return;
     const villes = deps ? r.value.montagne : r.value.montagne.slice(0, 1);
     for (const v of villes) {
-      const p = pointDepuisSerie(v.code, v.nom, v.serie, dateISO);
+      const p = pointDepuisSerie(v.code, v.nom, v.serie, dateISO, finPeriode);
       if (p.maxi != null) points.push({ ...p, lat: v.lat, lon: v.lon, altitude: v.altitude, dep: liste[i] });
     }
   });
