@@ -82,8 +82,8 @@ export default function CartesEurope({ aujourdhui, logoId }: { aujourdhui: strin
   const [echeances, setEcheances] = useState<{ modele: ModeleEurope; run: string; liste: Echeance[] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [heureUtc, setHeureUtc] = useState(12);
-  const [style, setStyle] = useState<StyleEurope>('classique');
-  const [fleches, setFleches] = useState(false);
+  const [style, setStyle] = useState<StyleEurope>('sombre');
+  const [fleches, setFleches] = useState(true);
   const [fond, setFond] = useState<{ cadre: Cadre; traces: { terres: string; frontieres: string } } | null>(null);
   const cadre = CADRES[modele];
 
