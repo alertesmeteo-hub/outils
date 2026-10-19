@@ -15,7 +15,26 @@ export interface GrilleEurope {
   nLon: number;
   /** Pression (hPa × 10 ; null hors données), nLat lignes de nLon valeurs, du sud au nord et d'ouest en est. */
   p: (number | null)[];
+  /** Style « pluie et températures » (?complet=1) : pluie (mm × 10) sur la période qui précède l'échéance, même grille que p… */
+  pluie?: (number | null)[];
+  /** …durée de cette période (h : 3 ou 6)… */
+  periodePluie?: number;
+  /** …et température à 2 m (°C) des grandes villes. */
+  villes?: { nom: string; lat: number; lon: number; t: number }[];
 }
+
+/** Grandes villes dont la température est affichée (style « pluie et températures »). */
+export const VILLES_EUROPE: [string, number, number][] = [
+  ['Reykjavik', 64.15, -21.94], ['Dublin', 53.35, -6.26], ['Édimbourg', 55.95, -3.19], ['Londres', 51.51, -0.13],
+  ['Paris', 48.86, 2.35], ['Brest', 48.39, -4.49], ['Bordeaux', 44.84, -0.58], ['Lyon', 45.76, 4.84], ['Marseille', 43.3, 5.37],
+  ['Madrid', 40.42, -3.7], ['Lisbonne', 38.72, -9.14], ['Séville', 37.39, -5.98], ['Barcelone', 41.39, 2.17], ['Rabat', 34.02, -6.84],
+  ['Alger', 36.75, 3.06], ['Tunis', 36.81, 10.18], ['Rome', 41.9, 12.5], ['Milan', 45.46, 9.19], ['Palerme', 38.12, 13.36],
+  ['Bruxelles', 50.85, 4.35], ['Amsterdam', 52.37, 4.9], ['Hambourg', 53.55, 9.99], ['Berlin', 52.52, 13.4], ['Munich', 48.14, 11.58],
+  ['Copenhague', 55.68, 12.57], ['Oslo', 59.91, 10.75], ['Stockholm', 59.33, 18.07], ['Helsinki', 60.17, 24.94], ['Varsovie', 52.23, 21.01],
+  ['Prague', 50.08, 14.44], ['Vienne', 48.21, 16.37], ['Budapest', 47.5, 19.04], ['Belgrade', 44.79, 20.45], ['Bucarest', 44.43, 26.1],
+  ['Athènes', 37.98, 23.73], ['Istanbul', 41.01, 28.98], ['Kiev', 50.45, 30.52], ['Minsk', 53.9, 27.57], ['Moscou', 55.76, 37.62],
+  ['Tromsø', 69.65, 18.96],
+];
 
 /** Modèles proposés : CEP (ECMWF, jusqu'à J+10) et GFS (NOAA, jusqu'à J+15). */
 export type ModeleEurope = 'cep' | 'gfs';
@@ -55,6 +74,11 @@ export const versLonLat = (c: Cadre, x: number, y: number) => ({
 
 /** Pression (hPa) interpolée en un point, ou null hors de la grille. */
 export function pressionEn(g: GrilleEurope, lon: number, lat: number): number | null {
+  return valeurEn(g, g.p, lon, lat);
+}
+
+/** Valeur interpolée (bilinéaire) d'un champ de la grille (stocké × 10), ou null hors de la grille. */
+export function valeurEn(g: GrilleEurope, champ: (number | null)[], lon: number, lat: number): number | null {
   const fi = (lat - g.lat0) / g.pas;
   const fj = (lon - g.lon0) / g.pas;
   if (fi < 0 || fj < 0 || fi > g.nLat - 1 || fj > g.nLon - 1) return null;
@@ -62,7 +86,7 @@ export function pressionEn(g: GrilleEurope, lon: number, lat: number): number | 
   const j = Math.min(g.nLon - 2, Math.floor(fj));
   const di = fi - i;
   const dj = fj - j;
-  const v = (a: number, b: number) => g.p[a * g.nLon + b];
+  const v = (a: number, b: number) => champ[a * g.nLon + b];
   const q = [v(i, j), v(i, j + 1), v(i + 1, j), v(i + 1, j + 1)];
   if (q.some((x) => x == null)) return null;
   const [a, b, c, d] = q as number[];
@@ -315,4 +339,69 @@ export function centresAction(g: GrilleEurope, cadre: Cadre): { type: 'A' | 'D';
       centres.push({ type: estMin ? 'D' : 'A', x, y, hpa: Math.round(c / 10) });
     }
   return centres;
+}
+
+/* ---------- Style « pluie et températures » (fond sombre) ---------- */
+
+/** Couleur d'une isobare selon son niveau : violets et bleus (dépressions), verts, jaunes, puis roses (anticyclones). */
+const COULEURS_ISOBARES: [number, string][] = [
+  [976, '#c4b5fd'], [988, '#93c5fd'], [1000, '#7dd3fc'], [1008, '#a5f3fc'], [1012, '#bbf7d0'],
+  [1016, '#d9f99d'], [1020, '#fef08a'], [1024, '#fed7aa'], [1028, '#fecaca'], [1032, '#fbcfe8'], [1040, '#f9a8d4'],
+];
+export function couleurIsobare(niveau: number): string {
+  for (const [max, couleur] of COULEURS_ISOBARES) if (niveau <= max) return couleur;
+  return COULEURS_ISOBARES[COULEURS_ISOBARES.length - 1][1];
+}
+
+/** Pluie (mm sur la période) : verts, jaune, orange, rouge, magenta ; rien sous 0,3 mm. */
+export const PALIERS_PLUIE_EUROPE: [number, [number, number, number]][] = [
+  [0.3, [21, 94, 50]], [1, [22, 128, 61]], [1.5, [22, 163, 74]], [2, [34, 197, 94]], [3, [74, 222, 128]],
+  [5, [163, 230, 53]], [7, [234, 179, 8]], [10, [249, 115, 22]], [20, [220, 38, 38]], [30, [219, 39, 119]],
+];
+export function couleurPluie(mm: number): [number, number, number] | null {
+  let c: [number, number, number] | null = null;
+  for (const [min, rgb] of PALIERS_PLUIE_EUROPE) if (mm >= min) c = rgb;
+  return c;
+}
+
+/** Température d'une ville : bleu (froid), cyan, blanc, jaune, orange, rouge (chaud). */
+export function couleurTemperature(t: number): string {
+  if (t < 0) return '#93c5fd';
+  if (t < 10) return '#67e8f9';
+  if (t < 15) return '#ffffff';
+  if (t < 25) return '#fde047';
+  if (t < 30) return '#fb923c';
+  return '#ef4444';
+}
+
+/**
+ * Flèches de vent déduites des isobares (vent géostrophique) : le vent longe les isobares, basses pressions à sa gauche
+ * (hémisphère nord), d'autant plus fort qu'elles sont serrées ; près du sol il se tourne d'environ 20° vers les basses
+ * pressions et faiblit (frottement). Une flèche tous les `pas` pixels, là où le vent dépasse 15 km/h.
+ */
+export function flechesVent(g: GrilleEurope, c: Cadre, pas = 70): { x: number; y: number; angle: number; kmh: number }[] {
+  const fleches: { x: number; y: number; angle: number; kmh: number }[] = [];
+  const d = 0.75; // demi-écart (degrés) du calcul du gradient : lisse les détails de la grille
+  for (let y = pas / 2; y < c.hauteur; y += pas)
+    for (let x = pas / 2 + ((Math.round(y / pas) % 2) * pas) / 2; x < c.largeur; x += pas) {
+      const { lon, lat } = versLonLat(c, x, y);
+      const est = pressionEn(g, lon + d, lat);
+      const ouest = pressionEn(g, lon - d, lat);
+      const nord = pressionEn(g, lon, lat + d);
+      const sud = pressionEn(g, lon, lat - d);
+      if (est == null || ouest == null || nord == null || sud == null) continue;
+      // Gradient en Pa/m (1° de latitude ≈ 111 km ; en longitude, × cos φ).
+      const dpdx = ((est - ouest) * 100) / (2 * d * 111_000 * Math.cos(lat * RAD));
+      const dpdy = ((nord - sud) * 100) / (2 * d * 111_000);
+      const f = 2 * 7.292e-5 * Math.sin(lat * RAD);
+      // Vent géostrophique (u vers l'est, v vers le nord), ρ = 1,2 kg/m³.
+      const u = -dpdy / (1.2 * f);
+      const v = dpdx / (1.2 * f);
+      const kmh = Math.hypot(u, v) * 3.6 * 0.7;
+      if (kmh < 15) continue;
+      // Angle écran (0 = vers le haut, sens horaire), tourné de 20° vers les basses pressions (vers la gauche).
+      const angle = (Math.atan2(u, v) / RAD - 20 + 360) % 360;
+      fleches.push({ x, y, angle, kmh: Math.min(150, Math.round(kmh)) });
+    }
+  return fleches;
 }
