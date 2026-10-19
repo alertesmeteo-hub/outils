@@ -13,7 +13,9 @@ export const metadata: Metadata = {
   alternates: { canonical: '/outils/carte-meteo-info/' },
 };
 
-export default function PageCartesInfo() {
+export default async function PageCartesInfo({ searchParams }: { searchParams: Promise<{ cartes?: string }> }) {
+  // ?cartes=europe : ouvre directement les cartes Europe des isobares (lien du menu).
+  const { cartes } = await searchParams;
   return (
     <>
       <h1 className="text-3xl font-extrabold">Cartes infos météo</h1>
@@ -30,9 +32,12 @@ export default function PageCartesInfo() {
         <Link href="/outils/carte-meteo/16-jours/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
           Les 16 cartes à 16 jours
         </Link>
+        <Link href="/outils/carte-meteo-info/?cartes=europe" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
+          Europe : isobares (J0 à J+15)
+        </Link>
       </p>
       <div className="mt-6">
-        <CartesInfo aujourdhui={aujourdhuiParis()} />
+        <CartesInfo aujourdhui={aujourdhuiParis()} modeInitial={cartes} />
       </div>
       <p className="mt-8 text-xs text-muted">
         Prévisions : paquets départementaux alertesmeteo-hub (AROME Météo-France, Harmonie KNMI, CEP ECMWF, GFS NOAA). Neige : estimation d&apos;environ 1 cm de

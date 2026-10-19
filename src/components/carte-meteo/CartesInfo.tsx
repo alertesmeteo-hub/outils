@@ -114,10 +114,15 @@ const dateParis = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 
 const legendeBarre = 'mb-1 block text-sm font-medium';
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
-export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
+export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: string; /** Catégorie ouverte d'office (?cartes=europe…). */ modeInitial?: string }) {
   const id = useId();
   const nom = (base: string) => `${base}-${id}`;
-  const [mode, setMode] = useState<Mode>('prevision');
+  const modeDemande = MODES.find(([m]) => m === modeInitial)?.[0];
+  const [mode, setMode] = useState<Mode>(modeDemande ?? 'prevision');
+  // Lien du menu suivi depuis cette même page : la catégorie demandée s'ouvre.
+  useEffect(() => {
+    if (modeDemande) setMode(modeDemande);
+  }, [modeDemande]);
   const [niveau, setNiveau] = useState<Niveau>('france');
   const [region, setRegion] = useState(REGIONS_FR[0]);
   const [departement, setDepartement] = useState('66');
