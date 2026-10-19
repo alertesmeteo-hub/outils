@@ -91,7 +91,16 @@ const ALTITUDES_MAX = [0, 500, 1000, 1500, 2000];
 const ALTITUDE_MAX_DEFAUT = 1000;
 
 /** Cumuls de pluie sur plusieurs jours : seuls le CEP et GFS vont au-delà de 2 jours (CEP par défaut). */
-const modeleDuCumul = (m: ModeleMeteo): ModeleMeteo => (m === 'gfs' ? 'gfs' : 'cep');
+const modeleDuCumul = (m: ModeleMeteo): ModeleMeteo => (m === 'gfs' ? 'gfs' : m === 'moyenne' ? 'moyenne' : 'cep');
+/** Échéance proposée : la moyenne des modèles va aussi loin que le CEP et GFS (elle moyenne ceux qui couvrent le jour). */
+const echeanceDe = (m: ModeleMeteo) => (m === 'moyenne' ? ECHEANCE_MAX.cep : ECHEANCE_MAX[m]);
+/** Paramètre de requête : ici, la moyenne est la moyenne complète (toutes les valeurs, France, régions, départements). */
+const paramModele = (m: ModeleMeteo) => (m === 'moyenne' ? 'moyenne&toutes=1' : m);
+/** Nom et source d'un modèle ; pour la moyenne, les modèles réellement moyennés (renvoyés par le serveur). */
+const infosModele = (id: ModeleMeteo, modeles?: string[]) =>
+  id === 'moyenne'
+    ? { libelle: 'Moyenne des modèles', fournisseur: modeles?.length ? modeles.map((x) => MODELES.find((m) => m.id === x)?.libelle ?? x).join(', ') : 'modèles disponibles' }
+    : MODELES.find((m) => m.id === id)!;
 
 /** « SAMEDI 11 OCTOBRE » */
 const jourCourt = (dateISO: string) =>
@@ -121,7 +130,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   const [climatCommunes, setClimatCommunes] = useState<{ dep: string; communes: ClimatCommune[] } | null>(null);
   const [erreurClimat, setErreurClimat] = useState<string | null>(null);
 
-  const [previsions, setPrevisions] = useState<{ cle: string; modele: ModeleMeteo; points: (PointCarte & { dep?: string })[] } | null>(null);
+  const [previsions, setPrevisions] = useState<{ cle: string; modele: ModeleMeteo; modeles?: string[]; points: (PointCarte & { dep?: string })[] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [cumuls, setCumuls] = useState<{ cle: string; modele: ModeleMeteo; points: (PointCarte & { dep?: string })[] } | null>(null);
   const [erreurCumuls, setErreurCumuls] = useState<string | null>(null);
@@ -149,7 +158,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   // Montagne : même modèle et même jour que les autres cartes, points au-dessus de 1 000 m.
   const cleMontagne = `${modele}|${dateISO}|${requeteZone}|montagne`;
   // Période de pluie ramenée à l'échéance du modèle choisi (AROME : 2 jours, CEP : 15 jours).
-  const jourMax = ECHEANCE_MAX[modele];
+  const jourMax = echeanceDe(modele);
   const debutPeriode = Math.min(periodePluie.debut, jourMax);
   const finPeriode = Math.min(Math.max(periodePluie.fin, debutPeriode), jourMax);
   const debutPeriodeISO = ajouterJours(aujourdhui, debutPeriode);
@@ -163,12 +172,12 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   useEffect(() => {
     if (mode !== 'prevision' || previsions?.cle === cle || erreur) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}${requeteZone}`, { signal: controleur.signal })
+    fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${dateISO}${requeteZone}`, { signal: controleur.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
-        return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
+        return r.json() as Promise<{ points: (PointCarte & { dep?: string })[]; modeles?: string[] }>;
       })
-      .then((json) => setPrevisions({ cle, modele, points: json.points }))
+      .then((json) => setPrevisions({ cle, modele, modeles: json.modeles, points: json.points }))
       .catch((e: Error) => {
         if (e.name === 'AbortError') return;
         // Jour non couvert par AROME / Harmonie : modèle suivant, puis le CEP.
@@ -184,7 +193,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   useEffect(() => {
     if (!groupesAvecCumul || cumuls?.cle === cleCumul || erreurCumuls) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/previsions/?modele=${modeleCumul}&date=${aujourdhui}${requeteZone}`, { signal: controleur.signal })
+    fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modeleCumul)}&date=${aujourdhui}${requeteZone}`, { signal: controleur.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
         return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
@@ -199,7 +208,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   useEffect(() => {
     if (!groupesAvecPeriode || pluiePeriode?.cle === clePeriode || erreurPeriode) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${debutPeriodeISO}&fin=${finPeriodeISO}${requeteZone}`, { signal: controleur.signal })
+    fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${debutPeriodeISO}&fin=${finPeriodeISO}${requeteZone}`, { signal: controleur.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
         return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
@@ -215,7 +224,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   useEffect(() => {
     if (!groupesAvecMontagnePeriode || montagnePeriode?.cle === cleMontagnePeriode || erreurMontagnePeriode) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${debutPeriodeISO}&fin=${finPeriodeISO}${requeteZone}&montagne=1`, { signal: controleur.signal })
+    fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${debutPeriodeISO}&fin=${finPeriodeISO}${requeteZone}&montagne=1`, { signal: controleur.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
         return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
@@ -230,7 +239,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   useEffect(() => {
     if (!groupesAvecMontagne || montagne?.cle === cleMontagne || erreurMontagne) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}${requeteZone}&montagne=1`, { signal: controleur.signal })
+    fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${dateISO}${requeteZone}&montagne=1`, { signal: controleur.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
         return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
@@ -359,7 +368,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
     const fins = (pluiePeriode?.cle === clePeriode ? pluiePeriode.points : []).map((p) => p.finPeriode).filter((f): f is string => !!f).sort();
     const couverte = fins.length ? dateParis(fins[0]) : finPeriodeISO;
     const fin = couverte < finPeriodeISO ? couverte : finPeriodeISO;
-    const libelle = MODELES.find((m) => m.id === modele)?.libelle ?? modele;
+    const libelle = infosModele(modele).libelle;
     return debutPeriodeISO === fin
       ? `${jourCourt(debutPeriodeISO)} · ${libelle}`
       : `DU ${jourCourt(debutPeriodeISO)} AU ${jourCourt(fin)}${fin < finPeriodeISO ? ' (FIN DU MODÈLE)' : ''} · ${libelle}`;
@@ -375,7 +384,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
     const fin = finCumuls && finCumuls < finTheorique ? finCumuls : finTheorique;
     return `DU ${jourCourt(aujourdhui)} AU ${jourCourt(fin)}${fin < finTheorique ? ' (FIN DU MODÈLE)' : ''}`;
   };
-  const modeleCumulAffiche = MODELES.find((m) => m.id === (cumuls?.cle === cleCumul ? cumuls.modele : modeleCumul))!;
+  const modeleCumulAffiche = infosModele(cumuls?.cle === cleCumul ? cumuls.modele : modeleCumul);
 
   /** Points de bilan par thème (stations). */
   const pointsBilan = useMemo(() => {
@@ -396,13 +405,13 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
   }, [bilans, altitudeMax]);
 
   function changerJour(j: number) {
-    if (j > ECHEANCE_MAX[modele]) setModele('cep');
+    if (j > echeanceDe(modele)) setModele('cep');
     setJour(j);
     setErreur(null);
   }
 
   const nomZone = niveau === 'france' ? 'France' : niveau === 'region' ? region : DEPARTEMENTS_FR[departement];
-  const modeleAffiche = previsions?.cle === cle ? MODELES.find((m) => m.id === previsions.modele) : undefined;
+  const modeleAffiche = previsions?.cle === cle ? infosModele(previsions.modele, previsions.modeles) : undefined;
   const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
   const groupes = parGroupe(themes);
   const groupesAffiches = groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
@@ -529,7 +538,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
               <fieldset>
                 <legend className={legendeBarre}>Modèle</legend>
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
-                  {MODELES.filter((m) => !m.departements && !m.vueDepartement).map((m) => (
+                  {MODELES.filter((m) => !m.departements && (!m.vueDepartement || m.id === 'moyenne')).map((m) => (
                     <label key={m.id} className="text-sm">
                       <input
                         type="radio"
@@ -537,7 +546,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                         checked={modele === m.id}
                         onChange={() => {
                           setModele(m.id);
-                          setJour((j) => Math.min(j, ECHEANCE_MAX[m.id]));
+                          setJour((j) => Math.min(j, echeanceDe(m.id)));
                           setErreur(null);
                         }}
                         className="mr-1.5"
@@ -553,7 +562,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                   {Array.from({ length: ECHEANCE_MAX.cep + 1 }, (_, n) => (
                     <option key={n} value={n}>
                       {NOM_ECHEANCE(n)}
-                      {n > ECHEANCE_MAX[modele] ? ' (CEP)' : ''}
+                      {n > echeanceDe(modele) ? ' (CEP)' : ''}
                     </option>
                   ))}
                 </select>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, estModele, modeleDisponible, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
 import { chargerPrevisionsCarte, chargerPrevisionsMontagne, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
+import { moyenneCarte, moyenneMontagne, moyenneVilles } from '@/lib/carte-meteo/moyenne-modeles';
 
 /**
  * GET /api/carte-meteo/previsions/?modele=arome|harmonie2km|harmonie|cep|gfs&date=YYYY-MM-DD[&dep=29 | &deps=29,22,35,56]
@@ -20,6 +21,9 @@ export async function GET(req: Request) {
   const demande = url.searchParams.get('modele');
   const modele: ModeleMeteo = estModele(demande) ? demande : 'arome';
   const date = url.searchParams.get('date') ?? aujourdhuiParis();
+
+  // Cartes infos : moyenne complète des modèles (France, région ou département, jusqu'à J+15, toutes les valeurs).
+  if (modele === 'moyenne' && url.searchParams.get('toutes') === '1') return moyenneComplete(url, date);
 
   const aujourdhui = aujourdhuiParis();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < ajouterJours(aujourdhui, -1) || date > ajouterJours(aujourdhui, ECHEANCE_MAX[modele])) {
@@ -83,6 +87,41 @@ export async function GET(req: Request) {
     const sansDonnee = erreur instanceof Error && erreur.message.includes('aucune donnée');
     // Un jour sans donnée (J+15 avant le passage de 12 h UTC…) est un cas normal : pas d'erreur dans les logs.
     if (!sansDonnee) console.error('Erreur carte météo', erreur);
+    return NextResponse.json(
+      { erreur: sansDonnee ? 'Pas de prévision pour ce jour avec ce modèle.' : 'Prévisions momentanément indisponibles' },
+      { status: sansDonnee ? 404 : 503 }
+    );
+  }
+}
+
+/**
+ * ?modele=moyenne&toutes=1 : moyenne, point par point, des modèles qui couvrent le jour (ou la période ?fin=) — AROME et
+ * Harmonie jusqu'à demain, CEP et GFS jusqu'à J+15 ; réponse avec la liste des modèles moyennés (`modeles`).
+ */
+async function moyenneComplete(url: URL, date: string) {
+  const aujourdhui = aujourdhuiParis();
+  const limite = ajouterJours(aujourdhui, ECHEANCE_MAX.cep);
+  const fin = url.searchParams.get('fin') ?? undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < ajouterJours(aujourdhui, -1) || date > limite || (fin !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(fin) || fin < date || fin > limite))) {
+    return NextResponse.json({ erreur: `Date invalide (de la veille à J+${ECHEANCE_MAX.cep}).` }, { status: 400 });
+  }
+  const dep = url.searchParams.get('dep');
+  const deps = url.searchParams.get('deps');
+  const liste = dep ? [dep] : deps ? [...new Set(deps.split(','))] : null;
+  if (liste && (liste.length === 0 || liste.length > 13 || liste.some((d) => !CODES_DEPARTEMENTS.includes(d)))) {
+    return NextResponse.json({ erreur: 'Département inconnu.' }, { status: 400 });
+  }
+  try {
+    const { points, modeles } =
+      url.searchParams.get('montagne') === '1'
+        ? await moyenneMontagne(date, liste, fin)
+        : liste
+          ? await moyenneVilles(date, liste, fin)
+          : await moyenneCarte(date, fin);
+    return NextResponse.json({ modele: 'moyenne', modeles, date, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
+  } catch (erreur) {
+    const sansDonnee = erreur instanceof Error && erreur.message.includes('aucune donnée');
+    if (!sansDonnee) console.error('Erreur carte météo (moyenne des modèles)', erreur);
     return NextResponse.json(
       { erreur: sansDonnee ? 'Pas de prévision pour ce jour avec ce modèle.' : 'Prévisions momentanément indisponibles' },
       { status: sansDonnee ? 404 : 503 }
