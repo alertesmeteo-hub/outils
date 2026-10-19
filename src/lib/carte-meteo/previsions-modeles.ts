@@ -102,6 +102,15 @@ export interface PointCarte {
   pluie5j?: number | null;
   pluie10j?: number | null;
   pluie16j?: number | null;
+  /** Rafale la plus forte (km/h) sur 3, 5, 10 et 16 jours à partir du jour demandé, et sa direction (d'où vient le vent). */
+  rafale3j?: number | null;
+  rafale5j?: number | null;
+  rafale10j?: number | null;
+  rafale16j?: number | null;
+  directionRafale3j?: number | null;
+  directionRafale5j?: number | null;
+  directionRafale10j?: number | null;
+  directionRafale16j?: number | null;
   finPrevision?: string | null;
   /** Période choisie (du jour demandé au jour `fin` inclus, ?fin=) : pluie et neige cumulées, rafale la plus forte (et sa
    * direction), maximale la plus haute et minimale la plus basse ; dernière échéance prise en compte. */
@@ -264,15 +273,40 @@ function cumulEntre(serie: Serie, debut: number, fin: number): { valeur: number 
   };
 }
 
-/** Cumuls de pluie sur 3, 5, 10 et 16 jours à partir de minuit (Paris) de `dateISO`. */
-function cumulsPluie(serie: Serie, dateISO: string): Pick<PointCarte, 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'finPrevision'> {
+/** Rafale la plus forte entre deux instants (ms) et sa direction, si la série couvre assez de la période. */
+function rafaleEntre(serie: Serie, debut: number, fin: number): { valeur: number | null; direction: number | null } {
+  const indices = serie.t.map((t, i) => ({ t: Date.parse(t), i })).filter(({ t }) => t > debut && t <= fin);
+  const derniere = indices.length ? indices[indices.length - 1].t : null;
+  if (derniere == null || (derniere - debut) / (fin - debut) < COUVERTURE_MIN_CUMUL) return { valeur: null, direction: null };
+  const i = indiceRafaleMax(serie, indices.map((x) => x.i));
+  return { valeur: i >= 0 ? arrondi(serie.rafale[i]) : null, direction: directionRafaleMax(serie, indices.map((x) => x.i)) };
+}
+
+/** Cumuls de pluie et rafales les plus fortes sur 3, 5, 10 et 16 jours à partir de minuit (Paris) de `dateISO`. */
+function cumulsPluie(
+  serie: Serie,
+  dateISO: string
+): Pick<
+  PointCarte,
+  | 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'finPrevision'
+  | 'rafale3j' | 'rafale5j' | 'rafale10j' | 'rafale16j' | 'directionRafale3j' | 'directionRafale5j' | 'directionRafale10j' | 'directionRafale16j'
+> {
   const debut = minuitParis(dateISO);
   const [c3, c5, c10, c16] = DUREES_CUMUL.map((jours) => cumulEntre(serie, debut, debut + jours * 86_400_000));
+  const [r3, r5, r10, r16] = DUREES_CUMUL.map((jours) => rafaleEntre(serie, debut, debut + jours * 86_400_000));
   return {
     pluie3j: c3.valeur,
     pluie5j: c5.valeur,
     pluie10j: c10.valeur,
     pluie16j: c16.valeur,
+    rafale3j: r3.valeur,
+    rafale5j: r5.valeur,
+    rafale10j: r10.valeur,
+    rafale16j: r16.valeur,
+    directionRafale3j: r3.direction,
+    directionRafale5j: r5.direction,
+    directionRafale10j: r10.direction,
+    directionRafale16j: r16.direction,
     finPrevision: c16.derniere != null ? new Date(c16.derniere).toISOString() : null,
   };
 }

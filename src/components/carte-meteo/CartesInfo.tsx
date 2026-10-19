@@ -824,7 +824,7 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
                           sousTitre={`${periodeCumul((theme as ThemePrevision).cumulJours!)} · ${modeleCumulAffiche.libelle}`}
                           logoId={logoId}
                           prefixeFichier={`carte-prevision-${aujourdhui}-${normaliser(nomZone).replace(/ /g, '-')}`}
-                          contexte={`Prévision du modèle ${modeleCumulAffiche.libelle} (${modeleCumulAffiche.fournisseur}), cumul de pluie sur ${(theme as ThemePrevision).cumulJours} jours à partir d'aujourd'hui`}
+                          contexte={`Prévision du modèle ${modeleCumulAffiche.libelle} (${modeleCumulAffiche.fournisseur}), ${theme.court.toLowerCase()} à partir d'aujourd'hui`}
                         />
                       )
                     ) : mode === 'prevision' && (theme as ThemePrevision).montagne && (theme as ThemePrevision).periode && (erreurMontagnePeriode || montagnePeriode?.cle !== cleMontagnePeriode) ? (
