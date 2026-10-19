@@ -22,8 +22,9 @@ import {
 import CarteInfo, { type PointInfo } from './CarteInfo';
 import CarteSynthese, { type RubriqueSynthese } from './CarteSynthese';
 import { MASQUES_FRANCE, NOM_ECHEANCE, SECOURS, codesDeLaZone, libelleJour, normaliser } from './CarteMeteo';
+import CartesEurope from './CartesEurope';
 
-type Mode = 'prevision' | 'bilan' | 'climat';
+type Mode = 'prevision' | 'bilan' | 'climat' | 'europe';
 
 /** Groupe des cartes du mois (voir THEMES_BILAN) : bouton « Bilan du mois ». */
 const GROUPE_MOIS = 'Bilan du mois';
@@ -32,6 +33,7 @@ const MODES: [Mode, string][] = [
   ['prevision', 'Prévisions'],
   ['bilan', 'Bilans (observations)'],
   ['climat', 'Réchauffement climatique'],
+  ['europe', 'Europe : isobares'],
 ];
 
 /** Centre d'une région : moyenne des centres de ses départements. */
@@ -443,6 +445,46 @@ export default function CartesInfo({ aujourdhui }: { aujourdhui: string }) {
 
   /** Bilans : période en clair, sans « (heure de Paris) ». */
   const periodeBilan = (themeId: string) => (bilans?.cartes[themeId]?.fenetre ?? '').replace(/\s*\(heure de Paris\)/, '').toUpperCase();
+
+  // Europe : cartes des isobares (CEP ou GFS), indépendantes de la zone et des thèmes.
+  if (mode === 'europe') {
+    return (
+      <div>
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
+          <fieldset>
+            <legend className={legendeBarre}>Cartes</legend>
+            <div className="flex flex-wrap gap-2">
+              {MODES.map(([valeur, libelle]) => (
+                <button
+                  key={valeur}
+                  type="button"
+                  aria-pressed={mode === valeur}
+                  onClick={() => {
+                    setMode(valeur);
+                    setGroupeChoisi('tous');
+                  }}
+                  className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === valeur ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+                >
+                  {libelle}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Logo</span>
+            <select value={logoId} onChange={(e) => setLogoChoisi(e.target.value)} className={selectBarre}>
+              {LOGOS_PRESETS.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.nom}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <CartesEurope aujourdhui={aujourdhui} logoId={logoId} />
+      </div>
+    );
+  }
 
   return (
     <div>
