@@ -102,31 +102,115 @@ export interface Isobare {
   points: number[];
 }
 
+/** Flou de boîte séparable (rayon r, 3 passes ≈ gaussien), qui ignore les points sans donnée. */
+function flouter(val: Float64Array, nI: number, nJ: number, r: number, passes = 3): Float64Array {
+  let a = val;
+  const ligne = (src: Float64Array, dst: Float64Array, n: number, m: number, idx: (k: number, l: number) => number) => {
+    for (let k = 0; k < n; k++)
+      for (let l = 0; l < m; l++) {
+        if (Number.isNaN(val[idx(k, l)])) {
+          dst[idx(k, l)] = NaN;
+          continue;
+        }
+        let somme = 0;
+        let nombre = 0;
+        for (let d = -r; d <= r; d++) {
+          const ll = l + d;
+          if (ll < 0 || ll >= m) continue;
+          const v = src[idx(k, ll)];
+          if (!Number.isNaN(v)) {
+            somme += v;
+            nombre++;
+          }
+        }
+        dst[idx(k, l)] = somme / nombre;
+      }
+  };
+  for (let p = 0; p < passes; p++) {
+    const h = new Float64Array(a.length);
+    ligne(a, h, nI, nJ, (i, j) => i * nJ + j);
+    const v = new Float64Array(a.length);
+    ligne(h, v, nJ, nI, (j, i) => i * nJ + j);
+    a = v;
+  }
+  return a;
+}
+
+type Pt = { x: number; y: number };
+
+/** Douglas-Peucker : retire les petits zigzags de la grille (tolérance en pixels) avant l'arrondi. */
+function simplifier(pts: Pt[], tolerance: number): Pt[] {
+  if (pts.length < 3) return pts;
+  const garder = new Uint8Array(pts.length);
+  garder[0] = garder[pts.length - 1] = 1;
+  const pile: [number, number][] = [[0, pts.length - 1]];
+  while (pile.length) {
+    const [d, f] = pile.pop()!;
+    const a = pts[d];
+    const b = pts[f];
+    const lx = b.x - a.x;
+    const ly = b.y - a.y;
+    const l = Math.hypot(lx, ly) || 1;
+    let pire = -1;
+    let ecart = tolerance;
+    for (let k = d + 1; k < f; k++) {
+      const e = Math.abs((pts[k].x - a.x) * ly - (pts[k].y - a.y) * lx) / l;
+      if (e > ecart) {
+        ecart = e;
+        pire = k;
+      }
+    }
+    if (pire >= 0) {
+      garder[pire] = 1;
+      pile.push([d, pire], [pire, f]);
+    }
+  }
+  return pts.filter((_, k) => garder[k]);
+}
+
+/** Arrondi de Chaikin ; une ligne fermée (autour d'un A ou d'un D) est arrondie sans coin au point de départ. */
+function arrondir(pts: Pt[], passes: number): Pt[] {
+  const fermee = pts.length > 3 && Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 1;
+  let q = fermee ? pts.slice(0, -1) : pts;
+  for (let n = 0; n < passes; n++) {
+    const sortie: Pt[] = fermee ? [] : [q[0]];
+    const fin = fermee ? q.length : q.length - 1;
+    for (let m = 0; m < fin; m++) {
+      const a = q[m];
+      const b = q[(m + 1) % q.length];
+      sortie.push({ x: 0.75 * a.x + 0.25 * b.x, y: 0.75 * a.y + 0.25 * b.y }, { x: 0.25 * a.x + 0.75 * b.x, y: 0.25 * a.y + 0.75 * b.y });
+    }
+    if (!fermee) sortie.push(q[q.length - 1]);
+    q = sortie;
+  }
+  return fermee ? [...q, q[0]] : q;
+}
+
 /**
- * Isobares tous les `ecart` hPa : carrés marchants sur la grille (affinée 2 fois par interpolation), segments raccordés en
- * lignes puis lissés (Chaikin). Coordonnées écran de la carte.
+ * Isobares tous les `ecart` hPa : champ de pression ramené au pas de 0,25° et lissé (flou gaussien d'environ 0,6°, comme sur
+ * les cartes de pression des services météo), carrés marchants, segments raccordés en lignes, petits zigzags retirés
+ * (Douglas-Peucker) puis lignes arrondies (Chaikin). Coordonnées écran de la carte.
  */
 export function tracerIsobares(g: GrilleEurope, c: Cadre, ecart = 4): Isobare[] {
-  // Grille affinée (pas de 0,25°) dans le cadre de la carte, avec une marge.
-  const f = 2;
-  const pas = g.pas / f;
+  // Grille au pas de 0,25° (GFS à 0,5° affiné, CEP déjà à 0,25°) dans le cadre de la carte, avec une marge.
+  const pas = Math.min(g.pas, 0.25);
   const lat0 = Math.max(g.lat0, c.sud - 3);
   const latMax = Math.min(g.lat0 + g.pas * (g.nLat - 1), latitudeNord(c) + 3);
   const lon0 = Math.max(g.lon0, c.ouest - 3);
   const lonMax = Math.min(g.lon0 + g.pas * (g.nLon - 1), c.est + 3);
   const nI = Math.floor((latMax - lat0) / pas) + 1;
   const nJ = Math.floor((lonMax - lon0) / pas) + 1;
-  const val = new Float64Array(nI * nJ);
+  const brut = new Float64Array(nI * nJ);
+  for (let i = 0; i < nI; i++)
+    for (let j = 0; j < nJ; j++) brut[i * nJ + j] = pressionEn(g, lon0 + j * pas, lat0 + i * pas) ?? NaN;
+  // Lissage du champ : sans lui, les isobares suivent les mailles du modèle et font des marches d'escalier.
+  const val = flouter(brut, nI, nJ, Math.max(1, Math.round(0.5 / pas)));
   let min = Infinity;
   let max = -Infinity;
-  for (let i = 0; i < nI; i++)
-    for (let j = 0; j < nJ; j++) {
-      const v = pressionEn(g, lon0 + j * pas, lat0 + i * pas);
-      val[i * nJ + j] = v ?? NaN;
-      if (v != null) {
-        min = Math.min(min, v);
-        max = Math.max(max, v);
-      }
+  for (const v of val)
+    if (!Number.isNaN(v)) {
+      min = Math.min(min, v);
+      max = Math.max(max, v);
     }
   const ecran = (i: number, j: number) => versEcranEurope(c, lon0 + j * pas, lat0 + i * pas);
   const isobares: Isobare[] = [];
@@ -183,17 +267,8 @@ export function tracerIsobares(g: GrilleEurope, c: Cadre, ecart = 4): Isobare[] 
         }
       }
       if (ligne.length < 4) continue;
-      // Lissage de Chaikin (2 passes) en coordonnées écran.
-      let pts = ligne.map(([i, j]) => ecran(i, j));
-      for (let n = 0; n < 2; n++) {
-        const lisse = [pts[0]];
-        for (let m = 0; m < pts.length - 1; m++) {
-          const [p, q] = [pts[m], pts[m + 1]];
-          lisse.push({ x: 0.75 * p.x + 0.25 * q.x, y: 0.75 * p.y + 0.25 * q.y }, { x: 0.25 * p.x + 0.75 * q.x, y: 0.25 * p.y + 0.75 * q.y });
-        }
-        lisse.push(pts[pts.length - 1]);
-        pts = lisse;
-      }
+      // En pixels : zigzags de la grille retirés, puis arrondi (4 passes de Chaikin).
+      const pts = arrondir(simplifier(ligne.map(([i, j]) => ecran(i, j)), 1.6), 4);
       isobares.push({ niveau, points: pts.flatMap((p) => [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10]) });
     }
   }
