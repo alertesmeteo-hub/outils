@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
-import { THEMES_BILAN, type ReponseBilans, type ThemeBilan } from '@/lib/carte-meteo/cartes-info';
+import { GROUPE_JOURNEE, THEMES_BILAN, type ReponseBilans, type ThemeBilan } from '@/lib/carte-meteo/cartes-info';
 import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
-import type { PointInfo } from './CarteInfo';
+import CarteInfo, { type PointInfo } from './CarteInfo';
 import CarteDirect from './CarteDirect';
 
 const THEMES_DIRECT = THEMES_BILAN.filter((t): t is ThemeBilan & { direct: NonNullable<ThemeBilan['direct']> } => t.direct != null);
+/** Maxi et mini de la journée : maxi du jour, mini de la nuit (provisoires), maxi d'hier, mini de la nuit dernière. */
+const THEMES_JOURNEE = THEMES_BILAN.filter((t) => t.groupe === GROUPE_JOURNEE);
 const TAILLES = { petite: 0.8, normale: 1, grande: 1.25, 'tres-grande': 1.5 } as const;
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
@@ -20,6 +22,7 @@ export default function TemperaturesDirect() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [taille, setTaille] = useState<keyof typeof TAILLES>('normale');
   const [logoId, setLogoId] = useState('aucun');
+  const [journee, setJournee] = useState(THEMES_JOURNEE[0]?.id ?? '');
 
   useEffect(() => {
     if (bilans || erreur) return;
@@ -42,8 +45,14 @@ export default function TemperaturesDirect() {
       const liste = pointsDuBilan(bilans, theme.id);
       resultat[theme.id] = theme.direct.vue === 'releve' ? sansValeursAberrantes(liste) : liste;
     }
+    for (const theme of THEMES_JOURNEE) resultat[theme.id] = sansValeursAberrantes(pointsDuBilan(bilans, theme.id));
     return resultat;
   }, [bilans]);
+
+  // Vues de la journée qui ont des valeurs (la nuit en cours, 20 h → 8 h, n'a encore rien en fin d'après-midi) ; la vue choisie,
+  // ou à défaut la première disponible.
+  const journeeDispo = THEMES_JOURNEE.filter((t) => (points[t.id]?.length ?? 0) > 0);
+  const journeeAffichee = journeeDispo.find((t) => t.id === journee) ?? journeeDispo[0];
 
   const sousTitre = (id: string) => (bilans?.cartes[id]?.fenetre ?? '').replace(/\s*\(heure de Paris\)/, '').toUpperCase();
 
@@ -100,6 +109,40 @@ export default function TemperaturesDirect() {
             echelleValeurs={TAILLES[taille]}
           />
         </div>
+      )}
+
+      {bilans && journeeAffichee && (
+        <section id="carte-journee" className="mx-auto mt-12 max-w-5xl scroll-mt-4">
+          <h2 className="mb-3 text-2xl font-extrabold">Maxi et mini de la journée</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
+            {journeeDispo.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={journeeAffichee.id === t.id}
+                onClick={() => setJournee(t.id)}
+                className={`rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wide shadow-sm ${
+                  journeeAffichee.id === t.id ? 'bg-primary text-white' : t.ordre === 'asc' ? 'bg-[#3b82f6] text-white hover:opacity-90' : 'bg-[#e67e22] text-white hover:opacity-90'
+                }`}
+              >
+                {t.court}
+              </button>
+            ))}
+          </div>
+          {[journeeAffichee].map((t) => (
+            <CarteInfo
+              key={t.id}
+              theme={t}
+              zone="france"
+              points={points[t.id] ?? []}
+              sousTitre={sousTitre(t.id)}
+              logoId={logoId}
+              prefixeFichier="temperatures-journee-france"
+              contexte="Maximales et minimales relevées par les stations Météo-France"
+              echelleValeurs={TAILLES[taille]}
+            />
+          ))}
+        </section>
       )}
     </div>
   );

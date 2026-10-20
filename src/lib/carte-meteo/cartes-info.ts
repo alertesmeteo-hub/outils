@@ -75,6 +75,8 @@ export interface ThemeClimat extends ThemeInfo {
 export type VueDirect = 'releve' | 'record-mois' | 'ecart-mois' | 'record-abs' | 'ecart-abs';
 /** Groupe de la carte « Températures en direct » (rendue à part, avec ses boutons). */
 export const GROUPE_DIRECT = 'Températures en direct';
+/** Groupe de la carte « Maxi et mini de la journée » (page des températures en direct, avec ses boutons). */
+export const GROUPE_JOURNEE = 'Maxi et mini de la journée';
 
 export interface ThemeBilan extends ThemeInfo {
   /** Identifiant du classement des stations (src/lib/obs/rankings.ts) ; vide pour les cartes du mois. */
@@ -330,6 +332,11 @@ export const THEMES_PREVISION: ThemePrevision[] = [
 export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'tx-fin', groupe: 'Températures', classement: 'tx-fin', titre: 'TEMPÉRATURES MAXIMALES', court: 'Maximales de la veille', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   // Températures en direct : toutes les stations, une carte à 5 boutons (relevés, records du mois et absolus, battus ?).
+  // Maxi et mini de la journée (page des températures en direct) : toutes les stations, une carte à boutons.
+  { id: 'tx-jour-direct', groupe: GROUPE_JOURNEE, classement: 'tx-prov', toutes: true, sansTeinte: true, titre: 'MAXIMALES DU JOUR (PROVISOIRES)', court: 'Maxi du jour', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tn-jour-direct', groupe: GROUPE_JOURNEE, classement: 'tn-prov', toutes: true, sansTeinte: true, titre: 'MINIMALES DE LA NUIT (PROVISOIRES)', court: 'Mini de la nuit', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'tx-veille-direct', groupe: GROUPE_JOURNEE, classement: 'tx-fin', toutes: true, sansTeinte: true, titre: 'MAXIMALES D’HIER', court: 'Maxi d’hier', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'tn-veille-direct', groupe: GROUPE_JOURNEE, classement: 'tn-fin', toutes: true, sansTeinte: true, titre: 'MINIMALES DE LA NUIT DERNIÈRE', court: 'Mini de la nuit dernière', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 't-direct', groupe: GROUPE_DIRECT, classement: 't', direct: { vue: 'releve' }, toutes: true, sansTeinte: true, titre: 'TEMPÉRATURES DU MOMENT', court: 'Relevés', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'record-mois-tx', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'record-mois', champ: 'tx' }, toutes: true, sansTeinte: true, titre: 'RECORDS DE CHALEUR DU MOIS', court: 'Records du mois (chaleur)', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus élevés' },
   { id: 'record-mois-tn', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'record-mois', champ: 'tn' }, toutes: true, sansTeinte: true, titre: 'RECORDS DE FROID DU MOIS', court: 'Records du mois (froid)', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus bas' },

@@ -9,6 +9,7 @@ import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import {
   GROUPE_DIRECT,
+  GROUPE_JOURNEE,
   THEMES_BILAN,
   THEMES_CLIMAT,
   THEMES_PREVISION,
@@ -400,7 +401,7 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
   const modeleAffiche = previsions?.cle === cle ? infosModele(previsions.modele, previsions.modeles) : undefined;
   const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
   // « Températures en direct » a sa propre page (/outils/temperatures-en-direct/) : pas ici.
-  const groupes = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT);
+  const groupes = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT && g.groupe !== GROUPE_JOURNEE);
   const groupesAffiches = groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
   /** Nom affiché d'un groupe : le bilan du mois porte le nom du mois choisi (« Octobre 2026 »). */
   const nomGroupe = (groupe: string) => (groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe);

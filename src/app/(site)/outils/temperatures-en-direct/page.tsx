@@ -16,7 +16,8 @@ export default function PageTemperaturesDirect() {
       <p className="mt-2 max-w-3xl text-muted">
         La température relevée en ce moment dans les stations Météo-France, et pour chaque station son record du mois et son record absolu, en
         chaleur ou en froid : les boutons « battus ? » montrent l&apos;écart de la maximale du jour (ou de la minimale de la nuit) à ces records.
-        Chaque carte s&apos;exporte en JPG.
+        Plus bas, la carte des maximales du jour et des minimales de la nuit (provisoires), et celles d&apos;hier. Chaque carte
+        s&apos;exporte en JPG.
       </p>
       <p className="mt-4 flex flex-wrap gap-2">
         <Link href="/outils/records-temperature/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
