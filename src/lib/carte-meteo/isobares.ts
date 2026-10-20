@@ -23,6 +23,8 @@ export interface GrilleEurope {
   villes?: { nom: string; lat: number; lon: number; t: number }[];
   /** …et sur toute la grille (°C × 10, style « températures » à fond clair). */
   t?: (number | null)[];
+  /** Fronts calculés (CEP, ?fronts=1), voir fronts.ts. */
+  fronts?: import('./fronts').Front[];
 }
 
 /** Grandes villes dont la température est affichée (style « pluie et températures »). */

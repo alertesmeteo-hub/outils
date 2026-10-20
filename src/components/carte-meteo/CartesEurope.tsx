@@ -87,6 +87,7 @@ export default function CartesEurope({ aujourdhui, logoId }: { aujourdhui: strin
   const [heureUtc, setHeureUtc] = useState(12);
   const [style, setStyle] = useState<StyleEurope>('sombre');
   const [fleches, setFleches] = useState(true);
+  const [avecFronts, setAvecFronts] = useState(true);
   const [fond, setFond] = useState<{ cadre: Cadre; traces: { terres: string; frontieres: string } } | null>(null);
   const cadre = CADRES[modele];
 
@@ -159,6 +160,10 @@ export default function CartesEurope({ aujourdhui, logoId }: { aujourdhui: strin
           <input type="checkbox" checked={fleches} onChange={(e) => setFleches(e.target.checked)} />
           Flèches de vent
         </label>
+        <label className={`flex items-center gap-2 pb-1.5 text-sm ${modele === 'cep' ? '' : 'opacity-50'}`} title="Fronts calculés automatiquement à partir du CEP (850 hPa)">
+          <input type="checkbox" checked={avecFronts && modele === 'cep'} disabled={modele !== 'cep'} onChange={(e) => setAvecFronts(e.target.checked)} />
+          Fronts {modele === 'cep' ? '(automatiques)' : '(CEP seulement)'}
+        </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block text-sm font-medium">Heure</span>
           <select value={heureUtc} onChange={(e) => setHeureUtc(Number(e.target.value))} className="rounded-lg border border-border bg-surface p-1.5 text-sm">
@@ -186,7 +191,7 @@ export default function CartesEurope({ aujourdhui, logoId }: { aujourdhui: strin
       {aJour && (
         <div className="mt-6 grid grid-cols-1 gap-8 xl:grid-cols-2">
           {jours.map(({ n, date, echeance }) => (
-            <section key={`${modele}-${date}-${heureUtc}-${style}`} className="min-w-0">
+            <section key={`${modele}-${date}-${heureUtc}-${style}-${avecFronts}`} className="min-w-0">
               {echeance ? (
                 <CarteEurope
                   modele={modele}
@@ -199,6 +204,7 @@ export default function CartesEurope({ aujourdhui, logoId }: { aujourdhui: strin
                   immediat={n < 2}
                   style={style}
                   fleches={fleches}
+                  avecFronts={avecFronts && modele === 'cep'}
                 />
               ) : (
                 <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">
@@ -222,6 +228,7 @@ function CarteEurope({
   immediat = false,
   style,
   fleches,
+  avecFronts,
   modele,
   cadre,
   echeance,
@@ -235,6 +242,8 @@ function CarteEurope({
   style: StyleEurope;
   /** Flèches de vent déduites des isobares. */
   fleches: boolean;
+  /** Fronts calculés (CEP). */
+  avecFronts: boolean;
   modele: ModeleEurope;
   cadre: Cadre;
   echeance: Echeance;
@@ -269,7 +278,7 @@ function CarteEurope({
   useEffect(() => {
     if (!visible || grille) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/europe/?modele=${modele}&h=${echeance.h}${style !== 'classique' ? '&complet=1' : ''}`, { signal: controleur.signal })
+    fetch(`/api/carte-meteo/europe/?modele=${modele}&h=${echeance.h}${style !== 'classique' ? '&complet=1' : ''}${avecFronts ? '&fronts=1' : ''}`, { signal: controleur.signal })
       .then(async (r) => {
         const json = (await r.json().catch(() => null)) as (GrilleEurope & { erreur?: string }) | null;
         if (!r.ok || !json?.p) throw new Error(json?.erreur ?? 'Grille GFS indisponible.');
@@ -277,7 +286,7 @@ function CarteEurope({
       })
       .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
     return () => controleur.abort();
-  }, [visible, grille, echeance.h, modele, style]);
+  }, [visible, grille, echeance.h, modele, style, avecFronts]);
 
   // Fond clair : isobares tous les 5 hPa, comme sur les cartes de presse ; sinon tous les 4 hPa.
   const isobares = useMemo(() => (grille ? tracerIsobares(grille, cadre, style === 'clair' ? 5 : 4) : []), [grille, cadre, style]);
@@ -398,6 +407,50 @@ function CarteEurope({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sombre, grille, cadre, centres, etiquettes]);
 
+  // Fronts : ligne et symboles tous les ~46 px. Air chaud à gauche de la ligne (voir fronts.ts) : triangles du front froid
+  // du côté chaud (sens de déplacement), demi-cercles du front chaud du côté froid ; front stationnaire : les deux en alternance.
+  const frontsEcran = useMemo(() => {
+    if (!avecFronts || !grille?.fronts) return [];
+    return grille.fronts.map((f) => {
+      const pts: { x: number; y: number }[] = [];
+      for (let k = 0; k < f.points.length; k += 2) pts.push(versEcranEurope(cadre, f.points[k], f.points[k + 1]));
+      const symboles: { d: string; type: 'froid' | 'chaud' }[] = [];
+      let parcouru = 0;
+      let prochain = 24;
+      let alterne = 0;
+      for (let m = 0; m < pts.length - 1; m++) {
+        const a = pts[m];
+        const b = pts[m + 1];
+        const l = Math.hypot(b.x - a.x, b.y - a.y);
+        if (!l) continue;
+        const dx = (b.x - a.x) / l;
+        const dy = (b.y - a.y) / l;
+        // Gauche visuelle à l'écran (y vers le bas).
+        const gx = dy;
+        const gy = -dx;
+        while (parcouru + l >= prochain) {
+          const t = prochain - parcouru;
+          const x = a.x + dx * t;
+          const y = a.y + dy * t;
+          const type = f.type === 'stationnaire' ? (alterne++ % 2 ? 'chaud' : 'froid') : f.type;
+          if (type === 'froid') {
+            symboles.push({ type, d: `M${x - dx * 7} ${y - dy * 7} L${x + gx * 11} ${y + gy * 11} L${x + dx * 7} ${y + dy * 7} Z` });
+          } else {
+            let d = `M${x - dx * 7} ${y - dy * 7}`;
+            for (let q = 1; q <= 8; q++) {
+              const th = (q / 8) * Math.PI;
+              d += ` L${x - dx * 7 * Math.cos(th) - gx * 7 * Math.sin(th)} ${y - dy * 7 * Math.cos(th) - gy * 7 * Math.sin(th)}`;
+            }
+            symboles.push({ type, d: `${d} Z` });
+          }
+          prochain += 46;
+        }
+        parcouru += l;
+      }
+      return { type: f.type, points: pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '), symboles };
+    });
+  }, [avecFronts, grille, cadre]);
+
   // Flèches de vent (option) : pas sur un A / D, une étiquette, une température ni un encadré.
   const vecteurs = useMemo(() => {
     if (!fleches || !grille) return [];
@@ -503,6 +556,25 @@ function CarteEurope({
                 strokeLinecap="round"
               />
             ))}
+            {frontsEcran.map((f, k) => {
+              const bleu = clair ? '#3f444b' : '#1d4ed8';
+              const rouge = clair ? '#3f444b' : '#dc2626';
+              return (
+                <g key={`fr${k}`}>
+                  {f.type === 'stationnaire' && !clair ? (
+                    <>
+                      <polyline points={f.points} fill="none" stroke={bleu} strokeWidth={3} strokeDasharray="20 20" strokeLinecap="round" />
+                      <polyline points={f.points} fill="none" stroke={rouge} strokeWidth={3} strokeDasharray="20 20" strokeDashoffset={20} strokeLinecap="round" />
+                    </>
+                  ) : (
+                    <polyline points={f.points} fill="none" stroke={f.type === 'chaud' ? rouge : bleu} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
+                  )}
+                  {f.symboles.map((sy, q) => (
+                    <path key={q} d={sy.d} fill={sy.type === 'chaud' ? rouge : bleu} />
+                  ))}
+                </g>
+              );
+            })}
             {clair &&
               etiquettes.map((e, k) => (
                 // Fond clair : valeur en italique dans le sens de la ligne, détourée de blanc.

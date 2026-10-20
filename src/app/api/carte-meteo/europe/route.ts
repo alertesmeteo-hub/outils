@@ -2,6 +2,7 @@ import { gunzipSync } from 'node:zlib';
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { VILLES_EUROPE, type GrilleEurope, type ModeleEurope } from '@/lib/carte-meteo/isobares';
+import { calculerFronts } from '@/lib/carte-meteo/fronts';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,10 @@ interface Echeance {
   /** CEP : grilles de pluie (depuis l'échéance précédente) et de température. */
   pluie?: string;
   temperature?: string;
+  /** CEP : température, humidité et géopotentiel à 850 hPa (fronts). */
+  t850?: string;
+  hr850?: string;
+  z850?: string;
   /** Durée (h) de la période de pluie qui se termine à l'échéance. */
   periode?: number;
 }
@@ -71,6 +76,9 @@ async function indexDe(modele: ModeleEurope): Promise<Index> {
         fichier: s.probes!.pression,
         pluie: s.probes!.pluie_1h,
         temperature: s.probes!.temperature,
+        t850: s.probes!.temperature_850,
+        hr850: s.probes!.humidite_850,
+        z850: s.probes!.geopotentiel_850,
         periode: k > 0 ? s.lead_hour - etapes[k - 1].lead_hour : undefined,
       })),
     };
@@ -148,17 +156,22 @@ const temperaturesVilles = (lecteur: (lon: number, lat: number) => number | null
     return t == null ? [] : [{ nom, lat, lon, t: Math.round(t) }];
   });
 
-async function grilleCep(idx: Index, e: Echeance, complet: boolean): Promise<GrilleEurope> {
+async function grilleCep(idx: Index, e: Echeance, complet: boolean, avecFronts: boolean): Promise<GrilleEurope> {
   const bornes = idx.bornes!;
   const charger = async (f: string) => lecteurCep(Buffer.from(await (await lire(`${SOURCES.cep}/${f}`)).arrayBuffer()), bornes);
   const pas = 0.25;
   const nLat = Math.round((bornes.north - bornes.south) / pas) + 1;
   const nLon = Math.round((bornes.east - bornes.west) / pas) + 1;
-  const [pression, pluie, temperature] = await Promise.all([
+  const frontsPossibles = avecFronts && cheminSur(e.t850) && cheminSur(e.hr850) && cheminSur(e.z850);
+  const [pression, pluie, temperature, t850, hr850, z850] = await Promise.all([
     charger(e.fichier),
     complet && cheminSur(e.pluie) ? charger(e.pluie!) : null,
     complet && cheminSur(e.temperature) ? charger(e.temperature!) : null,
+    frontsPossibles ? charger(e.t850!) : null,
+    frontsPossibles ? charger(e.hr850!) : null,
+    frontsPossibles ? charger(e.z850!) : null,
   ]);
+  const fronts = t850 && hr850 && z850 ? calculerFronts(t850, hr850, z850, { sud: bornes.south, ouest: bornes.west, nord: bornes.north, est: bornes.east }) : undefined;
   return {
     run: idx.run,
     valide: e.valide,
@@ -169,6 +182,7 @@ async function grilleCep(idx: Index, e: Echeance, complet: boolean): Promise<Gri
     nLat,
     nLon,
     p: echantillonner(pression, bornes.south, bornes.west, pas, nLat, nLon),
+    ...(fronts ? { fronts } : {}),
     ...(complet
       ? {
           pluie: pluie ? echantillonner(pluie, bornes.south, bornes.west, pas, nLat, nLon) : undefined,
@@ -207,6 +221,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const modele: ModeleEurope = url.searchParams.get('modele') === 'gfs' ? 'gfs' : 'cep';
   const complet = url.searchParams.get('complet') === '1';
+  // Fronts : CEP seulement (GFS ne publie pas les champs à 850 hPa).
+  const avecFronts = modele === 'cep' && url.searchParams.get('fronts') === '1';
   try {
     const idx = await indexDe(modele);
     const h = url.searchParams.get('h');
@@ -219,11 +235,11 @@ export async function GET(req: Request) {
     const e = idx.echeances.find((x) => String(x.h) === h);
     if (!e || !cheminSur(e.fichier)) return NextResponse.json({ erreur: 'Échéance inconnue.' }, { status: 404 });
 
-    const cle = `${modele}|${idx.run}|${idx.genere}|${e.h}|${complet ? 'complet' : 'pression'}`;
+    const cle = `${modele}|${idx.run}|${idx.genere}|${e.h}|${complet ? 'complet' : 'pression'}|${avecFronts ? 'fronts' : ''}`;
     let grille = grilles.get(cle);
     if (!grille) {
       grille =
-        modele === 'cep' ? await grilleCep(idx, e, complet) : grilleGfs((await (await lire(`${SOURCES.gfs}/${e.fichier}`)).json()) as FichierGfs, idx, e, complet);
+        modele === 'cep' ? await grilleCep(idx, e, complet, avecFronts) : grilleGfs((await (await lire(`${SOURCES.gfs}/${e.fichier}`)).json()) as FichierGfs, idx, e, complet);
       grilles.set(cle, grille);
       if (grilles.size > 40) grilles.delete(grilles.keys().next().value!);
     }
