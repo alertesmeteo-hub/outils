@@ -84,7 +84,7 @@ const COULEUR_TITRE_PO = '#ff8c1a';
 /** Hauteur du logo (px de la carte) : agrandi sur la carte des Pyrénées-Orientales (logo rond Météo Pays Catalan). */
 const HAUTEUR_LOGO = 83;
 const HAUTEUR_LOGO_PO = 150;
-const SEUIL_RAFALES_DEFAUT = 60;
+const SEUIL_RAFALES_DEFAUT = 50; // France et région : vent fort (la tramontane à 50-60 km/h doit apparaître)
 /** Vue département : rafales signalées dès 35 km/h par défaut (les villes sont proches, les rafales plus faibles). */
 const SEUIL_RAFALES_DEPARTEMENT = 35;
 /** Distance minimale (pixels de la carte) entre deux villes affichées en vue département. */
@@ -106,12 +106,14 @@ const NOMBRES_RAFALES: { valeur: NombreRafales; libelle: string }[] = [
   { valeur: 'toutes', libelle: 'Toutes' },
 ];
 /**
- * France : grandes zones de vent, pour qu'une pastille de rafale revienne à chaque régime (tempête atlantique, tramontane et
+ * France : grandes zones de vent, pour qu'une pastille de rafale revienne à chaque régime (tempête atlantique, tramontane,
  * mistral, Corse…) avant de compléter avec les plus fortes. Départements absents de la liste : « nord-est » (et centre).
  */
 const ZONES_VENT: Record<string, string[]> = {
   corse: ['2A', '2B'],
-  mediterranee: ['66', '11', '34', '30', '48', '13', '83', '84', '04', '05', '06', '26', '07'],
+  // Tramontane (Roussillon, Languedoc) et mistral (vallée du Rhône, Provence) : deux régimes, deux zones.
+  tramontane: ['66', '11', '34'],
+  mistral: ['30', '48', '13', '83', '84', '04', '05', '06', '26', '07'],
   ouest: ['29', '22', '56', '35', '50', '14', '61', '27', '76', '44', '85', '49', '53', '72'],
   'sud-ouest': ['17', '33', '40', '64', '24', '47', '16', '79', '86', '87', '19', '23', '31', '32', '65', '09', '81', '82', '46', '12'],
 };

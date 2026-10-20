@@ -98,7 +98,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v13'; // v13 : nuages bas, moyens et hauts (ciel voilé)
+const VERSION_CACHE = 'v14'; // v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -281,9 +281,28 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     serie: serieDuPoint(fichier, c, v.pointId),
     altitude: Math.round(altitude(v.pointId) / 10) * 10,
   }));
+  // Carte de France : la rafale du département est la plus forte de ses communes de plaine (point du modèle à 500 m au plus),
+  // à chaque échéance, avec le vent et la direction de cette commune. Un seul point (Perpignan) est souvent plus abrité que la
+  // plaine et la côte : la tramontane (65 km/h à Banyuls, 36 au point de Perpignan) n'apparaissait pas. Températures, ciel et
+  // pluie restent ceux de la ville affichée.
+  const chef = serieDuPoint(fichier, c, chefCommune.pointId);
+  const plaine = [chefCommune, ...choisies.filter((v) => v !== chefCommune)]
+    .filter((v) => altitude(v.pointId) <= ALTITUDE_MAX_FRANCE)
+    .map((v) => (v === chefCommune ? chef : serieDuPoint(fichier, c, v.pointId)));
+  if (plaine.length > 1) {
+    chef.rafale = chef.rafale.map((_, i) => {
+      let meilleure = null as Serie | null;
+      for (const s of plaine) if (s.rafale[i] != null && (meilleure == null || s.rafale[i]! > meilleure.rafale[i]!)) meilleure = s;
+      if (meilleure && meilleure !== chef) {
+        chef.direction[i] = meilleure.direction[i];
+        chef.vent[i] = meilleure.vent[i];
+      }
+      return meilleure?.rafale[i] ?? null;
+    });
+  }
   return {
     runTime,
-    chef: serieDuPoint(fichier, c, chefCommune.pointId),
+    chef,
     chefCommune: { nom: chefCommune.nom, lat: chefCommune.lat, lon: chefCommune.lon },
     villes,
     montagne,
