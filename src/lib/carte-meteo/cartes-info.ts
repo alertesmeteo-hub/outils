@@ -77,6 +77,13 @@ export type VueDirect = 'releve' | 'record-mois' | 'ecart-mois' | 'record-abs' |
 export const GROUPE_DIRECT = 'Températures en direct';
 /** Groupe de la carte « Maxi et mini de la journée » (page des températures en direct, avec ses boutons). */
 export const GROUPE_JOURNEE = 'Maxi et mini de la journée';
+/** Groupe de la carte « Observations en direct » (page à part, une carte à boutons rangés par rubrique). */
+export const GROUPE_OBS = 'Observations en direct';
+/** Rubriques des boutons de la carte « Observations en direct », dans l'ordre d'affichage. */
+export const RUBRIQUES_OBS = ['Température', 'T°C minis / maxis', 'Pluvio & vent', 'Autres'] as const;
+export type VuePluie = 'releve' | 'normale-mois' | 'normale-annee' | 'record-mois' | 'ecart-mois' | 'record-abs' | 'ecart-abs';
+/** Groupe de la carte « Pluie en direct » (page des observations en direct, avec ses boutons). */
+export const GROUPE_PLUIE_DIRECT = 'Pluie en direct';
 
 export interface ThemeBilan extends ThemeInfo {
   /** Identifiant du classement des stations (src/lib/obs/rankings.ts) ; vide pour les cartes du mois. */
@@ -94,6 +101,13 @@ export interface ThemeBilan extends ThemeInfo {
   neigeMontagne?: boolean;
   /** Stations retenues jusqu'à cette altitude (m) : carte « de plaine », sans les stations de montagne. */
   altMax?: number;
+  /** Observations en direct : rubrique du bouton (voir RUBRIQUES_OBS) ; `controle` : valeurs comparées aux stations voisines. */
+  obs?: { rubrique: (typeof RUBRIQUES_OBS)[number]; controle?: boolean };
+  /**
+   * Pluie en direct (une carte à boutons) : pluie de la journée en cours, cumul moyen du mois ou de l'année (normales 1991-2020),
+   * record de pluie en 24 h du mois ou absolu de chaque station, ou pluie de la journée en % de ce record.
+   */
+  pluie?: { vue: VuePluie };
 }
 
 const p = (min: number, fond: string, texte: string, libelle: string, neutre = false): Palier => ({ min, fond, texte, libelle, neutre });
@@ -296,6 +310,111 @@ const PALIERS_NEIGE_SOL: Palier[] = PALIERS_NEIGE.map((x) => (x.neutre ? { ...x,
 /** Montagne : « 0 cm » s'affiche aussi (où il n'y a pas encore de neige), en gris (thèmes avec neutresVisibles). */
 const PALIERS_NEIGE_MONTAGNE: Palier[] = PALIERS_NEIGE.map((x) => (x.neutre ? { ...x, fond: '#94a3b8', libelle: 'Pas de neige' } : x));
 
+/** Variation de la température sur 24 heures. */
+const PALIERS_VARIATION_T: Palier[] = [
+  p(8, '#67001f', BLANC, '+8° et plus'),
+  p(5, '#c1121f', BLANC, '+5 à +7,9°'),
+  p(2, '#f4a582', NOIR, '+2 à +4,9°'),
+  p(-2, '#e5e7eb', NOIR, 'Peu de changement (±2°)'),
+  p(-5, '#92c5de', NOIR, '-2 à -4,9°'),
+  p(-8, '#2166ac', BLANC, '-5 à -7,9°'),
+  p(-Infinity, '#053061', BLANC, '-8° et moins'),
+];
+
+/** Humidex : échelle d'Environnement Canada à partir de 30 ; en dessous, des teintes de température. */
+const PALIERS_HUMIDEX: Palier[] = [
+  p(54, '#800000', BLANC, '54 et plus : coup de chaleur'),
+  p(46, '#ff0000', BLANC, '46 à 53 : danger'),
+  p(40, '#ff8c00', NOIR, '40 à 45 : beaucoup d’inconfort'),
+  p(30, '#ffff00', NOIR, '30 à 39 : un certain inconfort'),
+  p(20, '#7ed957', NOIR, '20 à 29 : bien-être'),
+  p(10, '#b5e48c', NOIR, '10 à 19'),
+  p(0, '#52b69a', BLANC, '0 à 9'),
+  p(-Infinity, '#3d8fd6', BLANC, 'Moins de 0'),
+];
+
+/** Pression au niveau de la mer (hPa). */
+const PALIERS_PRESSION: Palier[] = [
+  p(1035, '#7a0f15', BLANC, '1 035 et plus'),
+  p(1030, '#c1121f', BLANC, '1 030 à 1 034'),
+  p(1025, '#f48c06', NOIR, '1 025 à 1 029'),
+  p(1020, '#ffba08', NOIR, '1 020 à 1 024'),
+  p(1015, '#f6e05e', NOIR, '1 015 à 1 019'),
+  p(1010, '#b5e48c', NOIR, '1 010 à 1 014'),
+  p(1005, '#52b69a', BLANC, '1 005 à 1 009'),
+  p(1000, '#3d8fd6', BLANC, '1 000 à 1 004'),
+  p(990, '#2f5fc4', BLANC, '990 à 999'),
+  p(980, '#5e3ea1', BLANC, '980 à 989'),
+  p(-Infinity, '#2d0f5e', BLANC, 'Moins de 980'),
+];
+
+/** Variation de la pression sur 3 heures (hPa) : les fortes baisses annoncent les dépressions et les coups de vent. */
+const PALIERS_VARIATION_P: Palier[] = [
+  p(3, '#b2182b', BLANC, '+3 et plus'),
+  p(1.5, '#ef8a62', NOIR, '+1,5 à +2,9'),
+  p(0.5, '#fddbc7', NOIR, '+0,5 à +1,4'),
+  p(-0.5, '#e5e7eb', NOIR, 'Stable (±0,5)'),
+  p(-1.5, '#d1e5f0', NOIR, '-0,5 à -1,4'),
+  p(-3, '#67a9cf', NOIR, '-1,5 à -2,9'),
+  p(-5, '#2166ac', BLANC, '-3 à -4,9'),
+  p(-Infinity, '#5e3ea1', BLANC, '-5 et moins'),
+];
+
+/** Humidité relative (%). */
+const PALIERS_HUMIDITE: Palier[] = [
+  p(95, '#08306b', BLANC, '95 à 100 %'),
+  p(85, '#2171b5', BLANC, '85 à 94 %'),
+  p(70, '#6baed6', NOIR, '70 à 84 %'),
+  p(50, '#c6dbef', NOIR, '50 à 69 %'),
+  p(30, '#fdd49e', NOIR, '30 à 49 %'),
+  p(-Infinity, '#e2470f', BLANC, 'Moins de 30 %'),
+];
+
+/** Cumul moyen d'un mois (normale, mm). */
+const PALIERS_NORMALE_MOIS: Palier[] = [
+  p(150, '#16307a', BLANC, '150 mm et plus'),
+  p(120, '#1d4ed8', BLANC, '120 à 149 mm'),
+  p(100, '#3b82f6', BLANC, '100 à 119 mm'),
+  p(80, '#7cb6f7', NOIR, '80 à 99 mm'),
+  p(60, '#c7e0fb', NOIR, '60 à 79 mm'),
+  p(40, '#fde68a', NOIR, '40 à 59 mm'),
+  p(-Infinity, '#fdb863', NOIR, 'Moins de 40 mm'),
+];
+
+/** Cumul moyen d'une année (normale, mm). */
+const PALIERS_NORMALE_ANNEE: Palier[] = [
+  p(1500, '#16307a', BLANC, '1 500 mm et plus'),
+  p(1200, '#1d4ed8', BLANC, '1 200 à 1 499 mm'),
+  p(1000, '#3b82f6', BLANC, '1 000 à 1 199 mm'),
+  p(800, '#7cb6f7', NOIR, '800 à 999 mm'),
+  p(650, '#c7e0fb', NOIR, '650 à 799 mm'),
+  p(-Infinity, '#fdb863', NOIR, 'Moins de 650 mm'),
+];
+
+/** Records de pluie en 24 heures (mm) : jusqu'à plusieurs centaines de millimètres dans les Cévennes. */
+const PALIERS_RECORD_PLUIE: Palier[] = [
+  p(300, '#3b0545', BLANC, '300 mm et plus'),
+  p(200, '#6a0d83', BLANC, '200 à 299 mm'),
+  p(150, '#b5121b', BLANC, '150 à 199 mm'),
+  p(100, '#e2470f', BLANC, '100 à 149 mm'),
+  p(70, '#16307a', BLANC, '70 à 99 mm'),
+  p(50, '#1d4ed8', BLANC, '50 à 69 mm'),
+  p(30, '#3b82f6', BLANC, '30 à 49 mm'),
+  p(-Infinity, '#7cb6f7', NOIR, 'Moins de 30 mm'),
+];
+
+/** Pluie de la journée en % du record de 24 h : seules les stations à 25 % du record ou plus sont affichées. */
+const PALIERS_PART_RECORD_PLUIE: Palier[] = [
+  p(100, '#3b0545', BLANC, 'Record battu ou égalé'),
+  p(75, '#b5121b', BLANC, '75 à 99 % du record'),
+  p(50, '#1d4ed8', BLANC, '50 à 74 % du record'),
+  p(25, '#7cb6f7', NOIR, '25 à 49 % du record'),
+  p(-Infinity, '#e5e7eb', NOIR, 'Moins de 25 % du record', true),
+];
+
+/** Rafales en direct : toutes les stations, vent faible compris (en gris). */
+const PALIERS_RAFALES_DIRECT: Palier[] = PALIERS_RAFALES.map((x) => (x.neutre ? { ...x, neutre: false } : x));
+
 /** Cartes de prévision (paquets des modèles AROME, Harmonie, CEP, GFS). */
 export const THEMES_PREVISION: ThemePrevision[] = [
   { id: 'tmax', groupe: 'Températures', titre: 'TEMPÉRATURES MAXIMALES', court: 'Températures maximales', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes', valeur: (x) => x.maxi },
@@ -346,6 +465,31 @@ export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'record-abs-tn', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'record-abs', champ: 'tn' }, toutes: true, sansTeinte: true, titre: 'RECORDS ABSOLUS DE FROID', court: 'Records absolus (froid)', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus bas' },
   { id: 'ecart-abs-tx', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'ecart-abs', champ: 'tx' }, toutes: true, sansTeinte: true, seuils: [{ valeur: 0, libelle: 'record absolu de chaleur' }], titre: 'RECORDS ABSOLUS DE CHALEUR BATTUS ?', court: 'Records absolus battus ? (chaleur)', unite: '°', decimales: 1, paliers: PALIERS_ECART_RECORD_CHAUD, ordre: 'desc', titreTop: 'Les plus proches du record', signe: true },
   { id: 'ecart-abs-tn', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'ecart-abs', champ: 'tn' }, toutes: true, sansTeinte: true, seuils: [{ valeur: 0, libelle: 'record absolu de froid' }], titre: 'RECORDS ABSOLUS DE FROID BATTUS ?', court: 'Records absolus battus ? (froid)', unite: '°', decimales: 1, paliers: PALIERS_ECART_RECORD_FROID, ordre: 'desc', titreTop: 'Les plus proches du record', signe: true },
+  // Observations en direct (page à part) : toutes les stations, une carte à boutons rangés par rubrique.
+  { id: 'obs-t', groupe: GROUPE_OBS, classement: 't', obs: { rubrique: 'Température', controle: true }, toutes: true, sansTeinte: true, titre: 'TEMPÉRATURES DU MOMENT', court: 'Température', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'obs-dt24', groupe: GROUPE_OBS, classement: 'dt24', obs: { rubrique: 'Température', controle: true }, toutes: true, sansTeinte: true, titre: 'VARIATION DE LA TEMPÉRATURE SUR 24 HEURES', court: 'Variation sur 24h', unite: '°', decimales: 1, paliers: PALIERS_VARIATION_T, ordre: 'desc', titreTop: 'Les plus fortes hausses', signe: true },
+  { id: 'obs-humidex', groupe: GROUPE_OBS, classement: 'humidex', obs: { rubrique: 'Température', controle: true }, toutes: true, sansTeinte: true, titre: 'HUMIDEX (CHALEUR RESSENTIE)', court: 'Humidex', unite: '', decimales: 0, paliers: PALIERS_HUMIDEX, ordre: 'desc', titreTop: 'Les plus élevés' },
+  { id: 'obs-windchill', groupe: GROUPE_OBS, classement: 'windchill', obs: { rubrique: 'Température', controle: true }, toutes: true, sansTeinte: true, titre: 'TEMPÉRATURES RESSENTIES AU VENT', court: 'Ressenti au vent', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'obs-tn12', groupe: GROUPE_OBS, classement: 'tn12', obs: { rubrique: 'T°C minis / maxis', controle: true }, toutes: true, sansTeinte: true, titre: 'MINIMALES SUR 12 HEURES', court: 'Minimales sur 12h', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'obs-tn24', groupe: GROUPE_OBS, classement: 'tn24', obs: { rubrique: 'T°C minis / maxis', controle: true }, toutes: true, sansTeinte: true, titre: 'MINIMALES SUR 24 HEURES', court: 'Minimales sur 24h', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'obs-tx12', groupe: GROUPE_OBS, classement: 'tx12', obs: { rubrique: 'T°C minis / maxis', controle: true }, toutes: true, sansTeinte: true, titre: 'MAXIMALES SUR 12 HEURES', court: 'Maximales sur 12h', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'obs-tx24', groupe: GROUPE_OBS, classement: 'tx24', obs: { rubrique: 'T°C minis / maxis', controle: true }, toutes: true, sansTeinte: true, titre: 'MAXIMALES SUR 24 HEURES', court: 'Maximales sur 24h', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'obs-rr24', groupe: GROUPE_OBS, classement: 'rr24', obs: { rubrique: 'Pluvio & vent' }, toutes: true, sansTeinte: true, titre: 'PLUVIOMÉTRIE SUR 24 HEURES', court: 'Pluviométrie sur 24h', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'obs-rr6', groupe: GROUPE_OBS, classement: 'rr6', obs: { rubrique: 'Pluvio & vent' }, toutes: true, sansTeinte: true, titre: 'PLUVIOMÉTRIE PARTIELLE', court: 'Pluviométrie partielle', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'obs-raf1', groupe: GROUPE_OBS, classement: 'raf1', obs: { rubrique: 'Pluvio & vent' }, toutes: true, sansTeinte: true, titre: 'DERNIÈRES RAFALES', court: 'Dernières rafales', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES_DIRECT, ordre: 'desc', titreTop: 'Les plus fortes' },
+  { id: 'obs-raf24', groupe: GROUPE_OBS, classement: 'raf24', obs: { rubrique: 'Pluvio & vent' }, toutes: true, sansTeinte: true, titre: 'RAFALES MAXIMALES SUR 24 HEURES', court: 'Rafales sur 24h', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES_DIRECT, ordre: 'desc', titreTop: 'Les plus fortes' },
+  { id: 'obs-pmer', groupe: GROUPE_OBS, classement: 'pmer', obs: { rubrique: 'Autres' }, toutes: true, sansTeinte: true, titre: 'PRESSION ATMOSPHÉRIQUE', court: 'Pression atmos.', unite: 'hPa', decimales: 0, paliers: PALIERS_PRESSION, ordre: 'asc', titreTop: 'Les plus basses' },
+  { id: 'obs-dp3', groupe: GROUPE_OBS, classement: 'dp3', obs: { rubrique: 'Autres' }, toutes: true, sansTeinte: true, titre: 'VARIATION DE LA PRESSION SUR 3 HEURES', court: 'Variation pres. sur 3h', unite: 'hPa', decimales: 1, paliers: PALIERS_VARIATION_P, ordre: 'asc', titreTop: 'Les plus fortes baisses', signe: true },
+  { id: 'obs-u', groupe: GROUPE_OBS, classement: 'u', obs: { rubrique: 'Autres' }, toutes: true, sansTeinte: true, titre: 'HUMIDITÉ RELATIVE', court: 'Humidité relative', unite: '%', decimales: 0, paliers: PALIERS_HUMIDITE, ordre: 'asc', titreTop: 'Les plus secs' },
+  { id: 'obs-insol24', groupe: GROUPE_OBS, classement: 'insol24', obs: { rubrique: 'Autres' }, toutes: true, sansTeinte: true, titre: 'ENSOLEILLEMENT SUR 24 HEURES', court: 'Ensoleillement sur 24h', unite: 'h', decimales: 1, paliers: PALIERS_SOLEIL, ordre: 'desc', titreTop: 'Les plus ensoleillés' },
+  // Pluie en direct (page des observations en direct) : toutes les stations, une carte à 7 boutons.
+  { id: 'pluie-releve', groupe: GROUPE_PLUIE_DIRECT, classement: 'rr6', pluie: { vue: 'releve' }, toutes: true, sansTeinte: true, titre: 'PLUIE DE LA JOURNÉE', court: 'Relevés', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'pluie-normale-mois', groupe: GROUPE_PLUIE_DIRECT, classement: '', pluie: { vue: 'normale-mois' }, toutes: true, sansTeinte: true, titre: 'CUMUL MOYEN DU MOIS', court: 'Cumul moy. mois', unite: 'mm', decimales: 0, paliers: PALIERS_NORMALE_MOIS, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'pluie-normale-annee', groupe: GROUPE_PLUIE_DIRECT, classement: '', pluie: { vue: 'normale-annee' }, toutes: true, sansTeinte: true, titre: 'CUMUL MOYEN DE L’ANNÉE', court: 'Cumul moy. année', unite: 'mm', decimales: 0, paliers: PALIERS_NORMALE_ANNEE, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'pluie-record-mois', groupe: GROUPE_PLUIE_DIRECT, classement: '', pluie: { vue: 'record-mois' }, toutes: true, sansTeinte: true, titre: 'RECORDS DE PLUIE EN 24 H DU MOIS', court: 'Records 24h mensuel', unite: 'mm', decimales: 1, paliers: PALIERS_RECORD_PLUIE, ordre: 'desc', titreTop: 'Les plus élevés' },
+  { id: 'pluie-ecart-mois', groupe: GROUPE_PLUIE_DIRECT, classement: '', pluie: { vue: 'ecart-mois' }, toutes: true, sansTeinte: true, seuils: [{ valeur: 100, libelle: 'record de pluie en 24 h du mois' }], titre: 'RECORDS DE PLUIE EN 24 H DU MOIS BATTUS ?', court: 'Records 24h mens. battus ?', unite: '%', decimales: 0, paliers: PALIERS_PART_RECORD_PLUIE, ordre: 'desc', titreTop: 'Les plus proches du record' },
+  { id: 'pluie-record-abs', groupe: GROUPE_PLUIE_DIRECT, classement: '', pluie: { vue: 'record-abs' }, toutes: true, sansTeinte: true, titre: 'RECORDS ABSOLUS DE PLUIE EN 24 H', court: 'Records 24h abs.', unite: 'mm', decimales: 1, paliers: PALIERS_RECORD_PLUIE, ordre: 'desc', titreTop: 'Les plus élevés' },
+  { id: 'pluie-ecart-abs', groupe: GROUPE_PLUIE_DIRECT, classement: '', pluie: { vue: 'ecart-abs' }, toutes: true, sansTeinte: true, seuils: [{ valeur: 100, libelle: 'record absolu de pluie en 24 h' }], titre: 'RECORDS ABSOLUS DE PLUIE EN 24 H BATTUS ?', court: 'Records 24h abs. battus ?', unite: '%', decimales: 0, paliers: PALIERS_PART_RECORD_PLUIE, ordre: 'desc', titreTop: 'Les plus proches du record' },
   { id: 'tx-chaleur', groupe: 'Températures', classement: 'tx-fin', toutes: true, sansTeinte: true, seuils: [{ valeur: 25, libelle: 'seuil de chaleur (25 °C)' }, { valeur: 30, libelle: 'seuil de forte chaleur (30 °C)' }], titre: 'MAXIMALES DE 25 °C ET PLUS', court: 'Chaleur (25 °C et plus)', unite: '°', decimales: 1, paliers: PALIERS_CHALEUR, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-fin', groupe: 'Températures', classement: 'tn-fin', titre: 'TEMPÉRATURES MINIMALES', court: 'Minimales de la nuit', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 'tx-prov', groupe: 'Températures', classement: 'tx-prov', titre: 'MAXIMALES DU JOUR (PROVISOIRES)', court: 'Maximales du jour', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },

@@ -23,6 +23,9 @@ export default function PageTemperaturesDirect() {
         <Link href="/outils/records-temperature/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
           Records de température en direct (détail, archives, records menacés)
         </Link>
+        <Link href="/outils/observations-en-direct/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
+          Observations en direct (pluie, rafales, pression, humidité…)
+        </Link>
         <Link href="/outils/carte-meteo-info/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
           Cartes infos météo
         </Link>

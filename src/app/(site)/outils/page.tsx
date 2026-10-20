@@ -64,6 +64,17 @@ export default async function AllTools() {
           </Link>
         </li>
         <li>
+          <Link href="/outils/observations-en-direct/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">📡</span>
+            <span>
+              <strong className="block leading-snug">Observations en direct</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Toutes les stations Météo-France : variation sur 24 h, humidex, ressenti, mini et maxi sur 12 et 24 h, pluie, rafales, pression, humidité, soleil.
+              </span>
+            </span>
+          </Link>
+        </li>
+        <li>
           <Link href="/outils/records-temperature/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
             <span aria-hidden className="text-3xl">🌡️</span>
             <span>

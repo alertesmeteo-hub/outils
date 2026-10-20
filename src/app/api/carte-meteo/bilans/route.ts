@@ -9,7 +9,10 @@ import { ilYAUnAn } from '@/lib/carte-meteo/il-y-a-un-an';
 export const dynamic = 'force-dynamic';
 
 /** Classements glissants (sans fenêtre fixe) : durée affichée devant la date de fin. */
-const DUREES: Record<string, string> = { t: 'relevé', snow: 'relevé', rr24: '24 h', rr72: '72 h', raf24: '24 h', insol24: '24 h' };
+const DUREES: Record<string, string> = {
+  t: 'relevé', snow: 'relevé', humidex: 'relevé', windchill: 'relevé', pmer: 'relevé', u: 'relevé',
+  rr24: '24 h', rr72: '72 h', raf24: '24 h', insol24: '24 h', raf1: '1 h', dp3: '3 h', dt24: '24 h', tx12: '12 h', tn12: '12 h', tx24: '24 h', tn24: '24 h',
+};
 
 /** Calcul partagé entre visiteurs tant que les observations n'ont pas changé (une entrée par mois demandé). */
 const caches = new Map<string, { cle: string; reponse: ReponseBilans }>();
@@ -67,6 +70,7 @@ export async function GET(req: Request) {
       for (const theme of THEMES_BILAN) {
         if (theme.anPasse) continue; // calculées après la boucle, à partir de la maximale d'hier et de la minimale de la nuit
         if (theme.direct && theme.direct.vue !== 'releve') continue; // records et écarts : après la boucle (maxi et mini du jour)
+        if (theme.pluie && theme.pluie.vue !== 'releve') continue; // normales, records et écarts : après la boucle (pluie du jour)
         if (theme.neigeMontagne) {
           const valeurs: [number, number][] = [];
           for (const s of stations) {
@@ -159,6 +163,42 @@ export async function GET(req: Request) {
             vue === 'record-mois' || vue === 'record-abs'
               ? `${quoi} de chaque station (Météo-France)`
               : `${champ === 'tx' ? 'maximale du jour' : 'minimale de la nuit'} (provisoire) comparée au ${quoi}`,
+          valeurs,
+        };
+      }
+      // Pluie en direct : cumul moyen du mois ou de l'année (normales 1991-2020), record de pluie en 24 h du mois ou absolu de
+      // chaque station (dépôt climato), et pluie de la journée en cours (depuis 6 h UTC) en % de ce record.
+      const pluieDuJour = new Map((cartes['pluie-releve']?.valeurs ?? []).map(([i, v]) => [i, v]));
+      for (const theme of THEMES_BILAN.filter((t) => t.pluie && t.pluie.vue !== 'releve')) {
+        const vue = theme.pluie!.vue;
+        const duMois = vue === 'record-mois' || vue === 'ecart-mois';
+        const valeurs: [number, number][] = [];
+        stations.forEach((s, i) => {
+          const rec = records[s.id];
+          if (vue === 'normale-mois' || vue === 'normale-annee') {
+            const mensuelles = vue === 'normale-mois' ? [rec?.normals?.[String(numeroMois)]?.rr] : Array.from({ length: 12 }, (_, m) => rec?.normals?.[String(m + 1)]?.rr);
+            if (mensuelles.every((v) => v != null)) valeurs.push([i, Math.round(mensuelles.reduce((a, b) => a! + b!, 0)!)]);
+            return;
+          }
+          const record = duMois ? rec?.monthly?.[String(numeroMois)]?.rr24?.v : rec?.absolute?.rr24?.v;
+          if (record == null || record <= 0) return;
+          if (vue === 'record-mois' || vue === 'record-abs') {
+            valeurs.push([i, record]);
+            return;
+          }
+          const v = pluieDuJour.get(i);
+          if (v != null) valeurs.push([i, Math.round((v / record) * 100)]);
+        });
+        const quoi = duMois ? `record de pluie en 24 h ${/^[aeiou]/.test(nomMois) ? 'd’' : 'de '}${nomMois}` : 'record absolu de pluie en 24 h';
+        cartes[theme.id] = {
+          fenetre:
+            vue === 'normale-mois'
+              ? `${nomMois} · normales 1991-2020`
+              : vue === 'normale-annee'
+                ? 'année · normales 1991-2020'
+                : vue === 'record-mois' || vue === 'record-abs'
+                  ? `${quoi} de chaque station (Météo-France)`
+                  : `pluie de la journée (depuis 6 h UTC) en % du ${quoi}`,
           valeurs,
         };
       }

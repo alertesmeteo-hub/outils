@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
-import { GROUPE_JOURNEE, THEMES_BILAN, type ReponseBilans, type ThemeBilan } from '@/lib/carte-meteo/cartes-info';
+import { GROUPE_JOURNEE, THEMES_BILAN, type ThemeBilan } from '@/lib/carte-meteo/cartes-info';
 import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import CarteInfo, { type PointInfo } from './CarteInfo';
 import CarteDirect from './CarteDirect';
+import { useBilans } from './useBilans';
 
 const THEMES_DIRECT = THEMES_BILAN.filter((t): t is ThemeBilan & { direct: NonNullable<ThemeBilan['direct']> } => t.direct != null);
 /** Maxi et mini de la journée : maxi du jour, mini de la nuit (provisoires), maxi d'hier, mini de la nuit dernière. */
@@ -18,24 +19,10 @@ const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
  * et absolus de chaque station, et records battus ? — lue dans les bilans des cartes infos (/api/carte-meteo/bilans/).
  */
 export default function TemperaturesDirect() {
-  const [bilans, setBilans] = useState<ReponseBilans | null>(null);
-  const [erreur, setErreur] = useState<string | null>(null);
+  const { bilans, erreur, reessayer } = useBilans();
   const [taille, setTaille] = useState<keyof typeof TAILLES>('normale');
   const [logoId, setLogoId] = useState('aucun');
   const [journee, setJournee] = useState(THEMES_JOURNEE[0]?.id ?? '');
-
-  useEffect(() => {
-    if (bilans || erreur) return;
-    const controleur = new AbortController();
-    fetch('/api/carte-meteo/bilans/', { signal: controleur.signal })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Observations momentanément indisponibles.');
-        return r.json() as Promise<ReponseBilans>;
-      })
-      .then(setBilans)
-      .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
-    return () => controleur.abort();
-  }, [bilans, erreur]);
 
   /** Points de chaque vue ; le relevé du moment est contrôlé par les stations voisines, les records sont propres à chaque station. */
   const points = useMemo(() => {
@@ -89,7 +76,7 @@ export default function TemperaturesDirect() {
       {erreur && (
         <p role="alert" className="mt-4 flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-danger">
           {erreur}
-          <button type="button" onClick={() => setErreur(null)} className="rounded-lg border border-border px-3 py-1 text-sm text-text">
+          <button type="button" onClick={reessayer} className="rounded-lg border border-border px-3 py-1 text-sm text-text">
             Réessayer
           </button>
         </p>

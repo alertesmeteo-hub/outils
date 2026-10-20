@@ -10,6 +10,8 @@ import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMet
 import {
   GROUPE_DIRECT,
   GROUPE_JOURNEE,
+  GROUPE_OBS,
+  GROUPE_PLUIE_DIRECT,
   THEMES_BILAN,
   THEMES_CLIMAT,
   THEMES_PREVISION,
@@ -400,8 +402,8 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
   const nomZone = niveau === 'france' ? 'France' : niveau === 'region' ? region : DEPARTEMENTS_FR[departement];
   const modeleAffiche = previsions?.cle === cle ? infosModele(previsions.modele, previsions.modeles) : undefined;
   const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
-  // « Températures en direct » a sa propre page (/outils/temperatures-en-direct/) : pas ici.
-  const groupes = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT && g.groupe !== GROUPE_JOURNEE);
+  // « Températures en direct » et « Observations en direct » ont leur propre page (/outils/temperatures-en-direct/, /outils/observations-en-direct/) : pas ici.
+  const groupes = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT && g.groupe !== GROUPE_JOURNEE && g.groupe !== GROUPE_OBS && g.groupe !== GROUPE_PLUIE_DIRECT);
   const groupesAffiches = groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
   /** Nom affiché d'un groupe : le bilan du mois porte le nom du mois choisi (« Octobre 2026 »). */
   const nomGroupe = (groupe: string) => (groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe);
