@@ -5,11 +5,13 @@
  *   3. le front est la ligne où TFP est maximal (∇TFP · n = 0), du côté chaud de la zone de fort gradient,
  *      là où ce gradient est assez marqué ;
  *   4. type selon le vent à 850 hPa (géostrophique, d'après le géopotentiel) : s'il pousse l'air froid vers l'air chaud,
- *      front froid ; l'air chaud vers l'air froid, front chaud ; vent le long du front, front quasi stationnaire.
+ *      front froid ; l'air chaud vers l'air froid, front chaud ; vent le long du front, front quasi stationnaire ;
+ *   5. près du centre d'une dépression creuse (≤ 1000 hPa, moins de 600 km), là où le front froid a rattrapé le front chaud :
+ *      front occlus.
  * Fonctions pures, coordonnées géographiques (lon, lat).
  */
 
-export type TypeFront = 'froid' | 'chaud' | 'stationnaire';
+export type TypeFront = 'froid' | 'chaud' | 'stationnaire' | 'occlus';
 /** Ligne de front : points [lon, lat, lon, lat…], orientée de sorte que l'air chaud soit à sa gauche. */
 export interface Front {
   type: TypeFront;
@@ -29,6 +31,9 @@ const GRADIENT_MIN = 1.2;
 const VENT_TRAVERSANT = 1.5;
 /** Longueur minimale d'un front (points de la ligne, environ 50 km chacun). */
 const POINTS_MIN = 14;
+/** Occlusion : dépression d'au plus 1000 hPa, front à moins de 600 km de son centre. */
+const PRESSION_OCCLUSION = 1000;
+const RAYON_OCCLUSION_KM = 600;
 /** Latitude moyenne minimale : au sud, les contrastes de chaleur du Sahara ne sont pas des fronts. */
 const LATITUDE_MIN = 36;
 
@@ -78,7 +83,9 @@ export function calculerFronts(
   z850: Lecteur,
   cadre: { sud: number; ouest: number; nord: number; est: number },
   /** Réglages (essais) : gradient minimal (K / 100 km) et longueur minimale (points). */
-  reglages: { gradientMin?: number; pointsMin?: number } = {}
+  reglages: { gradientMin?: number; pointsMin?: number } = {},
+  /** Pression au niveau de la mer (hPa), pour repérer les occlusions autour des dépressions creuses. */
+  pression?: Lecteur
 ): Front[] {
   const gradientMin = reglages.gradientMin ?? GRADIENT_MIN;
   const pointsMin = reglages.pointsMin ?? POINTS_MIN;
@@ -224,5 +231,54 @@ export function calculerFronts(
       debut = m;
     }
   }
-  return fronts;
+  return pression ? marquerOcclusions(fronts, depressionsCreuses(pression, cadre)) : fronts;
+}
+
+/** Centres des dépressions creuses : minimum de pression dans un rayon de 6°, à 1000 hPa ou moins. */
+function depressionsCreuses(pression: Lecteur, cadre: { sud: number; ouest: number; nord: number; est: number }): { lon: number; lat: number }[] {
+  const nI = Math.floor((cadre.nord - cadre.sud) / PAS) + 1;
+  const nJ = Math.floor((cadre.est - cadre.ouest) / PAS) + 1;
+  const p = new Float64Array(nI * nJ);
+  for (let i = 0; i < nI; i++) for (let j = 0; j < nJ; j++) p[i * nJ + j] = pression(cadre.ouest + j * PAS, cadre.sud + i * PAS) ?? NaN;
+  const rayon = Math.round(6 / PAS);
+  const centres: { lon: number; lat: number }[] = [];
+  for (let i = 0; i < nI; i++)
+    for (let j = 0; j < nJ; j++) {
+      const c = p[i * nJ + j];
+      if (!(c <= PRESSION_OCCLUSION)) continue;
+      let minimum = true;
+      for (let di = -rayon; di <= rayon && minimum; di++)
+        for (let dj = -rayon; dj <= rayon; dj++) {
+          const ii = i + di;
+          const jj = j + dj;
+          if ((!di && !dj) || ii < 0 || jj < 0 || ii >= nI || jj >= nJ) continue;
+          if (p[ii * nJ + jj] < c) {
+            minimum = false;
+            break;
+          }
+        }
+      if (minimum) centres.push({ lon: cadre.ouest + j * PAS, lat: cadre.sud + i * PAS });
+    }
+  return centres;
+}
+
+/** Parties des fronts proches d'une dépression creuse : front occlus (morceaux d'au moins 4 points). */
+function marquerOcclusions(fronts: Front[], depressions: { lon: number; lat: number }[]): Front[] {
+  if (!depressions.length) return fronts;
+  const km = (lon1: number, lat1: number, lon2: number, lat2: number) =>
+    Math.hypot((lon1 - lon2) * 111 * Math.cos(((lat1 + lat2) / 2) * RAD), (lat1 - lat2) * 111);
+  const sortie: Front[] = [];
+  for (const f of fronts) {
+    const n = f.points.length / 2;
+    const proche = Array.from({ length: n }, (_, k) => depressions.some((d) => km(f.points[2 * k], f.points[2 * k + 1], d.lon, d.lat) <= RAYON_OCCLUSION_KM));
+    let debut = 0;
+    for (let k = 1; k <= n; k++) {
+      if (k < n && proche[k] === proche[debut]) continue;
+      // Un morceau se raccorde au suivant (point commun) pour que la ligne reste continue.
+      const morceau = f.points.slice(debut * 2, Math.min(n, k + 1) * 2);
+      if (morceau.length >= 4) sortie.push({ type: proche[debut] && k - debut >= 4 ? 'occlus' : f.type, points: morceau });
+      debut = k;
+    }
+  }
+  return sortie;
 }

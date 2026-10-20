@@ -407,14 +407,15 @@ function CarteEurope({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sombre, grille, cadre, centres, etiquettes]);
 
-  // Fronts : ligne et symboles tous les ~46 px. Air chaud à gauche de la ligne (voir fronts.ts) : triangles du front froid
-  // du côté chaud (sens de déplacement), demi-cercles du front chaud du côté froid ; front stationnaire : les deux en alternance.
+  // Fronts : ligne et symboles tous les ~46 px, dans le sens de déplacement. Air chaud à gauche de la ligne (voir fronts.ts) :
+  // froid, triangles bleus du côté chaud ; chaud, demi-cercles rouges du côté froid ; occlus, violet, triangles et demi-cercles
+  // alternés du même côté ; stationnaire, triangles bleus d'un côté et demi-cercles rouges de l'autre, en alternance.
   const frontsEcran = useMemo(() => {
     if (!avecFronts || !grille?.fronts) return [];
     return grille.fronts.map((f) => {
       const pts: { x: number; y: number }[] = [];
       for (let k = 0; k < f.points.length; k += 2) pts.push(versEcranEurope(cadre, f.points[k], f.points[k + 1]));
-      const symboles: { d: string; type: 'froid' | 'chaud' }[] = [];
+      const symboles: { d: string; type: 'froid' | 'chaud' | 'occlus' }[] = [];
       let parcouru = 0;
       let prochain = 24;
       let alterne = 0;
@@ -432,16 +433,20 @@ function CarteEurope({
           const t = prochain - parcouru;
           const x = a.x + dx * t;
           const y = a.y + dy * t;
-          const type = f.type === 'stationnaire' ? (alterne++ % 2 ? 'chaud' : 'froid') : f.type;
-          if (type === 'froid') {
-            symboles.push({ type, d: `M${x - dx * 7} ${y - dy * 7} L${x + gx * 11} ${y + gy * 11} L${x + dx * 7} ${y + dy * 7} Z` });
+          const rang = alterne++;
+          // Forme : triangle (froid) ou demi-cercle (chaud) ; côté : gauche (+1, air chaud) ou droite (-1, air froid).
+          const [forme, cote]: ['triangle' | 'demi', 1 | -1] =
+            f.type === 'froid' ? ['triangle', 1] : f.type === 'chaud' ? ['demi', -1] : f.type === 'occlus' ? [rang % 2 ? 'demi' : 'triangle', 1] : rang % 2 ? ['demi', -1] : ['triangle', 1];
+          const couleur = f.type === 'occlus' ? 'occlus' : forme === 'triangle' ? 'froid' : 'chaud';
+          if (forme === 'triangle') {
+            symboles.push({ type: couleur, d: `M${x - dx * 7} ${y - dy * 7} L${x + cote * gx * 11} ${y + cote * gy * 11} L${x + dx * 7} ${y + dy * 7} Z` });
           } else {
             let d = `M${x - dx * 7} ${y - dy * 7}`;
             for (let q = 1; q <= 8; q++) {
               const th = (q / 8) * Math.PI;
-              d += ` L${x - dx * 7 * Math.cos(th) - gx * 7 * Math.sin(th)} ${y - dy * 7 * Math.cos(th) - gy * 7 * Math.sin(th)}`;
+              d += ` L${x - dx * 7 * Math.cos(th) + cote * gx * 7 * Math.sin(th)} ${y - dy * 7 * Math.cos(th) + cote * gy * 7 * Math.sin(th)}`;
             }
-            symboles.push({ type, d: `${d} Z` });
+            symboles.push({ type: couleur, d: `${d} Z` });
           }
           prochain += 46;
         }
@@ -557,20 +562,22 @@ function CarteEurope({
               />
             ))}
             {frontsEcran.map((f, k) => {
-              const bleu = clair ? '#3f444b' : '#1d4ed8';
-              const rouge = clair ? '#3f444b' : '#dc2626';
+              // Couleurs conventionnelles sur tous les styles : froid bleu, chaud rouge, occlus violet.
+              const bleu = '#1d4ed8';
+              const rouge = '#dc2626';
+              const violet = '#7e22ce';
               return (
                 <g key={`fr${k}`}>
-                  {f.type === 'stationnaire' && !clair ? (
+                  {f.type === 'stationnaire' ? (
                     <>
                       <polyline points={f.points} fill="none" stroke={bleu} strokeWidth={3} strokeDasharray="20 20" strokeLinecap="round" />
                       <polyline points={f.points} fill="none" stroke={rouge} strokeWidth={3} strokeDasharray="20 20" strokeDashoffset={20} strokeLinecap="round" />
                     </>
                   ) : (
-                    <polyline points={f.points} fill="none" stroke={f.type === 'chaud' ? rouge : bleu} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
+                    <polyline points={f.points} fill="none" stroke={f.type === 'chaud' ? rouge : f.type === 'occlus' ? violet : bleu} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
                   )}
                   {f.symboles.map((sy, q) => (
-                    <path key={q} d={sy.d} fill={sy.type === 'chaud' ? rouge : bleu} />
+                    <path key={q} d={sy.d} fill={sy.type === 'chaud' ? rouge : sy.type === 'occlus' ? violet : bleu} />
                   ))}
                 </g>
               );

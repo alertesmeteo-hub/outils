@@ -171,7 +171,7 @@ async function grilleCep(idx: Index, e: Echeance, complet: boolean, avecFronts: 
     frontsPossibles ? charger(e.hr850!) : null,
     frontsPossibles ? charger(e.z850!) : null,
   ]);
-  const fronts = t850 && hr850 && z850 ? calculerFronts(t850, hr850, z850, { sud: bornes.south, ouest: bornes.west, nord: bornes.north, est: bornes.east }) : undefined;
+  const fronts = t850 && hr850 && z850 ? calculerFronts(t850, hr850, z850, { sud: bornes.south, ouest: bornes.west, nord: bornes.north, est: bornes.east }, {}, pression) : undefined;
   return {
     run: idx.run,
     valide: e.valide,
