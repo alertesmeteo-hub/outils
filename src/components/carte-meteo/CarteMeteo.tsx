@@ -105,6 +105,17 @@ const NOMBRES_RAFALES: { valeur: NombreRafales; libelle: string }[] = [
   { valeur: '12', libelle: 'Les 12 plus fortes' },
   { valeur: 'toutes', libelle: 'Toutes' },
 ];
+/**
+ * France : grandes zones de vent, pour qu'une pastille de rafale revienne à chaque régime (tempête atlantique, tramontane et
+ * mistral, Corse…) avant de compléter avec les plus fortes. Départements absents de la liste : « nord-est » (et centre).
+ */
+const ZONES_VENT: Record<string, string[]> = {
+  corse: ['2A', '2B'],
+  mediterranee: ['66', '11', '34', '30', '48', '13', '83', '84', '04', '05', '06', '26', '07'],
+  ouest: ['29', '22', '56', '35', '50', '14', '61', '27', '76', '44', '85', '49', '53', '72'],
+  'sud-ouest': ['17', '33', '40', '64', '24', '47', '16', '79', '86', '87', '19', '23', '31', '32', '65', '09', '81', '82', '46', '12'],
+};
+const zoneVent = (dep: string) => Object.entries(ZONES_VENT).find(([, deps]) => deps.includes(dep))?.[0] ?? 'nord-est';
 const maximumRafales = (n: NombreRafales) => (n === 'aucune' ? 0 : n === 'toutes' ? Infinity : Number(n));
 /** France entière (Corse comprise) : quasi pleine hauteur, centrée sur la carte. */
 export const LARGEUR_FRANCE = 960;
@@ -634,18 +645,31 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const rafaleDe = (p: PointCarte) => (periode === 'matin' ? p.rafaleMatin : periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee);
   const ventDe = (p: PointCarte) => (periode === 'matin' ? p.ventMatin : periode === 'apres-midi' ? p.ventApresMidi : p.ventJournee);
 
-  /** Codes des points dont la rafale est signalée : au plus `maxRafales`, les plus fortes à partir du seuil. */
-  const plusFortesRafales = (liste: PointCarte[]) =>
-    new Set(
-      liste
-        .map((p) => ({ code: p.code, r: rafaleDe(p) }))
-        .filter((x): x is { code: string; r: number } => x.r != null && x.r >= seuilRafales)
-        .sort((a, b) => b.r - a.r)
-        .slice(0, maxRafales)
-        .map((x) => x.code)
-    );
+  /**
+   * Codes des points dont la rafale est signalée : au plus `maxRafales`, les plus fortes à partir du seuil. En France, d'abord la
+   * plus forte de chaque zone de vent (ZONES_VENT) : la tramontane ou le mistral ne disparaissent plus derrière quatre pastilles de
+   * la même tempête atlantique. Puis on complète avec les plus fortes restantes.
+   */
+  const plusFortesRafales = (liste: PointCarte[]) => {
+    const triees = liste
+      .map((p) => ({ p, r: rafaleDe(p) }))
+      .filter((x): x is { p: PointCarte; r: number } => x.r != null && x.r >= seuilRafales)
+      // Disposition de référence (France « Moyen ») : seuls ses points ont un picto ; une rafale ailleurs (Bastia) serait perdue.
+      .filter((x) => !(enFrance && periode !== 'journee' && !miniMaxiAM) || CAPTURE_FRANCE.some((c) => c.code === x.p.code))
+      .sort((a, b) => b.r - a.r);
+    if (!enFrance || !Number.isFinite(maxRafales)) return new Set(triees.slice(0, maxRafales).map((x) => x.p.code));
+    const retenues: PointCarte[] = [];
+    const zones = new Set<string>();
+    for (const { p } of triees) {
+      if (retenues.length >= maxRafales || zones.has(zoneVent(p.code))) continue;
+      retenues.push(p);
+      zones.add(zoneVent(p.code));
+    }
+    for (const { p } of triees) if (retenues.length < maxRafales && !retenues.includes(p)) retenues.push(p);
+    return new Set(retenues.map((p) => p.code));
+  };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const codesRafales = useMemo(() => plusFortesRafales(points), [points, periode, seuilRafales, maxRafales]);
+  const codesRafales = useMemo(() => plusFortesRafales(points), [points, periode, seuilRafales, maxRafales, enFrance, miniMaxiAM]);
 
   /**
    * France entière : les points sont posés sur une grille régulière (lignes décalées d'une demi-case) limitée au territoire,
