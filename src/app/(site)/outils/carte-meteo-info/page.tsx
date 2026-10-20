@@ -35,6 +35,9 @@ export default async function PageCartesInfo({ searchParams }: { searchParams: P
         <Link href="/outils/carte-meteo-info/?cartes=europe" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
           Europe : isobares (J0 à J+15)
         </Link>
+        <Link href="/outils/temperatures-en-direct/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
+          Températures en direct (relevés et records)
+        </Link>
       </p>
       <div className="mt-6">
         <CartesInfo aujourdhui={aujourdhuiParis()} modeInitial={cartes} />

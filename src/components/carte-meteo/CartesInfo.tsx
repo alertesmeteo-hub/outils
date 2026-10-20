@@ -22,7 +22,7 @@ import {
   type ThemePrevision,
 } from '@/lib/carte-meteo/cartes-info';
 import CarteInfo, { type PointInfo } from './CarteInfo';
-import CarteDirect from './CarteDirect';
+import { depStation, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import CarteSynthese, { type RubriqueSynthese } from './CarteSynthese';
 import { MASQUES_FRANCE, NOM_ECHEANCE, SECOURS, codesDeLaZone, libelleJour, normaliser } from './CarteMeteo';
 import CartesEurope from './CartesEurope';
@@ -45,35 +45,6 @@ function centreRegion(region: string) {
   return { lat: deps.reduce((s, c) => s + c.lat, 0) / deps.length, lon: deps.reduce((s, c) => s + c.lon, 0) / deps.length };
 }
 type Niveau = 'france' | 'region' | 'departement';
-
-/** Les stations de Corse sont rattachées au « 20 » : on les répartit entre la Corse-du-Sud et la Haute-Corse. */
-const depStation = (dep: string, lat: number) => (dep === '20' ? (lat < 42.2 ? '2A' : '2B') : dep.padStart(2, '0'));
-
-/**
- * Contrôle de cohérence des températures observées : une station qui s'écarte de plus de 8° de la médiane de ses voisines
- * (8 plus proches à moins de 80 km et à ±300 m d'altitude, pour ne pas comparer une vallée à des sommets) est écartée
- * (capteur défaillant, ex. 33,7° isolé un jour à 18°). Les cumuls de pluie et
- * les rafales ne sont pas filtrés : un orage localisé y donne légitimement une valeur isolée.
- */
-function sansValeursAberrantes(points: PointInfo[]): PointInfo[] {
-  const rad = Math.PI / 180;
-  const xy = points.map((p) => ({ x: p.lon * Math.cos(p.lat * rad) * 111, y: p.lat * 111 }));
-  return points.filter((p, i) => {
-    const voisins: { d: number; v: number }[] = [];
-    for (let j = 0; j < points.length; j++) {
-      if (j === i) continue;
-      const altI = p.alt;
-      const altJ = points[j].alt;
-      if (altI != null && altJ != null && Math.abs(altI - altJ) > 300) continue;
-      const d = (xy[i].x - xy[j].x) ** 2 + (xy[i].y - xy[j].y) ** 2;
-      if (d < 80 * 80) voisins.push({ d, v: points[j].valeur });
-    }
-    if (voisins.length < 3) return true;
-    const proches = voisins.sort((a, b) => a.d - b.d).slice(0, 8).map((x) => x.v).sort((a, b) => a - b);
-    const mediane = proches[Math.floor(proches.length / 2)];
-    return Math.abs(p.valeur - mediane) <= 8;
-  });
-}
 
 /** « Octobre 2026 » pour « 2026-10 ». */
 const libelleMoisCourt = (m: string) => {
@@ -428,7 +399,8 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
   const nomZone = niveau === 'france' ? 'France' : niveau === 'region' ? region : DEPARTEMENTS_FR[departement];
   const modeleAffiche = previsions?.cle === cle ? infosModele(previsions.modele, previsions.modeles) : undefined;
   const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
-  const groupes = parGroupe(themes);
+  // « Températures en direct » a sa propre page (/outils/temperatures-en-direct/) : pas ici.
+  const groupes = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT);
   const groupesAffiches = groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
   /** Nom affiché d'un groupe : le bilan du mois porte le nom du mois choisi (« Octobre 2026 »). */
   const nomGroupe = (groupe: string) => (groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe);
@@ -756,17 +728,11 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
           {groupesAffiches.map((g) => (
             <div key={g.groupe} className="flex flex-wrap items-center gap-1.5">
               <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{nomGroupe(g.groupe)}</span>
-              {g.groupe === GROUPE_DIRECT ? (
-                <a href="#carte-direct" className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
-                  Relevés et records (une carte à boutons)
+              {g.themes.map((t) => (
+                <a key={t.id} href={`#carte-${t.id}`} className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
+                  {t.court}
                 </a>
-              ) : (
-                g.themes.map((t) => (
-                  <a key={t.id} href={`#carte-${t.id}`} className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
-                    {t.court}
-                  </a>
-                ))
-              )}
+              ))}
             </div>
           ))}
         </nav>
@@ -869,23 +835,7 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
             <section key={g.groupe} className="mt-8">
               <h2 className="border-b border-border pb-1 text-xl font-extrabold">{nomGroupe(g.groupe)}</h2>
               <div className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-2">
-                {/* Températures en direct : une seule carte, ses boutons choisissent la vue (relevés, records, battus ?). */}
-                {g.groupe === GROUPE_DIRECT && mode === 'bilan' && (
-                  <div id="carte-direct" className="mx-auto w-full min-w-0 max-w-5xl scroll-mt-4 xl:col-span-2">
-                    <CarteDirect
-                      key={zone}
-                      echelleValeurs={echelleValeurs}
-                      themes={g.themes as ThemeBilan[]}
-                      points={pointsBilan}
-                      sousTitre={periodeBilan}
-                      zone={zone}
-                      logoId={logoId}
-                      prefixeFichier={prefixe}
-                      contexte={contexteBilan}
-                    />
-                  </div>
-                )}
-                {g.groupe !== GROUPE_DIRECT && g.themes.map((theme) => (
+                {g.themes.map((theme) => (
                   <div key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">
                     {mode === 'prevision' && (theme as ThemePrevision).cumulJours ? (
                       erreurCumuls ? (

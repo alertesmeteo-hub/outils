@@ -53,6 +53,17 @@ export default async function AllTools() {
           </Link>
         </li>
         <li>
+          <Link href="/outils/temperatures-en-direct/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">🌡️</span>
+            <span>
+              <strong className="block leading-snug">Températures en direct</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Relevés de toutes les stations Météo-France, record du mois et record absolu de chaque station, records battus aujourd&apos;hui.
+              </span>
+            </span>
+          </Link>
+        </li>
+        <li>
           <Link href="/outils/records-temperature/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
             <span aria-hidden className="text-3xl">🌡️</span>
             <span>
