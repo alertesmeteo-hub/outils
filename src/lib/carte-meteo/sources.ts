@@ -21,6 +21,7 @@ const BASES: Record<ModeleSource, string> = {
   arome: 'https://raw.githubusercontent.com/alertesmeteo-hub/arome-meteofrance/data',
   harmonie: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie/data',
   harmonie2km: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-dmi-2km/data',
+  arpege: 'https://raw.githubusercontent.com/alertesmeteo-hub/arpege-meteo-france/data',
   cep: 'https://raw.githubusercontent.com/alertesmeteo-hub/cep/data',
   gfs: 'https://raw.githubusercontent.com/alertesmeteo-hub/gfs/data',
 };
@@ -28,6 +29,7 @@ const LIBELLES: Record<ModeleSource, string> = {
   arome: 'AROME 0,01° (Météo-France)',
   harmonie: 'HARMONIE-AROME (KNMI)',
   harmonie2km: 'HARMONIE DINI 2 km (DMI)',
+  arpege: 'ARPEGE Europe 0,1° (Météo-France)',
   cep: 'CEP (ECMWF IFS)',
   gfs: 'GFS (NOAA)',
 };
@@ -233,7 +235,8 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     wind_direction_deg: indice(cols, 'wind_direction_deg'),
     wind_speed_kmh: indice(cols, 'wind_speed_kmh'),
     wind_gust_kmh: indice(cols, 'wind_gust_kmh'),
-    visibility_km: indice(cols, 'visibility_km'),
+    // Absente d'ARPEGE : pas de visibilité (valeurs nulles, pas de brouillard déduit de la visibilité).
+    visibility_km: cols.indexOf('visibility_km'),
     // Absente du HARMONIE DINI du DMI : pas de risque d'orage (valeurs nulles).
     thunder_risk_code: cols.indexOf('thunder_risk_code'),
     cloud_low_pct: cols.indexOf('cloud_low_pct'),

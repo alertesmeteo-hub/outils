@@ -5,7 +5,7 @@ import { chargerPrevisionsCarte, chargerPrevisionsMontagne, chargerPrevisionsVil
 import { moyenneCarte, moyenneMontagne, moyenneVilles } from '@/lib/carte-meteo/moyenne-modeles';
 
 /**
- * GET /api/carte-meteo/previsions/?modele=arome|harmonie2km|harmonie|cep|gfs&date=YYYY-MM-DD[&dep=29 | &deps=29,22,35,56]
+ * GET /api/carte-meteo/previsions/?modele=arome|harmonie2km|harmonie|arpege|cep|gfs&date=YYYY-MM-DD[&dep=29 | &deps=29,22,35,56]
  * Sans `dep` : prévisions de tous les départements métropolitains ; avec `dep` : de ses principales villes ;
  * avec `deps` (cartes infos d'une région, 13 départements au plus) : les villes de chacun, avec leur département (`dep`).
  * Prévisions AROME (Météo-France) ou CEP (ECMWF) lues dans les paquets départementaux publiés sur GitHub

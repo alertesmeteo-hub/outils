@@ -348,7 +348,7 @@ export function libelleJour(dateISO: string): string {
     .toUpperCase();
 }
 
-export const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { harmonie2km: 'arome', arome: 'harmonie', harmonie: 'cep' };
+export const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { harmonie2km: 'arome', arome: 'harmonie', harmonie: 'cep', arpege: 'cep' };
 export const NOM_ECHEANCE = (n: number) => (n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : `J+${n}`);
 
 const champLabel = 'block text-sm font-medium';

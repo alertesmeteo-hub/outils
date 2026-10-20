@@ -6,22 +6,24 @@ import { temperaturePlausible, ventPlausible } from './limites';
  * Modèles proposés, lus dans les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (voir `sources.ts`) :
  *   - arome : AROME 0,01° de Météo-France, pas horaire, 48 h ;
  *   - harmonie : HARMONIE-AROME du KNMI (Pays-Bas), pas horaire, 60 h ;
+ *   - arpege : ARPEGE Europe 0,1° de Météo-France, pas horaire, ~102 h (jusqu'à J+3 complet) ;
  *   - cep : CEP, modèle du Centre européen (ECMWF IFS), pas de 3 h, 15 jours ;
  *   - gfs : GFS de la NOAA, pas de 3 h, 15 jours.
  */
-export type ModeleMeteo = 'moyenne' | 'arome' | 'harmonie2km' | 'harmonie' | 'cep' | 'gfs';
+export type ModeleMeteo = 'moyenne' | 'arome' | 'harmonie2km' | 'harmonie' | 'arpege' | 'cep' | 'gfs';
 /** Modèles qui ont leurs propres fichiers de prévision (tous sauf la moyenne). */
 export type ModeleSource = Exclude<ModeleMeteo, 'moyenne'>;
 /** Modèles moyennés par « Moyenne des modèles » (Harmonie 2 km seulement là où il est publié). */
-export const MODELES_MOYENNE: ModeleSource[] = ['arome', 'harmonie2km', 'harmonie', 'cep', 'gfs'];
+export const MODELES_MOYENNE: ModeleSource[] = ['arome', 'harmonie2km', 'harmonie', 'arpege', 'cep', 'gfs'];
 
 export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string; departements?: string[]; vueDepartement?: boolean }[] = [
   // Températures moyennées sur les modèles disponibles ; pictos, nuages et vent d'AROME. Vue département seulement.
-  { id: 'moyenne', libelle: 'Moyenne des modèles', fournisseur: 'T° : AROME, Harmonie, CEP, GFS', vueDepartement: true },
+  { id: 'moyenne', libelle: 'Moyenne des modèles', fournisseur: 'T° : AROME, Harmonie, ARPEGE, CEP, GFS', vueDepartement: true },
   { id: 'arome', libelle: 'AROME', fournisseur: 'Météo-France' },
   // HARMONIE DINI du DMI à 2 km, publié pour les Pyrénées-Orientales seulement (dépôt harmonie-dmi-2km).
   { id: 'harmonie2km', libelle: 'Harmonie 2 km', fournisseur: 'DMI', departements: ['66'] },
   { id: 'harmonie', libelle: 'Harmonie', fournisseur: 'KNMI' },
+  { id: 'arpege', libelle: 'ARPEGE', fournisseur: 'Météo-France' },
   { id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' },
   { id: 'gfs', libelle: 'GFS', fournisseur: 'NOAA' },
 ];
@@ -43,7 +45,7 @@ export const modeleParDefautJ0 = (dep: string | null): ModeleMeteo => (modeleDis
  * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. Les modèles à 48-60 h ne couvrent pas
  * l'après-midi de J+2 ; le CEP et GFS vont jusqu'à 15 jours (J+15 n'a des données que selon l'heure du passage).
  */
-export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, harmonie2km: 1, harmonie: 1, cep: 15, gfs: 15 };
+export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, harmonie2km: 1, harmonie: 1, arpege: 3, cep: 15, gfs: 15 };
 
 /** Un point par département métropolitain (ou par ville), avec les valeurs de l'après-midi (12 h-18 h) et de la journée. */
 export interface PointCarte {
