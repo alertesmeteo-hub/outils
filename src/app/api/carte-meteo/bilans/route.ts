@@ -66,6 +66,7 @@ export async function GET(req: Request) {
         : null;
       for (const theme of THEMES_BILAN) {
         if (theme.anPasse) continue; // calculées après la boucle, à partir de la maximale d'hier et de la minimale de la nuit
+        if (theme.direct && theme.direct.vue !== 'releve') continue; // records et écarts : après la boucle (maxi et mini du jour)
         if (theme.neigeMontagne) {
           const valeurs: [number, number][] = [];
           for (const s of stations) {
@@ -124,6 +125,40 @@ export async function GET(req: Request) {
         }
         cartes[theme.id] = {
           fenetre: anPasse ? (ecart ? `${jourLong(ref.jour)} comparé au ${jourLong(anPasse.date)}` : jourLong(anPasse.date)) : 'relevés de l’an dernier en cours de chargement',
+          valeurs,
+        };
+      }
+      // Températures en direct : record du mois ou absolu de chaque station (dépôt climato), et écart de la maximale du jour
+      // (8 h → 8 h, provisoire) ou de la minimale de la nuit (20 h → 8 h, provisoire) à ce record. Écart positif = record battu
+      // (de chaleur : maxi au-dessus du record ; de froid : mini au-dessous).
+      const numeroMois = Number(jourParis(now).slice(5, 7));
+      const nomMois = new Date(Date.UTC(2026, numeroMois - 1, 15)).toLocaleDateString('fr-FR', { month: 'long', timeZone: 'UTC' });
+      const recentes = {
+        tx: new Map((cartes['tx-prov']?.valeurs ?? []).map(([i, v]) => [i, v])),
+        tn: new Map((cartes['tn-prov']?.valeurs ?? []).map(([i, v]) => [i, v])),
+      };
+      for (const theme of THEMES_BILAN.filter((t) => t.direct && t.direct.vue !== 'releve')) {
+        const { vue, champ = 'tx' } = theme.direct!;
+        const duMois = vue === 'record-mois' || vue === 'ecart-mois';
+        const valeurs: [number, number][] = [];
+        stations.forEach((s, i) => {
+          const rec = records[s.id];
+          const record = duMois ? rec?.monthly?.[String(numeroMois)]?.[champ]?.v : rec?.absolute?.[champ]?.v;
+          if (record == null) return;
+          if (vue === 'record-mois' || vue === 'record-abs') {
+            valeurs.push([i, record]);
+            return;
+          }
+          const v = recentes[champ].get(i);
+          if (v == null) return;
+          valeurs.push([i, Math.round((champ === 'tx' ? v - record : record - v) * 10) / 10]);
+        });
+        const quoi = duMois ? `record ${champ === 'tx' ? 'de chaleur' : 'de froid'} ${/^[aeiou]/.test(nomMois) ? 'd’' : 'de '}${nomMois}` : `record absolu ${champ === 'tx' ? 'de chaleur' : 'de froid'}`;
+        cartes[theme.id] = {
+          fenetre:
+            vue === 'record-mois' || vue === 'record-abs'
+              ? `${quoi} de chaque station (Météo-France)`
+              : `${champ === 'tx' ? 'maximale du jour' : 'minimale de la nuit'} (provisoire) comparée au ${quoi}`,
           valeurs,
         };
       }

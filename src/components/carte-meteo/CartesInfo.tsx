@@ -8,6 +8,7 @@ import { CLIMAT_REGIONS, type Horizon } from '@/lib/carte-meteo/climat-tracc';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import {
+  GROUPE_DIRECT,
   THEMES_BILAN,
   THEMES_CLIMAT,
   THEMES_PREVISION,
@@ -15,11 +16,13 @@ import {
   type ClimatCommune,
   type ClimatDepartements,
   type ReponseBilans,
+  type ThemeBilan,
   type ThemeClimat,
   type ThemeInfo,
   type ThemePrevision,
 } from '@/lib/carte-meteo/cartes-info';
 import CarteInfo, { type PointInfo } from './CarteInfo';
+import CarteDirect from './CarteDirect';
 import CarteSynthese, { type RubriqueSynthese } from './CarteSynthese';
 import { MASQUES_FRANCE, NOM_ECHEANCE, SECOURS, codesDeLaZone, libelleJour, normaliser } from './CarteMeteo';
 import CartesEurope from './CartesEurope';
@@ -406,7 +409,9 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
           return { code, nom: nomStation, dep: depStation(dep, lat), lat, lon, alt, valeur };
         })
         .filter((p) => p.alt == null || p.alt <= plafond);
-      resultat[theme.id] = theme.unite === '°' ? sansValeursAberrantes(points) : points;
+      // Records et écarts aux records (températures en direct) : valeurs propres à chaque station, pas de contrôle par les voisines.
+      const controle = theme.unite === '°' && !(theme.direct && theme.direct.vue !== 'releve');
+      resultat[theme.id] = controle ? sansValeursAberrantes(points) : points;
     }
     return resultat;
   }, [bilans, altitudeMax]);
@@ -739,11 +744,17 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
           {groupesAffiches.map((g) => (
             <div key={g.groupe} className="flex flex-wrap items-center gap-1.5">
               <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{nomGroupe(g.groupe)}</span>
-              {g.themes.map((t) => (
-                <a key={t.id} href={`#carte-${t.id}`} className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
-                  {t.court}
+              {g.groupe === GROUPE_DIRECT ? (
+                <a href="#carte-direct" className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
+                  Relevés et records (une carte à boutons)
                 </a>
-              ))}
+              ) : (
+                g.themes.map((t) => (
+                  <a key={t.id} href={`#carte-${t.id}`} className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
+                    {t.court}
+                  </a>
+                ))
+              )}
             </div>
           ))}
         </nav>
@@ -846,7 +857,22 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
             <section key={g.groupe} className="mt-8">
               <h2 className="border-b border-border pb-1 text-xl font-extrabold">{nomGroupe(g.groupe)}</h2>
               <div className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-2">
-                {g.themes.map((theme) => (
+                {/* Températures en direct : une seule carte, ses boutons choisissent la vue (relevés, records, battus ?). */}
+                {g.groupe === GROUPE_DIRECT && mode === 'bilan' && (
+                  <div id="carte-direct" className="mx-auto w-full min-w-0 max-w-5xl scroll-mt-4 xl:col-span-2">
+                    <CarteDirect
+                      key={zone}
+                      themes={g.themes as ThemeBilan[]}
+                      points={pointsBilan}
+                      sousTitre={periodeBilan}
+                      zone={zone}
+                      logoId={logoId}
+                      prefixeFichier={prefixe}
+                      contexte={contexteBilan}
+                    />
+                  </div>
+                )}
+                {g.groupe !== GROUPE_DIRECT && g.themes.map((theme) => (
                   <div key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">
                     {mode === 'prevision' && (theme as ThemePrevision).cumulJours ? (
                       erreurCumuls ? (

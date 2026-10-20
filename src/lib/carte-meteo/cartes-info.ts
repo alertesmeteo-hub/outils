@@ -72,6 +72,10 @@ export interface ThemeClimat extends ThemeInfo {
   drias?: 'cumulAn' | 'cumulHiver' | 'cumulEte' | 'intensitePct' | 'freqJours';
 }
 
+export type VueDirect = 'releve' | 'record-mois' | 'ecart-mois' | 'record-abs' | 'ecart-abs';
+/** Groupe de la carte « Températures en direct » (rendue à part, avec ses boutons). */
+export const GROUPE_DIRECT = 'Températures en direct';
+
 export interface ThemeBilan extends ThemeInfo {
   /** Identifiant du classement des stations (src/lib/obs/rankings.ts) ; vide pour les cartes du mois. */
   classement: string;
@@ -79,6 +83,11 @@ export interface ThemeBilan extends ThemeInfo {
   mois?: CleMois;
   /** Il y a un an : maximale ou minimale relevée le même jour l'an dernier (dépôt climato), ou écart de la valeur récente à celle-ci. */
   anPasse?: { champ: 'tx' | 'tn'; ecart?: boolean };
+  /**
+   * Températures en direct (une carte à boutons) : relevé du moment, record du mois ou record absolu de chaque station, ou écart
+   * de la maximale du jour / minimale de la nuit (provisoires) à ce record ; `champ` : chaleur (tx) ou froid (tn).
+   */
+  direct?: { vue: VueDirect; champ?: 'tx' | 'tn' };
   /** Neige au sol des stations de montagne (1 000 m et plus), y compris celles sans neige (0 cm). */
   neigeMontagne?: boolean;
   /** Stations retenues jusqu'à cette altitude (m) : carte « de plaine », sans les stations de montagne. */
@@ -260,6 +269,17 @@ const PALIERS_VENT_MOIS: Palier[] = [
   p(-Infinity, '#94a3b8', NOIR, 'Moins de 10 km/h', true),
 ];
 
+/** Écart au record (positif = record battu) : seules les stations à 6° ou moins du record sont affichées. */
+const paliersEcartRecord = (battu: string, proche: string, moyen: string, loin: string): Palier[] => [
+  p(0, battu, BLANC, 'Record battu ou égalé'),
+  p(-1, proche, BLANC, 'À moins de 1° du record'),
+  p(-3, moyen, NOIR, 'À 1 à 3° du record'),
+  p(-6, loin, NOIR, 'À 3 à 6° du record'),
+  p(-Infinity, '#e5e7eb', NOIR, 'À plus de 6° du record', true),
+];
+const PALIERS_ECART_RECORD_CHAUD = paliersEcartRecord('#67000d', '#d7301f', '#fc8d59', '#fdd49e');
+const PALIERS_ECART_RECORD_FROID = paliersEcartRecord('#08306b', '#2171b5', '#6baed6', '#c6dbef');
+
 const PALIERS_ECART: Palier[] = [
   p(8, '#67001f', BLANC, '+8° et plus'),
   p(5, '#c1121f', BLANC, '+5 à +7°'),
@@ -309,6 +329,16 @@ export const THEMES_PREVISION: ThemePrevision[] = [
 /** Cartes de bilan (observations des stations Météo-France, mêmes fenêtres que les classements). */
 export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'tx-fin', groupe: 'Températures', classement: 'tx-fin', titre: 'TEMPÉRATURES MAXIMALES', court: 'Maximales de la veille', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  // Températures en direct : toutes les stations, une carte à 5 boutons (relevés, records du mois et absolus, battus ?).
+  { id: 't-direct', groupe: GROUPE_DIRECT, classement: 't', direct: { vue: 'releve' }, toutes: true, sansTeinte: true, titre: 'TEMPÉRATURES DU MOMENT', court: 'Relevés', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
+  { id: 'record-mois-tx', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'record-mois', champ: 'tx' }, toutes: true, sansTeinte: true, titre: 'RECORDS DE CHALEUR DU MOIS', court: 'Records du mois (chaleur)', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus élevés' },
+  { id: 'record-mois-tn', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'record-mois', champ: 'tn' }, toutes: true, sansTeinte: true, titre: 'RECORDS DE FROID DU MOIS', court: 'Records du mois (froid)', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus bas' },
+  { id: 'ecart-mois-tx', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'ecart-mois', champ: 'tx' }, toutes: true, sansTeinte: true, seuils: [{ valeur: 0, libelle: 'record de chaleur du mois' }], titre: 'RECORDS DE CHALEUR DU MOIS BATTUS ?', court: 'Records du mois battus ? (chaleur)', unite: '°', decimales: 1, paliers: PALIERS_ECART_RECORD_CHAUD, ordre: 'desc', titreTop: 'Les plus proches du record', signe: true },
+  { id: 'ecart-mois-tn', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'ecart-mois', champ: 'tn' }, toutes: true, sansTeinte: true, seuils: [{ valeur: 0, libelle: 'record de froid du mois' }], titre: 'RECORDS DE FROID DU MOIS BATTUS ?', court: 'Records du mois battus ? (froid)', unite: '°', decimales: 1, paliers: PALIERS_ECART_RECORD_FROID, ordre: 'desc', titreTop: 'Les plus proches du record', signe: true },
+  { id: 'record-abs-tx', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'record-abs', champ: 'tx' }, toutes: true, sansTeinte: true, titre: 'RECORDS ABSOLUS DE CHALEUR', court: 'Records absolus (chaleur)', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus élevés' },
+  { id: 'record-abs-tn', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'record-abs', champ: 'tn' }, toutes: true, sansTeinte: true, titre: 'RECORDS ABSOLUS DE FROID', court: 'Records absolus (froid)', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus bas' },
+  { id: 'ecart-abs-tx', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'ecart-abs', champ: 'tx' }, toutes: true, sansTeinte: true, seuils: [{ valeur: 0, libelle: 'record absolu de chaleur' }], titre: 'RECORDS ABSOLUS DE CHALEUR BATTUS ?', court: 'Records absolus battus ? (chaleur)', unite: '°', decimales: 1, paliers: PALIERS_ECART_RECORD_CHAUD, ordre: 'desc', titreTop: 'Les plus proches du record', signe: true },
+  { id: 'ecart-abs-tn', groupe: GROUPE_DIRECT, classement: '', direct: { vue: 'ecart-abs', champ: 'tn' }, toutes: true, sansTeinte: true, seuils: [{ valeur: 0, libelle: 'record absolu de froid' }], titre: 'RECORDS ABSOLUS DE FROID BATTUS ?', court: 'Records absolus battus ? (froid)', unite: '°', decimales: 1, paliers: PALIERS_ECART_RECORD_FROID, ordre: 'desc', titreTop: 'Les plus proches du record', signe: true },
   { id: 'tx-chaleur', groupe: 'Températures', classement: 'tx-fin', toutes: true, sansTeinte: true, seuils: [{ valeur: 25, libelle: 'seuil de chaleur (25 °C)' }, { valeur: 30, libelle: 'seuil de forte chaleur (30 °C)' }], titre: 'MAXIMALES DE 25 °C ET PLUS', court: 'Chaleur (25 °C et plus)', unite: '°', decimales: 1, paliers: PALIERS_CHALEUR, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-fin', groupe: 'Températures', classement: 'tn-fin', titre: 'TEMPÉRATURES MINIMALES', court: 'Minimales de la nuit', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 'tx-prov', groupe: 'Températures', classement: 'tx-prov', titre: 'MAXIMALES DU JOUR (PROVISOIRES)', court: 'Maximales du jour', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
