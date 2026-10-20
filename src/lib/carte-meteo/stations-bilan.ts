@@ -56,10 +56,10 @@ const AUTRES_GRANDES_VILLES: [string, string][] = [
 const normaliserNom = (nom: string) =>
   nom
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/[-'’]/g, ' ')
-    .replace(/SAINTE?/g, (m) => (m === 'SAINTE' ? 'STE' : 'ST'))
+    .replace(/\bSAINTE?\b/g, (m) => (m === 'SAINTE' ? 'STE' : 'ST'))
     .replace(/\s+/g, ' ')
     .trim();
 
