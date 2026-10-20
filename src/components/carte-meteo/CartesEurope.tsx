@@ -1,17 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import {
   CADRES,
   PALIERS_LEGENDE,
   PALIERS_PLUIE_EUROPE,
+  PALIERS_TEMPERATURE_EUROPE,
   centresAction,
   couleurIsobare,
   couleurPluie,
   couleurPression,
   couleurTemperature,
+  couleurTemperatureClasse,
   flechesVent,
   pressionEn,
   valeurEn,
@@ -40,10 +42,11 @@ const MODELES_EUROPE: { id: ModeleEurope; libelle: string; detail: string }[] = 
 const NOM_MODELE: Record<ModeleEurope, string> = { cep: 'CEP', gfs: 'GFS' };
 
 /** Classique : fond coloré selon la pression ; sombre : fond gris, pluie, isobares colorées et températures des villes. */
-type StyleEurope = 'classique' | 'sombre';
+type StyleEurope = 'classique' | 'sombre' | 'clair';
 const STYLES_EUROPE: { id: StyleEurope; libelle: string }[] = [
   { id: 'classique', libelle: 'Pression colorée' },
   { id: 'sombre', libelle: 'Pluie, isobares et températures (fond sombre)' },
+  { id: 'clair', libelle: 'Températures et isobares (fond clair)' },
 ];
 
 const heureParis = (iso: string) => `${new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric' }).format(new Date(iso)).replace(/\s/g, '')}`;
@@ -266,7 +269,7 @@ function CarteEurope({
   useEffect(() => {
     if (!visible || grille) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/europe/?modele=${modele}&h=${echeance.h}${style === 'sombre' ? '&complet=1' : ''}`, { signal: controleur.signal })
+    fetch(`/api/carte-meteo/europe/?modele=${modele}&h=${echeance.h}${style !== 'classique' ? '&complet=1' : ''}`, { signal: controleur.signal })
       .then(async (r) => {
         const json = (await r.json().catch(() => null)) as (GrilleEurope & { erreur?: string }) | null;
         if (!r.ok || !json?.p) throw new Error(json?.erreur ?? 'Grille GFS indisponible.');
@@ -276,10 +279,39 @@ function CarteEurope({
     return () => controleur.abort();
   }, [visible, grille, echeance.h, modele, style]);
 
-  const isobares = useMemo(() => (grille ? tracerIsobares(grille, cadre) : []), [grille, cadre]);
+  // Fond clair : isobares tous les 5 hPa, comme sur les cartes de presse ; sinon tous les 4 hPa.
+  const isobares = useMemo(() => (grille ? tracerIsobares(grille, cadre, style === 'clair' ? 5 : 4) : []), [grille, cadre, style]);
   const centres = useMemo(() => (grille ? centresAction(grille, cadre) : []), [grille, cadre]);
 
   const sombre = style === 'sombre';
+  const clair = style === 'clair';
+  const idClip = `terres-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  // Fond clair : températures en image, découpée ensuite sur les terres (la mer reste bleu pâle).
+  const [imageTemperature, setImageTemperature] = useState<string | null>(null);
+  useEffect(() => {
+    if (!clair || !grille?.t) return;
+    const t = grille.t;
+    const canvas = document.createElement('canvas');
+    canvas.width = cadre.largeur / 2;
+    canvas.height = cadre.hauteur / 2;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const image = ctx.createImageData(canvas.width, canvas.height);
+    for (let py = 0; py < canvas.height; py++)
+      for (let px = 0; px < canvas.width; px++) {
+        const { lon, lat } = versLonLat(cadre, ((px + 0.5) * cadre.largeur) / canvas.width, ((py + 0.5) * cadre.hauteur) / canvas.height);
+        const v = valeurEn(grille, t, lon, lat);
+        if (v == null) continue;
+        const hex = couleurTemperatureClasse(v);
+        const k = (py * canvas.width + px) * 4;
+        image.data[k] = parseInt(hex.slice(1, 3), 16);
+        image.data[k + 1] = parseInt(hex.slice(3, 5), 16);
+        image.data[k + 2] = parseInt(hex.slice(5, 7), 16);
+        image.data[k + 3] = 255;
+      }
+    ctx.putImageData(image, 0, 0);
+    setImageTemperature(canvas.toDataURL('image/png'));
+  }, [clair, grille, cadre]);
 
   // Fond (demi-résolution, lissé par le navigateur) : pression colorée, ou pluie seule sur le fond sombre.
   useEffect(() => {
@@ -294,6 +326,7 @@ function CarteEurope({
       for (let px = 0; px < w; px++) {
         const { lon, lat } = versLonLat(cadre, ((px + 0.5) * cadre.largeur) / w, ((py + 0.5) * cadre.hauteur) / h);
         const k = (py * w + px) * 4;
+        if (clair) continue;
         if (sombre) {
           const mm = grille.pluie ? valeurEn(grille, grille.pluie, lon, lat) : null;
           const c = mm == null ? null : couleurPluie(mm);
@@ -312,18 +345,18 @@ function CarteEurope({
         image.data[k + 3] = 255;
       }
     ctx.putImageData(image, 0, 0);
-  }, [grille, cadre, sombre]);
+  }, [grille, cadre, sombre, clair]);
 
   /** Zones réservées : bords, titre (en haut à gauche), logo (en haut à droite), légende (en bas à gauche). */
   const interdit = (x: number, y: number) =>
-    x < 30 || y < 30 || x > cadre.largeur - 30 || y > cadre.hauteur - 40 || (x < (sombre ? 620 : 470) && y < 95) || (x > cadre.largeur - 260 && y < 120) || (x < 200 && y > cadre.hauteur - 280);
+    x < 30 || y < 30 || x > cadre.largeur - 30 || y > cadre.hauteur - 40 || (x < (sombre || clair ? 620 : 470) && y < 95) || (x > cadre.largeur - 260 && y < 120) || (x < 200 && y > cadre.hauteur - (clair ? 310 : 280));
 
   // Étiquettes des isobares : au milieu des lignes assez longues, puis à intervalles réguliers (plus nombreuses sur le fond
   // sombre, comme sur les cartes de référence), jamais trop près d'une autre étiquette, d'un bord ou des encadrés.
   const etiquettes = useMemo(() => {
-    const posees: { x: number; y: number; niveau: number }[] = [];
-    const intervalle = sombre ? 330 : 650;
-    const ecartMin = sombre ? 75 : 110;
+    const posees: { x: number; y: number; niveau: number; angle: number }[] = [];
+    const intervalle = sombre ? 330 : clair ? 430 : 650;
+    const ecartMin = sombre ? 75 : clair ? 95 : 110;
     for (const iso of [...isobares].sort((a, b) => b.points.length - a.points.length)) {
       const pts = iso.points;
       const cumul = [0];
@@ -337,12 +370,18 @@ function CarteEurope({
         const x = pts[idx * 2];
         const y = pts[idx * 2 + 1];
         if (interdit(x, y) || posees.some((p) => Math.hypot(p.x - x, p.y - y) < ecartMin)) continue;
-        posees.push({ x, y, niveau: iso.niveau });
+        // Fond clair : valeur écrite dans le sens de la ligne (jamais à l'envers).
+        const a = Math.max(0, idx - 3);
+        const b = Math.min(pts.length / 2 - 1, idx + 3);
+        let angle = (Math.atan2(pts[b * 2 + 1] - pts[a * 2 + 1], pts[b * 2] - pts[a * 2]) * 180) / Math.PI;
+        if (angle > 90) angle -= 180;
+        if (angle < -90) angle += 180;
+        posees.push({ x, y, niveau: iso.niveau, angle });
       }
     }
     return posees;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isobares, cadre, sombre]);
+  }, [isobares, cadre, sombre, clair]);
 
   // Températures des villes (fond sombre) : pas sur un A / D, une étiquette ou une autre ville.
   const temperatures = useMemo(() => {
@@ -413,10 +452,34 @@ function CarteEurope({
               {fond && <path d={fond.terres} fill="#67636f" />}
             </svg>
           )}
+          {clair && (
+            // Fond clair : mer bleu pâle, terres colorées selon la température (image découpée sur les terres).
+            <svg className="cmap-svg" viewBox={`0 0 ${cadre.largeur} ${cadre.hauteur}`} width={cadre.largeur} height={cadre.hauteur}>
+              <rect width={cadre.largeur} height={cadre.hauteur} fill="#e8f3fa" />
+              {fond && (
+                <>
+                  <clipPath id={idClip}>
+                    <path d={fond.terres} />
+                  </clipPath>
+                  {/* Ombre légère sous les terres, comme sur les cartes de presse. */}
+                  <path d={fond.terres} fill="#b8c4cc" transform="translate(3 3)" />
+                  <path d={fond.terres} fill="#f3f1e7" />
+                  {imageTemperature && (
+                    <image href={imageTemperature} x={0} y={0} width={cadre.largeur} height={cadre.hauteur} preserveAspectRatio="none" clipPath={`url(#${idClip})`} />
+                  )}
+                </>
+              )}
+            </svg>
+          )}
           <canvas ref={canvasRef} width={cadre.largeur / 2} height={cadre.hauteur / 2} style={{ position: 'absolute', inset: 0, width: cadre.largeur, height: cadre.hauteur }} />
           <svg className="cmap-svg" viewBox={`0 0 ${cadre.largeur} ${cadre.hauteur}`} width={cadre.largeur} height={cadre.hauteur}>
             {fond &&
-              (sombre ? (
+              (clair ? (
+                <>
+                  <path d={fond.terres} fill="none" stroke="#ffffff" strokeWidth={1.3} strokeLinejoin="round" />
+                  <path d={fond.frontieres} fill="none" stroke="#8a96a3" strokeOpacity={0.8} strokeWidth={0.7} />
+                </>
+              ) : sombre ? (
                 <>
                   <path d={fond.terres} fill="none" stroke="#141414" strokeOpacity={0.9} strokeWidth={0.9} strokeLinejoin="round" />
                   <path d={fond.frontieres} fill="none" stroke="#1f1f1f" strokeOpacity={0.6} strokeWidth={0.6} strokeDasharray="3 2" />
@@ -433,14 +496,33 @@ function CarteEurope({
                 key={k}
                 points={iso.points.join(' ')}
                 fill="none"
-                stroke={sombre ? couleurIsobare(iso.niveau) : '#101528'}
+                stroke={clair ? '#4b5058' : sombre ? couleurIsobare(iso.niveau) : '#101528'}
                 strokeOpacity={0.9}
-                strokeWidth={sombre ? (iso.niveau % 20 === 0 ? 1.9 : 1.2) : iso.niveau % 20 === 0 ? 2.4 : 1.4}
+                strokeWidth={clair ? 1.2 : sombre ? (iso.niveau % 20 === 0 ? 1.9 : 1.2) : iso.niveau % 20 === 0 ? 2.4 : 1.4}
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
             ))}
-            {etiquettes.map((e, k) => (
+            {clair &&
+              etiquettes.map((e, k) => (
+                // Fond clair : valeur en italique dans le sens de la ligne, détourée de blanc.
+                <text
+                  key={`c${k}`}
+                  transform={`translate(${e.x} ${e.y}) rotate(${e.angle})`}
+                  y={5}
+                  textAnchor="middle"
+                  fontFamily="Georgia, 'Times New Roman', serif"
+                  fontStyle="italic"
+                  fontSize={15}
+                  fill="#3f444b"
+                  stroke="#ffffff"
+                  strokeWidth={4}
+                  paintOrder="stroke"
+                >
+                  {e.niveau}
+                </text>
+              ))}
+            {!clair && etiquettes.map((e, k) => (
               <g key={k} transform={`translate(${e.x} ${e.y})`}>
                 {/* Fond sombre : pastille de la couleur de l'isobare, comme sur les cartes de référence. */}
                 <rect
@@ -466,7 +548,7 @@ function CarteEurope({
                   <path
                     d={`M0 ${l / 2} L0 ${-l / 2} M-5 ${-l / 2 + 7} L0 ${-l / 2} L5 ${-l / 2 + 7}`}
                     fill="none"
-                    stroke={sombre ? '#ffffff' : '#0f172a'}
+                    stroke={sombre ? '#ffffff' : clair ? '#3f444b' : '#0f172a'}
                     strokeWidth={f.kmh >= 60 ? 2.6 : 1.8}
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -502,7 +584,7 @@ function CarteEurope({
                   fontFamily="Impact, 'Arial Black', sans-serif"
                   fontStyle={sombre ? 'italic' : undefined}
                   fontSize={sombre ? 54 : 40}
-                  fill={sombre ? (c.type === 'A' ? '#ef2b2d' : '#2348d8') : c.type === 'A' ? '#1d4ed8' : '#dc2626'}
+                  fill={clair ? '#4b5058' : sombre ? (c.type === 'A' ? '#ef2b2d' : '#2348d8') : c.type === 'A' ? '#1d4ed8' : '#dc2626'}
                   stroke="#ffffff"
                   strokeWidth={sombre ? 0 : 3}
                   paintOrder="stroke"
@@ -512,6 +594,7 @@ function CarteEurope({
                 <text
                   textAnchor="middle"
                   y={sombre ? 34 : 28}
+                  display={clair ? 'none' : undefined}
                   fontFamily="Arial, sans-serif"
                   fontWeight={700}
                   fontSize={sombre ? 17 : 14}
@@ -533,10 +616,22 @@ function CarteEurope({
           <div className="cmap-titre cmap-titre-gauche" style={{ left: 28 }}>
             <div className="cmap-date">{titre}</div>
             <div className="cmap-sous-titre">
-              {sombre ? 'PRESSION, PLUIE ET TEMPÉRATURES' : 'PRESSION ET ISOBARES'} · {heure.toUpperCase()} · {NOM_MODELE[modele]}
+              {sombre ? 'PRESSION, PLUIE ET TEMPÉRATURES' : clair ? 'TEMPÉRATURES ET PRESSION' : 'PRESSION ET ISOBARES'} · {heure.toUpperCase()} · {NOM_MODELE[modele]}
             </div>
           </div>
-          {sombre ? (
+          {clair ? (
+            <div className="cinfo-encadre" style={{ left: 22, top: cadre.hauteur - 44 - (30 + PALIERS_TEMPERATURE_EUROPE.length * 19), width: 160 }}>
+              <div className="cinfo-encadre-titre">Température</div>
+              <ul>
+                {PALIERS_TEMPERATURE_EUROPE.map((x) => (
+                  <li key={x.libelle}>
+                    <i style={{ background: x.couleur }} />
+                    {x.libelle}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : sombre ? (
             <div className="cinfo-encadre" style={{ left: 22, top: cadre.hauteur - 44 - (30 + PALIERS_PLUIE_EUROPE.length * 19), width: 170 }}>
               <div className="cinfo-encadre-titre">Pluie (mm en {grille?.periodePluie ?? 3} h)</div>
               <ul>

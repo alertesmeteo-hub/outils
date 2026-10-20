@@ -174,6 +174,7 @@ async function grilleCep(idx: Index, e: Echeance, complet: boolean): Promise<Gri
           pluie: pluie ? echantillonner(pluie, bornes.south, bornes.west, pas, nLat, nLon) : undefined,
           periodePluie: e.periode,
           villes: temperature ? temperaturesVilles(temperature) : [],
+          t: temperature ? echantillonner(temperature, bornes.south, bornes.west, pas, nLat, nLon) : undefined,
         }
       : {}),
   };
@@ -195,7 +196,7 @@ function grilleGfs(f: FichierGfs, idx: Index, e: Echeance, complet: boolean): Gr
     return typeof v === 'number' ? v : null;
   };
   // Échéance 0 : pas encore de cumul de pluie.
-  return { ...g, pluie: e.h > 0 ? aplatir(f.fields.precipitation_mm) : undefined, periodePluie: e.periode, villes: temperaturesVilles(lecteurT) };
+  return { ...g, pluie: e.h > 0 ? aplatir(f.fields.precipitation_mm) : undefined, periodePluie: e.periode, villes: temperaturesVilles(lecteurT), t: aplatir(t) };
 }
 
 export async function GET(req: Request) {

@@ -19,8 +19,10 @@ export interface GrilleEurope {
   pluie?: (number | null)[];
   /** …durée de cette période (h : 3 ou 6)… */
   periodePluie?: number;
-  /** …et température à 2 m (°C) des grandes villes. */
+  /** …et température à 2 m (°C) des grandes villes… */
   villes?: { nom: string; lat: number; lon: number; t: number }[];
+  /** …et sur toute la grille (°C × 10, style « températures » à fond clair). */
+  t?: (number | null)[];
 }
 
 /** Grandes villes dont la température est affichée (style « pluie et températures »). */
@@ -404,4 +406,26 @@ export function flechesVent(g: GrilleEurope, c: Cadre, pas = 70): { x: number; y
       fleches.push({ x, y, angle, kmh: Math.min(150, Math.round(kmh)) });
     }
   return fleches;
+}
+
+/* ---------- Style « températures » (fond clair, façon cartes de presse) ---------- */
+
+/** Tranches de température à 2 m (°C) : du bleu (gel) au rouge (plus de 34 °C). */
+export const PALIERS_TEMPERATURE_EUROPE: { min: number; couleur: string; libelle: string }[] = [
+  { min: 35, couleur: '#e3001b', libelle: 'plus de 34 °C' },
+  { min: 30, couleur: '#f07d00', libelle: '30 à 34 °C' },
+  { min: 25, couleur: '#f9b200', libelle: '25 à 29 °C' },
+  { min: 20, couleur: '#fdd600', libelle: '20 à 24 °C' },
+  { min: 15, couleur: '#fff27f', libelle: '15 à 19 °C' },
+  { min: 10, couleur: '#c5d75b', libelle: '10 à 14 °C' },
+  { min: 5, couleur: '#6fbea0', libelle: '5 à 9 °C' },
+  { min: 0, couleur: '#a9d8e8', libelle: '0 à 4 °C' },
+  { min: -4, couleur: '#5fb9e6', libelle: '-1 à -4 °C' },
+  { min: -9, couleur: '#21a3dc', libelle: '-5 à -9 °C' },
+  { min: -14, couleur: '#3f86c7', libelle: '-10 à -14 °C' },
+  { min: -Infinity, couleur: '#2f6db0', libelle: 'moins de -14 °C' },
+];
+export function couleurTemperatureClasse(t: number): string {
+  const arrondie = Math.round(t);
+  return (PALIERS_TEMPERATURE_EUROPE.find((p) => arrondie >= p.min) ?? PALIERS_TEMPERATURE_EUROPE[PALIERS_TEMPERATURE_EUROPE.length - 1]).couleur;
 }
