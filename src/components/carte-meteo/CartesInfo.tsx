@@ -132,6 +132,9 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
   const [modele, setModele] = useState<ModeleMeteo>('arome');
   const [jour, setJour] = useState(0);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
+  /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
+  const [tailleValeurs, setTailleValeurs] = useState<'petite' | 'normale' | 'grande' | 'tres-grande'>('normale');
+  const echelleValeurs = { petite: 0.8, normale: 1, grande: 1.25, 'tres-grande': 1.5 }[tailleValeurs];
   const [horizon, setHorizon] = useState<Horizon>(2050);
   const [altitudeMax, setAltitudeMax] = useState(ALTITUDE_MAX_DEFAUT);
   /** Thème affiché (« tous » : toutes les cartes de la catégorie, rangées par thème). */
@@ -731,6 +734,15 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
               ))}
             </select>
           </label>
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Taille des valeurs</span>
+            <select value={tailleValeurs} onChange={(e) => setTailleValeurs(e.target.value as typeof tailleValeurs)} className={selectBarre} title="Petites : plus de valeurs sur la carte ; grandes : plus lisibles">
+              <option value="petite">Petites (plus de valeurs)</option>
+              <option value="normale">Normales</option>
+              <option value="grande">Grandes</option>
+              <option value="tres-grande">Très grandes</option>
+            </select>
+          </label>
         </div>
         <nav aria-label="Aller à une carte" className="flex flex-col gap-1.5 border-t border-border pt-3">
           {avecSynthese && (
@@ -862,6 +874,7 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
                   <div id="carte-direct" className="mx-auto w-full min-w-0 max-w-5xl scroll-mt-4 xl:col-span-2">
                     <CarteDirect
                       key={zone}
+                      echelleValeurs={echelleValeurs}
                       themes={g.themes as ThemeBilan[]}
                       points={pointsBilan}
                       sousTitre={periodeBilan}
@@ -891,6 +904,7 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
                         </p>
                       ) : (
                         <CarteInfo
+                          echelleValeurs={echelleValeurs}
                           theme={theme}
                           zone={zone}
                           points={pointsPrevision[theme.id]}
@@ -935,6 +949,7 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
                       )
                     ) : mode === 'prevision' ? (
                       <CarteInfo
+                          echelleValeurs={echelleValeurs}
                         theme={theme}
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
@@ -952,9 +967,10 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
                         contexte={(theme as ThemePrevision).montagne ? `${contextePrevision}, communes de montagne (point du modèle à 1 000 m ou plus)` : contextePrevision}
                       />
                     ) : mode === 'bilan' ? (
-                      <CarteInfo theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
+                      <CarteInfo echelleValeurs={echelleValeurs} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
                     ) : (
                       <CarteInfo
+                          echelleValeurs={echelleValeurs}
                         theme={theme}
                         zone={zone}
                         points={climat[theme.id]?.points ?? []}

@@ -21,6 +21,7 @@ interface Props {
   logoId: string;
   prefixeFichier: string;
   contexte: string;
+  echelleValeurs?: number;
 }
 
 /**
@@ -28,7 +29,7 @@ interface Props {
  * record absolu de chaque station, et écart de la maxi du jour (ou de la mini de la nuit) à ce record. Chaleur / froid pour
  * les vues de records.
  */
-export default function CarteDirect({ themes, points, sousTitre, zone, logoId, prefixeFichier, contexte }: Props) {
+export default function CarteDirect({ themes, points, sousTitre, zone, logoId, prefixeFichier, contexte, echelleValeurs = 1 }: Props) {
   const [vue, setVue] = useState<VueDirect>('releve');
   const [champ, setChamp] = useState<'tx' | 'tn'>('tx');
   const theme = themes.find((t) => t.direct?.vue === vue && (vue === 'releve' || t.direct?.champ === champ)) ?? themes[0];
@@ -74,6 +75,7 @@ export default function CarteDirect({ themes, points, sousTitre, zone, logoId, p
         logoId={logoId}
         prefixeFichier={prefixeFichier}
         contexte={contexte}
+        echelleValeurs={echelleValeurs}
       />
     </div>
   );

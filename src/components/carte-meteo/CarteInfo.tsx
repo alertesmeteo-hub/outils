@@ -43,6 +43,8 @@ interface Props {
   valeursDepartements?: Record<string, number>;
   /** Nature et source des données (texte IA) : « Prévision du modèle AROME (Météo-France) »… */
   contexte?: string;
+  /** Taille des pastilles (1 = normale ; plus petites = plus de valeurs placées sans chevauchement). */
+  echelleValeurs?: number;
 }
 
 const NOP = () => {};
@@ -58,7 +60,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '' }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '', echelleValeurs = 1 }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -244,7 +246,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const cleTexte = texteIA.rect ? `${texteIA.rect.y}|${texteIA.rect.h}` : '';
 
   // « Toutes les stations » : pastilles plus petites pour en placer le plus possible.
-  const taille = theme.toutes ? (enFrance ? 10 : 13) : enFrance ? 16 : enDepartement ? 19 : 17;
+  const taille = Math.round((theme.toutes ? (enFrance ? 10 : 13) : enFrance ? 16 : enDepartement ? 19 : 17) * echelleValeurs * 10) / 10;
   const plafond = theme.toutes ? 500 : PLAFOND[niveau];
   const parDepartementMax = theme.toutes ? Infinity : PAR_DEPARTEMENT[niveau];
   const avecFleche = (p: PointInfo) => p.direction != null && Number.isFinite(p.direction);
