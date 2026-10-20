@@ -34,7 +34,7 @@ const GROUPE_MOIS = 'Bilan du mois';
 
 const MODES: [Mode, string][] = [
   ['prevision', 'Prévisions'],
-  ['bilan', 'Bilans (observations)'],
+  ['bilan', 'Bilans des stations'],
   ['climat', 'Réchauffement climatique'],
   ['europe', 'Europe : isobares'],
 ];
@@ -504,6 +504,10 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
               >
                 Bilan du mois
               </button>
+              {/* Carte à part : relevés du moment et records de toutes les stations. */}
+              <a href="/outils/temperatures-en-direct/" className="rounded-full border border-border bg-surface px-4 py-1.5 text-sm font-semibold hover:bg-bg">
+                Températures en direct ↗
+              </a>
             </div>
           </fieldset>
           <fieldset>

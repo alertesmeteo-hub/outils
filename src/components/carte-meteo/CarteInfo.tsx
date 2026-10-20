@@ -14,6 +14,7 @@ import { BOITE_FRANCE, FICHIERS_CONTOURS, LARGEUR_FRANCE, ZONE_FRANCE, ZONE_UTIL
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { statsDe } from '@/lib/carte-meteo/texte-ia';
 import { useTexteIA } from './TexteIA';
+import { estStationGrandeVille } from '@/lib/carte-meteo/stations-bilan';
 
 /** Une valeur à placer sur la carte : point de prévision (département, ville) ou station d'observation. */
 export interface PointInfo {
@@ -253,9 +254,15 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
 
   const places = useMemo(() => {
     if (contoursDep.length === 0) return [];
+    // Températures relevées (stations) : la station de la grande ville du département d'abord (Paris-Montsouris, Lyon-Bron,
+    // Perpignan…), placée en priorité ; sinon la plus marquante. Le classement garde, lui, les vrais extrêmes.
+    const grandesVilles = new Set(
+      theme.unite === '°' && !theme.signe ? tries.filter((p) => p.alt !== undefined && estStationGrandeVille(p.nom, p.dep)).map((p) => p.code) : []
+    );
+    const ordre = grandesVilles.size ? [...tries].sort((a, b) => Number(grandesVilles.has(b.code)) - Number(grandesVilles.has(a.code))) : tries;
     // Candidats : les plus marquants de chaque département (un seul en vue France), et les extrêmes de la zone.
     const parDep = new Map<string, number>();
-    const candidats = tries.filter((p) => {
+    const candidats = ordre.filter((p) => {
       if (palierDe(theme.paliers, p.valeur).neutre && !theme.neutresVisibles) return false;
       const n = parDep.get(p.dep) ?? 0;
       parDep.set(p.dep, n + 1);
@@ -267,7 +274,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     const rang = new Map(ordreRepartition(ecran.map((e) => ({ code: e.p.code, x: e.x, y: e.y }))).map((code, i) => [code, i]));
     const codesTop = new Set(top.map((p) => p.code));
     const elements = ecran
-      .sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0))
+      .sort((a, b) => Number(grandesVilles.has(b.p.code)) - Number(grandesVilles.has(a.p.code)) || (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0))
       .slice(0, plafond * 2)
       .map((e) => {
         const texte = texteInfo(theme, e.p.valeur);
@@ -283,7 +290,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           droite: demi,
           haut: hauteurBulle / 2,
           bas: hauteurBulle / 2 + (enDepartement ? 0.85 * taille : 0),
-          priorite: codesTop.has(e.p.code) ? 0 : 1,
+          priorite: codesTop.has(e.p.code) || grandesVilles.has(e.p.code) ? 0 : 1,
         };
       });
     const obstacles: Rect[] = [
