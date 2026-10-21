@@ -613,7 +613,8 @@ export default function CarteRendu({
         })}
 
         {/* « ° » après chaque température : style de la capture (Arial gras, 0,58 em par chiffre) et cartes de région ou de
-            département (Impact, 0,54 em par chiffre) ; la case de saisie prend la largeur du nombre pour que « ° » le suive. */}
+            département (Impact, 0,54 em par chiffre) ; la case de saisie prend la largeur du nombre pour que « ° » le suive.
+            Pas de « ° » seul sous un picto ajouté sans température. */}
         {marqueurs.map((m) => (
           <div
             key={m.code}
@@ -649,7 +650,7 @@ export default function CarteRendu({
                     size={2}
                     style={degres ? { width: largeurValeur(m.valeur) } : undefined}
                   />
-                  {degres && <span className={`cmap-degre ${m.ton === 'chaud' || m.mini != null ? 'cmap-chaud' : m.ton === 'froid' ? 'cmap-froid' : ''}`}>°</span>}
+                  {degres && m.valeur.trim() !== '' && <span className={`cmap-degre ${m.ton === 'chaud' || m.mini != null ? 'cmap-chaud' : m.ton === 'froid' ? 'cmap-froid' : ''}`}>°</span>}
                 </span>
                 {m.mini != null && (
                   <span className="cmap-valeur-ligne">
@@ -660,7 +661,7 @@ export default function CarteRendu({
                       size={2}
                       style={degres ? { width: largeurValeur(m.mini) } : undefined}
                     />
-                    {degres && <span className="cmap-degre cmap-froid">°</span>}
+                    {degres && m.mini.trim() !== '' && <span className="cmap-degre cmap-froid">°</span>}
                   </span>
                 )}
               </div>
