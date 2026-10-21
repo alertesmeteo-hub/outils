@@ -60,6 +60,18 @@ const LABELS_PICTOS_IMAGES: Record<number, string> = {
   30: 'Orage violent',
   31: 'Orage et pluie',
   32: 'Orage',
+  99: 'Chaleur',
+  100: 'Soleil',
+  101: 'Peu nuageux',
+  102: 'Nuageux',
+  103: 'Couvert',
+  104: 'Éclaircies',
+  105: 'Peu nuageux',
+  106: 'Très nuageux',
+  107: 'Ciel voilé',
+  109: 'Couvert et pluie faible',
+  110: 'Couvert et pluie',
+  111: 'Couvert et pluie forte',
 };
 
 /** Numéros des images présentes dans public/pictos (jeu fourni par l'utilisateur). */
@@ -193,13 +205,13 @@ export function cheminPictoImage(picto: string): string | undefined {
 export type JeuPictos = 'emoji' | 'images' | 'meteocons' | 'alertes';
 
 /**
- * Code météo WMO → image du jeu fourni. Le jeu n'a pas de « éclaircies » seul : ciel peu nuageux → soleil,
- * ciel variable → nuage clair ; le détail des variantes est modifiable picto par picto sur la carte.
+ * Code météo WMO → image du jeu fourni : ciel peu nuageux → soleil et petit nuage (101), nuageux → soleil et nuages (102),
+ * couvert → nuages gris (103) ; le détail des variantes est modifiable picto par picto sur la carte.
  */
 function pictoImageDepuisCode(code: number | null | undefined): PictoMeteo {
   if (code == null || code === 0 || code === 1) return 'img:1';
-  if (code === 2) return 'img:3';
-  if (code === 3) return 'img:2';
+  if (code === 2) return 'img:102';
+  if (code === 3) return 'img:103';
   if (code === 45 || code === 48) return 'img:3';
   if ([51, 53, 55, 56, 57].includes(code)) return 'img:4';
   if (code === 61 || code === 80) return 'img:5';
@@ -347,7 +359,8 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
   // Voile de nuages hauts : le soleil passe, mais le ciel n'est ni dégagé ni nuageux (pas d'équivalent dans le jeu d'images).
   if (e.voile && !images) return PICTO_VOILE;
   if (ciel < 20) return images ? 'img:1' : '☀️';
-  if (ciel < 45) return images ? 'img:1' : '🌤️';
-  if (ciel < 75) return images ? 'img:3' : '⛅';
-  return images ? 'img:2' : '☁️';
+  if (ciel < 45) return images ? 'img:101' : '🌤️';
+  if (ciel < 75) return images ? 'img:102' : '⛅';
+  // Couvert : nuages gris (103) ; les images 2 et 3 sont de la brume et du brouillard.
+  return images ? 'img:103' : '☁️';
 }
