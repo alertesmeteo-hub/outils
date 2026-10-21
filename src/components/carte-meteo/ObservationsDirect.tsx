@@ -11,7 +11,7 @@ import ChoixZone, { useZone } from './ChoixZone';
 const THEMES_OBS = THEMES_BILAN.filter((t) => t.groupe === GROUPE_OBS);
 /** Pluie en direct : relevés, cumuls moyens du mois et de l'année, records de 24 h du mois et absolus, battus ? */
 const THEMES_PLUIE = THEMES_BILAN.filter((t) => t.groupe === GROUPE_PLUIE_DIRECT);
-const TAILLES = { petite: 0.8, normale: 1, grande: 1.25, 'tres-grande': 1.5 } as const;
+const TAILLES = { petite: 0.8, normale: 1, grande: 1.25, 'tres-grande': 1.5, extra: 1.9 } as const;
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 /** Couleur des boutons de chaque rubrique (bouton choisi : couleur du site). */
 const COULEURS: Record<(typeof RUBRIQUES_OBS)[number], string> = {
@@ -29,7 +29,7 @@ const COULEURS: Record<(typeof RUBRIQUES_OBS)[number], string> = {
  */
 export default function ObservationsDirect() {
   const { bilans, erreur, reessayer } = useBilans();
-  const [taille, setTaille] = useState<keyof typeof TAILLES>('normale');
+  const [taille, setTaille] = useState<keyof typeof TAILLES>('tres-grande');
   const [logoId, setLogoId] = useState('aucun');
   const zone = useZone('zone-observations-en-direct');
   const [themeId, setThemeId] = useState(THEMES_OBS[0]?.id ?? '');
@@ -61,6 +61,7 @@ export default function ObservationsDirect() {
             <option value="normale">Normales</option>
             <option value="grande">Grandes</option>
             <option value="tres-grande">Très grandes</option>
+            <option value="extra">Extra</option>
           </select>
         </label>
         <label className="text-sm font-medium">
