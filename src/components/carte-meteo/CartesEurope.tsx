@@ -356,9 +356,24 @@ function CarteEurope({
     ctx.putImageData(image, 0, 0);
   }, [grille, cadre, sombre, clair]);
 
-  /** Zones réservées : bords, titre (en haut à gauche), logo (en haut à droite), légende (en bas à gauche). */
+  // Couleurs conventionnelles des fronts sur tous les styles (froid bleu, chaud rouge, occlus violet), plus claires sur le
+  // fond sombre où le bleu foncé et le violet se perdaient.
+  const couleursFront = sombre
+    ? { froid: '#4f9dff', chaud: '#ff4d4d', occlus: '#c77dff' }
+    : { froid: '#1d4ed8', chaud: '#dc2626', occlus: '#7e22ce' };
+  // Légende : seulement les types présents sur la carte, dans l'ordre habituel.
+  const typesFronts = (['froid', 'chaud', 'occlus', 'stationnaire'] as const).filter((t) => avecFronts && grille?.fronts?.some((f) => f.type === t));
+
+  /** Zones réservées : bords, titre (en haut à gauche), logo (en haut à droite), légende (en bas à gauche), fronts (en bas à droite). */
   const interdit = (x: number, y: number) =>
-    x < 30 || y < 30 || x > cadre.largeur - 30 || y > cadre.hauteur - 40 || (x < (sombre || clair ? 620 : 470) && y < 95) || (x > cadre.largeur - 260 && y < 120) || (x < 200 && y > cadre.hauteur - (clair ? 310 : 280));
+    x < 30 ||
+    y < 30 ||
+    x > cadre.largeur - 30 ||
+    y > cadre.hauteur - 40 ||
+    (x < (sombre || clair ? 620 : 470) && y < 95) ||
+    (x > cadre.largeur - 260 && y < 120) ||
+    (x < 200 && y > cadre.hauteur - (clair ? 310 : 280)) ||
+    (typesFronts.length > 0 && x > cadre.largeur - 200 && y > cadre.hauteur - 60 - (30 + typesFronts.length * 19));
 
   // Étiquettes des isobares : au milieu des lignes assez longues, puis à intervalles réguliers (plus nombreuses sur le fond
   // sombre, comme sur les cartes de référence), jamais trop près d'une autre étiquette, d'un bord ou des encadrés.
@@ -562,10 +577,7 @@ function CarteEurope({
               />
             ))}
             {frontsEcran.map((f, k) => {
-              // Couleurs conventionnelles sur tous les styles : froid bleu, chaud rouge, occlus violet.
-              const bleu = '#1d4ed8';
-              const rouge = '#dc2626';
-              const violet = '#7e22ce';
+              const { froid: bleu, chaud: rouge, occlus: violet } = couleursFront;
               return (
                 <g key={`fr${k}`}>
                   {f.type === 'stationnaire' ? (
@@ -735,6 +747,19 @@ function CarteEurope({
               </ul>
             </div>
           )}
+          {typesFronts.length > 0 && (
+            <div className="cinfo-encadre" style={{ right: 22, top: cadre.hauteur - 44 - (30 + typesFronts.length * 19), width: 168 }}>
+              <div className="cinfo-encadre-titre">Fronts</div>
+              <ul>
+                {typesFronts.map((t) => (
+                  <li key={t}>
+                    <SymboleFront type={t} couleurs={couleursFront} />
+                    {t === 'froid' ? 'Front froid' : t === 'chaud' ? 'Front chaud' : t === 'occlus' ? 'Front occlus' : 'Stationnaire'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="cmap-pied">www.alertes-meteo.com</div>
           {!grille && !erreur && (
             <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-4 py-2 text-sm text-text shadow">Chargement…</p>
@@ -742,5 +767,45 @@ function CarteEurope({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Petit tronçon de front pour la légende (mêmes formes que sur la carte, symboles vers le haut). */
+function SymboleFront({ type, couleurs }: { type: 'froid' | 'chaud' | 'occlus' | 'stationnaire'; couleurs: { froid: string; chaud: string; occlus: string } }) {
+  const triangle = (x: number, c: string, bas = false) => <path d={`M${x - 5} 11 L${x} ${bas ? 16 : 5} L${x + 5} 11 Z`} fill={c} />;
+  const demi = (x: number, c: string, bas = false) => <path d={`M${x - 5} 11 A5 5 0 0 ${bas ? 0 : 1} ${x + 5} 11 Z`} fill={c} />;
+  return (
+    <svg width={36} height={17} viewBox="0 0 36 17" style={{ flex: 'none' }} aria-hidden>
+      {type === 'stationnaire' ? (
+        <>
+          <line x1={1} y1={11} x2={18} y2={11} stroke={couleurs.froid} strokeWidth={2.5} />
+          <line x1={18} y1={11} x2={35} y2={11} stroke={couleurs.chaud} strokeWidth={2.5} />
+          {triangle(10, couleurs.froid)}
+          {demi(26, couleurs.chaud, true)}
+        </>
+      ) : (
+        <>
+          <line x1={1} y1={11} x2={35} y2={11} stroke={couleurs[type]} strokeWidth={2.5} />
+          {type === 'froid' && (
+            <>
+              {triangle(10, couleurs.froid)}
+              {triangle(26, couleurs.froid)}
+            </>
+          )}
+          {type === 'chaud' && (
+            <>
+              {demi(10, couleurs.chaud)}
+              {demi(26, couleurs.chaud)}
+            </>
+          )}
+          {type === 'occlus' && (
+            <>
+              {triangle(10, couleurs.occlus)}
+              {demi(26, couleurs.occlus)}
+            </>
+          )}
+        </>
+      )}
+    </svg>
   );
 }

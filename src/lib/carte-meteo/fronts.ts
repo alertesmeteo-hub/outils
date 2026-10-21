@@ -31,11 +31,46 @@ const GRADIENT_MIN = 1.2;
 const VENT_TRAVERSANT = 1.5;
 /** Longueur minimale d'un front (points de la ligne, environ 50 km chacun). */
 const POINTS_MIN = 14;
+/**
+ * Longueur minimale (km) d'un morceau de même type le long d'une ligne : plus court, il prend le type du plus long
+ * de ses voisins (sinon une même ligne se hache en petits bouts froid / chaud / stationnaire / occlus).
+ */
+const MORCEAU_MIN_KM = 250;
 /** Occlusion : dépression d'au plus 1000 hPa, front à moins de 600 km de son centre. */
 const PRESSION_OCCLUSION = 1000;
 const RAYON_OCCLUSION_KM = 600;
 /** Latitude moyenne minimale : au sud, les contrastes de chaleur du Sahara ne sont pas des fronts. */
 const LATITUDE_MIN = 36;
+
+/**
+ * Types point par point d'une ligne, sans morceau plus court que `minKm` : le plus court est absorbé par le plus long
+ * de ses voisins, jusqu'à ce qu'il n'en reste plus (ou qu'un seul morceau). `pas[m]` = km entre les points m et m + 1.
+ */
+export function regrouperMorceaux<T>(types: readonly T[], pas: readonly number[], minKm: number): T[] {
+  const sortie = types.slice();
+  for (;;) {
+    const morceaux: { debut: number; fin: number; km: number }[] = [];
+    let debut = 0;
+    for (let m = 1; m <= sortie.length; m++) {
+      if (m < sortie.length && sortie[m] === sortie[debut]) continue;
+      // Le morceau commence au dernier point du précédent : la ligne reste continue.
+      let km = 0;
+      for (let q = Math.max(0, debut - 1); q < m - 1; q++) km += pas[q] ?? 0;
+      morceaux.push({ debut, fin: m, km });
+      debut = m;
+    }
+    if (morceaux.length < 2) return sortie;
+    let court = -1;
+    morceaux.forEach((x, r) => {
+      if (x.km < minKm && (court < 0 || x.km < morceaux[court].km)) court = r;
+    });
+    if (court < 0) return sortie;
+    const avant = morceaux[court - 1];
+    const apres = morceaux[court + 1];
+    const voisin = !avant ? apres : !apres ? avant : avant.km >= apres.km ? avant : apres;
+    sortie.fill(sortie[voisin.debut], morceaux[court].debut, morceaux[court].fin);
+  }
+}
 
 /** θe (K) d'après T (°C) et HR (%) à 850 hPa (formule de Bolton simplifiée). */
 function thetaE(t: number, hr: number): number {
@@ -208,13 +243,21 @@ export function calculerFronts(
       const fenetre = infos.slice(Math.max(0, m - 4), m + 5).map((x) => x.traversant).filter(Number.isFinite);
       return fenetre.reduce((s, x) => s + x, 0) / (fenetre.length || 1);
     });
-    const types: TypeFront[] = lisse.map((w) => (w > VENT_TRAVERSANT ? 'froid' : w < -VENT_TRAVERSANT ? 'chaud' : 'stationnaire'));
+    const pas = ligne.slice(1).map(([i2, j2], q) => {
+      const [i1, j1] = ligne[q];
+      return Math.hypot((j2 - j1) * PAS * 111 * Math.cos(lat((i1 + i2) / 2) * RAD), (i2 - i1) * PAS * 111);
+    });
+    const types = regrouperMorceaux<TypeFront>(
+      lisse.map((w) => (w > VENT_TRAVERSANT ? 'froid' : w < -VENT_TRAVERSANT ? 'chaud' : 'stationnaire')),
+      pas,
+      MORCEAU_MIN_KM
+    );
     let debut = 0;
     for (let m = 1; m <= ligne.length; m++) {
       if (m < ligne.length && types[m] === types[debut]) continue;
-      // Morceau trop court : rattaché au morceau précédent (même type).
+      // Le morceau repart du dernier point du précédent.
       const morceau = ligne.slice(Math.max(0, debut - 1), m);
-      if (morceau.length >= 4 || fronts.length === 0) {
+      if (morceau.length >= 2) {
         // Air chaud à gauche : la normale gauche de la ligne doit aller dans le sens de n (vers l'air chaud).
         let accord = 0;
         for (let q = debut; q < m - 1; q++) {
@@ -226,7 +269,7 @@ export function calculerFronts(
         }
         const points = morceau.map(([i, j]) => [Math.round(lon(j) * 100) / 100, Math.round(lat(i) * 100) / 100]);
         if (accord < 0) points.reverse();
-        if (morceau.length >= 6) fronts.push({ type: types[debut], points: points.flat() });
+        fronts.push({ type: types[debut], points: points.flat() });
       }
       debut = m;
     }
@@ -262,7 +305,7 @@ function depressionsCreuses(pression: Lecteur, cadre: { sud: number; ouest: numb
   return centres;
 }
 
-/** Parties des fronts proches d'une dépression creuse : front occlus (morceaux d'au moins 4 points). */
+/** Parties des fronts proches d'une dépression creuse : front occlus (morceaux d'au moins MORCEAU_MIN_KM). */
 function marquerOcclusions(fronts: Front[], depressions: { lon: number; lat: number }[]): Front[] {
   if (!depressions.length) return fronts;
   const km = (lon1: number, lat1: number, lon2: number, lat2: number) =>
@@ -270,13 +313,18 @@ function marquerOcclusions(fronts: Front[], depressions: { lon: number; lat: num
   const sortie: Front[] = [];
   for (const f of fronts) {
     const n = f.points.length / 2;
-    const proche = Array.from({ length: n }, (_, k) => depressions.some((d) => km(f.points[2 * k], f.points[2 * k + 1], d.lon, d.lat) <= RAYON_OCCLUSION_KM));
+    const pas = Array.from({ length: n - 1 }, (_, k) => km(f.points[2 * k], f.points[2 * k + 1], f.points[2 * k + 2], f.points[2 * k + 3]));
+    const proche = regrouperMorceaux(
+      Array.from({ length: n }, (_, k) => depressions.some((d) => km(f.points[2 * k], f.points[2 * k + 1], d.lon, d.lat) <= RAYON_OCCLUSION_KM)),
+      pas,
+      MORCEAU_MIN_KM
+    );
     let debut = 0;
     for (let k = 1; k <= n; k++) {
       if (k < n && proche[k] === proche[debut]) continue;
       // Un morceau se raccorde au suivant (point commun) pour que la ligne reste continue.
       const morceau = f.points.slice(debut * 2, Math.min(n, k + 1) * 2);
-      if (morceau.length >= 4) sortie.push({ type: proche[debut] && k - debut >= 4 ? 'occlus' : f.type, points: morceau });
+      if (morceau.length >= 4) sortie.push({ type: proche[debut] ? 'occlus' : f.type, points: morceau });
       debut = k;
     }
   }
