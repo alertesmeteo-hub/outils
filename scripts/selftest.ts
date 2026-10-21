@@ -5,6 +5,7 @@ import * as MF from '../src/lib/obs/meteofrance';
 import { fromClimato } from '../src/lib/obs/climato';
 import { matchStations, parseSynop } from '../src/lib/obs/synop';
 import marignane from './fixtures/normales-13054001.json';
+import { regrouperMorceaux } from '../src/lib/carte-meteo/fronts';
 
 let fail = 0;
 const eq = (name: string, cond: boolean, info = '') => { if (!cond) { fail++; console.error('✗', name, info); } else console.log('✓', name); };
@@ -182,6 +183,20 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   const csv = 'Id_station;Id_omm;Nom_usuel;Latitude;Longitude;Altitude;Date_ouverture;Pack\n13054001;07650;MARIGNANE;43.44;5.22;9;1920-01-01;RADOME\n13001009;;AIX;43.5;5.4;173;1990-05-01;ETENDU\n99999999;;HORS;0;0;0;;RADOME';
   const sl = MF.parseStationsCsv(csv, (id) => (id.startsWith('13') ? '13' : undefined));
   eq('liste stations : Pack ETENDU = secondaire, date d’ouverture', sl.length === 2 && sl[1].kind === 'secondaire' && sl[0].opened === '1920-01-01' && sl[0].alt === 9);
+}
+
+// Fronts : pas de petits bouts d'un autre type au milieu d'une ligne (50 km entre deux points).
+{
+  const pas50 = (n: number) => Array(n - 1).fill(50);
+  const f = 'froid', c = 'chaud', st = 'stationnaire';
+  const r1 = regrouperMorceaux([f, f, f, f, f, f, f, st, st, f, f, f, f, f, f, f], pas50(16), 250);
+  eq('fronts : 100 km de stationnaire au milieu d’un front froid = froid', r1.every((x) => x === f), r1.join());
+  const r2 = regrouperMorceaux([f, f, f, f, f, f, f, f, c, c, c, c, c, c, c, c], pas50(16), 250);
+  eq('fronts : deux morceaux de 350-400 km gardés', r2.slice(0, 8).every((x) => x === f) && r2.slice(8).every((x) => x === c), r2.join());
+  const r3 = regrouperMorceaux([c, c, c, f, f, f, f, f, f, f, f, f, f, st, st, st], pas50(16), 250);
+  eq('fronts : bouts courts aux extrémités absorbés', r3.every((x) => x === f), r3.join());
+  const r4 = regrouperMorceaux([true, false, false, false], pas50(4), 250);
+  eq('fronts : ligne plus courte que le minimum = un seul type', new Set(r4).size === 1, r4.join());
 }
 
 console.log('Paris 21/12/2026 :', s2.metrics.map((m: any) => m.value).join(' | '), '– durée', s2.headline.value);
