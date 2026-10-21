@@ -7,6 +7,7 @@ import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations
 import CarteInfo, { type PointInfo } from './CarteInfo';
 import CarteDirect from './CarteDirect';
 import { useBilans } from './useBilans';
+import ChoixZone, { useZone } from './ChoixZone';
 
 const THEMES_DIRECT = THEMES_BILAN.filter((t): t is ThemeBilan & { direct: NonNullable<ThemeBilan['direct']> } => t.direct != null);
 /** Maxi et mini de la journée : maxi du jour, mini de la nuit (provisoires), maxi d'hier, mini de la nuit dernière. */
@@ -22,6 +23,7 @@ export default function TemperaturesDirect() {
   const { bilans, erreur, reessayer } = useBilans();
   const [taille, setTaille] = useState<keyof typeof TAILLES>('normale');
   const [logoId, setLogoId] = useState('aucun');
+  const zone = useZone('zone-temperatures-en-direct');
   const [journee, setJournee] = useState(THEMES_JOURNEE[0]?.id ?? '');
 
   /** Points de chaque vue ; le relevé du moment est contrôlé par les stations voisines, les records sont propres à chaque station. */
@@ -46,6 +48,7 @@ export default function TemperaturesDirect() {
   return (
     <div>
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
+        <ChoixZone etat={zone} />
         <label className="text-sm font-medium">
           <span className="mb-1 block">Taille des valeurs</span>
           <select value={taille} onChange={(e) => setTaille(e.target.value as keyof typeof TAILLES)} className={selectBarre} title="Petites : plus de stations sur la carte ; grandes : plus lisibles">
@@ -89,9 +92,9 @@ export default function TemperaturesDirect() {
             themes={THEMES_DIRECT}
             points={points}
             sousTitre={sousTitre}
-            zone="france"
+            zone={zone.zone}
             logoId={logoId}
-            prefixeFichier="temperatures-en-direct-france"
+            prefixeFichier={`temperatures-en-direct-${zone.nomFichier}`}
             contexte="Observations des stations Météo-France (relevé du moment) et records de chaque station (fiches climatologiques Météo-France)"
             echelleValeurs={TAILLES[taille]}
           />
@@ -120,11 +123,11 @@ export default function TemperaturesDirect() {
             <CarteInfo
               key={t.id}
               theme={t}
-              zone="france"
+              zone={zone.zone}
               points={points[t.id] ?? []}
               sousTitre={sousTitre(t.id)}
               logoId={logoId}
-              prefixeFichier="temperatures-journee-france"
+              prefixeFichier={`temperatures-journee-${zone.nomFichier}`}
               contexte="Maximales et minimales relevées par les stations Météo-France"
               echelleValeurs={TAILLES[taille]}
             />

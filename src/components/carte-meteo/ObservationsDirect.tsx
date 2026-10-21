@@ -6,6 +6,7 @@ import { GROUPE_OBS, GROUPE_PLUIE_DIRECT, RUBRIQUES_OBS, THEMES_BILAN } from '@/
 import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import CarteInfo, { type PointInfo } from './CarteInfo';
 import { useBilans } from './useBilans';
+import ChoixZone, { useZone } from './ChoixZone';
 
 const THEMES_OBS = THEMES_BILAN.filter((t) => t.groupe === GROUPE_OBS);
 /** Pluie en direct : relevés, cumuls moyens du mois et de l'année, records de 24 h du mois et absolus, battus ? */
@@ -30,6 +31,7 @@ export default function ObservationsDirect() {
   const { bilans, erreur, reessayer } = useBilans();
   const [taille, setTaille] = useState<keyof typeof TAILLES>('normale');
   const [logoId, setLogoId] = useState('aucun');
+  const zone = useZone('zone-observations-en-direct');
   const [themeId, setThemeId] = useState(THEMES_OBS[0]?.id ?? '');
   const [pluieId, setPluieId] = useState(THEMES_PLUIE[0]?.id ?? '');
 
@@ -51,6 +53,7 @@ export default function ObservationsDirect() {
   return (
     <div>
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
+        <ChoixZone etat={zone} />
         <label className="text-sm font-medium">
           <span className="mb-1 block">Taille des valeurs</span>
           <select value={taille} onChange={(e) => setTaille(e.target.value as keyof typeof TAILLES)} className={selectBarre} title="Petites : plus de stations sur la carte ; grandes : plus lisibles">
@@ -113,11 +116,11 @@ export default function ObservationsDirect() {
           <CarteInfo
             key={theme.id}
             theme={theme}
-            zone="france"
+            zone={zone.zone}
             points={points[theme.id] ?? []}
             sousTitre={sousTitre(theme.id)}
             logoId={logoId}
-            prefixeFichier="observations-en-direct-france"
+            prefixeFichier={`observations-en-direct-${zone.nomFichier}`}
             contexte="Observations des stations Météo-France"
             echelleValeurs={TAILLES[taille]}
           />
@@ -149,11 +152,11 @@ export default function ObservationsDirect() {
           <CarteInfo
             key={pluie.id}
             theme={pluie}
-            zone="france"
+            zone={zone.zone}
             points={points[pluie.id] ?? []}
             sousTitre={sousTitre(pluie.id)}
             logoId={logoId}
-            prefixeFichier="pluie-en-direct-france"
+            prefixeFichier={`pluie-en-direct-${zone.nomFichier}`}
             contexte="Pluie relevée par les stations Météo-France, normales 1991-2020 et records de chaque station (fiches climatologiques Météo-France)"
             echelleValeurs={TAILLES[taille]}
           />
