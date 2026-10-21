@@ -253,13 +253,30 @@ async function refreshSix() {
 /** Observations au pas de 6 minutes (2 dernières heures). */
 export const getSix = () => six;
 
+/** Heure (ms) du relevé 6 min le plus récent, toutes stations confondues (0 sans relevé). */
+export function dernierReleveSix(): number {
+  let t = 0;
+  for (const liste of Object.values(six)) t = Math.max(t, Date.parse(liste[liste.length - 1]?.time ?? '') || 0);
+  return t;
+}
+
+/** Heure (ms) du relevé horaire le plus récent, toutes stations confondues. */
+function dernierReleveHoraire(obs: Record<string, HourlyObs[]>): number {
+  let t = 0;
+  for (const liste of Object.values(obs)) t = Math.max(t, Date.parse(liste[liste.length - 1]?.time ?? '') || 0);
+  return t;
+}
+
 export async function getSnapshot(): Promise<ObsSnapshot> {
   const d = await load();
   if (SIX_ON && !sixTimer && paquetKey()) {
     sixTimer = setInterval(() => { refreshSix().catch(() => {}); }, STEP);
     refreshSix().catch(() => {});
   }
-  const stale = !d.updatedAt || Date.now() - Date.parse(d.updatedAt) > REFRESH_MIN * 60_000;
+  const age = d.updatedAt ? Date.now() - Date.parse(d.updatedAt) : Infinity;
+  // Relevé horaire suivant sans doute publié (dernier relevé de plus d'1 h 15) : nouvelle collecte au bout de 10 min,
+  // sans attendre REFRESH_MIN (le relevé de 16 h manquait encore à 17 h).
+  const stale = age > REFRESH_MIN * 60_000 || (age > 10 * 60_000 && Date.now() - dernierReleveHoraire(d.obs) > 75 * 60_000);
   if (stale && obsConfigured() && !running) {
     running = refresh().catch((e) => console.error('[obs] rafraîchissement', e)).finally(() => { running = null; });
   }

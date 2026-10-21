@@ -261,6 +261,13 @@ const synopGust = (h: number) => (obs: HourlyObs[], _w: unknown, now: number, c:
 };
 /** Dernier relevé 6 min (≤ 30 min). */
 const last6 = (c: Ctx) => { const x = c.six?.[c.six.length - 1]; return x && Date.now() - Date.parse(x.time) <= 30 * 60_000 ? x : undefined; };
+/** Valeur du dernier relevé 6 min (≤ 30 min), plus récent que le relevé horaire ; sinon null. */
+const six6 = (key: 'pmer' | 'u', c: Ctx): Agg | null => { const l = last6(c); return l?.[key] != null ? { value: l[key] as number, n: 1, expected: 1, at: l.time } : null; };
+/** Dernier relevé 6 min s'il donne la température et `besoin` (vent, point de rosée), sinon le dernier relevé horaire. */
+const actuel = (obs: HourlyObs[], now: number, c: Ctx, besoin: 'ff' | 'td'): { t?: number; ff?: number; td?: number; time: string } | undefined => {
+  const l = last6(c);
+  return l?.t != null && l[besoin] != null ? l : latest(obs, now);
+};
 /** Rafale max. sur les `min` dernières minutes (relevés 6 min). */
 const rafRecent = (min: number) => (_o: HourlyObs[], _w: unknown, _n: number, c: Ctx): Agg | null => {
   const l = last6(c);
@@ -326,18 +333,18 @@ export const RANKINGS: Ranking[] = [
   { id: 'fxi48', short: 'Vent moy 48 h', label: 'Classement du vent maximal sur 48 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(48) },
   { id: 'fxi72', short: 'Vent moy 72 h', label: 'Classement du vent maximal sur 72 heures glissantes (vent moyen sur 10 min le plus fort)', group: V, unit: 'km/h', digits: 0, order: 'desc', value: gustMax(72) },
 
-  { id: 'pmer', short: 'Pression mer', label: 'Classement de la pression au niveau de la mer', group: C, unit: 'hPa', digits: 1, order: 'desc', instant: true, value: cur('pmer') },
+  { id: 'pmer', short: 'Pression mer', label: 'Classement de la pression au niveau de la mer', group: C, unit: 'hPa', digits: 1, order: 'desc', instant: true, value: (o, w, n, c) => six6('pmer', c) ?? cur('pmer')(o, w, n) },
   { id: 'dp3', short: 'Variation 3 h', label: 'Classement de la variation de pression sur 3 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 3) },
   { id: 'dp12', short: 'Variation 12 h', label: 'Classement de la variation de pression sur 12 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 12) },
   { id: 'dp24', short: 'Variation 24 h', label: 'Classement de la variation de pression sur 24 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 24) },
-  { id: 'u', short: 'Humidité', label: 'Classement de l’humidité relative', group: C, unit: '%', digits: 0, order: 'desc', instant: true, value: cur('u') },
+  { id: 'u', short: 'Humidité', label: 'Classement de l’humidité relative', group: C, unit: '%', digits: 0, order: 'desc', instant: true, value: (o, w, n, c) => six6('u', c) ?? cur('u')(o, w, n) },
   { id: 'vv', short: 'Visibilité', label: 'Classement de la visibilité (les plus faibles en tête)', group: C, unit: 'km', digits: 1, order: 'asc', instant: true, value: (o, w, n) => { const a = cur('vv')(o, w, n); return a && { ...a, value: a.value / 1000 }; } },
   { id: 'snow', short: 'Hauteur de neige', label: 'Classement de la hauteur de neige au sol', group: C, unit: 'cm', digits: 0, order: 'desc', instant: true, value: (o, w, n) => { const a = cur('snow')(o, w, n); return a && a.value > 0 ? a : null; } },
   { id: 'insol24', short: 'Soleil 24 h', label: 'Classement de l’ensoleillement sur les dernières 24 heures', group: C, unit: 'h', digits: 1, order: 'desc', value: (o, _w, n) => insolH(aggSum(o, { start: n - 24 * H, end: n }, 'insol', n)) },
 
   { id: 'td', short: 'Point de rosée', label: 'Classement des points de rosée', group: R, ...T, order: 'desc', instant: true, value: cur('td') },
-  { id: 'windchill', short: 'Windchill', label: 'Classement windchill : température ressentie par le froid et le vent', group: R, ...T, order: 'asc', instant: true, value: (obs, _w, now) => { const o = latest(obs, now); const v = windchillOf(o?.t, o?.ff); return v == null ? null : { value: v, n: 1, expected: 1, at: o!.time }; } },
-  { id: 'humidex', short: 'Humidex', label: 'Classement humidex : chaleur ressentie', group: R, unit: '', digits: 0, order: 'desc', instant: true, value: (obs, _w, now) => { const o = latest(obs, now); const v = humidexFrom(o?.t, o?.td); return v == null ? null : { value: v, n: 1, expected: 1, at: o!.time }; } },
+  { id: 'windchill', short: 'Windchill', label: 'Classement windchill : température ressentie par le froid et le vent', group: R, ...T, order: 'asc', instant: true, value: (obs, _w, now, c) => { const o = actuel(obs, now, c, 'ff'); const v = windchillOf(o?.t, o?.ff); return v == null ? null : { value: v, n: 1, expected: 1, at: o!.time }; } },
+  { id: 'humidex', short: 'Humidex', label: 'Classement humidex : chaleur ressentie', group: R, unit: '', digits: 0, order: 'desc', instant: true, value: (obs, _w, now, c) => { const o = actuel(obs, now, c, 'td'); const v = humidexFrom(o?.t, o?.td); return v == null ? null : { value: v, n: 1, expected: 1, at: o!.time }; } },
 
   { id: 'sol10', short: 'Température à 10 cm', label: 'Classement de la température du sol à 10 cm', group: 'Sol', ...T, order: 'desc', instant: true, value: cur('t10') },
   { id: 'sol20', short: 'Température à 20 cm', label: 'Classement de la température du sol à 20 cm', group: 'Sol', ...T, order: 'desc', instant: true, value: cur('t20') },

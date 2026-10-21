@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { THEMES_BILAN, type ReponseBilans } from '@/lib/carte-meteo/cartes-info';
 import { buildRanking, getRanking, windows } from '@/lib/obs/rankings';
-import { getRecords, getSix, getSnapshot, obsConfigured } from '@/lib/obs/store';
+import { dernierReleveSix, getRecords, getSix, getSnapshot, obsConfigured } from '@/lib/obs/store';
 import { bilanDuMois, moisDisponibles } from '@/lib/carte-meteo/extremes-mois';
 import { ilYAUnAn } from '@/lib/carte-meteo/il-y-a-un-an';
 
@@ -13,6 +13,9 @@ const DUREES: Record<string, string> = {
   t: 'relevé', snow: 'relevé', humidex: 'relevé', windchill: 'relevé', pmer: 'relevé', u: 'relevé',
   rr24: '24 h', rr72: '72 h', raf24: '24 h', insol24: '24 h', raf1: '1 h', dp3: '3 h', dt24: '24 h', tx12: '12 h', tn12: '12 h', tx24: '24 h', tn24: '24 h',
 };
+
+/** Classements lus dans les relevés 6 min quand ils sont frais : leur carte est datée de ce relevé, pas du relevé horaire. */
+const RELEVES_SIX = new Set(['t', 'humidex', 'windchill', 'u', 'pmer', 'raf1']);
 
 /** Calcul partagé entre visiteurs tant que les observations n'ont pas changé (une entrée par mois demandé). */
 const caches = new Map<string, { cle: string; reponse: ReponseBilans }>();
@@ -54,7 +57,10 @@ export async function GET(req: Request) {
     const courant = disponibles[disponibles.length - 1];
     const demande = new URL(req.url).searchParams.get('mois');
     const moisAffiche = demande && disponibles.includes(demande) ? demande : courant;
-    const cle = `${snap.updatedAt}|${now}`;
+    // Relevés 6 min (≈ 10 min de délai) : la carte est recalculée à chaque nouveau relevé, pas seulement à la collecte horaire.
+    const six = dernierReleveSix();
+    const sixFrais = six > 0 && Date.now() - six <= 30 * 60_000;
+    const cle = `${snap.updatedAt}|${now}|${sixFrais ? six : 0}`;
     let cache = caches.get(moisAffiche);
     if (cache?.cle !== cle) {
       const w = windows(now);
@@ -102,7 +108,11 @@ export async function GET(req: Request) {
         const r = getRanking(theme.classement);
         const lignes = buildRanking(r, stations, snap.obs, now, { secondaires: true, amateurs: false, byDept: false }, records, extra);
         cartes[theme.id] = {
-          fenetre: r.window ? r.window(w).label : DUREES[theme.classement] === 'relevé' ? `relevé du ${hm(now)} (heure de Paris)` : `${DUREES[theme.classement] ?? ''} jusqu'au ${hm(now)} (heure de Paris)`.trim(),
+          fenetre: r.window
+            ? r.window(w).label
+            : ((instant) => (DUREES[theme.classement] === 'relevé' ? `relevé du ${hm(instant)} (heure de Paris)` : `${DUREES[theme.classement] ?? ''} jusqu'au ${hm(instant)} (heure de Paris)`.trim()))(
+                sixFrais && RELEVES_SIX.has(theme.classement) ? six : now
+              ),
           valeurs: lignes.map((l) => [indice.get(l.station.id)!, Math.round(l.value * 10) / 10] as [number, number]).filter(([i]) => i != null),
         };
       }
