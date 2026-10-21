@@ -12,6 +12,7 @@ import { DIRECTIONS_VENT, angleFleche, ressenti as calculerRessenti } from '@/li
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { PICTOS_METEO, PICTOS_DEFAUT_IMAGES, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
+import { CalqueAnnotations, PanneauAnnotations, type Annotation, type ReglagesAnnotation } from './Annotations';
 import { CREDITS_COUCHES, LIBELLES_COUCHES, coucheParDefaut, type Couche } from '@/lib/carte-meteo/tuiles';
 import {
   LATITUDE_SEUIL_NORD_SUD,
@@ -423,6 +424,14 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Rafales ajoutées à la main (clic sur la carte), avec la direction du vent, propres à chaque zone. */
   const [rafalesAjoutees, setRafalesAjoutees] = useState<{ id: number; zone: string; x: number; y: number; texte: string; provenance: number }[]>([]);
   const [modeAjoutRafale, setModeAjoutRafale] = useState(false);
+  /** Textes et icônes posés à la main (clic sur la carte), propres à chaque zone ; réglages des prochains ajouts. */
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [modeAnnotation, setModeAnnotation] = useState<'texte' | 'icone' | null>(null);
+  const [annotationChoisie, setAnnotationChoisie] = useState<number | null>(null);
+  const [texteNouveau, setTexteNouveau] = useState('Texte');
+  const [iconeNouvelle, setIconeNouvelle] = useState('vigi:orange:orages');
+  const [reglagesTexte, setReglagesTexte] = useState<ReglagesAnnotation>({ couleur: '#ffffff', taille: 36, gras: true, fond: 'contour', police: 'impact' });
+  const [tailleIcone, setTailleIcone] = useState(56);
   /** Valeur et direction des prochaines rafales posées (tramontane / mistral par défaut : vent de nord-ouest). */
   const [rafaleNouvelle, setRafaleNouvelle] = useState('80');
   const [provenanceNouvelle, setProvenanceNouvelle] = useState(315);
@@ -1087,6 +1096,28 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     setPaletteOuvertePour(`ajout:${id}`);
   }
 
+  /** Mode « ajouter du texte / une icône » : un clic sur la carte le pose avec les réglages en cours, et le sélectionne. */
+  function ajouterAnnotation(x: number, y: number) {
+    if (!modeAnnotation) return;
+    const id = Date.now();
+    const reglages = modeAnnotation === 'texte' ? reglagesTexte : { ...reglagesTexte, taille: tailleIcone };
+    setAnnotations((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), type: modeAnnotation, contenu: modeAnnotation === 'texte' ? texteNouveau : iconeNouvelle, ...reglages }]);
+    setAnnotationChoisie(id);
+  }
+  const annotationSelectionnee = annotations.find((a) => a.id === annotationChoisie && a.zone === zone) ?? null;
+  const modifierAnnotation = (champs: Partial<Annotation>) =>
+    annotationSelectionnee && setAnnotations((liste) => liste.map((a) => (a.id === annotationSelectionnee.id ? { ...a, ...champs } : a)));
+  /** Choisit le mode d'ajout (pictos, rafales, textes et icônes) : un seul à la fois. */
+  function choisirModeAnnotation(mode: 'texte' | 'icone' | null) {
+    setModeAnnotation(mode);
+    setAnnotationChoisie(null);
+    if (mode) {
+      setModeAjout(false);
+      setModeAjoutRafale(false);
+      setPaletteOuvertePour(null);
+    }
+  }
+
   /** Mode « ajouter une rafale » : un clic sur la carte pose une pastille avec la valeur et la direction choisies. */
   function ajouterRafale(x: number, y: number) {
     setRafalesAjoutees((liste) => [...liste, { id: Date.now(), zone, x: Math.round(x), y: Math.round(y), texte: rafaleNouvelle, provenance: provenanceNouvelle }]);
@@ -1267,7 +1298,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       regions={regionsAffichees}
       selection={selection}
       marqueurs={marqueursAffiches}
-      onClicCarte={enExport ? undefined : modeAjout ? ajouterPicto : modeAjoutRafale ? ajouterRafale : undefined}
+      onClicCarte={enExport ? undefined : modeAjout ? ajouterPicto : modeAjoutRafale ? ajouterRafale : modeAnnotation ? ajouterAnnotation : undefined}
       rafalesAjoutees={rafalesAjoutees.filter((r) => r.zone === zone).map((r) => ({ code: `rafale:${r.id}`, x: r.x, y: r.y, texte: r.texte, provenance: r.provenance }))}
       onModifierRafaleAjoutee={(code, champ, valeur) =>
         (champ !== 'texte' || saisieAcceptee(valeur, 'vent')) &&
@@ -1323,7 +1354,20 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         }
       }}
       onModifier={modifier}
-    />
+    >
+      <CalqueAnnotations
+        annotations={annotations.filter((a) => a.zone === zone)}
+        facteur={facteur}
+        selection={annotationChoisie}
+        enExport={enExport}
+        onSelectionner={setAnnotationChoisie}
+        onDeplacer={(id, x, y) => setAnnotations((liste) => liste.map((a) => (a.id === id ? { ...a, x, y } : a)))}
+        onSupprimer={(id) => {
+          setAnnotations((liste) => liste.filter((a) => a.id !== id));
+          if (annotationChoisie === id) setAnnotationChoisie(null);
+        }}
+      />
+    </CarteRendu>
   );
 
   if (compact) {
@@ -1388,6 +1432,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 onChange={(e) => {
                   setModeAjout(e.target.checked);
                   if (e.target.checked) setModeAjoutRafale(false);
+                  if (e.target.checked) choisirModeAnnotation(null);
                   setPaletteOuvertePour(null);
                 }}
               />
@@ -1414,6 +1459,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 onChange={(e) => {
                   setModeAjoutRafale(e.target.checked);
                   if (e.target.checked) setModeAjout(false);
+                  if (e.target.checked) choisirModeAnnotation(null);
                   setPaletteOuvertePour(null);
                 }}
               />
@@ -1454,6 +1500,41 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </button>
             )}
           </div>
+          <PanneauAnnotations
+            mode={modeAnnotation}
+            onMode={choisirModeAnnotation}
+            texte={texteNouveau}
+            onTexte={(t) => {
+              setTexteNouveau(t);
+              modifierAnnotation({ contenu: t });
+            }}
+            icone={iconeNouvelle}
+            onIcone={(i) => {
+              setIconeNouvelle(i);
+              if (annotationSelectionnee?.type === 'icone') modifierAnnotation({ contenu: i });
+            }}
+            reglages={
+              annotationSelectionnee
+                ? annotationSelectionnee
+                : modeAnnotation === 'icone'
+                  ? { ...reglagesTexte, taille: tailleIcone }
+                  : reglagesTexte
+            }
+            onReglages={(r) => {
+              const type = annotationSelectionnee?.type ?? modeAnnotation;
+              if (type === 'icone') {
+                if (r.taille != null) setTailleIcone(r.taille);
+              } else setReglagesTexte((x) => ({ ...x, ...r }));
+              modifierAnnotation(r);
+            }}
+            selection={annotationSelectionnee}
+            onDeselectionner={() => setAnnotationChoisie(null)}
+            nombre={annotations.filter((a) => a.zone === zone).length}
+            onToutRetirer={() => {
+              setAnnotations((liste) => liste.filter((a) => a.zone !== zone));
+              setAnnotationChoisie(null);
+            }}
+          />
           <label className="mt-3 block text-sm font-medium">
             Altitude de la neige (m)
             <input
