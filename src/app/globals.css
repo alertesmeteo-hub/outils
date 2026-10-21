@@ -305,3 +305,32 @@ body {
 .cinfo-encadre ol li .cinfo-valeur-top { padding: 0 5px; border-radius: 4px; line-height: 17px; }
 /* Texte IA posé sur l'image (option), au-dessus de l'adresse du site. */
 .cinfo-texte-ia { position: absolute; z-index: 3; box-sizing: border-box; padding: 7px 12px; background: rgba(13, 20, 40, 0.88); border: 2px solid #f5c400; border-radius: 8px; color: #fff; font-size: 15px; line-height: 20px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; white-space: pre-line; }
+
+/* Choix d'un picto (ChoixPicto) : bulle sur la carte et panneau « Modifier plusieurs pictos ». */
+.cmap-palette.cmap-palette-pictos { width: 330px; max-height: none; overflow: visible; padding: 0; }
+.cmap-choix { display: flex; flex-direction: column; background: #fff; color: #0f172a; border-radius: 8px; font-family: system-ui, sans-serif; }
+.cmap-palette-pictos .cmap-choix { max-height: 420px; }
+.cmap-choix-desactive { pointer-events: none; opacity: 0.45; }
+.cmap-choix-tete { padding: 8px 8px 4px; border-bottom: 1px solid #e2e8f0; }
+.cmap-choix-titre { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+.cmap-choix button { font-family: inherit; }
+.cmap-choix .cmap-choix-fermer { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; font-size: 20px; line-height: 1; color: #475569; background: #f1f5f9; border: none; cursor: pointer; padding: 0; }
+.cmap-choix .cmap-choix-fermer:hover { background: #fee2e2; color: #b91c1c; }
+.cmap-choix-recherche { display: flex; align-items: center; gap: 6px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 3px 6px; font-size: 13px; }
+.cmap-choix-recherche:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25); }
+.cmap-choix-recherche input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; color: #0f172a; font-size: 13px; padding: 2px 0; }
+.cmap-choix-recherche button { border: none; background: none; cursor: pointer; font-size: 16px; color: #64748b; padding: 0 2px; }
+.cmap-choix-filtres { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; }
+.cmap-choix .cmap-choix-filtres button { font-size: 11px; line-height: 1.2; padding: 3px 7px; border-radius: 999px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; }
+.cmap-choix .cmap-choix-filtres button.actif { background: #0f172a; border-color: #0f172a; color: #fff; }
+.cmap-choix-tete .cmap-palette-partout, .cmap-choix-tete .cmap-palette-aide, .cmap-choix-tete .cmap-palette-altitude { margin: 4px 0 2px; }
+.cmap-choix-liste { overflow-y: auto; padding: 2px 8px 6px; flex: 1; min-height: 80px; max-height: 260px; }
+.cmap-choix-groupe { position: sticky; top: 0; z-index: 1; background: #fff; font-size: 10.5px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 0 3px; }
+.cmap-choix-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 2px; }
+.cmap-choix .cmap-choix-grille button { display: grid; place-items: center; height: 38px; padding: 2px; border-radius: 6px; border: 1px solid transparent; background: none; cursor: pointer; }
+.cmap-choix .cmap-choix-grille button:hover, .cmap-choix .cmap-choix-grille button:focus-visible { background: #e0f2fe; border-color: #7dd3fc; outline: none; }
+.cmap-choix .cmap-choix-grille button.actuel { background: #fef3c7; border-color: #f59e0b; }
+.cmap-choix-img { width: 30px; height: 30px; object-fit: contain; }
+.cmap-choix-vide { font-size: 12px; color: #64748b; padding: 12px 2px; text-align: center; }
+.cmap-choix-pied { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-top: 1px solid #e2e8f0; font-size: 11.5px; color: #475569; background: #f8fafc; border-radius: 0 0 8px 8px; }
+.cmap-choix-pied span:first-child { font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

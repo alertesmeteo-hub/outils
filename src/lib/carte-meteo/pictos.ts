@@ -1,3 +1,5 @@
+import { ICONES_ALERTES } from './icones-alertes';
+
 /** Pictos météo emoji, disponibles en plus des images (voir PICTOS_IMAGES ci-dessous). */
 export const PICTOS_METEO = [
   '☀️',
@@ -127,6 +129,39 @@ export const PICTOS_METEOCONS: PictoImage[] = METEOCONS.map(([nom, label]) => ({
   label,
 }));
 
+/** Icônes Alertes Météo (jeu maison, voir icones-alertes.ts), rangées par catégorie. */
+export interface PictoAlertes extends PictoImage {
+  categorie: string;
+  motsCles: string;
+}
+export const PICTOS_ALERTES: PictoAlertes[] = ICONES_ALERTES.map(([nom, label, categorie, motsCles]) => ({
+  id: `am:${nom}`,
+  fichier: `/pictos-alertes/${nom}.svg`,
+  label,
+  categorie,
+  motsCles,
+}));
+
+/** Libellés des emojis, pour l'infobulle et la recherche. */
+export const LIBELLES_EMOJIS: Record<string, string> = {
+  '☀️': 'Soleil',
+  '🌤️': 'Peu nuageux',
+  '⛅': 'Éclaircies',
+  '🌥️': 'Nuageux',
+  '☁️': 'Couvert',
+  '🌦️': 'Averses',
+  '🌧️': 'Pluie',
+  '⛈️': 'Orage et pluie',
+  '🌩️': 'Orage',
+  '🌨️': 'Neige',
+  '❄️': 'Flocon, froid',
+  '🌫️': 'Brouillard',
+  '💨': 'Vent',
+  '🌪️': 'Tornade',
+  '🌈': 'Arc-en-ciel',
+  '🌙': 'Nuit',
+};
+
 export type PictoMeteo = (typeof PICTOS_METEO)[number] | PictoImage['id'];
 
 /** Pictos proposés avec les emojis par défaut, qui n'ont pas d'équivalent emoji (ciel voilé). */
@@ -137,23 +172,25 @@ export const PICTO_VOILE: PictoMeteo = 'mc:ciel-voile';
 export const PICTO_DEFAUT: PictoMeteo = '☀️';
 
 export function estPictoImage(picto: string): boolean {
-  return picto.startsWith('img:') || picto.startsWith('mc:');
+  return picto.startsWith('img:') || picto.startsWith('mc:') || picto.startsWith('am:');
 }
 
 /** Picto de neige (emojis, images ou Meteocons) : on peut y afficher une altitude (ex. « 2000 m »). */
 export function estPictoNeige(picto: string): boolean {
   if (picto === '🌨️' || picto === '❄️' || picto === '☃️') return true;
   if (picto.startsWith('mc:')) return /snow|sleet/.test(picto);
+  if (picto.startsWith('am:')) return /neige|blizzard/.test(picto);
   if (picto.startsWith('img:')) return /neige/i.test(PICTOS_IMAGES.find((p) => p.id === picto)?.label ?? '');
   return false;
 }
 
 export function cheminPictoImage(picto: string): string | undefined {
-  return (picto.startsWith('mc:') ? PICTOS_METEOCONS : PICTOS_IMAGES).find((p) => p.id === picto)?.fichier;
+  const jeu = picto.startsWith('mc:') ? PICTOS_METEOCONS : picto.startsWith('am:') ? PICTOS_ALERTES : PICTOS_IMAGES;
+  return jeu.find((p) => p.id === picto)?.fichier;
 }
 
 /** Jeu de pictos appliqué automatiquement à toute la carte : emojis, ou les images fournies (public/pictos). */
-export type JeuPictos = 'emoji' | 'images' | 'meteocons';
+export type JeuPictos = 'emoji' | 'images' | 'meteocons' | 'alertes';
 
 /**
  * Code météo WMO → image du jeu fourni. Le jeu n'a pas de « éclaircies » seul : ciel peu nuageux → soleil,
@@ -196,8 +233,28 @@ function meteoconsDepuisCode(code: number | null | undefined): PictoMeteo {
   return 'mc:rain';
 }
 
+/** Code météo WMO → icône Alertes Météo. */
+function alertesDepuisCode(code: number | null | undefined): PictoMeteo {
+  if (code == null || code <= 1) return 'am:soleil';
+  if (code === 2) return 'am:eclaircies';
+  if (code === 3) return 'am:couvert';
+  if (code === 45 || code === 48) return 'am:brouillard';
+  if (code >= 51 && code <= 55) return 'am:bruine';
+  if (code === 56 || code === 57 || code === 66 || code === 67) return 'am:pluie-verglacante';
+  if (code === 61) return 'am:pluie-faible';
+  if (code === 65) return 'am:forte-pluie';
+  if (code >= 80 && code <= 82) return code === 82 ? 'am:forte-pluie' : 'am:averses';
+  if (code === 71 || code === 85) return 'am:neige-faible';
+  if (code === 75 || code === 86) return 'am:forte-neige';
+  if (code === 73 || code === 77) return 'am:neige';
+  if (code === 95) return 'am:orage-pluie';
+  if (code === 96 || code === 99) return 'am:orage-grele';
+  return 'am:pluie';
+}
+
 export function pictoDepuisCodeMeteo(code: number | null | undefined, jeu: JeuPictos = 'emoji'): PictoMeteo {
   if (jeu === 'meteocons') return meteoconsDepuisCode(code);
+  if (jeu === 'alertes') return alertesDepuisCode(code);
   if (jeu === 'images') return pictoImageDepuisCode(code);
   if (code == null) return '☀️';
   if (code === 0) return '☀️';
@@ -233,6 +290,25 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
   const { code, nuages, pluie, temperature } = e;
   const images = jeu === 'images';
   if (nuages == null && pluie == null) return pictoDepuisCodeMeteo(code, jeu);
+  if (jeu === 'alertes') {
+    const mm = pluie ?? 0;
+    const ciel = nuages ?? 50;
+    if (code != null && code >= 95) return code >= 96 ? 'am:orage-grele' : mm >= 2 ? 'am:orage-pluie' : ciel < 75 ? 'am:averse-orageuse' : 'am:orage';
+    const precipite = mm >= 0.3;
+    const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
+    if (neige && precipite) return mm >= 3 ? 'am:forte-neige' : ciel < 75 ? 'am:averses-neige' : 'am:neige';
+    if ((code === 45 || code === 48) && !precipite) return 'am:brouillard';
+    if (precipite) {
+      if (mm >= 8) return 'am:forte-pluie';
+      if (mm >= 2) return ciel < 75 ? 'am:averses' : 'am:pluie';
+      return ciel < 75 ? 'am:averses' : 'am:pluie-faible';
+    }
+    if (e.voile) return 'am:ciel-voile';
+    if (ciel < 20) return 'am:soleil';
+    if (ciel < 45) return 'am:peu-nuageux';
+    if (ciel < 75) return 'am:eclaircies';
+    return 'am:couvert';
+  }
   if (jeu === 'meteocons') {
     const mm = pluie ?? 0;
     const ciel = nuages ?? 50;

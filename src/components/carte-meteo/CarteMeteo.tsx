@@ -10,7 +10,8 @@ import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement'
 import { saisieAcceptee } from '@/lib/carte-meteo/limites';
 import { DIRECTIONS_VENT, angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
-import { PICTOS_METEO, PICTOS_DEFAUT_IMAGES, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { ChoixPicto } from './ChoixPicto';
+import { estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { CalqueAnnotations, PanneauAnnotations, type Annotation, type ReglagesAnnotation } from './Annotations';
 import { CREDITS_COUCHES, LIBELLES_COUCHES, coucheParDefaut, type Couche } from '@/lib/carte-meteo/tuiles';
@@ -1091,7 +1092,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Mode « ajouter un picto » : un clic sur la carte pose un picto (soleil par défaut) et ouvre sa palette. */
   function ajouterPicto(x: number, y: number) {
     const id = Date.now();
-    setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : '☀️', valeur: '' }]);
+    setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : jeuPictos === 'alertes' ? 'am:soleil' : '☀️', valeur: '' }]);
     setPictosSelectionnes(new Set());
     setPaletteOuvertePour(`ajout:${id}`);
   }
@@ -1416,6 +1417,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 ['emoji', 'Emojis'],
                 ['images', 'Mes pictos (images)'],
                 ['meteocons', 'Meteocons (icônes libres)'],
+                ['alertes', 'Icônes Alertes Météo'],
               ] as const
             ).map(([valeur, libelle]) => (
               <label key={valeur} className="mt-1 block text-sm">
@@ -1572,19 +1574,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                   </button>
                   <span className="self-center text-muted">{pictosSelectionnes.size} sélectionné(s)</span>
                 </div>
-                <div className={`mt-2 flex max-h-56 flex-wrap gap-1 overflow-y-auto ${pictosSelectionnes.size === 0 ? 'pointer-events-none opacity-40' : ''}`}>
-                  {PICTOS_METEO.map((picto) => (
-                    <button key={picto} type="button" className="rounded p-1 text-xl leading-none hover:bg-bg" onClick={() => appliquerALaSelection(picto)}>
-                      {picto}
-                    </button>
-                  ))}
-                  {/* Avec les emojis : le ciel voilé, qui n'a pas d'emoji. */}
-                  {[...PICTOS_DEFAUT_IMAGES, ...PICTOS_IMAGES, ...PICTOS_METEOCONS.filter((p) => !PICTOS_DEFAUT_IMAGES.includes(p))].map((picto) => (
-                    <button key={picto.id} type="button" title={picto.label} className="rounded p-1 hover:bg-bg" onClick={() => appliquerALaSelection(picto.id)}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={picto.fichier} alt={picto.label} className="h-8 w-8 object-contain" />
-                    </button>
-                  ))}
+                <div className="mt-2">
+                  <ChoixPicto titre="Icône des pictos sélectionnés" onChoisir={appliquerALaSelection} autoFocus={false} desactive={pictosSelectionnes.size === 0} />
                 </div>
               </div>
             )}

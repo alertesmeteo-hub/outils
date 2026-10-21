@@ -3,7 +3,8 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as PointerEventReact, type ReactNode, type RefObject } from 'react';
 import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { MATRICE_RELIEF, TAILLE_TUILE_VIDE, coucheParDefaut, tuileParente, tuilesVisibles, type Couche, type Tuile } from '@/lib/carte-meteo/tuiles';
-import { PICTOS_METEO, PICTOS_DEFAUT_IMAGES, PICTOS_IMAGES, PICTOS_METEOCONS, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { PICTOS_DEFAUT_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { ChoixPicto } from './ChoixPicto';
 import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 
 /**
@@ -307,8 +308,8 @@ const TRAIT_REGION = { ...TRAIT_COMMUN, fill: 'none', stroke: '#ffffff', strokeO
 // surface continue (avec la transparence, les jointures apparaîtraient comme de fines lignes claires).
 const TRAIT_UNI = { ...TRAIT_COMMUN, fill: '#919fe6', fillOpacity: 1, stroke: '#919fe6', strokeOpacity: 1, strokeWidth: 0.7 };
 
-const LARGEUR_PALETTE = 232;
-const HAUTEUR_PALETTE = 270;
+const LARGEUR_PALETTE = 330;
+const HAUTEUR_PALETTE = 420;
 
 /** Palette ouverte dans le cadre de la carte : sous le marqueur s'il est en haut, décalée pour ne jamais être coupée sur les bords. */
 function stylePalette(x: number, y: number, em: number, largeur: number): CSSProperties {
@@ -703,46 +704,26 @@ export default function CarteRendu({
               </div>
             )}
             {paletteOuvertePour === m.code && (
-              <div className="cmap-palette" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs, largeur)}>
-                <label className="cmap-palette-partout">
-                  <input type="checkbox" checked={partout} onChange={(e) => setPartout(e.target.checked)} /> Même icône sur toute la carte
-                </label>
-                <div className="cmap-palette-aide">Ctrl/Maj + clic sur d'autres pictos : les modifier ensemble</div>
-                {m.neige && (
-                  <label className="cmap-palette-altitude">
-                    Altitude de la neige (m)
-                    <input value={m.altitude ?? ''} onChange={(e) => onModifier(m.code, 'altitude', e.target.value)} placeholder="ex. 2000" inputMode="numeric" size={6} />
-                  </label>
-                )}
-                <div className="cmap-palette-groupe">
-                  {PICTOS_METEO.map((picto) => (
-                    <button key={picto} type="button" onClick={() => onModifier(m.code, 'picto', picto, partout)}>
-                      {picto}
-                    </button>
-                  ))}
-                  {/* Ciel voilé : pas d'emoji, une image proposée avec les pictos par défaut. */}
-                  {PICTOS_DEFAUT_IMAGES.map((picto) => (
-                    <button key={picto.id} type="button" title={picto.label} onClick={() => onModifier(m.code, 'picto', picto.id, partout)}>
-                      <img src={picto.fichier} alt={picto.label} className="cmap-picto-image" />
-                    </button>
-                  ))}
-                </div>
-                <div className="cmap-palette-separateur">Mes pictos</div>
-                <div className="cmap-palette-groupe">
-                  {PICTOS_IMAGES.map((picto) => (
-                    <button key={picto.id} type="button" title={picto.label} onClick={() => onModifier(m.code, 'picto', picto.id, partout)}>
-                      <img src={picto.fichier} alt={picto.label} className="cmap-picto-image" />
-                    </button>
-                  ))}
-                </div>
-                <div className="cmap-palette-separateur">Meteocons (libres)</div>
-                <div className="cmap-palette-groupe">
-                  {PICTOS_METEOCONS.map((picto) => (
-                    <button key={picto.id} type="button" title={picto.label} onClick={() => onModifier(m.code, 'picto', picto.id, partout)}>
-                      <img src={picto.fichier} alt={picto.label} className="cmap-picto-image" />
-                    </button>
-                  ))}
-                </div>
+              <div className="cmap-palette cmap-palette-pictos cmap-sans-export" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs, largeur)}>
+                <ChoixPicto
+                  actuel={m.picto}
+                  onChoisir={(picto) => onModifier(m.code, 'picto', picto, partout)}
+                  onFermer={() => onBasculerPalette(m.code, false)}
+                  entete={
+                    <>
+                      <label className="cmap-palette-partout">
+                        <input type="checkbox" checked={partout} onChange={(e) => setPartout(e.target.checked)} /> Même icône sur toute la carte
+                      </label>
+                      <div className="cmap-palette-aide">Ctrl/Maj + clic sur d'autres pictos : les modifier ensemble</div>
+                      {m.neige && (
+                        <label className="cmap-palette-altitude">
+                          Altitude de la neige (m)
+                          <input value={m.altitude ?? ''} onChange={(e) => onModifier(m.code, 'altitude', e.target.value)} placeholder="ex. 2000" inputMode="numeric" size={6} />
+                        </label>
+                      )}
+                    </>
+                  }
+                />
               </div>
             )}
           </div>
