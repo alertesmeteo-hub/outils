@@ -383,7 +383,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [densite, setDensite] = useState<Densite>('moyen');
   const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(initialVilles);
   // Emojis par défaut, quelle que soit la zone (France, région, département) et sur la page des 16 jours.
-  const jeuInitial: JeuPictos = 'emoji';
+  const jeuInitial: JeuPictos = 'alertes';
   const [jeuPictos, setJeuPictos] = useState<JeuPictos>(jeuInitial);
   const jeuRef = useRef<JeuPictos>(jeuInitial);
   jeuRef.current = jeuPictos;
@@ -417,6 +417,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [rafalesRetirees, setRafalesRetirees] = useState<Set<string>>(new Set());
   /** Pastilles de rafale déplacées à la main : décalage par rapport à leur ville, par « période|ville ». */
   const [ventsDeplaces, setVentsDeplaces] = useState<Record<string, { dx: number; dy: number }>>({});
+  /** Pictos du modèle glissés à la souris : nouvelle position du centre (pixels de la carte), par zone. */
+  const [pictosDeplaces, setPictosDeplaces] = useState<Record<string, { x: number; y: number }>>({});
   /** Pictos ajoutés à la main (clic sur la carte), propres à chaque zone. */
   /** Pictos du modèle retirés à la main (croix au survol), par zone : `zone|code`. Pas de ville de remplacement. */
   const [pictosRetires, setPictosRetires] = useState<Set<string>>(new Set());
@@ -1066,6 +1068,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       .filter((m) => !pictosRetires.has(`${zone}|${m.code}`))
       .map((m) => ({
         ...m,
+        ...(pictosDeplaces[`${zone}|${m.code}`] ?? {}),
         neige: estPictoNeige(m.picto),
         altitude: altitudeDe(m.code, m.picto),
         // Pastille de rafale déplacée à la main : sa position remplace celle du placement automatique.
@@ -1321,6 +1324,14 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 ? setAjouts((liste) => liste.filter((a) => `ajout:${a.id}` !== code))
                 : setPictosRetires((r) => new Set(r).add(`${zone}|${code}`))
       }
+      onDeplacerPicto={
+        enExport
+          ? undefined
+          : (code, x, y) =>
+              code.startsWith('ajout:')
+                ? setAjouts((liste) => liste.map((a) => (`ajout:${a.id}` === code ? { ...a, x, y } : a)))
+                : setPictosDeplaces((d) => ({ ...d, [`${zone}|${code}`]: { x, y } }))
+      }
       echelleMarqueurs={echelleMarqueurs}
       afficherNoms={nomsVisibles}
       titre={titre}
@@ -1414,10 +1425,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <legend className="sr-only">Jeu de pictos</legend>
             {(
               [
+                ['alertes', 'Icônes Alertes Météo'],
                 ['emoji', 'Emojis'],
                 ['images', 'Mes pictos (images)'],
                 ['meteocons', 'Meteocons (icônes libres)'],
-                ['alertes', 'Icônes Alertes Météo'],
               ] as const
             ).map(([valeur, libelle]) => (
               <label key={valeur} className="mt-1 block text-sm">
@@ -1446,7 +1457,16 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 Retirer les pictos ajoutés ({ajouts.filter((a) => a.zone === zone).length})
               </button>
             )}
-            <p className="mt-1 text-xs text-muted">Survole un picto : la croix rouge le retire de la carte.</p>
+            <p className="mt-1 text-xs text-muted">Clic sur un picto : changer son icône ou le retirer. Glisser un picto : le déplacer.</p>
+            {Object.keys(pictosDeplaces).some((c) => c.startsWith(`${zone}|`)) && (
+              <button
+                type="button"
+                className="btn-ghost mt-2 rounded-md px-2 py-1 text-xs"
+                onClick={() => setPictosDeplaces((d) => Object.fromEntries(Object.entries(d).filter(([c]) => !c.startsWith(`${zone}|`))))}
+              >
+                Remettre les pictos déplacés à leur place ({Object.keys(pictosDeplaces).filter((c) => c.startsWith(`${zone}|`)).length})
+              </button>
+            )}
             {[...pictosRetires].some((c) => c.startsWith(`${zone}|`)) && (
               <button type="button" className="btn-ghost mt-2 rounded-md px-2 py-1 text-xs" onClick={() => setPictosRetires((r) => new Set([...r].filter((c) => !c.startsWith(`${zone}|`))))}>
                 Réafficher les pictos retirés ({[...pictosRetires].filter((c) => c.startsWith(`${zone}|`)).length})

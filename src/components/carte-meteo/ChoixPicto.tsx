@@ -1,7 +1,8 @@
 'use client';
 
 /* eslint-disable @next/next/no-img-element -- petites icônes locales (public/), inutile de passer par next/image */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as PointerEventReact, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import {
   LIBELLES_EMOJIS,
   PICTOS_ALERTES,
@@ -48,6 +49,14 @@ const FILTRES: [Jeu, string][] = [
   ['meteocons', 'Meteocons'],
 ];
 
+/** Jeu d'un picto : la fenêtre s'ouvre sur le jeu du picto cliqué (Alertes Météo par défaut). */
+function jeuDe(id: string | undefined): Jeu {
+  if (!id || id.startsWith('am:')) return 'alertes';
+  if (id.startsWith('mc:')) return 'meteocons';
+  if (id.startsWith('img:')) return 'images';
+  return 'emoji';
+}
+
 function lireRecents(): string[] {
   try {
     const v = JSON.parse(localStorage.getItem(CLE_RECENTS) ?? '[]');
@@ -89,7 +98,7 @@ export function ChoixPicto({
   desactive?: boolean;
 }) {
   const [q, setQ] = useState('');
-  const [filtre, setFiltre] = useState<Jeu>('tous');
+  const [filtre, setFiltre] = useState<Jeu>(() => jeuDe(actuel));
   const [survol, setSurvol] = useState<string | null>(null);
   const [recents, setRecents] = useState<string[]>([]);
   const champ = useRef<HTMLInputElement>(null);
@@ -194,5 +203,109 @@ export function ChoixPicto({
         <span>{q ? `${nb} résultat${nb > 1 ? 's' : ''}` : `${ENTREES.length} pictos`}</span>
       </div>
     </div>
+  );
+}
+
+const CLE_TAILLE = 'carte-meteo:fenetre-picto';
+const TAILLE_DEFAUT = { l: 340, h: 470 };
+const TAILLE_MIN = { l: 280, h: 300 };
+/** Position choisie à la souris pendant la visite : la fenêtre se rouvre au même endroit. */
+let positionGardee: { x: number; y: number } | null = null;
+
+function lireTaille(): { l: number; h: number } {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLE_TAILLE) ?? 'null');
+    if (v && Number.isFinite(v.l) && Number.isFinite(v.h)) return { l: Math.max(TAILLE_MIN.l, v.l), h: Math.max(TAILLE_MIN.h, v.h) };
+  } catch {
+    /* navigation privée */
+  }
+  return TAILLE_DEFAUT;
+}
+
+/**
+ * Fenêtre flottante du choix de picto, posée au-dessus de la page (hors de la carte, donc jamais dans l'export) :
+ * ouverte à côté du picto cliqué sans le cacher, déplaçable par sa barre de titre, agrandissable par son coin
+ * (taille gardée dans le navigateur).
+ */
+export function FenetrePicto({ ancre, children }: { ancre: RefObject<HTMLElement | null>; children: ReactNode }) {
+  const [taille] = useState(lireTaille);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const boite = useRef<HTMLDivElement>(null);
+  const glisser = useRef<{ sx: number; sy: number; x0: number; y0: number } | null>(null);
+
+  const dansLEcran = (x: number, y: number, l: number, h: number) => ({
+    x: Math.min(Math.max(x, 8), Math.max(8, window.innerWidth - l - 8)),
+    y: Math.min(Math.max(y, 8), Math.max(8, window.innerHeight - Math.min(h, 120) - 8)),
+  });
+
+  useLayoutEffect(() => {
+    const { l, h } = taille;
+    if (positionGardee) {
+      setPos(dansLEcran(positionGardee.x, positionGardee.y, l, h));
+      return;
+    }
+    const r = ancre.current?.getBoundingClientRect();
+    if (!r) {
+      setPos(dansLEcran((window.innerWidth - l) / 2, 80, l, h));
+      return;
+    }
+    // À droite du picto s'il y a la place, sinon à gauche, sinon en dessous ; à hauteur du picto.
+    const x = r.right + 14 + l <= window.innerWidth - 8 ? r.right + 14 : r.left - 14 - l >= 8 ? r.left - 14 - l : r.left + r.width / 2 - l / 2;
+    const y = x === r.left + r.width / 2 - l / 2 ? r.bottom + 10 : r.top + r.height / 2 - 60;
+    setPos(dansLEcran(x, Math.min(y, window.innerHeight - h - 8), l, h));
+    // Ouverture seulement : ensuite, la fenêtre reste là où on la met.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const placee = pos != null;
+  // Taille changée par le coin : gardée pour les prochaines ouvertures.
+  useEffect(() => {
+    const el = boite.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const obs = new ResizeObserver(() => {
+      try {
+        localStorage.setItem(CLE_TAILLE, JSON.stringify({ l: Math.round(el.offsetWidth), h: Math.round(el.offsetHeight) }));
+      } catch {
+        /* navigation privée */
+      }
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [placee]);
+
+  // Barre de titre = poignée (pas sur la croix). En phase de capture : ChoixPicto arrête la propagation des clics.
+  const debut = (e: PointerEventReact<HTMLDivElement>) => {
+    const t = e.target as HTMLElement;
+    if (e.button !== 0 || !pos || !t.closest('.cmap-choix-titre') || t.closest('button')) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    glisser.current = { sx: e.clientX, sy: e.clientY, x0: pos.x, y0: pos.y };
+  };
+  const pendant = (e: PointerEventReact<HTMLDivElement>) => {
+    const g = glisser.current;
+    if (!g || !boite.current) return;
+    const p = dansLEcran(g.x0 + e.clientX - g.sx, g.y0 + e.clientY - g.sy, boite.current.offsetWidth, boite.current.offsetHeight);
+    positionGardee = p;
+    setPos(p);
+  };
+  const fin = (e: PointerEventReact<HTMLDivElement>) => {
+    glisser.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <div
+      ref={boite}
+      className="cmap-fenetre-picto cmap-sans-export"
+      style={{ left: pos?.x ?? -9999, top: pos?.y ?? -9999, width: taille.l, height: taille.h, visibility: pos ? 'visible' : 'hidden' }}
+      onPointerDownCapture={debut}
+      onPointerMove={pendant}
+      onPointerUp={fin}
+      onPointerCancel={fin}
+    >
+      {children}
+    </div>,
+    document.body
   );
 }

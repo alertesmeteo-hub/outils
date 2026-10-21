@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEve
 import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { MATRICE_RELIEF, TAILLE_TUILE_VIDE, coucheParDefaut, tuileParente, tuilesVisibles, type Couche, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_DEFAUT_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
-import { ChoixPicto } from './ChoixPicto';
+import { ChoixPicto, FenetrePicto } from './ChoixPicto';
 import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 
 /**
@@ -292,6 +292,8 @@ interface Props {
   onClicCarte?: (x: number, y: number) => void;
   /** Supprime un picto ajouté à la main. */
   onSupprimer?: (code: string) => void;
+  /** Déplacement d'un picto à la souris (position du centre du marqueur, pixels de la carte). */
+  onDeplacerPicto?: (code: string, x: number, y: number) => void;
   /** Retire l'indicateur de rafale d'un marqueur. */
   onSupprimerRafale?: (code: string) => void;
 }
@@ -307,21 +309,6 @@ const TRAIT_REGION = { ...TRAIT_COMMUN, fill: 'none', stroke: '#ffffff', strokeO
 // Sans contours : remplissage opaque et trait de la même couleur, pour que les départements voisins forment une
 // surface continue (avec la transparence, les jointures apparaîtraient comme de fines lignes claires).
 const TRAIT_UNI = { ...TRAIT_COMMUN, fill: '#919fe6', fillOpacity: 1, stroke: '#919fe6', strokeOpacity: 1, strokeWidth: 0.7 };
-
-const LARGEUR_PALETTE = 330;
-const HAUTEUR_PALETTE = 420;
-
-/** Palette ouverte dans le cadre de la carte : sous le marqueur s'il est en haut, décalée pour ne jamais être coupée sur les bords. */
-function stylePalette(x: number, y: number, em: number, largeur: number): CSSProperties {
-  const gauche = Math.min(Math.max(x - LARGEUR_PALETTE / 2, 6), largeur - LARGEUR_PALETTE - 6);
-  const enHaut = y < HAUTEUR_PALETTE + 40;
-  return {
-    left: `calc(50% + ${gauche - x}px)`,
-    transform: 'none',
-    ...(enHaut ? { top: 1.2 * em + 10, bottom: 'auto' } : { bottom: 1.2 * em + 10 }),
-  };
-}
-
 
 export interface Fleuves {
   /** Loire, Seine, Rhône, Garonne-Gironde. */
@@ -376,6 +363,7 @@ export default function CarteRendu({
   onModifier,
   onClicCarte,
   onSupprimer,
+  onDeplacerPicto,
   onSupprimerRafale,
   rafalesAjoutees = [],
   remplissages,
@@ -426,6 +414,38 @@ export default function CarteRendu({
       g.champ.focus();
       g.champ.select();
     }
+  };
+  // Pictos déplaçables à la souris (ou au doigt) : le marqueur suit le pointeur au-delà de 3 px ; en dessous, c'est un clic
+  // (choix de l'icône, saisie de la température). Le pointeur n'est retenu qu'une fois le déplacement commencé, sinon le
+  // clic n'atteindrait plus le picto.
+  const glisserPicto = useRef<{ code: string; sx: number; sy: number; x0: number; y0: number; bouge: boolean } | null>(null);
+  const vientDeGlisserPicto = useRef(false);
+  const ancrePicto = useRef<HTMLButtonElement | null>(null);
+  const debutGlisserPicto = (e: PointerEventReact<HTMLDivElement>, m: Marqueur) => {
+    vientDeGlisserPicto.current = false;
+    const t = e.target as HTMLElement;
+    if (!onDeplacerPicto || e.button !== 0 || t.closest('input, .cmap-supprimer, .cmap-vent-place, .cmap-palette')) return;
+    if (t.closest('img')) e.preventDefault(); // pas d'image « fantôme » glissée par le navigateur
+    glisserPicto.current = { code: m.code, sx: e.clientX, sy: e.clientY, x0: m.x, y0: m.y, bouge: false };
+  };
+  const pendantGlisserPicto = (e: PointerEventReact<HTMLDivElement>) => {
+    const g = glisserPicto.current;
+    if (!g || !onDeplacerPicto) return;
+    const dx = (e.clientX - g.sx) / facteur;
+    const dy = (e.clientY - g.sy) / facteur;
+    if (!g.bouge) {
+      if (Math.hypot(dx, dy) < 3) return;
+      g.bouge = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    onDeplacerPicto(g.code, Math.round(g.x0 + dx), Math.round(g.y0 + dy));
+  };
+  const finGlisserPicto = (e: PointerEventReact<HTMLDivElement>) => {
+    const g = glisserPicto.current;
+    glisserPicto.current = null;
+    if (!g?.bouge) return;
+    vientDeGlisserPicto.current = true;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   };
   return (
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
@@ -619,22 +639,35 @@ export default function CarteRendu({
         {marqueurs.map((m) => (
           <div
             key={m.code}
-            className={`cmap-marqueur ${grosPictos ? 'cmap-gros' : ''} ${carteLocale ? 'cmap-local' : ''} ${styleCapture ? 'cmap-capture' : ''}`}
+            className={`cmap-marqueur ${grosPictos ? 'cmap-gros' : ''} ${carteLocale ? 'cmap-local' : ''} ${styleCapture ? 'cmap-capture' : ''} ${onDeplacerPicto ? 'cmap-marqueur-mobile' : ''}`}
             style={{ left: m.x, top: m.y, fontSize: 22 * echelleMarqueurs, ...(paletteOuvertePour === m.code ? { zIndex: 20 } : {}) }}
             title={m.infoBulle ?? m.nom}
+            onPointerDown={(e) => debutGlisserPicto(e, m)}
+            onPointerMove={pendantGlisserPicto}
+            onPointerUp={finGlisserPicto}
+            onPointerCancel={finGlisserPicto}
           >
             {afficherNoms && <div className="cmap-nom">{m.nom}</div>}
             <div className={`cmap-ligne ${m.mini == null ? 'cmap-ligne-simple' : ''}`}>
               <button
                 type="button"
+                ref={paletteOuvertePour === m.code ? ancrePicto : undefined}
                 className={`cmap-picto ${pictosSelectionnes?.has(m.code) ? 'cmap-picto-selectionne' : ''}`}
                 // Le nom de la ville en tête : ce titre remplace celui du marqueur au survol du picto.
-                title={`${m.infoBulle ?? m.nom ? `${m.infoBulle ?? m.nom}\n` : ''}Clic : changer l'icône · Ctrl/Maj + clic : en sélectionner plusieurs`}
-                onClick={(e) => onBasculerPalette(m.code, e.ctrlKey || e.shiftKey || e.metaKey)}
+                title={`${m.infoBulle ?? m.nom ? `${m.infoBulle ?? m.nom}\n` : ''}Clic : changer l'icône ou la retirer · Glisser : déplacer · Ctrl/Maj + clic : en sélectionner plusieurs`}
+                onClick={(e) => {
+                  // Fin d'un déplacement : ce n'est pas un clic.
+                  if (vientDeGlisserPicto.current) {
+                    vientDeGlisserPicto.current = false;
+                    return;
+                  }
+                  onBasculerPalette(m.code, e.ctrlKey || e.shiftKey || e.metaKey);
+                }}
               >
                 {estPictoImage(m.picto) ? (
                   <img
                     src={cheminPictoImage(m.picto)}
+                    draggable={false}
                     alt=""
                     className={`cmap-picto-image ${pictosEmoji && PICTOS_DEFAUT_IMAGES.some((p) => p.id === m.picto) ? 'cmap-picto-defaut' : ''}`}
                   />
@@ -704,7 +737,7 @@ export default function CarteRendu({
               </div>
             )}
             {paletteOuvertePour === m.code && (
-              <div className="cmap-palette cmap-palette-pictos cmap-sans-export" style={stylePalette(m.x, m.y, 22 * echelleMarqueurs, largeur)}>
+              <FenetrePicto ancre={ancrePicto}>
                 <ChoixPicto
                   actuel={m.picto}
                   onChoisir={(picto) => onModifier(m.code, 'picto', picto, partout)}
@@ -721,10 +754,22 @@ export default function CarteRendu({
                           <input value={m.altitude ?? ''} onChange={(e) => onModifier(m.code, 'altitude', e.target.value)} placeholder="ex. 2000" inputMode="numeric" size={6} />
                         </label>
                       )}
+                      {onSupprimer && (
+                        <button
+                          type="button"
+                          className="cmap-choix-retirer"
+                          onClick={() => {
+                            onBasculerPalette(m.code, false);
+                            onSupprimer(m.code);
+                          }}
+                        >
+                          🗑 Retirer ce picto de la carte
+                        </button>
+                      )}
                     </>
                   }
                 />
-              </div>
+              </FenetrePicto>
             )}
           </div>
         ))}
