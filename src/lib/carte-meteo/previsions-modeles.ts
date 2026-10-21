@@ -342,7 +342,7 @@ function valeursSurPeriode(
 }
 
 /**
- * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h, l'après-midi de 12 h à 18 h (température : maximum de 14 h à 18 h), la journée de 7 h à 20 h pour le
+ * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h (température : celle de 8 h), l’après-midi de 12 h à 18 h (température : maximum de 14 h à 18 h), la journée de 7 h à 20 h pour le
  * ciel. Le minimum de la nuit n'est donné que si la série couvre le début de la journée (avant 7 h).
  */
 export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateISO: string, finPeriode?: string): PointCarte {
@@ -356,6 +356,10 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
   const locaux = serie.t.map(dateHeureParis);
   const jour = locaux.map((l, i) => ({ ...l, i })).filter((l) => l.date === dateISO);
   const matin = jour.filter((l) => l.heure >= 6 && l.heure <= 11).map((l) => l.i);
+  // Température du matin : celle de 8 h (ou de l'heure la plus proche entre 6 h et 9 h), pas le maximum de la matinée,
+  // qui donnait la valeur de 11 h, presque celle de l'après-midi (18° à Perpignan un matin à 9°). Sans heure du petit matin
+  // dans la série (prévision du jour lancée après 9 h), pas de valeur plutôt qu'une valeur de fin de matinée.
+  const debutMatin = jour.filter((l) => l.heure >= 6 && l.heure <= 9 && serie.temp[l.i] != null).sort((a, b) => Math.abs(a.heure - 8) - Math.abs(b.heure - 8) || a.heure - b.heure);
   const apresMidi = jour.filter((l) => l.heure >= 12 && l.heure <= 17).map((l) => l.i);
   // Température de l'après-midi : le maximum entre 14 h et 18 h (heure de Paris).
   const chaleurApresMidi = jour.filter((l) => l.heure >= 14 && l.heure <= 18).map((l) => l.i);
@@ -368,7 +372,7 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
     nom,
     mini: debutCouvert ? arrondi(minimum(toute.map((i) => serie.temp[i])), 1) : null,
     maxi: arrondi(maximum(toute.map((i) => serie.temp[i])), 1),
-    tempMatin: arrondi(maximum(matin.map((i) => serie.temp[i])), 1),
+    tempMatin: debutMatin.length ? arrondi(serie.temp[debutMatin[0].i], 1) : null,
     rafaleMatin: arrondi(maximum(matin.map((i) => serie.rafale[i]))),
     directionRafaleMatin: directionRafaleMax(serie, matin),
     codeMatin: codePeriode(serie, matin),
