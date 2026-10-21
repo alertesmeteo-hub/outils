@@ -385,6 +385,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   // Emojis par défaut, quelle que soit la zone (France, région, département) et sur la page des 16 jours.
   const jeuInitial: JeuPictos = 'alertes';
   const [jeuPictos, setJeuPictos] = useState<JeuPictos>(jeuInitial);
+  /** Taille des icônes (%), températures inchangées. */
+  const [tailleIcones, setTailleIcones] = useState(100);
   const jeuRef = useRef<JeuPictos>(jeuInitial);
   jeuRef.current = jeuPictos;
   const [periode, setPeriode] = useState<Periode>('apres-midi');
@@ -848,7 +850,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // Toutes les rafales : y compris celles des villes de réserve, qui peuvent remplacer une ville sans place.
     const rafalesSignalees = enDepartement ? plusFortesRafales(maxRafales === Infinity ? pointsAffiches : reference) : codesRafales;
     // Distance (px) du centre du picto au centre du marqueur, pour les tests « sur la terre » (France : pictos plus petits).
-    const decalagePicto = (enFrance ? 1.2 : 1.5) * 22 * echelleMarqueurs;
+    const decalagePicto = (enFrance ? 1.2 : 1.5) * 22 * echelleMarqueurs * (tailleIcones / 100);
     // France « Moyen » : points à la place exacte de la carte de référence (ni rapprochement de la terre, ni décalage).
     const dispositionFixe = modeCapture && grilleFrance != null;
     const bruts: Marqueur[] = pointsAffiches.map((p, i) => {
@@ -893,7 +895,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
       const gros = enDepartement ? 0.6 : 0; // pictos 1,6 fois plus grands : +1,4 em de large, +1,1 em de haut
       // Régions et départements : températures 15 % et pictos 5 % plus grands (`.cmap-local`).
-      const kPicto = enFrance ? 1 : ECHELLE_PICTO_LOCAL;
+      const kPicto = (enFrance ? 1 : ECHELLE_PICTO_LOCAL) * (tailleIcones / 100);
       const kTemp = enFrance ? 1 : enDepartement ? ECHELLE_TEMP_DEPARTEMENT : ECHELLE_TEMP_LOCAL;
       // Régions et départements : « ° » après la température (+0,4 em sur une ligne simple).
       const largeurLigne = 2.35 * (1 + gros) * kPicto + (m.mini == null ? (enFrance ? 1.85 : 2.25) : 2.55) * kTemp;
@@ -1060,7 +1062,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       return m.rafale != null ? { ...m, rafale: null, ressenti: null } : m;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees, miniMaxiAM, xTitreFrance]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees, miniMaxiAM, xTitreFrance, tailleIcones]);
 
   const altitudeDe = (code: string, picto: string) => (estPictoNeige(picto) ? altitudes[`${periode}|${code}`] ?? altitudeNeige : undefined);
   const marqueursAffiches: Marqueur[] = [
@@ -1333,6 +1335,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                 : setPictosDeplaces((d) => ({ ...d, [`${zone}|${code}`]: { x, y } }))
       }
       echelleMarqueurs={echelleMarqueurs}
+      echellePictos={tailleIcones / 100}
       afficherNoms={nomsVisibles}
       titre={titre}
       sousTitre={sousTitre}
@@ -1437,6 +1440,15 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </label>
             ))}
           </fieldset>
+          <label className="mt-3 block text-sm font-medium">
+            Taille des icônes : {tailleIcones} %
+            <input type="range" min={50} max={150} step={5} value={tailleIcones} onChange={(e) => setTailleIcones(Number(e.target.value))} className="block w-full" aria-label="Taille des icônes en pourcentage" />
+          </label>
+          {tailleIcones !== 100 && (
+            <button type="button" className="btn-ghost rounded-md px-2 py-1 text-xs" onClick={() => setTailleIcones(100)}>
+              Revenir à 100 %
+            </button>
+          )}
           <div className="mt-3 rounded-lg border border-border p-2">
             <label className="flex items-center gap-2 text-sm font-semibold">
               <input

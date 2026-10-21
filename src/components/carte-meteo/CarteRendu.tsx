@@ -258,6 +258,8 @@ interface Props {
   selection: Set<string>;
   marqueurs: Marqueur[];
   echelleMarqueurs: number;
+  /** Taille des pictos seuls (1 = normale), sans changer les températures : réglage « Taille des icônes » en %. */
+  echellePictos?: number;
   afficherNoms: boolean;
   titre: string;
   sousTitre: string;
@@ -347,6 +349,7 @@ export default function CarteRendu({
   selection,
   marqueurs,
   echelleMarqueurs,
+  echellePictos = 1,
   afficherNoms,
   titre,
   sousTitre,
@@ -664,16 +667,19 @@ export default function CarteRendu({
                   onBasculerPalette(m.code, e.ctrlKey || e.shiftKey || e.metaKey);
                 }}
               >
-                {estPictoImage(m.picto) ? (
-                  <img
-                    src={cheminPictoImage(m.picto)}
-                    draggable={false}
-                    alt=""
-                    className={`cmap-picto-image ${pictosEmoji && PICTOS_DEFAUT_IMAGES.some((p) => p.id === m.picto) ? 'cmap-picto-defaut' : ''}`}
-                  />
-                ) : (
-                  m.picto
-                )}
+                {/* Taille des icônes : les images (en em) et les emojis suivent la taille de ce bloc. */}
+                <span style={{ display: 'block', fontSize: `${echellePictos}em`, lineHeight: 1 }}>
+                  {estPictoImage(m.picto) ? (
+                    <img
+                      src={cheminPictoImage(m.picto)}
+                      draggable={false}
+                      alt=""
+                      className={`cmap-picto-image ${pictosEmoji && PICTOS_DEFAUT_IMAGES.some((p) => p.id === m.picto) ? 'cmap-picto-defaut' : ''}`}
+                    />
+                  ) : (
+                    m.picto
+                  )}
+                </span>
               </button>
               <div className="cmap-valeurs">
                 <span className="cmap-valeur-ligne">
