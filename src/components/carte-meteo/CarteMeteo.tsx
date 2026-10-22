@@ -370,6 +370,9 @@ interface Props {
   compact?: boolean;
 }
 
+/** Une sauvegarde par carte de la page (chacune a ses réglages de départ). */
+const cleCarteFigee = (reglages: unknown) => `carte-meteo-figee-v1:${JSON.stringify(reglages ?? {})}`;
+
 export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, reglages, compact = false }: Props) {
   const idCarte = useId();
   const nom = (base: string) => `${base}-${idCarte}`;
@@ -475,7 +478,99 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const villesAJour = donneesVilles?.modele === modele && donneesVilles.dateISO === dateISO && donneesVilles.departement === departement;
   const depVue = enDepartement ? departement : null;
 
+  // Carte figée : prévisions et retouches gardées dans le navigateur (même page fermée), plus de rechargement des prévisions.
+  const [figee, setFigee] = useState(false);
+  const [figeeLe, setFigeeLe] = useState<string | null>(null);
+  const [erreurFiger, setErreurFiger] = useState<string | null>(null);
   useEffect(() => {
+    if (compact) return;
+    try {
+      const brut = localStorage.getItem(cleCarteFigee(reglages));
+      if (!brut) return;
+      const e = JSON.parse(brut) as Record<string, unknown>;
+      if (typeof e.dateISO !== 'string') return;
+      if ('modele' in e) setModele(e.modele as never);
+      if ('modeleTouche' in e) setModeleTouche(e.modeleTouche as never);
+      if ('niveau' in e) setNiveau(e.niveau as never);
+      if ('region' in e) setRegion(e.region as never);
+      if ('departement' in e) setDepartement(e.departement as never);
+      if ('densite' in e) setDensite(e.densite as never);
+      if ('donneesVilles' in e) setDonneesVilles(e.donneesVilles as never);
+      if ('jeuPictos' in e) setJeuPictos(e.jeuPictos as never);
+      if ('tailleIcones' in e) setTailleIcones(e.tailleIcones as never);
+      if ('periode' in e) setPeriode(e.periode as never);
+      if ('miniMaxi' in e) setMiniMaxi(e.miniMaxi as never);
+      if ('donnees' in e) setDonnees(e.donnees as never);
+      if ('editions' in e) setEditions(e.editions as never);
+      if ('fond' in e) setFond(e.fond as never);
+      if ('niveauNoms' in e) setNiveauNoms(e.niveauNoms as never);
+      if ('afficherNoms' in e) setAfficherNoms(e.afficherNoms as never);
+      if ('seuilChoisi' in e) setSeuilChoisi(e.seuilChoisi as never);
+      if ('choixRafales' in e) setChoixRafales(e.choixRafales as never);
+      if ('styleVent' in e) setStyleVent(e.styleVent as never);
+      if ('afficherRessenti' in e) setAfficherRessenti(e.afficherRessenti as never);
+      if ('logoPresetId' in e) setLogoPresetId(e.logoPresetId as never);
+      if ('logoPersonnalise' in e) setLogoPersonnalise(e.logoPersonnalise as never);
+      if ('titreManuel' in e) setTitreManuel(e.titreManuel as never);
+      if ('sousTitreManuel' in e) setSousTitreManuel(e.sousTitreManuel as never);
+      if ('moyennesManuelles' in e) setMoyennesManuelles(e.moyennesManuelles as never);
+      if ('rafalesManuelles' in e) setRafalesManuelles(e.rafalesManuelles as never);
+      if ('ventsDeplaces' in e) setVentsDeplaces(e.ventsDeplaces as never);
+      if ('pictosDeplaces' in e) setPictosDeplaces(e.pictosDeplaces as never);
+      if ('ajouts' in e) setAjouts(e.ajouts as never);
+      if ('rafalesAjoutees' in e) setRafalesAjoutees(e.rafalesAjoutees as never);
+      if ('annotations' in e) setAnnotations(e.annotations as never);
+      if ('altitudeNeige' in e) setAltitudeNeige(e.altitudeNeige as never);
+      if ('altitudes' in e) setAltitudes(e.altitudes as never);
+      if ('pied' in e) setPied(e.pied as never);
+      if ('afficherFleuves' in e) setAfficherFleuves(e.afficherFleuves as never);
+      if ('densiteChoisie' in e) setDensiteFleuves(e.densiteChoisie as never);
+      if ('opaciteFleuves' in e) setOpaciteFleuves(e.opaciteFleuves as never);
+      if ('afficherFleches' in e) setAfficherFleches(e.afficherFleches as never);
+      if ('afficherRelief' in e) setAfficherRelief(e.afficherRelief as never);
+      if ('reliefPourcent' in e) setReliefPourcent(e.reliefPourcent as never);
+      if ('fondChoisi' in e) setFondChoisi(e.fondChoisi as never);
+      if (Array.isArray(e.rafalesRetirees)) setRafalesRetirees(new Set(e.rafalesRetirees as string[]));
+      if (Array.isArray(e.pictosRetires)) setPictosRetires(new Set(e.pictosRetires as string[]));
+      setJour(Math.round((Date.parse(e.dateISO) - Date.parse(aujourdhui)) / 86400000));
+      setFigeeLe(typeof e.figeeLe === 'string' ? e.figeeLe : null);
+      setFigee(true);
+    } catch {
+      // Sauvegarde illisible ou stockage bloqué : carte normale.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!figee || compact) return;
+    const minuteur = setTimeout(() => {
+      try {
+        localStorage.setItem(cleCarteFigee(reglages), JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, rafalesRetirees: [...rafalesRetirees], pictosRetires: [...pictosRetires], dateISO, figeeLe }));
+        setErreurFiger(null);
+      } catch {
+        setErreurFiger('Sauvegarde impossible dans ce navigateur (navigation privée ou stockage plein, logo importé trop lourd ?).');
+      }
+    }, 400);
+    return () => clearTimeout(minuteur);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, rafalesRetirees, pictosRetires, dateISO, figee, compact, figeeLe]);
+  function basculerFiger() {
+    if (figee) {
+      setFigee(false);
+      setFigeeLe(null);
+      setErreurFiger(null);
+      try {
+        localStorage.removeItem(cleCarteFigee(reglages));
+      } catch {
+        // rien à effacer
+      }
+    } else {
+      setFigee(true);
+      setFigeeLe(new Date().toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }));
+    }
+  }
+
+  useEffect(() => {
+    if (figee) return;
     // Modèle non publié pour cette zone (Harmonie 2 km hors du 66, ou en France / région) : AROME.
     if (!modeleDisponible(modele, depVue)) {
       setModele('arome');
@@ -491,10 +586,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       setModele(defaut);
       setErreur(null);
     }
-  }, [depVue, jour, modele, modeleTouche, reglages?.modele]);
+  }, [depVue, jour, modele, modeleTouche, reglages?.modele, figee]);
 
   useEffect(() => {
-    if (enDepartement || aJour || erreur) return;
+    if (figee || enDepartement || aJour || erreur) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}`, { signal: controleur.signal })
       .then(async (r) => {
@@ -521,10 +616,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         else setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
-  }, [enDepartement, aJour, erreur, modele, dateISO]);
+  }, [figee, enDepartement, aJour, erreur, modele, dateISO]);
 
   useEffect(() => {
-    if (!enDepartement || villesAJour || erreur) return;
+    if (figee || !enDepartement || villesAJour || erreur) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}&dep=${departement}`, { signal: controleur.signal })
       .then(async (r) => {
@@ -550,7 +645,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         else setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
-  }, [enDepartement, villesAJour, erreur, modele, dateISO, departement]);
+  }, [figee, enDepartement, villesAJour, erreur, modele, dateISO, departement]);
 
   const contoursDep = useContours(FICHIERS_CONTOURS.departements);
   const fleuves = useFleuves(afficherFleuves);
@@ -1282,7 +1377,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     }
   }
 
-  const chargement = !(enDepartement ? villesAJour : aJour) && !erreur;
+  const chargement = !figee && !(enDepartement ? villesAJour : aJour) && !erreur;
   const departementsTries = CODES_DEPARTEMENTS.map((code) => ({ code, nom: DEPARTEMENTS_FR[code] }));
 
   const legendeBarre = 'mb-1 block text-sm font-medium';
@@ -1685,6 +1780,19 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           >
             {enExport ? 'Export en cours…' : 'Exporter en JPG'}
           </button>
+          <button
+            type="button"
+            onClick={basculerFiger}
+            className={`rounded-lg px-5 py-2.5 text-sm font-medium ${figee ? 'border border-amber-500 bg-amber-50 text-amber-900' : 'border border-border'}`}
+            title="Garde la carte telle quelle (prévisions et retouches), même après fermeture de la page"
+          >
+            {figee ? '🔓 Défiger la carte' : '🔒 Figer la carte'}
+          </button>
+          {erreurFiger && (
+            <p role="alert" className="text-sm text-danger">
+              {erreurFiger}
+            </p>
+          )}
           {erreurExport && (
             <p role="alert" className="text-sm text-danger">
               {erreurExport}
@@ -1713,7 +1821,17 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       </aside>
 
       <div className="order-1 min-w-0 lg:order-2" ref={colonneRef}>
-        <div className="mb-3 flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+        {figee && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+            <span>
+              🔒 Carte figée{figeeLe ? ` le ${figeeLe}` : ''} : prévisions et retouches gardées, même en fermant la page. Les pictos, textes et valeurs restent modifiables.
+            </span>
+            <button type="button" onClick={basculerFiger} className="rounded-lg border border-amber-500 bg-white px-3 py-1 font-medium">
+              Défiger
+            </button>
+          </div>
+        )}
+        <div inert={figee || undefined} className={`mb-3 flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 ${figee ? 'opacity-50' : ''}`}>
           <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
             <p className={`${titreGroupe} w-full`}>Prévision</p>
             <fieldset>
