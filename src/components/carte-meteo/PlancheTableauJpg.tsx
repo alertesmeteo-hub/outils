@@ -8,7 +8,9 @@ import { COLONNES, uniteEntete, type Ligne } from '@/lib/carte-meteo/colonnes-re
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { STYLES_TABLEAU, type StyleTableau } from '@/lib/carte-meteo/styles-tableau';
+import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import { normaliser } from './CarteMeteo';
+import CarteInfo from './CarteInfo';
 
 /** Largeur logique de l'image (exportée à 1,5 ×) ; la hauteur dépend du nombre de lignes. */
 const LARGEUR = 1280;
@@ -115,6 +117,14 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
     return r;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lignesTriees, mesures]);
+
+  /** Carte de la même zone et de la même mesure (France, région ou département). */
+  const zoneCarte = departement ? `dep:${departement}` : region ? `reg:${region}` : 'france';
+  const pointsCarte = useMemo(() => {
+    if (!classement) return [];
+    const brut = pointsDuBilan(bilans, classement.id, altitudeMax || Infinity);
+    return classement.obs?.controle ? sansValeursAberrantes(brut) : brut;
+  }, [bilans, classement, altitudeMax]);
 
   const nomZone = departement ? `${DEPARTEMENTS_FR[departement] ?? departement} (${departement})` : region || 'France';
   const suffixeTitre = classement ? (sens === classement.ordre && classement.titreTop ? classement.titreTop.toUpperCase() : sens === 'asc' ? 'LES PLUS BAS' : 'LES PLUS ÉLEVÉS') : '';
@@ -404,6 +414,23 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
           </div>
         </div>
       </div>
+
+      {classement && (
+        <div className="mt-10">
+          <h3 className="mb-2 text-xl font-extrabold">Carte : {nomZone}</h3>
+          <CarteInfo
+            key={`${classement.id}-${zoneCarte}`}
+            theme={classement}
+            zone={zoneCarte}
+            points={pointsCarte}
+            sousTitre={fenetreDe(bilans, classement.id)}
+            logoId={logoId}
+            prefixeFichier={`carte-${classement.id}-${normaliser(nomZone).replace(/ /g, '-')}`}
+            contexte="Observations des stations Météo-France"
+            echelleValeurs={1.5}
+          />
+        </div>
+      )}
     </section>
   );
 }
