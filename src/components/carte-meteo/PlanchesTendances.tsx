@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
+import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
 import { THEMES_PREVISION, type ThemePrevision } from '@/lib/carte-meteo/cartes-info';
 import { DUREES_TENDANCES } from '@/lib/carte-meteo/previsions-modeles';
 import type { PointTendance } from '@/lib/carte-meteo/sources';
@@ -39,6 +40,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   const [avecPictos, setAvecPictos] = useState(true);
   const [logoId, setLogoId] = useState('aucun');
   const [taille, setTaille] = useState(1);
+  const [region, setRegion] = useState('');
 
   const reglage = THEMES_TENDANCES.find((t) => t.id === themeId)!;
   const themeBase = THEMES_PREVISION.find((t) => t.id === reglage.theme) as ThemePrevision;
@@ -86,6 +88,17 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           Avec les pictos (temps dominant)
         </label>
         <label className="text-sm font-medium">
+          <span className="mb-1 block">Zone</span>
+          <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectBarre}>
+            <option value="">France</option>
+            {REGIONS_FR.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
           <span className="mb-1 block">Taille des valeurs</span>
           <select value={taille} onChange={(e) => setTaille(Number(e.target.value))} className={selectBarre}>
             <option value={0.8}>Petites (plus de départements)</option>
@@ -121,7 +134,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
               ) : (
                 <CarteInfo
                   theme={theme}
-                  zone="france"
+                  zone={region ? `reg:${region}` : 'france'}
                   points={points}
                   pictos={avecPictos ? pictos : undefined}
                   echelleValeurs={taille}

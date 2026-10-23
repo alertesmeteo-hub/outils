@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import PlanchesJours from '@/components/carte-meteo/PlanchesJours';
 import PlanchesTendances from '@/components/carte-meteo/PlanchesTendances';
-import { aujourdhuiParis, DUREES_TENDANCES, estModele, MODELES, type ModeleSource } from '@/lib/carte-meteo/previsions-modeles';
-import { chargerPrevisionsTendances, type PointTendance } from '@/lib/carte-meteo/sources';
+import { versPointJour, type PointJour } from '@/lib/carte-meteo/planches-jours';
+import { aujourdhuiParis, ajouterJours, DUREES_TENDANCES, estModele, MODELES, type ModeleSource } from '@/lib/carte-meteo/previsions-modeles';
+import { chargerPrevisionsCarteJours, chargerPrevisionsTendances, type PointTendance } from '@/lib/carte-meteo/sources';
 
 // La date « du jour » doit être celle de la requête ; les fichiers de prévisions sont mis en cache côté serveur.
 export const dynamic = 'force-dynamic';
@@ -23,9 +25,13 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
   const aujourdhui = aujourdhuiParis();
 
   let periodes: Record<number, PointTendance[] | null> = {};
+  let jours: Record<string, PointJour[] | null> = {};
   let erreur = false;
   try {
-    periodes = await chargerPrevisionsTendances(modele, aujourdhui, [...DUREES_TENDANCES]);
+    const dates = Array.from({ length: 16 }, (_, k) => ajouterJours(aujourdhui, k));
+    const [p, j] = await Promise.all([chargerPrevisionsTendances(modele, aujourdhui, [...DUREES_TENDANCES]), chargerPrevisionsCarteJours(modele, dates, false)]);
+    periodes = p;
+    jours = Object.fromEntries(dates.map((d) => [d, j[d] ? j[d]!.map(versPointJour).filter((x): x is PointJour => x != null) : null]));
   } catch (e) {
     console.error('Planches tendances indisponibles', modele, e);
     erreur = true;
@@ -65,7 +71,13 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
           Prévisions momentanément indisponibles. Réessayez dans quelques minutes.
         </p>
       ) : (
-        <PlanchesTendances aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} periodes={periodes} />
+        <>
+          <div className="mt-8">
+            <PlanchesJours aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} jours={jours} />
+          </div>
+          <h2 className="mt-12 text-2xl font-extrabold">Cartes de tendance par thème</h2>
+          <PlanchesTendances aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} periodes={periodes} />
+        </>
       )}
 
       <p className="mt-8 text-xs text-muted">
