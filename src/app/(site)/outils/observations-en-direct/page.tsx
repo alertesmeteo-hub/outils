@@ -25,6 +25,9 @@ export default function PageObservationsDirect() {
         <Link href="/outils/temperatures-en-direct/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
           Températures en direct (relevés et records)
         </Link>
+        <Link href="/outils/releves-en-direct/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
+          Le super tableau de tous les relevés
+        </Link>
         <Link href="/classements/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
           Classements des stations
         </Link>

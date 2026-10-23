@@ -86,6 +86,17 @@ export default async function AllTools() {
           </Link>
         </li>
         <li>
+          <Link href="/outils/releves-en-direct/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">🗂️</span>
+            <span>
+              <strong className="block leading-snug">Relevés en direct : le super tableau</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Toutes les stations Météo-France dans un seul tableau : températures, pluie, rafales, pression, humidité, records de pluie. Tri, recherche, export CSV.
+              </span>
+            </span>
+          </Link>
+        </li>
+        <li>
           <Link href="/outils/records-temperature/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
             <span aria-hidden className="text-3xl">🌡️</span>
             <span>
