@@ -2,26 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
-import { GROUPE_OBS, GROUPE_PLUIE_DIRECT, RUBRIQUES_OBS, THEMES_BILAN, palierDe, texteInfo, type ThemeBilan } from '@/lib/carte-meteo/cartes-info';
+import { palierDe, texteInfo } from '@/lib/carte-meteo/cartes-info';
+import { COLONNES, RUBRIQUES, RUBRIQUE_RECORDS, uniteEntete, type Ligne, type Rubrique } from '@/lib/carte-meteo/colonnes-releves';
 import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import { normaliser } from './CarteMeteo';
 import { useBilans } from './useBilans';
-
-/** Rubriques de colonnes : celles des boutons des observations, puis les records de pluie. */
-const RUBRIQUE_RECORDS = 'Records de pluie';
-const RUBRIQUES = [...RUBRIQUES_OBS, RUBRIQUE_RECORDS] as const;
-type Rubrique = (typeof RUBRIQUES)[number];
-
-interface Colonne {
-  theme: ThemeBilan;
-  rubrique: Rubrique;
-}
-
-/** Colonnes : toutes les observations en direct, puis les records de pluie en 24 h (la pluie du jour figure déjà dans « Pluviométrie partielle »). */
-const COLONNES: Colonne[] = [
-  ...THEMES_BILAN.filter((t) => t.groupe === GROUPE_OBS && t.obs).map((t) => ({ theme: t, rubrique: t.obs!.rubrique as Rubrique })),
-  ...THEMES_BILAN.filter((t) => t.groupe === GROUPE_PLUIE_DIRECT && t.pluie && t.pluie.vue !== 'releve').map((t) => ({ theme: t, rubrique: RUBRIQUE_RECORDS as Rubrique })),
-];
+import PlancheTableauJpg from './PlancheTableauJpg';
 
 const PAR_PAGE = 100;
 const COULEURS_BOUTONS: Record<Rubrique, string> = {
@@ -32,17 +18,7 @@ const COULEURS_BOUTONS: Record<Rubrique, string> = {
   [RUBRIQUE_RECORDS]: 'bg-[#8e44ad] text-white',
 };
 
-interface Ligne {
-  code: string;
-  nom: string;
-  dep: string;
-  alt: number | null;
-  valeurs: Record<string, number>;
-}
-
 type Tri = { colonne: 'nom' | 'dep' | 'alt' | string; sens: 1 | -1 };
-
-const uniteEntete = (t: ThemeBilan) => (t.unite === '°' ? '°C' : t.unite);
 
 /** Une cellule d'un fichier CSV (séparateur « ; », virgule décimale : s'ouvre tel quel dans Excel en français). */
 const cellule = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
@@ -294,6 +270,7 @@ export default function TableauReleves() {
               </button>
             </p>
           )}
+          <PlancheTableauJpg lignes={lignes} departements={departements} bilans={bilans} />
         </>
       )}
     </div>
