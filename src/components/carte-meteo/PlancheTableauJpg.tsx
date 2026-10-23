@@ -24,7 +24,7 @@ const ALTITUDES = [300, 500, 1000, 1500] as const;
 
 /** Modèles de tableaux : mesures affichées (la première classe les stations) et sens du classement. */
 const MODELES = [
-  { id: 'pluie', libelle: '🌧️ Pluie', mesures: ['obs-rr24', 'obs-rr6'], sens: 'desc' },
+  { id: 'pluie', libelle: '🌧️ Pluie', mesures: ['obs-rr24', 'obs-rr48', 'obs-rr72', 'obs-rr6'], sens: 'desc' },
   { id: 'rafales', libelle: '💨 Rafales', mesures: ['obs-raf24', 'obs-raf1'], sens: 'desc' },
   { id: 'pluie-vent', libelle: '🌧️💨 Pluie et vent', mesures: ['obs-rr24', 'obs-raf24', 'obs-rr6', 'obs-raf1'], sens: 'desc' },
   { id: 'maxi', libelle: '🔥 Maxi', mesures: ['obs-tx24', 'obs-tx12', 'obs-t'], sens: 'desc' },
