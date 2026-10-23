@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 /** Classements glissants (sans fenêtre fixe) : durée affichée devant la date de fin. */
 const DUREES: Record<string, string> = {
   t: 'relevé', snow: 'relevé', humidex: 'relevé', windchill: 'relevé', pmer: 'relevé', u: 'relevé',
-  rr24: '24 h', rr72: '72 h', raf24: '24 h', insol24: '24 h', raf1: '1 h', dp3: '3 h', dt24: '24 h', tx12: '12 h', tn12: '12 h', tx24: '24 h', tn24: '24 h',
+  rr24: '24 h', rr72: '72 h', raf24: '24 h', insol24: '24 h', raf1: '1 h', dp3: '3 h', dp6: '6 h', dp9: '9 h', dp12: '12 h', dp24: '24 h', dt24: '24 h', tx12: '12 h', tn12: '12 h', tx24: '24 h', tn24: '24 h',
 };
 
 /** Classements lus dans les relevés 6 min quand ils sont frais : leur carte est datée de ce relevé, pas du relevé horaire. */

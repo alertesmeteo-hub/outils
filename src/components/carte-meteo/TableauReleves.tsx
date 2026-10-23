@@ -113,63 +113,6 @@ export default function TableauReleves() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
-        <label className="text-sm font-medium">
-          <span className="mb-1 block">Station ou département</span>
-          <input
-            type="search"
-            value={recherche}
-            onChange={(e) => {
-              setRecherche(e.target.value);
-              setAffichees(PAR_PAGE);
-            }}
-            placeholder="Perpignan, 66, Finistère…"
-            className={`${selectBarre} w-56`}
-          />
-        </label>
-        <label className="text-sm font-medium">
-          <span className="mb-1 block">Département</span>
-          <select
-            value={departement}
-            onChange={(e) => {
-              setDepartement(e.target.value);
-              setAffichees(PAR_PAGE);
-            }}
-            className={selectBarre}
-          >
-            <option value="">Tous</option>
-            {departements.map((d) => (
-              <option key={d} value={d}>
-                {d} — {DEPARTEMENTS_FR[d] ?? d}
-              </option>
-            ))}
-          </select>
-        </label>
-        <fieldset>
-          <legend className="mb-1 text-sm font-medium">Colonnes</legend>
-          <div className="flex flex-wrap gap-2">
-            {RUBRIQUES.map((r) => (
-              <button
-                key={r}
-                type="button"
-                aria-pressed={rubriques.has(r)}
-                onClick={() => basculer(r)}
-                className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide shadow-sm ${rubriques.has(r) ? COULEURS_BOUTONS[r] : 'border border-border bg-bg text-muted line-through'}`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
-          <input type="checkbox" checked={couleurs} onChange={(e) => setCouleurs(e.target.checked)} />
-          Couleurs des cartes
-        </label>
-        <button type="button" onClick={exporterCsv} disabled={!bilans || visibles.length === 0} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold disabled:opacity-60">
-          Exporter en CSV
-        </button>
-      </div>
-
       {erreur && (
         <p role="alert" className="mt-4 flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-danger">
           {erreur}
@@ -180,98 +123,158 @@ export default function TableauReleves() {
       )}
       {!bilans && !erreur && <p className="mt-4 text-sm text-muted">Chargement des relevés…</p>}
 
+      {bilans && <PlancheTableauJpg lignes={lignes} departements={departements} bilans={bilans} />}
+
       {bilans && (
-        <>
-          <p className="mt-4 text-sm text-muted">
-            {visibles.length} station{visibles.length > 1 ? 's' : ''}
-            {bilans.majA && (
-              <>
-                {' '}
-                · relevés Météo-France, mise à jour {new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}
-              </>
-            )}
-            . Cliquez sur un titre de colonne pour trier. Chaque colonne a sa période (24 h, 12 h, dernière mesure…) : survolez le titre.
-          </p>
-          <div className="mt-2 max-h-[75vh] overflow-auto rounded-xl border border-border">
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr>
-                  <th scope="col" aria-sort={ariaTri('nom')} onClick={() => trier('nom', 1)} className={`${entete} left-0 z-20`}>
-                    Station{fleche('nom')}
-                  </th>
-                  <th scope="col" aria-sort={ariaTri('dep')} onClick={() => trier('dep', 1)} className={entete}>
-                    Dép.{fleche('dep')}
-                  </th>
-                  <th scope="col" aria-sort={ariaTri('alt')} onClick={() => trier('alt', -1)} className={`${entete} text-right`}>
-                    Alt. (m){fleche('alt')}
-                  </th>
-                  {colonnes.map(({ theme }) => (
-                    <th
-                      key={theme.id}
-                      scope="col"
-                      aria-sort={ariaTri(theme.id)}
-                      onClick={() => trier(theme.id, -1)}
-                      title={`${theme.titre}${bilans.cartes[theme.id]?.fenetre ? ` — ${bilans.cartes[theme.id].fenetre}` : ''}`}
-                      className={`${entete} text-right`}
-                    >
-                      {theme.court}
-                      {uniteEntete(theme) ? <span className="font-normal normal-case text-muted"> ({uniteEntete(theme)})</span> : null}
-                      {fleche(theme.id)}
+        <section id="tableau-complet" className="mt-12 scroll-mt-4">
+          <h2 className="text-2xl font-extrabold">Le tableau complet</h2>
+          <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
+            <label className="text-sm font-medium">
+              <span className="mb-1 block">Station ou département</span>
+              <input
+                type="search"
+                value={recherche}
+                onChange={(e) => {
+                  setRecherche(e.target.value);
+                  setAffichees(PAR_PAGE);
+                }}
+                placeholder="Perpignan, 66, Finistère…"
+                className={`${selectBarre} w-56`}
+              />
+            </label>
+            <label className="text-sm font-medium">
+              <span className="mb-1 block">Département</span>
+              <select
+                value={departement}
+                onChange={(e) => {
+                  setDepartement(e.target.value);
+                  setAffichees(PAR_PAGE);
+                }}
+                className={selectBarre}
+              >
+                <option value="">Tous</option>
+                {departements.map((d) => (
+                  <option key={d} value={d}>
+                    {d} — {DEPARTEMENTS_FR[d] ?? d}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <fieldset>
+              <legend className="mb-1 text-sm font-medium">Colonnes</legend>
+              <div className="flex flex-wrap gap-2">
+                {RUBRIQUES.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    aria-pressed={rubriques.has(r)}
+                    onClick={() => basculer(r)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide shadow-sm ${rubriques.has(r) ? COULEURS_BOUTONS[r] : 'border border-border bg-bg text-muted line-through'}`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
+              <input type="checkbox" checked={couleurs} onChange={(e) => setCouleurs(e.target.checked)} />
+              Couleurs des cartes
+            </label>
+            <button type="button" onClick={exporterCsv} disabled={!bilans || visibles.length === 0} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold disabled:opacity-60">
+              Exporter en CSV
+            </button>
+          </div>
+
+
+            <p className="mt-4 text-sm text-muted">
+              {visibles.length} station{visibles.length > 1 ? 's' : ''}
+              {bilans.majA && (
+                <>
+                  {' '}
+                  · relevés Météo-France, mise à jour {new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}
+                </>
+              )}
+              . Cliquez sur un titre de colonne pour trier. Chaque colonne a sa période (24 h, 12 h, dernière mesure…) : survolez le titre.
+            </p>
+            <div className="mt-2 max-h-[75vh] overflow-auto rounded-xl border border-border">
+              <table className="min-w-full border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th scope="col" aria-sort={ariaTri('nom')} onClick={() => trier('nom', 1)} className={`${entete} left-0 z-20`}>
+                      Station{fleche('nom')}
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visibles.slice(0, affichees).map((l) => (
-                  <tr key={l.code} className="border-b border-border/60 hover:bg-surface">
-                    <th scope="row" className="sticky left-0 z-10 whitespace-nowrap bg-bg px-3 py-1.5 text-left font-semibold">
-                      {l.nom}
+                    <th scope="col" aria-sort={ariaTri('dep')} onClick={() => trier('dep', 1)} className={entete}>
+                      Dép.{fleche('dep')}
                     </th>
-                    <td className="whitespace-nowrap px-3 py-1.5 text-muted" title={DEPARTEMENTS_FR[l.dep]}>
-                      {l.dep}
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-muted">{l.alt ?? '–'}</td>
-                    {colonnes.map(({ theme }) => {
-                      const v = l.valeurs[theme.id];
-                      if (v == null) {
+                    <th scope="col" aria-sort={ariaTri('alt')} onClick={() => trier('alt', -1)} className={`${entete} text-right`}>
+                      Alt. (m){fleche('alt')}
+                    </th>
+                    {colonnes.map(({ theme }) => (
+                      <th
+                        key={theme.id}
+                        scope="col"
+                        aria-sort={ariaTri(theme.id)}
+                        onClick={() => trier(theme.id, -1)}
+                        title={`${theme.titre}${bilans.cartes[theme.id]?.fenetre ? ` — ${bilans.cartes[theme.id].fenetre}` : ''}`}
+                        className={`${entete} text-right`}
+                      >
+                        {theme.court}
+                        {uniteEntete(theme) ? <span className="font-normal normal-case text-muted"> ({uniteEntete(theme)})</span> : null}
+                        {fleche(theme.id)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibles.slice(0, affichees).map((l) => (
+                    <tr key={l.code} className="border-b border-border/60 hover:bg-surface">
+                      <th scope="row" className="sticky left-0 z-10 whitespace-nowrap bg-bg px-3 py-1.5 text-left font-semibold">
+                        {l.nom}
+                      </th>
+                      <td className="whitespace-nowrap px-3 py-1.5 text-muted" title={DEPARTEMENTS_FR[l.dep]}>
+                        {l.dep}
+                      </td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-muted">{l.alt ?? '–'}</td>
+                      {colonnes.map(({ theme }) => {
+                        const v = l.valeurs[theme.id];
+                        if (v == null) {
+                          return (
+                            <td key={theme.id} className="px-3 py-1.5 text-right text-muted">
+                              –
+                            </td>
+                          );
+                        }
+                        const palier = couleurs ? palierDe(theme.paliers, v) : null;
+                        const teinte = palier && !palier.neutre ? { background: palier.fond, color: palier.texte } : undefined;
                         return (
-                          <td key={theme.id} className="px-3 py-1.5 text-right text-muted">
-                            –
+                          <td key={theme.id} style={teinte} className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">
+                            {texteInfo(theme, v)}
                           </td>
                         );
-                      }
-                      const palier = couleurs ? palierDe(theme.paliers, v) : null;
-                      const teinte = palier && !palier.neutre ? { background: palier.fond, color: palier.texte } : undefined;
-                      return (
-                        <td key={theme.id} style={teinte} className="whitespace-nowrap px-3 py-1.5 text-right font-semibold tabular-nums">
-                          {texteInfo(theme, v)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-                {visibles.length === 0 && (
-                  <tr>
-                    <td colSpan={3 + colonnes.length} className="px-3 py-6 text-center text-muted">
-                      Aucune station ne correspond.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {visibles.length > affichees && (
-            <p className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-              <button type="button" onClick={() => setAffichees((n) => n + PAR_PAGE)} className="rounded-lg border border-border px-4 py-2 font-semibold">
-                Afficher {Math.min(PAR_PAGE, visibles.length - affichees)} de plus
-              </button>
-              <button type="button" onClick={() => setAffichees(visibles.length)} className="rounded-lg border border-border px-4 py-2 font-semibold">
-                Tout afficher ({visibles.length})
-              </button>
-            </p>
-          )}
-          <PlancheTableauJpg lignes={lignes} departements={departements} bilans={bilans} />
-        </>
+                      })}
+                    </tr>
+                  ))}
+                  {visibles.length === 0 && (
+                    <tr>
+                      <td colSpan={3 + colonnes.length} className="px-3 py-6 text-center text-muted">
+                        Aucune station ne correspond.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {visibles.length > affichees && (
+              <p className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                <button type="button" onClick={() => setAffichees((n) => n + PAR_PAGE)} className="rounded-lg border border-border px-4 py-2 font-semibold">
+                  Afficher {Math.min(PAR_PAGE, visibles.length - affichees)} de plus
+                </button>
+                <button type="button" onClick={() => setAffichees(visibles.length)} className="rounded-lg border border-border px-4 py-2 font-semibold">
+                  Tout afficher ({visibles.length})
+                </button>
+              </p>
+            )}
+        </section>
       )}
     </div>
   );

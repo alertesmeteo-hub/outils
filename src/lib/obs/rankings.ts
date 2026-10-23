@@ -175,7 +175,7 @@ export type RankingId =
   | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin' | 'tn12' | 'tn24'
   | 'rr1' | 'rr3' | 'rr12' | 'rr24' | 'rr6' | 'rr24c' | 'rr48' | 'rr72'
   | 'ff' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf24' | 'raf48' | 'raf72'
-  | 'pmer' | 'dp3' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
+  | 'pmer' | 'dp3' | 'dp6' | 'dp9' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
   | 'td' | 'windchill' | 'humidex' | 'sol10' | 'sol20' | 'sol50' | 'sol100'
   | 'n-tx' | 'n-tn' | 'n-tx24' | 'n-tn24' | 'e-recm-tx' | 'e-recm-tn' | 'e-reca-tx' | 'e-reca-tn';
 
@@ -335,6 +335,8 @@ export const RANKINGS: Ranking[] = [
 
   { id: 'pmer', short: 'Pression mer', label: 'Classement de la pression au niveau de la mer', group: C, unit: 'hPa', digits: 1, order: 'desc', instant: true, value: (o, w, n, c) => six6('pmer', c) ?? cur('pmer')(o, w, n) },
   { id: 'dp3', short: 'Variation 3 h', label: 'Classement de la variation de pression sur 3 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 3) },
+  { id: 'dp6', short: 'Variation 6 h', label: 'Classement de la variation de pression sur 6 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 6) },
+  { id: 'dp9', short: 'Variation 9 h', label: 'Classement de la variation de pression sur 9 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 9) },
   { id: 'dp12', short: 'Variation 12 h', label: 'Classement de la variation de pression sur 12 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 12) },
   { id: 'dp24', short: 'Variation 24 h', label: 'Classement de la variation de pression sur 24 heures', group: C, unit: 'hPa', digits: 1, order: 'abs', signed: true, instant: true, showPmer: true, value: variation('pmer', 24) },
   { id: 'u', short: 'Humidité', label: 'Classement de l’humidité relative', group: C, unit: '%', digits: 0, order: 'desc', instant: true, value: (o, w, n, c) => six6('u', c) ?? cur('u')(o, w, n) },
