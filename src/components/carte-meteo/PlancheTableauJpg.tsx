@@ -134,7 +134,7 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
   const pasLigne = HAUTEUR_LIGNE + st.ecart;
   const hauteur = HAUTEUR_ENTETE + HAUTEUR_TITRES_COLONNES + Math.max(lignesTriees.length, 1) * pasLigne + HAUTEUR_PIED;
   // Plus il y a de mesures, plus la colonne « station » se resserre.
-  const largeurMesure = colonnesChoisies.length > 4 ? 150 : 180;
+  const largeurMesure = st.valeur === 'barre' ? (colonnesChoisies.length > 4 ? 170 : colonnesChoisies.length > 2 ? 210 : 300) : colonnesChoisies.length > 4 ? 150 : 180;
   const marge = st.ecart ? 28 : 36;
   // Titre sur une seule ligne : police réduite quand il est long (Impact est étroite, les autres polices plus larges).
   const largeurTitre = LARGEUR - 2 * marge - 52 - (logo?.fichier ? 230 : 0);
@@ -175,9 +175,9 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
       const { min, max } = etendues[theme.id] ?? { min: 0, max: 0 };
       const part = max === min ? 1 : 0.5 + (0.5 * (v - min)) / (max - min);
       return (
-        <span style={{ display: 'block', width: largeurMesure - 24, height: 34, background: st.barreFond, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
+        <span style={{ display: 'block', width: largeurMesure - 12, height: 44, background: st.barreFond, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(part * 100)}%`, background: fond, borderRadius: 6 }} />
-          <span style={{ position: 'absolute', left: 10, top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontFamily: st.policeValeur, fontSize: 22, lineHeight: 1, color: texte }}>{nombre}</span>
+          <span style={{ position: 'absolute', left: 12, top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontFamily: st.policeValeur, fontSize: 29, lineHeight: 1, color: texte }}>{nombre}</span>
         </span>
       );
     }
