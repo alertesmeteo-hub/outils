@@ -132,6 +132,7 @@ function BadgeVent({
   direction,
   ressenti,
   style,
+  flecheGrande = false,
 }: {
   rafale: number;
   texteRafale: string;
@@ -139,6 +140,8 @@ function BadgeVent({
   direction: number | null;
   ressenti: number | null;
   style: StyleVent;
+  /** Carte de département (pictos agrandis) : flèche plus grande, sans changer la hauteur de la pastille. */
+  flecheGrande?: boolean;
 }) {
   const { fond, texte } = couleurRafale(rafale);
   const nombre = Number(texteRafale);
@@ -154,7 +157,7 @@ function BadgeVent({
       <>
       <div className="cmap-vent" style={{ background: fond, color: texte }} title="Rafales maximales (km/h)">
         {direction != null && (
-          <svg viewBox="-12 -12 24 24" style={{ width: '1.15em', height: '1.15em', flex: 'none' }} aria-hidden>
+          <svg viewBox="-12 -12 24 24" style={flecheGrande ? { width: '1.5em', height: '1.5em', margin: '-0.07em 0', flex: 'none' } : { width: '1.15em', height: '1.15em', flex: 'none' }} aria-hidden>
             <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" fill={texte} stroke={texte} strokeWidth={1} strokeLinejoin="round" transform={`rotate(${direction})`} />
           </svg>
         )}
@@ -601,6 +604,7 @@ export default function CarteRendu({
                   direction={angleFleche(r.provenance)}
                   ressenti={null}
                   style={styleVent}
+                  flecheGrande={grosPictos}
                 />
               </div>
               {directionOuvertePour === r.code && (
@@ -739,6 +743,7 @@ export default function CarteRendu({
                 direction={m.direction ?? null}
                 ressenti={m.ressenti ?? null}
                 style={styleVent}
+                flecheGrande={grosPictos}
               />
               </div>
             )}
