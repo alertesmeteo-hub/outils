@@ -50,7 +50,7 @@ interface Props {
 
 /**
  * Tableau en JPG : le classement des stations sur une mesure (pluie, rafales, maxi, mini, pression…), avec les mesures voisines en colonnes,
- * dans l'un des onze styles (voir styles-tableau.ts), et exporté en image. Limité à une zone et à une altitude.
+ * dans l'un des quatorze styles (voir styles-tableau.ts), et exporté en image. Limité à une zone et à une altitude.
  */
 export default function PlancheTableauJpg({ lignes, departements, bilans }: Props) {
   const [modeleId, setModeleId] = useState<(typeof MODELES)[number]['id']>('pluie');
@@ -194,7 +194,7 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
     <section id="tableau-jpg" className="scroll-mt-4">
       <h2 className="text-2xl font-extrabold">Tableaux en JPG</h2>
       <p className="mt-1 max-w-3xl text-sm text-muted">
-        Le classement des stations sur une mesure (pluie, rafales, maxi, mini, pression…), avec les mesures voisines en colonnes, dans l&apos;un des onze styles
+        Le classement des stations sur une mesure (pluie, rafales, maxi, mini, pression…), avec les mesures voisines en colonnes, dans l&apos;un des quatorze styles
         proposés, exporté en image. Choisissez un modèle, un style, la zone et le nombre de lignes ; changez les mesures à volonté (six au plus, la première classe les stations).
       </p>
 
