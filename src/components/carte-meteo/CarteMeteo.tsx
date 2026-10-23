@@ -374,6 +374,8 @@ interface Props {
 
 /** Une sauvegarde par carte de la page (chacune a ses réglages de départ). */
 const cleCarteFigee = (reglages: unknown) => `carte-meteo-figee-v1:${JSON.stringify(reglages ?? {})}`;
+/** Paramètres mémorisés : un jeu par carte de la page, comme la carte figée. */
+const cleParametres = (reglages: unknown) => `carte-meteo-parametres-v1:${JSON.stringify(reglages ?? {})}`;
 
 export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, reglages, compact = false }: Props) {
   const idCarte = useId();
@@ -413,6 +415,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [choixRafales, setChoixRafales] = useState<NombreRafales | null>(null);
   const [styleVent, setStyleVent] = useState<StyleVent>('pastille');
   const [afficherRessenti, setAfficherRessenti] = useState(false);
+  /** Taille des pastilles de rafale (%), toutes zones. */
+  const [tailleVent, setTailleVent] = useState(100);
   const [logoPresetId, setLogoPresetId] = useState<string | null>(null);
   const [logoPersonnalise, setLogoPersonnalise] = useState<string | null>(null);
   const [titreManuel, setTitreManuel] = useState<string | null>(null);
@@ -480,6 +484,81 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const villesAJour = donneesVilles?.modele === modele && donneesVilles.dateISO === dateISO && donneesVilles.departement === departement;
   const depVue = enDepartement ? departement : null;
 
+  // Paramètres mémorisés : tous les réglages (zone, modèle, tailles, rafales, fond, logo, textes à poser…), gardés dans le navigateur
+  // et rétablis à la prochaine ouverture. Pas les prévisions ni les retouches faites sur la carte (voir « Figer la carte »).
+  const [memoriser, setMemoriser] = useState(false);
+  const [erreurMemo, setErreurMemo] = useState<string | null>(null);
+  const parametres = JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, jeuPictos, tailleIcones, tailleVent, periode, miniMaxi, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, altitudeNeige, reglagesTexte, tailleIcone, texteNouveau, iconeNouvelle, rafaleNouvelle, provenanceNouvelle });
+  useEffect(() => {
+    if (compact) return;
+    try {
+      const brut = localStorage.getItem(cleParametres(reglages));
+      if (!brut) return;
+      const e = JSON.parse(brut) as Record<string, unknown>;
+      if ('modele' in e) setModele(e.modele as never);
+      if ('modeleTouche' in e) setModeleTouche(e.modeleTouche as never);
+      if ('niveau' in e) setNiveau(e.niveau as never);
+      if ('region' in e) setRegion(e.region as never);
+      if ('departement' in e) setDepartement(e.departement as never);
+      if ('densite' in e) setDensite(e.densite as never);
+      if ('jeuPictos' in e && e.jeuPictos !== jeuRef.current) changerJeuPictos(e.jeuPictos as JeuPictos);
+      if ('tailleIcones' in e) setTailleIcones(e.tailleIcones as never);
+      if ('tailleVent' in e) setTailleVent(e.tailleVent as never);
+      if ('periode' in e) setPeriode(e.periode as never);
+      if ('miniMaxi' in e) setMiniMaxi(e.miniMaxi as never);
+      if ('fond' in e) setFond(e.fond as never);
+      if ('niveauNoms' in e) setNiveauNoms(e.niveauNoms as never);
+      if ('afficherNoms' in e) setAfficherNoms(e.afficherNoms as never);
+      if ('seuilChoisi' in e) setSeuilChoisi(e.seuilChoisi as never);
+      if ('choixRafales' in e) setChoixRafales(e.choixRafales as never);
+      if ('styleVent' in e) setStyleVent(e.styleVent as never);
+      if ('afficherRessenti' in e) setAfficherRessenti(e.afficherRessenti as never);
+      if ('logoPresetId' in e) setLogoPresetId(e.logoPresetId as never);
+      if ('pied' in e) setPied(e.pied as never);
+      if ('afficherFleuves' in e) setAfficherFleuves(e.afficherFleuves as never);
+      if ('densiteChoisie' in e) setDensiteFleuves(e.densiteChoisie as never);
+      if ('opaciteFleuves' in e) setOpaciteFleuves(e.opaciteFleuves as never);
+      if ('afficherFleches' in e) setAfficherFleches(e.afficherFleches as never);
+      if ('afficherRelief' in e) setAfficherRelief(e.afficherRelief as never);
+      if ('reliefPourcent' in e) setReliefPourcent(e.reliefPourcent as never);
+      if ('fondChoisi' in e) setFondChoisi(e.fondChoisi as never);
+      if ('altitudeNeige' in e) setAltitudeNeige(e.altitudeNeige as never);
+      if ('reglagesTexte' in e) setReglagesTexte(e.reglagesTexte as never);
+      if ('tailleIcone' in e) setTailleIcone(e.tailleIcone as never);
+      if ('texteNouveau' in e) setTexteNouveau(e.texteNouveau as never);
+      if ('iconeNouvelle' in e) setIconeNouvelle(e.iconeNouvelle as never);
+      if ('rafaleNouvelle' in e) setRafaleNouvelle(e.rafaleNouvelle as never);
+      if ('provenanceNouvelle' in e) setProvenanceNouvelle(e.provenanceNouvelle as never);
+      setMemoriser(true);
+    } catch {
+      // Sauvegarde illisible ou stockage bloqué : réglages par défaut.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (compact || !memoriser) return;
+    const minuteur = setTimeout(() => {
+      try {
+        localStorage.setItem(cleParametres(reglages), parametres);
+        setErreurMemo(null);
+      } catch {
+        setErreurMemo('Sauvegarde impossible dans ce navigateur (navigation privée ou stockage plein).');
+      }
+    }, 400);
+    return () => clearTimeout(minuteur);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parametres, memoriser, compact]);
+  function basculerMemoriser(actif: boolean) {
+    setMemoriser(actif);
+    if (actif) return;
+    setErreurMemo(null);
+    try {
+      localStorage.removeItem(cleParametres(reglages));
+    } catch {
+      // rien à effacer
+    }
+  }
+
   // Carte figée : prévisions et retouches gardées dans le navigateur (même page fermée), plus de rechargement des prévisions.
   const [figee, setFigee] = useState(false);
   const [figeeLe, setFigeeLe] = useState<string | null>(null);
@@ -510,6 +589,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       if ('seuilChoisi' in e) setSeuilChoisi(e.seuilChoisi as never);
       if ('choixRafales' in e) setChoixRafales(e.choixRafales as never);
       if ('styleVent' in e) setStyleVent(e.styleVent as never);
+      if ('tailleVent' in e) setTailleVent(e.tailleVent as never);
       if ('afficherRessenti' in e) setAfficherRessenti(e.afficherRessenti as never);
       if ('logoPresetId' in e) setLogoPresetId(e.logoPresetId as never);
       if ('logoPersonnalise' in e) setLogoPersonnalise(e.logoPersonnalise as never);
@@ -546,7 +626,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     if (!figee || compact) return;
     const minuteur = setTimeout(() => {
       try {
-        localStorage.setItem(cleCarteFigee(reglages), JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, rafalesRetirees: [...rafalesRetirees], pictosRetires: [...pictosRetires], dateISO, figeeLe }));
+        localStorage.setItem(cleCarteFigee(reglages), JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, rafalesRetirees: [...rafalesRetirees], pictosRetires: [...pictosRetires], dateISO, figeeLe }));
         setErreurFiger(null);
       } catch {
         setErreurFiger('Sauvegarde impossible dans ce navigateur (navigation privée ou stockage plein, logo importé trop lourd ?).');
@@ -554,7 +634,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     }, 400);
     return () => clearTimeout(minuteur);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, rafalesRetirees, pictosRetires, dateISO, figee, compact, figeeLe]);
+  }, [modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, rafalesRetirees, pictosRetires, dateISO, figee, compact, figeeLe]);
   function basculerFiger() {
     if (figee) {
       setFigee(false);
@@ -1045,9 +1125,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       };
     });
     // Taille de la pastille de rafale d'un marqueur (plus petite sous SEUIL_VENT_REDUIT).
-    const tailleVent = (m: Marqueur) => {
+    const tailleVentDe = (m: Marqueur) => {
       const reduit = (m.rafale ?? 0) < SEUIL_VENT_REDUIT;
-      const k = (reduit ? ECHELLE_VENT_REDUIT : 1) * em;
+      const k = (reduit ? ECHELLE_VENT_REDUIT : 1) * em * (tailleVent / 100);
       return { reduit, w: LARGEUR_VENT[styleVent] * k, h: (HAUTEUR_VENT[styleVent] + (m.ressenti != null ? HAUTEUR_RESSENTI : 0)) * k };
     };
     // France et départements : aucune position de repli en mer (le décalage anti-chevauchement reste sur la terre).
@@ -1081,7 +1161,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const ajouteesIci = rafalesAjoutees
       .filter((r) => r.zone === zone)
       .map((r) => {
-        const k = (valeurRafaleSaisie(r.texte) < SEUIL_VENT_REDUIT ? ECHELLE_VENT_REDUIT : 1) * em;
+        const k = (valeurRafaleSaisie(r.texte) < SEUIL_VENT_REDUIT ? ECHELLE_VENT_REDUIT : 1) * em * (tailleVent / 100);
         const w = LARGEUR_VENT[styleVent] * k;
         const h = HAUTEUR_VENT[styleVent] * k;
         return { x: r.x - w / 2, y: r.y - h / 2, w, h };
@@ -1098,7 +1178,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const avecVent = retenus.filter((m) => m.rafale != null).sort((a, b) => (b.rafale ?? 0) - (a.rafale ?? 0));
     const positions = new Map<string, { dx: number; dy: number; reduit: boolean }>();
     for (const m of avecVent) {
-      const { reduit, w, h } = tailleVent(m);
+      const { reduit, w, h } = tailleVentDe(m);
       const e = elementDe.get(m.code)!;
       // La pastille est toujours collée à son picto (dessous de préférence, sinon dessus, à droite ou à gauche) : on ne la pose jamais
       // ailleurs, sinon on ne sait plus à quel picto elle appartient. Le rectangle du picto est retiré des zones occupées
@@ -1159,7 +1239,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       return m.rafale != null ? { ...m, rafale: null, ressenti: null } : m;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees, miniMaxiAM, xTitreFrance, tailleIcones]);
+  }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees, miniMaxiAM, xTitreFrance, tailleIcones, tailleVent]);
 
   const altitudeDe = (code: string, picto: string) => (estPictoNeige(picto) ? altitudes[`${periode}|${code}`] ?? altitudeNeige : undefined);
   const marqueursAffiches: Marqueur[] = [
@@ -1447,6 +1527,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       styleCapture={modeCapture}
       pictosEmoji={jeuPictos === 'emoji'}
       styleVent={styleVent}
+      echelleVent={tailleVent / 100}
       couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
       onModifierMoyenne={(id, v) => saisieAcceptee(v, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne(id)]: v }))}
@@ -1795,6 +1876,18 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               {erreurFiger}
             </p>
           )}
+          <label className="flex items-start gap-2 text-sm" title="Garde tous les réglages de la carte (zone, modèle, tailles, rafales, fond, logo…) pour la prochaine ouverture, sans les prévisions">
+            <input type="checkbox" checked={memoriser} onChange={(e) => basculerMemoriser(e.target.checked)} className="mt-1" />
+            <span>
+              💾 Sauvegarder tous les paramètres
+              <span className="block text-xs text-muted">Rétablis à chaque ouverture de cette carte, sur cet appareil.</span>
+            </span>
+          </label>
+          {erreurMemo && (
+            <p role="alert" className="text-sm text-danger">
+              {erreurMemo}
+            </p>
+          )}
           {erreurExport && (
             <p role="alert" className="text-sm text-danger">
               {erreurExport}
@@ -2097,6 +2190,15 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               <option value="pastille">Pastille (flèche + valeur)</option>
               <option value="rond">Rond fléché</option>
             </select>
+          </label>
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Taille des rafales : {tailleVent} %</span>
+            <input type="range" min={50} max={200} step={5} value={tailleVent} onChange={(e) => setTailleVent(Number(e.target.value))} className="block w-40" aria-label="Taille des pictos de vent en pourcentage" />
+            {tailleVent !== 100 && (
+              <button type="button" className="btn-ghost mt-1 rounded-md px-2 py-1 text-xs" onClick={() => setTailleVent(100)}>
+                Revenir à 100 %
+              </button>
+            )}
           </label>
           <label className="flex items-center gap-2 pb-1.5 text-sm">
             <input type="checkbox" checked={afficherRessenti} onChange={(e) => setAfficherRessenti(e.target.checked)} />

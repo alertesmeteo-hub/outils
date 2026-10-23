@@ -263,6 +263,8 @@ interface Props {
   echelleMarqueurs: number;
   /** Taille des pictos seuls (1 = normale), sans changer les températures : réglage « Taille des icônes » en %. */
   echellePictos?: number;
+  /** Taille des pastilles de rafale (1 = normale). */
+  echelleVent?: number;
   afficherNoms: boolean;
   titre: string;
   sousTitre: string;
@@ -353,6 +355,7 @@ export default function CarteRendu({
   marqueurs,
   echelleMarqueurs,
   echellePictos = 1,
+  echelleVent = 1,
   afficherNoms,
   titre,
   sousTitre,
@@ -576,7 +579,7 @@ export default function CarteRendu({
             >
               <div
                 className={`cmap-vent-place ${onDeplacerRafaleAjoutee ? 'cmap-vent-mobile' : ''}`}
-                style={valeur < SEUIL_VENT_REDUIT ? { fontSize: `${ECHELLE_VENT_REDUIT}em` } : undefined}
+                style={(valeur < SEUIL_VENT_REDUIT ? ECHELLE_VENT_REDUIT : 1) * echelleVent !== 1 ? { fontSize: `${(valeur < SEUIL_VENT_REDUIT ? ECHELLE_VENT_REDUIT : 1) * echelleVent}em` } : undefined}
                 title="Clic : changer la direction du vent · glisser : déplacer"
                 onPointerDown={(e) => debutGlisser(e, r.x, r.y, onDeplacerRafaleAjoutee && ((x, y) => onDeplacerRafaleAjoutee(r.code, x, y)))}
                 onPointerMove={pendantGlisser}
@@ -723,7 +726,7 @@ export default function CarteRendu({
                 style={{
                   left: `calc(50% + ${m.vent?.dx ?? 0}px)`,
                   top: `calc(50% + ${m.vent?.dy ?? 0}px)`,
-                  ...(m.ventReduit ? { fontSize: `${ECHELLE_VENT_REDUIT}em` } : {}),
+                  ...((m.ventReduit ? ECHELLE_VENT_REDUIT : 1) * echelleVent !== 1 ? { fontSize: `${(m.ventReduit ? ECHELLE_VENT_REDUIT : 1) * echelleVent}em` } : {}),
                 }}
                 title={onDeplacerRafale ? 'Glisser : déplacer la rafale' : undefined}
                 onPointerDown={(e) => debutGlisser(e, m.vent?.dx ?? 0, m.vent?.dy ?? 0, onDeplacerRafale && ((dx, dy) => onDeplacerRafale(m.code, dx, dy)))}
