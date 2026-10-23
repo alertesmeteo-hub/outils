@@ -5,6 +5,7 @@ import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { palierDe, texteInfo } from '@/lib/carte-meteo/cartes-info';
 import { COLONNES, RUBRIQUES, RUBRIQUE_RECORDS, uniteEntete, type Ligne, type Rubrique } from '@/lib/carte-meteo/colonnes-releves';
 import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
+import { REGIONS_FR, REGION_PAR_DEPARTEMENT } from '@/lib/carte-meteo/regions-fr';
 import { normaliser } from './CarteMeteo';
 import { useBilans } from './useBilans';
 import PlancheTableauJpg from './PlancheTableauJpg';
@@ -32,6 +33,7 @@ export default function TableauReleves() {
   const { bilans, erreur, reessayer } = useBilans();
   const [recherche, setRecherche] = useState('');
   const [departement, setDepartement] = useState('');
+  const [region, setRegion] = useState('');
   const [rubriques, setRubriques] = useState<Set<Rubrique>>(() => new Set<Rubrique>(['Température', 'T°C minis / maxis', 'Pluvio & vent', 'Autres']));
   const [tri, setTri] = useState<Tri>({ colonne: 'nom', sens: 1 });
   const [affichees, setAffichees] = useState(PAR_PAGE);
@@ -58,7 +60,7 @@ export default function TableauReleves() {
 
   const visibles = useMemo(() => {
     const q = normaliser(recherche);
-    const filtrees = lignes.filter((l) => (!departement || l.dep === departement) && (!q || normaliser(`${l.nom} ${l.dep} ${DEPARTEMENTS_FR[l.dep] ?? ''}`).includes(q)));
+    const filtrees = lignes.filter((l) => (!departement || l.dep === departement) && (!region || REGION_PAR_DEPARTEMENT[l.dep] === region) && (!q || normaliser(`${l.nom} ${l.dep} ${DEPARTEMENTS_FR[l.dep] ?? ''}`).includes(q)));
     const valeur = (l: Ligne): string | number | null => (tri.colonne === 'nom' ? l.nom : tri.colonne === 'dep' ? l.dep : tri.colonne === 'alt' ? l.alt : (l.valeurs[tri.colonne] ?? null));
     return filtrees.sort((a, b) => {
       const va = valeur(a);
@@ -70,7 +72,7 @@ export default function TableauReleves() {
       const c = typeof va === 'string' || typeof vb === 'string' ? String(va).localeCompare(String(vb), 'fr', { numeric: true }) : va - vb;
       return (c || a.nom.localeCompare(b.nom, 'fr')) * tri.sens;
     });
-  }, [lignes, recherche, departement, tri]);
+  }, [lignes, recherche, departement, region, tri]);
 
   function trier(colonne: string, sensInitial: 1 | -1) {
     setTri((t) => (t.colonne === colonne ? { colonne, sens: (t.sens * -1) as 1 | -1 } : { colonne, sens: sensInitial }));
@@ -143,6 +145,25 @@ export default function TableauReleves() {
               />
             </label>
             <label className="text-sm font-medium">
+              <span className="mb-1 block">Région</span>
+              <select
+                value={region}
+                onChange={(e) => {
+                  setRegion(e.target.value);
+                  setDepartement('');
+                  setAffichees(PAR_PAGE);
+                }}
+                className={selectBarre}
+              >
+                <option value="">Toute la France</option>
+                {REGIONS_FR.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm font-medium">
               <span className="mb-1 block">Département</span>
               <select
                 value={departement}
@@ -153,7 +174,7 @@ export default function TableauReleves() {
                 className={selectBarre}
               >
                 <option value="">Tous</option>
-                {departements.map((d) => (
+                {departements.filter((d) => !region || REGION_PAR_DEPARTEMENT[d] === region).map((d) => (
                   <option key={d} value={d}>
                     {d} — {DEPARTEMENTS_FR[d] ?? d}
                   </option>
