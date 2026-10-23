@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { COORDS_DEPARTEMENTS } from './departements-coords';
 import { DEPARTEMENTS_FR } from './departements-fr';
 import { ALTITUDE_MAX_VILLE_FRANCE, VILLES_FRANCE } from './villes-france';
-import { CODES_DEPARTEMENTS, MODELES_MOYENNE, modeleDisponible, pointDepuisSerie, type ModeleMeteo, type ModeleSource, type PointCarte, type Serie } from './previsions-modeles';
+import { pictoDepuisPrevision } from './pictos';
+import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pointDepuisSerie, type ModeleMeteo, type ModeleSource, type PointCarte, type Serie } from './previsions-modeles';
 
 /**
  * Prévisions de la carte météo : les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (branche `data`),
@@ -407,6 +408,53 @@ export async function chargerPrevisionsCarteJours(
     }
   });
   for (const date of datesISO) if (!(sortie[date] as PointCarte[]).length) sortie[date] = null;
+  if (echecs === CODES_DEPARTEMENTS.length) throw new Error(`${LIBELLES[modele]} : aucun département disponible`);
+  return sortie;
+}
+
+/** Point d'une planche tendance : valeurs sur la période (pluie, neige, rafale, maxi, mini) et picto qui y domine (icônes Alertes Météo). */
+export type PointTendance = PointCarte & { pictoPeriode: string | null };
+
+/** Picto le plus fréquent d'une liste (à égalité, le premier dans l'ordre des jours). */
+function pictoDominant(pictos: string[]): string | null {
+  const comptes = new Map<string, number>();
+  for (const p of pictos) comptes.set(p, (comptes.get(p) ?? 0) + 1);
+  let meilleur: string | null = null;
+  for (const [p, n] of comptes) if (meilleur == null || n > (comptes.get(meilleur) ?? 0)) meilleur = p;
+  return meilleur;
+}
+
+/**
+ * Planches tendances : pour chaque durée (2, 4… 16 jours), une valeur par département sur la période qui commence à `debutISO`
+ * (pluie et neige cumulées, rafale la plus forte, maxi et mini), et le picto dominant d'après les pictos de chaque jour.
+ * Une durée que la série ne couvre pas (à 85 % au moins) donne null aux valeurs et au picto.
+ */
+export async function chargerPrevisionsTendances(modele: ModeleSource, debutISO: string, durees: number[]): Promise<Record<number, PointTendance[] | null>> {
+  const resultats = await enParallele(CODES_DEPARTEMENTS, CONCURRENCE, (dep) => extraitDepartement(modele, dep));
+  const jours = Array.from({ length: Math.max(...durees) }, (_, k) => ajouterJours(debutISO, k));
+  const sortie: Record<number, PointTendance[]> = Object.fromEntries(durees.map((d) => [d, []]));
+  let echecs = 0;
+  resultats.forEach((r, i) => {
+    const dep = CODES_DEPARTEMENTS[i];
+    if (r.status === 'rejected') {
+      echecs++;
+      console.error('Planches tendances : département indisponible', modele, dep, r.reason);
+      return;
+    }
+    const { nom: ville, lat, lon } = r.value.chefCommune;
+    const nom = DEPARTEMENTS_FR[dep] ?? dep;
+    // Picto de chaque jour (null si le modèle n'a pas encore ce jour).
+    const pictosJours = jours.map((date) => {
+      const p = pointDepuisSerie(dep, nom, r.value.chef, date);
+      if (p.nuagesJournee == null && p.pluieJournee == null) return null;
+      return pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: p.pluieJournee, temperature: p.maxi, voile: p.voileJournee }, 'alertes') as string;
+    });
+    for (const duree of durees) {
+      const point = { ...pointDepuisSerie(dep, nom, r.value.chef, debutISO, ajouterJours(debutISO, duree - 1)), ville, lat, lon };
+      const valides = pictosJours.slice(0, duree).filter((x): x is string => x != null);
+      sortie[duree].push({ ...point, pictoPeriode: valides.length >= duree * 0.85 ? pictoDominant(valides) : null });
+    }
+  });
   if (echecs === CODES_DEPARTEMENTS.length) throw new Error(`${LIBELLES[modele]} : aucun département disponible`);
   return sortie;
 }

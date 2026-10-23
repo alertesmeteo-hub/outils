@@ -42,6 +42,17 @@ export default async function AllTools() {
           </Link>
         </li>
         <li>
+          <Link href="/outils/carte-meteo/tendances/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">📈</span>
+            <span>
+              <strong className="block leading-snug">Planches tendances 2 à 16 jours</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Pluie, rafales, maxi, mini ou neige sur 2, 4, 6… 16 jours : huit cartes de France avec le temps dominant en pictos.
+              </span>
+            </span>
+          </Link>
+        </li>
+        <li>
           <Link href="/outils/carte-meteo-info/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
             <span aria-hidden className="text-3xl">📊</span>
             <span>

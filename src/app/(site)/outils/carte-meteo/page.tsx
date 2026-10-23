@@ -64,6 +64,9 @@ export default async function PageCarteMeteo() {
         <Link href="/outils/carte-meteo/16-jours/" className="inline-block rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
           Les 16 cartes à 16 jours (CEP ou GFS) sur une seule page →
         </Link>{' '}
+        <Link href="/outils/carte-meteo/tendances/" className="ml-2 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
+          Planches tendances 2 à 16 jours →
+        </Link>{' '}
         <Link href="/outils/carte-meteo-info/?cartes=europe" className="ml-2 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
           Europe : isobares (J0 à J+15) →
         </Link>{' '}

@@ -128,6 +128,8 @@ export interface PointCarte {
 /** Durées (jours) des cartes de cumul de pluie. */
 export const DUREES_CUMUL = [3, 5, 10, 16] as const;
 export type DureeCumul = (typeof DUREES_CUMUL)[number];
+/** Durées (jours à partir d'aujourd'hui) des planches tendances. */
+export const DUREES_TENDANCES = [2, 4, 6, 8, 10, 12, 14, 16] as const;
 /**
  * Part minimale de la période que la série doit couvrir pour donner un cumul : le CEP s'arrête à 15 jours (≈ 14,5 jours
  * à partir de minuit selon le passage) ; un passage GFS publié tronqué (≈ 4 jours) ne donne pas de cumul sur 10 jours.

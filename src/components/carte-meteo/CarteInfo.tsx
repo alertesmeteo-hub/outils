@@ -7,6 +7,7 @@ import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement'
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
+import { cheminPictoImage } from '@/lib/carte-meteo/pictos';
 import { angleFleche } from '@/lib/carte-meteo/vent';
 import { palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
@@ -46,7 +47,12 @@ interface Props {
   contexte?: string;
   /** Taille des pastilles (1 = normale ; plus petites = plus de valeurs placées sans chevauchement). */
   echelleValeurs?: number;
+  /** Picto à poser au-dessus de la pastille de chaque point (identifiant de picto Alertes Météo, par code de point). */
+  pictos?: Record<string, string>;
 }
+
+/** Taille (em de la pastille) du picto posé au-dessus d'une valeur. */
+const TAILLE_PICTO = 2.4;
 
 const NOP = () => {};
 const AUCUN = new Set<string>();
@@ -61,7 +67,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '', echelleValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '', echelleValeurs = 1, pictos }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -281,14 +287,15 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         const largeurBulle = (texte.length * 0.56 + (uniteVisible ? uniteVisible.length * 0.42 + 0.25 : 0) + 0.95 + (avecFleche(e.p) ? 1.05 : 0)) * taille;
         const hauteurBulle = 1.45 * taille;
         const largeurNom = enDepartement ? e.p.nom.length * 0.33 * taille + 6 : 0;
-        const demi = Math.max(largeurBulle, largeurNom) / 2;
+        const avecPicto = !!pictos?.[e.p.code];
+        const demi = Math.max(largeurBulle, largeurNom, avecPicto ? TAILLE_PICTO * taille : 0) / 2;
         return {
           code: e.p.code,
           x: e.x,
           y: e.y,
           gauche: demi,
           droite: demi,
-          haut: hauteurBulle / 2,
+          haut: hauteurBulle / 2 + (avecPicto ? TAILLE_PICTO * taille : 0),
           bas: hauteurBulle / 2 + (enDepartement ? 0.85 * taille : 0),
           priorite: codesTop.has(e.p.code) || grandesVilles.has(e.p.code) ? 0 : 1,
         };
@@ -311,7 +318,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       .filter((e) => e.priorite === 0 || restantes-- > 0)
       .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax]);
+  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -427,8 +434,11 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       >
         {places.map(({ p, x, y }) => {
           const palier = palierDe(theme.paliers, p.valeur);
+          const fichierPicto = pictos?.[p.code] ? cheminPictoImage(pictos[p.code]) : undefined;
           return (
-            <div key={p.code} className="cinfo-point" style={{ left: x, top: y - 0.725 * taille, fontSize: taille }} title={`${p.nom} : ${texteInfo(theme, p.valeur)} ${uniteVisible}`}>
+            <div key={p.code} className="cinfo-point" style={{ left: x, top: y - 0.725 * taille - (fichierPicto ? TAILLE_PICTO * taille : 0), fontSize: taille }} title={`${p.nom} : ${texteInfo(theme, p.valeur)} ${uniteVisible}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {fichierPicto && <img src={fichierPicto} alt="" crossOrigin="anonymous" style={{ width: `${TAILLE_PICTO}em`, height: `${TAILLE_PICTO}em`, marginBottom: '-0.15em', filter: 'drop-shadow(0 0.04em 0.12em rgba(0,0,0,0.55))' }} />}
               <div className="cinfo-bulle" style={{ background: palier.fond, color: palier.texte }}>
                 {avecFleche(p) && (
                   <svg viewBox="-12 -12 24 24" aria-hidden>
