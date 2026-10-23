@@ -43,6 +43,8 @@ const ECHELLE_PICTO_LOCAL = 1.05;
 const ECHELLE_TEMP_LOCAL = 1.15;
 /** Départements : températures encore 7 % plus grandes (`.cmap-local.cmap-gros` dans globals.css). */
 const ECHELLE_TEMP_DEPARTEMENT = ECHELLE_TEMP_LOCAL * 1.07;
+/** Départements : pictos 5 % plus petits que les régions (`.cmap-local.cmap-gros` dans globals.css). */
+const ECHELLE_PICTO_DEPARTEMENT = ECHELLE_PICTO_LOCAL * 0.95;
 const DENSITES: Record<Densite, { libelle: string; part: number; villes: number }> = {
   leger: { libelle: 'Léger', part: 0.3, villes: 7 },
   moyen: { libelle: 'Moyen', part: 0.6, villes: 14 },
@@ -990,7 +992,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       // (3,4 em avec mini et maxi empilés) ; pastille de rafale ≈ 1 em ; étiquette de nom ≈ 0,3 em par lettre.
       const gros = enDepartement ? 0.6 : 0; // pictos 1,6 fois plus grands : +1,4 em de large, +1,1 em de haut
       // Régions et départements : températures 15 % et pictos 5 % plus grands (`.cmap-local`).
-      const kPicto = (enFrance ? 1 : ECHELLE_PICTO_LOCAL) * (tailleIcones / 100);
+      const kPicto = (enFrance ? 1 : enDepartement ? ECHELLE_PICTO_DEPARTEMENT : ECHELLE_PICTO_LOCAL) * (tailleIcones / 100);
       const kTemp = enFrance ? 1 : enDepartement ? ECHELLE_TEMP_DEPARTEMENT : ECHELLE_TEMP_LOCAL;
       // Régions et départements : « ° » après la température (+0,4 em sur une ligne simple).
       const largeurLigne = 2.35 * (1 + gros) * kPicto + (m.mini == null ? (enFrance ? 1.85 : 2.25) : 2.55) * kTemp;

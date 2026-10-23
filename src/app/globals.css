@@ -237,9 +237,9 @@ body {
 .cmap-local .cmap-valeur { font-size: calc(1.35em * 1.15); }
 .cmap-local .cmap-ligne-simple .cmap-valeur { font-size: calc(1.1em * 1.15); }
 .cmap-local .cmap-picto { font-size: calc(1.7em * 1.05); }
-.cmap-local.cmap-gros .cmap-picto { font-size: calc(2.7em * 1.05); }
+.cmap-local.cmap-gros .cmap-picto { font-size: calc(2.7em * 1.05 * 0.95); }
 .cmap-local .cmap-ligne .cmap-picto-image { width: calc(1.3em * 1.05); height: calc(1.3em * 1.05); }
-.cmap-local.cmap-gros .cmap-ligne .cmap-picto-image { width: calc(2.1em * 1.05); height: calc(2.1em * 1.05); }
+.cmap-local.cmap-gros .cmap-ligne .cmap-picto-image { width: calc(2.1em * 1.05 * 0.95); height: calc(2.1em * 1.05 * 0.95); }
 /* Départements : températures encore 7 % plus grandes (ECHELLE_TEMP_DEPARTEMENT). */
 .cmap-local.cmap-gros .cmap-valeur { font-size: calc(1.35em * 1.15 * 1.07); }
 .cmap-local.cmap-gros .cmap-ligne-simple .cmap-valeur { font-size: calc(1.1em * 1.15 * 1.07); }
