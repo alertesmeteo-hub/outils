@@ -28,7 +28,7 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
   let jours: Record<string, PointJour[] | null> = {};
   let erreur = false;
   try {
-    const dates = Array.from({ length: 16 }, (_, k) => ajouterJours(aujourdhui, k));
+    const dates = Array.from({ length: 17 }, (_, k) => ajouterJours(aujourdhui, k));
     const [p, j] = await Promise.all([chargerPrevisionsTendances(modele, aujourdhui, [...DUREES_TENDANCES]), chargerPrevisionsCarteJours(modele, dates, false)]);
     periodes = p;
     jours = Object.fromEntries(dates.map((d) => [d, j[d] ? j[d]!.map(versPointJour).filter((x): x is PointJour => x != null) : null]));

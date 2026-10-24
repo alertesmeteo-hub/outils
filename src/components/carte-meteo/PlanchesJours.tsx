@@ -40,6 +40,8 @@ interface Props {
  */
 export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   const [duree, setDuree] = useState<number>(4);
+  /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
+  const [depart, setDepart] = useState(0);
   const [zone, setZone] = useState('france');
   const [logoId, setLogoId] = useState('aucun');
   const [donneesDep, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
@@ -58,7 +60,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   }, []);
 
   const enDepartement = zone.startsWith('dep:');
-  const dates = useMemo(() => Array.from({ length: duree }, (_, k) => ajouterJours(aujourdhui, k)), [aujourdhui, duree]);
+  const dates = useMemo(() => Array.from({ length: duree }, (_, k) => ajouterJours(aujourdhui, depart + k)), [aujourdhui, duree, depart]);
 
   // Département : prévisions des villes, jour par jour (le serveur ne publie que la France entière).
   useEffect(() => {
@@ -125,7 +127,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
     if (!planchRef.current) return;
     setEnExport(true);
     try {
-      await exporterEnJpg(planchRef.current, `tendance-${duree}-jours-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modele.id}`, LARGEUR, hauteur);
+      await exporterEnJpg(planchRef.current, `tendance-${duree}-jours${depart ? '-sans-j0' : ''}-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modele.id}`, LARGEUR, hauteur);
     } catch (e) {
       console.error('Export de la planche en JPG', e);
       setErreur("L'export a échoué. Réessayez dans un instant.");
@@ -155,6 +157,13 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
         ))}
       </div>
       <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Premier jour</span>
+          <select value={depart} onChange={(e) => setDepart(Number(e.target.value))} className={selectBarre}>
+            <option value={0}>Avec aujourd&apos;hui (J0)</option>
+            <option value={1}>Sans la carte J0 (dès demain)</option>
+          </select>
+        </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Zone</span>
           <select value={zone} onChange={(e) => setZone(e.target.value)} className={selectBarre}>
