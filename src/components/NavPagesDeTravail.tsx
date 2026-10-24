@@ -6,6 +6,7 @@ export const PAGES_DE_TRAVAIL = [
   { href: '/outils/carte-meteo/', libelle: 'Carte météo (pictos)' },
   { href: '/outils/carte-meteo/16-jours/', libelle: 'Cartes à 16 jours' },
   { href: '/outils/carte-meteo/tendances/', libelle: 'Planches tendances' },
+  { href: '/outils/carte-meteo/animations/', libelle: 'Animations GIF / MP4' },
   { href: '/outils/carte-meteo-info/', libelle: 'Cartes infos' },
   { href: '/outils/carte-meteo-info/?cartes=europe', libelle: 'Europe : isobares' },
   { href: '/outils/observations-en-direct/', libelle: 'Observations en direct' },

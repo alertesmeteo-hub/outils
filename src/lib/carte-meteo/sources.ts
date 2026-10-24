@@ -459,6 +459,38 @@ export async function chargerPrevisionsTendances(modele: ModeleSource, debutISO:
   return sortie;
 }
 
+/** Séries de pluie et de vent des départements, pas à pas, pour les animations (images toutes les 1 ou 3 heures). */
+export interface SeriesAnimation {
+  /** Échéances (ISO UTC) et durée de chaque pas (heures). */
+  t: string[];
+  pasHeures: number;
+  /** Par département (sa préfecture) : pluie du pas (mm), rafale (km/h) et direction d'où vient le vent (degrés), alignées sur `t`. */
+  departements: { code: string; nom: string; lat: number; lon: number; pluie: (number | null)[]; rafale: (number | null)[]; direction: (number | null)[] }[];
+}
+
+/** Pluie et vent des 96 départements de minuit (heure de Paris, environ) de `debutISO` jusqu'à `jours` jours plus tard. */
+export async function chargerSeriesAnimation(modele: ModeleSource, debutISO: string, jours: number): Promise<SeriesAnimation> {
+  const resultats = await enParallele(CODES_DEPARTEMENTS, CONCURRENCE, (dep) => extraitDepartement(modele, dep));
+  const debut = Date.parse(`${debutISO}T00:00:00Z`) - 2 * 3600_000;
+  const fin = debut + jours * 86_400_000;
+  let reference: string[] | null = null;
+  const departements: SeriesAnimation['departements'] = [];
+  resultats.forEach((r, i) => {
+    if (r.status === 'rejected') return;
+    const dep = CODES_DEPARTEMENTS[i];
+    const { chef, chefCommune } = r.value;
+    const indices = chef.t.map((t, k) => ({ t: Date.parse(t), k })).filter(({ t }) => t > debut && t <= fin).map(({ k }) => k);
+    if (!reference) reference = indices.map((k) => chef.t[k]);
+    const index = new Map(chef.t.map((t, k) => [t, k]));
+    const lire = (champ: (number | null)[]) => reference!.map((t) => champ[index.get(t) ?? -1] ?? null);
+    departements.push({ code: dep, nom: DEPARTEMENTS_FR[dep] ?? dep, lat: chefCommune.lat, lon: chefCommune.lon, pluie: lire(chef.pluie), rafale: lire(chef.rafale), direction: lire(chef.direction) });
+  });
+  const t: string[] = reference ?? [];
+  if (!departements.length || t.length < 2) throw new Error(`${LIBELLES[modele]} : aucune donnée pour l'animation`);
+  const pas = (Date.parse(t[1]) - Date.parse(t[0])) / 3600_000;
+  return { t, pasHeures: pas > 0 ? pas : 1, departements };
+}
+
 /** Prévisions des 96 départements pour un modèle et un jour (un point par département). */
 export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: string, finPeriode?: string): Promise<PointCarte[]> {
   if (modele === 'moyenne') throw new Error('La moyenne des modèles est réservée à la vue département');

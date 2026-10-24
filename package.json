@@ -16,6 +16,7 @@
     "@anthropic-ai/sdk": "^0.133.0",
     "@prisma/client": "^6.0.0",
     "@sentry/nextjs": "^11.4.0",
+    "gifenc": "^1.0.3",
     "html-to-image": "^1.11.13",
     "next": "^15.1.0",
     "react": "^19.0.0",

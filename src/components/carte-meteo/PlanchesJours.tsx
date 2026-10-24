@@ -11,7 +11,7 @@ import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
 import { cheminPictoImage } from '@/lib/carte-meteo/pictos';
 import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
-import { pictoDuJour, versPointJour, type PointJour } from '@/lib/carte-meteo/planches-jours';
+import { pictoDuJour, pointsParQuart, versPointJour, type PointJour } from '@/lib/carte-meteo/planches-jours';
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, FICHIERS_CONTOURS } from './CarteMeteo';
 
 const LARGEUR = 1600;
@@ -62,6 +62,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   }, []);
 
   const enDepartement = zone.startsWith('dep:');
+  /** France en quatre quarts (NO, NE, SO, SE) : un seul picto et la moyenne par quart. */
+  const parQuarts = zone === 'quarts';
+  const zoneCarte = parQuarts ? 'france' : zone;
   const dates = useMemo(() => Array.from({ length: duree }, (_, k) => ajouterJours(aujourdhui, depart + k)), [aujourdhui, duree, depart]);
 
   // Département : prévisions des villes, jour par jour (le serveur ne publie que la France entière).
@@ -90,19 +93,19 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   }, [enDepartement, zone, dates, modele.id]);
 
   const contours = useContours(FICHIERS_CONTOURS.departements);
-  const codes = useMemo(() => new Set(codesDeLaZone(zone)), [zone]);
+  const codes = useMemo(() => new Set(codesDeLaZone(zoneCarte)), [zoneCarte]);
   const colonnes = COLONNES[duree];
   const largeurCarte = (LARGEUR - 2 * MARGE - (colonnes - 1) * ECART) / colonnes;
-  const hauteurCarte = Math.round(largeurCarte * (zone === 'france' ? 1 : 0.92));
+  const hauteurCarte = Math.round(largeurCarte * (zoneCarte === 'france' ? 1 : 0.92));
   const lignes = Math.ceil(duree / colonnes);
   const hauteur = HAUTEUR_TITRE + lignes * (hauteurCarte + ECART) + HAUTEUR_PIED;
 
   const vue = useMemo(() => {
     const boite = unirBoites(contours.filter((c) => codes.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
-    return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zone === 'france' ? 0.01 : 0.05);
-  }, [contours, codes, largeurCarte, hauteurCarte, zone]);
+    return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : 0.05);
+  }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte]);
 
-  const taillePicto = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09)));
+  const taillePicto = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 1.7 : 1);
   /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */
   const partDetail = NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1;
   const nombreMax = Math.max(3, Math.floor((largeurCarte / (taillePicto * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
@@ -112,16 +115,16 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
     () =>
       dates.map((date) => {
         const brut = enDepartement ? donneesDep[`${zone.slice(4)}|${date}`] : jours[date];
-        const dansZone = (brut ?? []).filter((p) => enDepartement || codes.has(p.code));
+        const dansZone = parQuarts ? pointsParQuart(brut ?? []) : (brut ?? []).filter((p) => enDepartement || codes.has(p.code));
         const ecran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > 10 && e.x < largeurCarte - 10 && e.y > HAUTEUR_JOUR && e.y < hauteurCarte - 10);
         const rang = new Map(ordreRepartition(ecran.map((e) => ({ code: e.p.code, x: e.x, y: e.y }))).map((c, i) => [c, i]));
-        const retenus = ecran.sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, Math.max(3, Math.round(Math.min(nombreMax, ecran.length) * partDetail)));
+        const retenus = ecran.sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, parQuarts ? 4 : Math.max(3, Math.round(Math.min(nombreMax, ecran.length) * partDetail)));
         return { date, charge: brut !== undefined, vide: brut === null, points: retenus };
       }),
-    [dates, jours, donneesDep, enDepartement, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax, partDetail]
+    [dates, jours, donneesDep, enDepartement, parQuarts, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax, partDetail]
   );
 
-  const nomZone = zone === 'france' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
+  const nomZone = zone === 'france' ? 'France' : parQuarts ? 'France en 4 zones (NO, NE, SO, SE)' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const titre = `TENDANCE SUR ${duree} JOURS : ${nomZone.toUpperCase()}`;
   const sousTitre = `DU ${jourLibelle(dates[0])} AU ${jourLibelle(dates[dates.length - 1])} · ${modele.libelle}`;
@@ -181,6 +184,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
           <span className="mb-1 block">Zone</span>
           <select value={zone} onChange={(e) => setZone(e.target.value)} className={selectBarre}>
             <option value="france">France</option>
+            <option value="quarts">France en 4 zones : NO, NE, SO, SE (moyenne)</option>
             <optgroup label="Régions">
               {REGIONS_FR.map((r) => (
                 <option key={r} value={`reg:${r}`}>
@@ -284,7 +288,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
 
             <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: HAUTEUR_PIED, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${MARGE}px`, fontSize: 16, color: '#cfe3fa' }}>
               <span>
-                Prévisions {modele.libelle} ({modele.fournisseur}) · un point par {enDepartement ? 'ville' : 'département'} · maximale puis <span style={{ color: '#7db4ff' }}>minimale</span>
+                Prévisions {modele.libelle} ({modele.fournisseur}) · {parQuarts ? 'moyenne par zone' : `un point par ${enDepartement ? 'ville' : 'département'}`} · maximale puis <span style={{ color: '#7db4ff' }}>minimale</span>
               </span>
               <span style={{ fontFamily: POLICE, fontSize: 24, color: '#fff' }}>www.alertes-meteo.com</span>
             </div>
