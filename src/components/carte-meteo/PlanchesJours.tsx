@@ -45,7 +45,9 @@ interface Props {
 export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   const [duree, setDuree] = useState<number>(4);
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
-  const [depart, setDepart] = useState(0);
+  const [depart, setDepart] = useState(1);
+  /** Grosseur de la pastille de rafale (%), plus petite par défaut. */
+  const [tailleRafale, setTailleRafale] = useState(70);
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState('france');
   const [logoId, setLogoId] = useState('aucun');
@@ -179,6 +181,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
           </select>
         </label>
         <label className="text-sm font-medium">
+          <span className="mb-1 block">Grosseur des rafales : {tailleRafale} %</span>
+          <input type="range" min={40} max={150} step={10} value={tailleRafale} onChange={(e) => setTailleRafale(Number(e.target.value))} className="block w-40" aria-label="Grosseur de la pastille de rafale en pourcentage" />
+        </label>
+        <label className="text-sm font-medium">
           <span className="mb-1 block">Premier jour</span>
           <select value={depart} onChange={(e) => setDepart(Number(e.target.value))} className={selectBarre}>
             <option value={0}>Avec aujourd&apos;hui (J0)</option>
@@ -284,9 +290,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
                           const c = couleurRafale(kmh);
                           const angle = angleFleche(p.direction);
                           return (
-                            <span style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4, background: c.fond, color: c.texte, border: '2px solid #fff', borderRadius: 999, padding: '1px 8px', fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.42), whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                            <span style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4, background: c.fond, color: c.texte, border: '2px solid #fff', borderRadius: 999, padding: '1px 8px', fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.42 * (tailleRafale / 100)), whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
                               {angle != null && (
-                                <svg viewBox="-12 -12 24 24" width={Math.round(taillePicto * 0.42)} height={Math.round(taillePicto * 0.42)} aria-hidden>
+                                <svg viewBox="-12 -12 24 24" width={Math.round(taillePicto * 0.42 * (tailleRafale / 100))} height={Math.round(taillePicto * 0.42 * (tailleRafale / 100))} aria-hidden>
                                   <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" fill={c.texte} transform={`rotate(${angle})`} />
                                 </svg>
                               )}
