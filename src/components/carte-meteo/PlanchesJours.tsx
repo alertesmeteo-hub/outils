@@ -105,7 +105,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   const taillePicto = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09)));
   /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */
   const partDetail = NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1;
-  const nombreMax = Math.max(3, Math.floor(partDetail * (largeurCarte / (taillePicto * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
+  const nombreMax = Math.max(3, Math.floor((largeurCarte / (taillePicto * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
 
   /** Points de chaque jour, dans la zone, répartis sur la carte (les premiers sont toujours bien espacés). */
   const cartes = useMemo(
@@ -115,10 +115,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
         const dansZone = (brut ?? []).filter((p) => enDepartement || codes.has(p.code));
         const ecran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > 10 && e.x < largeurCarte - 10 && e.y > HAUTEUR_JOUR && e.y < hauteurCarte - 10);
         const rang = new Map(ordreRepartition(ecran.map((e) => ({ code: e.p.code, x: e.x, y: e.y }))).map((c, i) => [c, i]));
-        const retenus = ecran.sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, nombreMax);
+        const retenus = ecran.sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, Math.max(3, Math.round(Math.min(nombreMax, ecran.length) * partDetail)));
         return { date, charge: brut !== undefined, vide: brut === null, points: retenus };
       }),
-    [dates, jours, donneesDep, enDepartement, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax]
+    [dates, jours, donneesDep, enDepartement, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax, partDetail]
   );
 
   const nomZone = zone === 'france' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
