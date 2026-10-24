@@ -477,12 +477,19 @@ export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: stri
   return valides;
 }
 
-/** Températures d'un point (les autres valeurs viennent du modèle de référence). */
-const CHAMPS_TEMPERATURE = ['mini', 'maxi', 'tempMatin', 'tempApresMidi'] as const;
+/** Températures, pluie et nuages d'un point : moyenne des modèles (vent et rafales viennent du modèle de référence). */
+const CHAMPS_MOYENNE = [
+  'mini', 'maxi', 'tempMatin', 'tempApresMidi',
+  'pluieMatin', 'pluieApresMidi', 'pluieJournee', 'nuagesMatin', 'nuagesApresMidi', 'nuagesJournee',
+] as const;
+/** Ciel voilé : retenu si la majorité des modèles le voient. */
+const CHAMPS_VOILE = ['voileMatin', 'voileApresMidi', 'voileJournee'] as const;
+/** Temps sensible (codes WMO) : le plus fréquent parmi les modèles ; à égalité, le plus fort (orage avant pluie…). */
+const CHAMPS_CODE = ['codeMatin', 'codeApresMidi', 'codeJournee'] as const;
 
 /**
- * « Moyenne des modèles » : les villes du premier modèle disponible (AROME, puis Harmonie…), dont il garde pictos, nuages,
- * pluie et vent ; chaque température est la moyenne des modèles qui ont cette ville pour ce jour (CEP et GFS au pas de
+ * « Moyenne des modèles » : les villes du premier modèle disponible (AROME, puis Harmonie…), dont il garde le vent et les
+ * rafales ; températures, pluie, nuages, ciel voilé et temps sensible (donc les pictos) sont la moyenne des modèles qui ont cette ville pour ce jour (CEP et GFS au pas de
  * 3 h comptent comme les autres). Un modèle sans donnée ce jour-là est simplement laissé de côté.
  */
 async function chargerPrevisionsVillesMoyenne(dateISO: string, dep: string): Promise<PointCarte[]> {
@@ -493,9 +500,21 @@ async function chargerPrevisionsVillesMoyenne(dateISO: string, dep: string): Pro
   const parModele = listes.map((liste) => new Map(liste.map((p) => [p.code, p])));
   return listes[0].map((base) => {
     const point: PointCarte = { ...base };
-    for (const champ of CHAMPS_TEMPERATURE) {
-      const valeurs = parModele.map((m) => m.get(base.code)?.[champ]).filter((v): v is number => typeof v === 'number');
-      point[champ] = valeurs.length ? Math.round((valeurs.reduce((a, b) => a + b, 0) / valeurs.length) * 10) / 10 : null;
+    const memes = parModele.map((m) => m.get(base.code)).filter((x): x is PointCarte => x != null);
+    for (const champ of CHAMPS_MOYENNE) {
+      const valeurs = memes.map((x) => x[champ]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      const m = valeurs.length ? valeurs.reduce((a, b) => a + b, 0) / valeurs.length : null;
+      point[champ] = m == null ? null : champ.startsWith('nuages') ? Math.round(m) : Math.round(m * 10) / 10;
+    }
+    for (const champ of CHAMPS_VOILE) {
+      const avis = memes.map((x) => x[champ]).filter((v): v is boolean => typeof v === 'boolean');
+      if (avis.length) point[champ] = avis.filter(Boolean).length * 2 > avis.length;
+    }
+    for (const champ of CHAMPS_CODE) {
+      const codes = memes.map((x) => x[champ]).filter((v): v is number => typeof v === 'number');
+      const n = new Map<number, number>();
+      for (const c of codes) n.set(c, (n.get(c) ?? 0) + 1);
+      point[champ] = codes.length ? [...n.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0] : null;
     }
     return point;
   });
