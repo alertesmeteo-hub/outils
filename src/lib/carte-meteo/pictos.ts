@@ -149,7 +149,7 @@ export interface PictoAlertes extends PictoImage {
 export const PICTOS_ALERTES: PictoAlertes[] = ICONES_ALERTES.map(([nom, label, categorie, motsCles]) => ({
   id: `am:${nom}`,
   // ?v= : à augmenter quand un SVG change, pour passer outre le cache des navigateurs (1 h + 1 jour).
-  fichier: `/pictos-alertes/${nom}.svg?v=4`,
+  fichier: `/pictos-alertes/${nom}.svg?v=5`,
   label,
   categorie,
   motsCles,

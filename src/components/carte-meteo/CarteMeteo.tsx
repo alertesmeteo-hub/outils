@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr';
+import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import { CHEF_LIEU_PAR_DEPARTEMENT } from '@/lib/carte-meteo/chefs-lieux';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
@@ -338,6 +339,7 @@ const coordsDe = (p: PointCarte) => (p.lat != null && p.lon != null ? { lat: p.l
 export function codesDeLaZone(zone: string): string[] {
   if (zone === 'france') return CODES_DEPARTEMENTS;
   if (zone.startsWith('reg:')) return departementsDeLaRegion(zone.slice(4));
+  if (zone.startsWith('gz:')) return grandeZone(zone.slice(3))?.departements ?? CODES_DEPARTEMENTS;
   return [zone.slice(4)];
 }
 

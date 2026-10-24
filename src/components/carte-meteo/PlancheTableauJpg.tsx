@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
+import { GRANDES_ZONES, grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import { REGIONS_FR, REGION_PAR_DEPARTEMENT } from '@/lib/carte-meteo/regions-fr';
 import { palierDe, texteInfo, type ReponseBilans } from '@/lib/carte-meteo/cartes-info';
 import { COLONNES, uniteEntete, type Ligne } from '@/lib/carte-meteo/colonnes-releves';
@@ -98,13 +99,17 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
     setTitreSaisi(null);
   }
 
+  // « Région » : une région, ou une grande zone (gz:nord, gz:mediterranee…).
+  const zoneChoisie = region.startsWith('gz:') ? grandeZone(region.slice(3)) : undefined;
+  const dansRegion = (dep: string) => !region || (zoneChoisie ? zoneChoisie.departements.includes(dep) : REGION_PAR_DEPARTEMENT[dep] === region);
   const lignesTriees = useMemo(() => {
     if (!classement) return [];
     const d = sens === 'asc' ? 1 : -1;
     return lignes
-      .filter((l) => l.valeurs[classement.id] != null && (!departement || l.dep === departement) && (!region || REGION_PAR_DEPARTEMENT[l.dep] === region) && (!altitudeMax || l.alt == null || l.alt <= altitudeMax))
+      .filter((l) => l.valeurs[classement.id] != null && (!departement || l.dep === departement) && dansRegion(l.dep) && (!altitudeMax || l.alt == null || l.alt <= altitudeMax))
       .sort((a, b) => d * (a.valeurs[classement.id] - b.valeurs[classement.id]) || a.nom.localeCompare(b.nom, 'fr'))
       .slice(0, nombre);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lignes, classement, sens, nombre, departement, region, altitudeMax]);
 
   /** Étendue des valeurs affichées de chaque mesure, pour la longueur des barres. */
@@ -119,14 +124,14 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
   }, [lignesTriees, mesures]);
 
   /** Carte de la même zone et de la même mesure (France, région ou département). */
-  const zoneCarte = departement ? `dep:${departement}` : region ? `reg:${region}` : 'france';
+  const zoneCarte = departement ? `dep:${departement}` : zoneChoisie ? region : region ? `reg:${region}` : 'france';
   const pointsCarte = useMemo(() => {
     if (!classement) return [];
     const brut = pointsDuBilan(bilans, classement.id, altitudeMax || Infinity);
     return classement.obs?.controle ? sansValeursAberrantes(brut) : brut;
   }, [bilans, classement, altitudeMax]);
 
-  const nomZone = departement ? `${DEPARTEMENTS_FR[departement] ?? departement} (${departement})` : region || 'France';
+  const nomZone = departement ? `${DEPARTEMENTS_FR[departement] ?? departement} (${departement})` : zoneChoisie?.nom ?? (region || 'France');
   const suffixeTitre = classement ? (sens === classement.ordre && classement.titreTop ? classement.titreTop.toUpperCase() : sens === 'asc' ? 'LES PLUS BAS' : 'LES PLUS ÉLEVÉS') : '';
   const titre = titreSaisi ?? (classement ? `${classement.titre} : ${suffixeTitre}` : '');
   const sousTitre = [classement ? fenetreDe(bilans, classement.id) : '', nomZone.toUpperCase(), altitudeMax ? `STATIONS JUSQU'À ${altitudeMax} M` : ''].filter(Boolean).join(' · ');
@@ -249,21 +254,30 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
           </select>
         </label>
         <label className="text-sm font-medium">
-          <span className="mb-1 block">Région</span>
+          <span className="mb-1 block">Région ou zone</span>
           <select value={region} onChange={(e) => { setRegion(e.target.value); setDepartement(''); }} className={selectBarre}>
             <option value="">Toute la France</option>
-            {REGIONS_FR.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
+            <optgroup label="Grandes zones">
+              {GRANDES_ZONES.map((z) => (
+                <option key={z.id} value={`gz:${z.id}`}>
+                  {z.nom}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Régions">
+              {REGIONS_FR.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Département</span>
           <select value={departement} onChange={(e) => setDepartement(e.target.value)} className={selectBarre}>
             <option value="">Toute la France</option>
-            {departements.filter((d) => !region || REGION_PAR_DEPARTEMENT[d] === region).map((d) => (
+            {departements.filter(dansRegion).map((d) => (
               <option key={d} value={d}>
                 {d} — {DEPARTEMENTS_FR[d] ?? d}
               </option>
