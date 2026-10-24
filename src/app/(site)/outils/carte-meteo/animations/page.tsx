@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/outils/carte-meteo/animations/' },
 };
 
-const MODELES_ANIMATION: ModeleSource[] = ['cep', 'gfs', 'arome'];
+const MODELES_ANIMATION: ModeleSource[] = ['cep', 'gfs', 'arpege', 'arome'];
 
 export default async function PageAnimations({ searchParams }: { searchParams: Promise<{ modele?: string }> }) {
   const { modele: demande } = await searchParams;
@@ -32,7 +32,7 @@ export default async function PageAnimations({ searchParams }: { searchParams: P
       <h1 className="text-3xl font-extrabold">Animations pluie et vent : 1 à 5 jours</h1>
       <p className="mt-2 max-w-3xl text-muted">
         La pluie, le vent (rafales et flèches) ou les deux, image après image sur 1, 2, 3, 4 ou 5 jours, d&apos;après {infos.libelle} ({infos.fournisseur}). Regardez-la ici, puis exportez-la en GIF ou en
-        vidéo MP4. AROME ne couvre que 2 jours (images toutes les heures) ; le CEP et GFS vont plus loin (images toutes les 3 heures).
+        vidéo MP4. AROME ne couvre que 2 jours (images toutes les heures), ARPEGE environ 4 jours ; le CEP et GFS vont plus loin (images toutes les 3 heures).
       </p>
       <nav aria-label="Modèle" className="mt-4 flex flex-wrap gap-2">
         {MODELES_ANIMATION.map((id) => {

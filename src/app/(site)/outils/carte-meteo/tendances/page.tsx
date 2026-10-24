@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/outils/carte-meteo/tendances/' },
 };
 
-const MODELES_LONGUE_ECHEANCE: ModeleSource[] = ['cep', 'gfs'];
+const MODELES_LONGUE_ECHEANCE: ModeleSource[] = ['cep', 'gfs', 'arpege'];
 
 export default async function PageTendances({ searchParams }: { searchParams: Promise<{ modele?: string }> }) {
   const { modele: demande } = await searchParams;
