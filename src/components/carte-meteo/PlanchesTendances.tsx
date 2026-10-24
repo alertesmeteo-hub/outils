@@ -42,7 +42,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   const [logoId, setLogoId] = useState('aucun');
   const [taille, setTaille] = useState(1);
   const [region, setRegion] = useState('');
-  const [niveauDetail, setNiveauDetail] = useState<number>(1);
+  const [niveauDetail, setNiveauDetail] = useState<number>(4);
 
   const reglage = THEMES_TENDANCES.find((t) => t.id === themeId)!;
   const themeBase = THEMES_PREVISION.find((t) => t.id === reglage.theme) as ThemePrevision;

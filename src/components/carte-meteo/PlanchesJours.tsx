@@ -43,7 +43,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   const [duree, setDuree] = useState<number>(4);
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
   const [depart, setDepart] = useState(0);
-  const [niveauDetail, setNiveauDetail] = useState<number>(1);
+  const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState('france');
   const [logoId, setLogoId] = useState('aucun');
   const [donneesDep, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
