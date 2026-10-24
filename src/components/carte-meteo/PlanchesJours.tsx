@@ -118,7 +118,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
       dates.map((date) => {
         const brut = enDepartement ? donneesDep[`${zone.slice(4)}|${date}`] : jours[date];
         const dansZone = parQuarts ? pointsParQuart(brut ?? []) : (brut ?? []).filter((p) => enDepartement || codes.has(p.code));
-        const ecran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > 10 && e.x < largeurCarte - 10 && e.y > HAUTEUR_JOUR + taillePicto * 0.7 && e.y < hauteurCarte - taillePicto * 0.5);
+        const ecran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > taillePicto * 0.95 && e.x < largeurCarte - taillePicto * 0.95 && e.y > HAUTEUR_JOUR + taillePicto * 0.7 && e.y < hauteurCarte - taillePicto * 0.95);
         const rang = new Map(ordreRepartition(ecran.map((e) => ({ code: e.p.code, x: e.x, y: e.y }))).map((c, i) => [c, i]));
         const retenus = ecran.sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, parQuarts ? 4 : Math.max(3, Math.round(Math.min(nombreMax, ecran.length) * partDetail)));
         return { date, charge: brut !== undefined, vide: brut === null, points: retenus };
