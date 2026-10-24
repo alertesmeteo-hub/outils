@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
+import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
 import { THEMES_PREVISION, type ThemePrevision } from '@/lib/carte-meteo/cartes-info';
 import { DUREES_TENDANCES } from '@/lib/carte-meteo/previsions-modeles';
 import type { PointTendance } from '@/lib/carte-meteo/sources';
@@ -41,6 +42,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   const [logoId, setLogoId] = useState('aucun');
   const [taille, setTaille] = useState(1);
   const [region, setRegion] = useState('');
+  const [niveauDetail, setNiveauDetail] = useState<number>(1);
 
   const reglage = THEMES_TENDANCES.find((t) => t.id === themeId)!;
   const themeBase = THEMES_PREVISION.find((t) => t.id === reglage.theme) as ThemePrevision;
@@ -101,6 +103,16 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           </select>
         </label>
         <label className="text-sm font-medium">
+          <span className="mb-1 block">Quantité d&apos;infos</span>
+          <select value={niveauDetail} onChange={(e) => setNiveauDetail(Number(e.target.value))} className={selectBarre}>
+            {NIVEAUX_DETAIL.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.libelle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
           <span className="mb-1 block">Taille des valeurs</span>
           <select value={taille} onChange={(e) => setTaille(Number(e.target.value))} className={selectBarre}>
             <option value={0.8}>Petites (plus de départements)</option>
@@ -140,6 +152,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
                   points={points}
                   pictos={avecPictos ? pictos : undefined}
                   echelleValeurs={taille}
+                  partValeurs={NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part}
                   sousTitre={`DU ${jourCourt(aujourdhui)} AU ${jourCourt(fin)} · ${modele.libelle}`}
                   logoId={logoId}
                   prefixeFichier={`tendance-${aujourdhui}-${duree}-jours-${modele.id}`}

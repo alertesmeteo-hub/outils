@@ -7,6 +7,7 @@ import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { PALIERS_TEMPERATURE, palierDe } from '@/lib/carte-meteo/cartes-info';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
+import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
 import { cheminPictoImage } from '@/lib/carte-meteo/pictos';
 import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
@@ -42,6 +43,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   const [duree, setDuree] = useState<number>(4);
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
   const [depart, setDepart] = useState(0);
+  const [niveauDetail, setNiveauDetail] = useState<number>(1);
   const [zone, setZone] = useState('france');
   const [logoId, setLogoId] = useState('aucun');
   const [donneesDep, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
@@ -102,7 +104,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
 
   const taillePicto = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09)));
   /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */
-  const nombreMax = Math.max(4, Math.floor((largeurCarte / (taillePicto * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
+  const partDetail = NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1;
+  const nombreMax = Math.max(3, Math.floor(partDetail * (largeurCarte / (taillePicto * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
 
   /** Points de chaque jour, dans la zone, répartis sur la carte (les premiers sont toujours bien espacés). */
   const cartes = useMemo(
@@ -157,6 +160,16 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
         ))}
       </div>
       <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Quantité d&apos;infos</span>
+          <select value={niveauDetail} onChange={(e) => setNiveauDetail(Number(e.target.value))} className={selectBarre}>
+            {NIVEAUX_DETAIL.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.libelle}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Premier jour</span>
           <select value={depart} onChange={(e) => setDepart(Number(e.target.value))} className={selectBarre}>
