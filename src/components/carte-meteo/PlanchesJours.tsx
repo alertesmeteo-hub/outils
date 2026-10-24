@@ -9,6 +9,7 @@ import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
 import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
 import { cheminPictoImage } from '@/lib/carte-meteo/pictos';
+import { angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { pictoDuJour, pointsParQuart, versPointJour, type PointJour } from '@/lib/carte-meteo/planches-jours';
@@ -22,6 +23,8 @@ const HAUTEUR_PIED = 44;
 const HAUTEUR_JOUR = 36;
 /** Colonnes de la grille selon le nombre de cartes : 2 cartes côte à côte, 16 cartes en 4 × 4… */
 const COLONNES: Record<number, number> = { 2: 2, 4: 2, 6: 3, 8: 4, 10: 5, 12: 4, 14: 5, 16: 4 };
+/** Rafale (km/h) au-delà de laquelle la pastille de vent s'ajoute au picto. */
+const SEUIL_RAFALE = 80;
 const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
@@ -118,7 +121,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
       dates.map((date) => {
         const brut = enDepartement ? donneesDep[`${zone.slice(4)}|${date}`] : jours[date];
         const dansZone = parQuarts ? pointsParQuart(brut ?? []) : (brut ?? []).filter((p) => enDepartement || codes.has(p.code));
-        const ecran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > taillePicto * 0.95 && e.x < largeurCarte - taillePicto * 0.95 && e.y > HAUTEUR_JOUR + taillePicto * 0.7 && e.y < hauteurCarte - taillePicto * 0.95);
+        const ecran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > taillePicto * 0.95 && e.x < largeurCarte - taillePicto * 0.95 && e.y > HAUTEUR_JOUR + taillePicto * 0.7 && e.y < hauteurCarte - taillePicto * 1.3);
         const rang = new Map(ordreRepartition(ecran.map((e) => ({ code: e.p.code, x: e.x, y: e.y }))).map((c, i) => [c, i]));
         const retenus = ecran.sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, parQuarts ? 4 : Math.max(3, Math.round(Math.min(nombreMax, ecran.length) * partDetail)));
         return { date, charge: brut !== undefined, vide: brut === null, points: retenus };
@@ -276,6 +279,22 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
                           {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: '0.8em' }}> {Math.round(p.mini)}°</span> : null}
                         </span>
+                        {p.rafale != null && p.rafale > SEUIL_RAFALE && (() => {
+                          const kmh = Math.round(p.rafale / 5) * 5;
+                          const c = couleurRafale(kmh);
+                          const angle = angleFleche(p.direction);
+                          return (
+                            <span style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4, background: c.fond, color: c.texte, border: '2px solid #fff', borderRadius: 999, padding: '1px 8px', fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.42), whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                              {angle != null && (
+                                <svg viewBox="-12 -12 24 24" width={Math.round(taillePicto * 0.42)} height={Math.round(taillePicto * 0.42)} aria-hidden>
+                                  <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" fill={c.texte} transform={`rotate(${angle})`} />
+                                </svg>
+                              )}
+                              {kmh}
+                              <span style={{ fontSize: '0.6em' }}>km/h</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     ))}
                     {premier == null && (

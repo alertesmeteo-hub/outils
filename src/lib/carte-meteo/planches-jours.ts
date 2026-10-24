@@ -15,6 +15,9 @@ export interface PointJour {
   voileJournee?: boolean;
   /** Picto déjà choisi (moyenne d'une zone) ; sinon déduit du temps du point. */
   picto?: string;
+  /** Rafale maximale de la journée (km/h) et direction d'où vient le vent (degrés). */
+  rafale?: number | null;
+  direction?: number | null;
 }
 
 export function versPointJour(p: PointCarte): PointJour | null {
@@ -30,6 +33,8 @@ export function versPointJour(p: PointCarte): PointJour | null {
     nuagesJournee: p.nuagesJournee,
     pluieJournee: p.pluieJournee,
     voileJournee: p.voileJournee,
+    rafale: p.rafaleJournee,
+    direction: p.directionRafaleJournee,
   };
 }
 
@@ -71,6 +76,8 @@ export function pointsParQuart(points: PointJour[]): PointJour[] {
         nuagesJournee: null,
         pluieJournee: null,
         picto,
+        rafale: Math.max(...groupe.map((p) => p.rafale ?? 0)) || null,
+        direction: groupe.reduce<PointJour | null>((m, p) => ((p.rafale ?? 0) > (m?.rafale ?? 0) ? p : m), null)?.direction ?? null,
       },
     ];
   });
