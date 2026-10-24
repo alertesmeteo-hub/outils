@@ -151,7 +151,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
                   zone={region ? `reg:${region}` : 'france'}
                   points={points}
                   pictos={avecPictos ? pictos : undefined}
-                  echelleValeurs={taille}
+                  echelleValeurs={taille / Math.sqrt(NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1)}
                   partValeurs={NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part}
                   sousTitre={`DU ${jourCourt(aujourdhui)} AU ${jourCourt(fin)} · ${modele.libelle}`}
                   logoId={logoId}

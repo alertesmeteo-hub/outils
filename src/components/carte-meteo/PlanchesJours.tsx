@@ -105,10 +105,12 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
     return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : 0.05);
   }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte]);
 
-  const taillePicto = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 1.7 : 1);
-  /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */
   const partDetail = NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1;
-  const nombreMax = Math.max(3, Math.floor((largeurCarte / (taillePicto * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
+  const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 1.7 : 1);
+  // Moins il y a de points, plus les pictos grossissent (jusqu'à environ deux fois au niveau 4).
+  const taillePicto = tailleBase * (parQuarts ? 1 : 1 / Math.sqrt(partDetail));
+  /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */
+  const nombreMax = Math.max(3, Math.floor((largeurCarte / (tailleBase * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
 
   /** Points de chaque jour, dans la zone, répartis sur la carte (les premiers sont toujours bien espacés). */
   const cartes = useMemo(
