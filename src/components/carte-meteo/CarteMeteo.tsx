@@ -418,7 +418,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [styleVent, setStyleVent] = useState<StyleVent>('pastille');
   const [afficherRessenti, setAfficherRessenti] = useState(false);
   /** Taille des pastilles de rafale (%), toutes zones. */
-  const [tailleVent, setTailleVent] = useState(100);
+  const [tailleVent, setTailleVent] = useState(160);
   const [logoPresetId, setLogoPresetId] = useState<string | null>(null);
   const [logoPersonnalise, setLogoPersonnalise] = useState<string | null>(null);
   const [titreManuel, setTitreManuel] = useState<string | null>(null);
@@ -2196,9 +2196,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           <label className="text-sm font-medium">
             <span className={legendeBarre}>Taille des rafales : {tailleVent} %</span>
             <input type="range" min={50} max={200} step={5} value={tailleVent} onChange={(e) => setTailleVent(Number(e.target.value))} className="block w-40" aria-label="Taille des pictos de vent en pourcentage" />
-            {tailleVent !== 100 && (
-              <button type="button" className="btn-ghost mt-1 rounded-md px-2 py-1 text-xs" onClick={() => setTailleVent(100)}>
-                Revenir à 100 %
+            {tailleVent !== 160 && (
+              <button type="button" className="btn-ghost mt-1 rounded-md px-2 py-1 text-xs" onClick={() => setTailleVent(160)}>
+                Revenir à 160 %
               </button>
             )}
           </label>
