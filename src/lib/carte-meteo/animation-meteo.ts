@@ -43,8 +43,8 @@ export interface Contour2D {
   chemin: Path2D;
 }
 
-export function vueAnimation(boite: Parameters<typeof ajusterVue>[0]): Vue {
-  return ajusterVue(boite, { gauche: 24, haut: 100, droite: 860, bas: HAUTEUR_ANIM - 44 }, 0.01);
+export function vueAnimation(boite: Parameters<typeof ajusterVue>[0], marge = 0.01): Vue {
+  return ajusterVue(boite, { gauche: 24, haut: 100, droite: 860, bas: HAUTEUR_ANIM - 44 }, marge);
 }
 
 export const heureLocale = (iso: string) =>
@@ -60,6 +60,11 @@ interface Params {
   n: number;
   mode: ModeAnimation;
   modele: string;
+  /** Zone affichée : départements colorés (les autres restent ternes) ; null = toute la France. */
+  codes?: Set<string> | null;
+  nomZone?: string;
+  /** Points = villes d'un département : disques colorés au lieu de départements entiers. */
+  villes?: boolean;
 }
 
 function fleche(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, taille: number) {
@@ -103,7 +108,7 @@ function legende(ctx: CanvasRenderingContext2D, x: number, y: number, titre: str
 }
 
 /** Dessine l'image numéro `i` de l'animation (1280 × 720 logiques, multipliées par `echelle`). */
-export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, modele }: Params) {
+export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, modele, codes = null, nomZone = 'FRANCE', villes = false }: Params) {
   ctx.save();
   ctx.scale(echelle, echelle);
   const fond = ctx.createLinearGradient(0, 0, LARGEUR_ANIM, HAUTEUR_ANIM);
@@ -122,7 +127,9 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
   for (const c of contours) {
     const d = parCode.get(c.code);
     let couleur = SEC;
-    if (d) {
+    const hors = codes != null && !codes.has(c.code);
+    if (hors) couleur = '#0c2748';
+    if (d && !hors && !villes) {
       const niveau = surPluie ? trouver(NIVEAUX_PLUIE, d.pluie[i] == null ? null : (d.pluie[i] as number) / pas) : trouver(NIVEAUX_VENT, d.rafale[i]);
       if (niveau) couleur = niveau.fond;
     }
@@ -134,10 +141,26 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
   }
   ctx.restore();
 
+  // Villes d'un département : un disque coloré par ville.
+  if (villes) {
+    for (const d of donnees.departements) {
+      const niveau = surPluie ? trouver(NIVEAUX_PLUIE, d.pluie[i] == null ? null : (d.pluie[i] as number) / pas) : trouver(NIVEAUX_VENT, d.rafale[i]);
+      const p = versEcran(versMonde(d.lat, d.lon), vue);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
+      ctx.fillStyle = niveau ? niveau.fond : 'rgba(255,255,255,0.18)';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
   // Flèches du vent (là où souffle le vent), plus grandes quand la rafale est forte.
   if (mode !== 'pluie') {
     const seuil = mode === 'vent' ? 30 : 50;
     for (const d of donnees.departements) {
+      if (codes && !villes && !codes.has(d.code)) continue;
       const r = d.rafale[i];
       const a = angleFleche(d.direction[i]);
       if (r == null || a == null || r < seuil) continue;
@@ -157,13 +180,13 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
   ctx.fillText(mode === 'pluie' ? 'PLUIE : ANIMATION DES PRÉVISIONS' : mode === 'vent' ? 'RAFALES : ANIMATION DES PRÉVISIONS' : 'PLUIE ET VENT : ANIMATION DES PRÉVISIONS', 42, 50);
   ctx.fillStyle = '#2563a8';
   ctx.font = `20px ${POLICE}`;
-  ctx.fillText(`PRÉVISION ${modele}`, 42, 73);
+  ctx.fillText(`${nomZone} · PRÉVISION ${modele}`, 42, 73);
 
   // Panneau de droite : heure et légendes
   ctx.fillStyle = '#ffffff';
   ctx.font = `34px ${POLICE}`;
   const heure = heureLocale(donnees.t[i]);
-  const mots = heure.split(' à ');
+  const mots = heure.split(' À ');
   ctx.fillText(mots[0] ?? heure, 900, 60);
   ctx.fillStyle = '#ffd21a';
   ctx.font = `54px ${POLICE}`;

@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { HAUTEUR_ANIM, LARGEUR_ANIM, dessiner, vueAnimation, type Contour2D, type ModeAnimation } from '@/lib/carte-meteo/animation-meteo';
 import type { SeriesAnimation } from '@/lib/carte-meteo/sources';
-import { BOITE_FRANCE, FICHIERS_CONTOURS, useContours } from './CarteMeteo';
+import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
+import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
+import { CODES_DEPARTEMENTS } from '@/lib/carte-meteo/previsions-modeles';
+import { unirBoites } from '@/lib/carte-meteo/projection-france';
+import { BOITE_FRANCE, FICHIERS_CONTOURS, codesDeLaZone, useContours } from './CarteMeteo';
 
 const MODES: { id: ModeAnimation; libelle: string }[] = [
   { id: 'pluie', libelle: '🌧️ Pluie' },
@@ -39,6 +43,8 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
   const [mode, setMode] = useState<ModeAnimation>('pluie-vent');
   const [jours, setJours] = useState(3);
   const [vitesse, setVitesse] = useState<number>(5);
+  const [zone, setZone] = useState('france');
+  const [villesDep, setVillesDep] = useState<{ cle: string; donnees: SeriesAnimation | null } | null>(null);
   const [i, setI] = useState(0);
   const [lecture, setLecture] = useState(true);
   const [etat, setEtat] = useState<string | null>(null);
@@ -47,28 +53,54 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
 
   const contoursBruts = useContours(FICHIERS_CONTOURS.departements);
   const contours = useMemo<Contour2D[]>(() => contoursBruts.map((c) => ({ code: c.code, chemin: new Path2D(c.d) })), [contoursBruts]);
-  const vue = useMemo(() => vueAnimation(BOITE_FRANCE), []);
+  const enDepartement = zone.startsWith('dep:');
+  const codes = useMemo(() => (zone === 'france' ? null : new Set(codesDeLaZone(zone))), [zone]);
+  const vue = useMemo(() => {
+    if (!codes) return vueAnimation(BOITE_FRANCE);
+    const boite = unirBoites(contoursBruts.filter((c) => codes.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
+    return vueAnimation(boite, 0.05);
+  }, [codes, contoursBruts]);
+  const nomZone = zone === 'france' ? 'FRANCE' : zone.startsWith('reg:') ? zone.slice(4).toUpperCase() : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`.toUpperCase();
+
+  // Département : séries des villes, chargées à la demande.
+  useEffect(() => {
+    if (!enDepartement) return;
+    const cle = `${modele.id}|${zone}`;
+    if (villesDep?.cle === cle) return;
+    const controleur = new AbortController();
+    setErreur(null);
+    fetch(`/api/carte-meteo/animation/?modele=${modele.id}&dep=${zone.slice(4)}`, { signal: controleur.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<SeriesAnimation>) : Promise.reject(new Error('Prévisions des villes indisponibles.'))))
+      .then((d) => setVillesDep({ cle, donnees: d }))
+      .catch((e: Error) => {
+        if (e.name === 'AbortError') return;
+        setErreur(e.message);
+        setVillesDep({ cle, donnees: null });
+      });
+    return () => controleur.abort();
+  }, [enDepartement, zone, modele.id, villesDep?.cle]);
+  const source = enDepartement ? (villesDep?.cle === `${modele.id}|${zone}` ? villesDep.donnees : null) : donnees;
 
   // Images retenues : les `jours` premiers jours à partir d'aujourd'hui (minuit, heure de Paris).
   const debut = Date.parse(`${aujourdhui}T00:00:00Z`) - 2 * 3600_000;
   const indices = useMemo(
-    () => donnees.t.map((t, k) => ({ t: Date.parse(t), k })).filter(({ t }) => t <= debut + jours * 86_400_000).map(({ k }) => k),
-    [donnees, debut, jours]
+    () => (source ?? donnees).t.map((t, k) => ({ t: Date.parse(t), k })).filter(({ t }) => t <= debut + jours * 86_400_000).map(({ k }) => k),
+    [source, donnees, debut, jours]
   );
   const joursDisponibles = Math.min(5, Math.floor((Date.parse(donnees.t[donnees.t.length - 1]) - debut) / 86_400_000 + 0.5));
   const n = indices.length;
   const donneesRetenues = useMemo<SeriesAnimation>(
     () => ({
-      ...donnees,
-      t: indices.map((k) => donnees.t[k]),
-      departements: donnees.departements.map((d) => ({
+      ...(source ?? donnees),
+      t: indices.map((k) => (source ?? donnees).t[k]),
+      departements: (source ?? donnees).departements.map((d) => ({
         ...d,
         pluie: indices.map((k) => d.pluie[k]),
         rafale: indices.map((k) => d.rafale[k]),
         direction: indices.map((k) => d.direction[k]),
       })),
     }),
-    [donnees, indices]
+    [source, donnees, indices]
   );
 
   useEffect(() => setI(0), [jours, mode]);
@@ -80,10 +112,10 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
 
   useEffect(() => {
     const c = canvasRef.current;
-    if (!c || contours.length === 0 || n === 0) return;
+    if (!c || contours.length === 0 || n === 0 || (enDepartement && !source)) return;
     const ctx = c.getContext('2d');
-    if (ctx) dessiner({ ctx, echelle: 1, contours, vue, donnees: donneesRetenues, i: Math.min(i, n - 1), n, mode, modele: modele.libelle.toUpperCase() });
-  }, [i, contours, vue, donneesRetenues, n, mode, modele.libelle]);
+    if (ctx) dessiner({ ctx, echelle: 1, contours, vue, donnees: donneesRetenues, i: Math.min(i, n - 1), n, mode, modele: modele.libelle.toUpperCase(), codes, nomZone, villes: enDepartement });
+  }, [i, contours, vue, donneesRetenues, n, mode, modele.libelle, codes, nomZone, enDepartement]);
 
   function canvasHorsEcran(echelle: number) {
     const c = document.createElement('canvas');
@@ -91,7 +123,7 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
     c.height = Math.round(HAUTEUR_ANIM * echelle);
     return c;
   }
-  const nomFichier = (ext: string) => `animation-${mode}-${jours}-jours-${aujourdhui}-${modele.id}.${ext}`;
+  const nomFichier = (ext: string) => `animation-${mode}-${zone.replace(':', '-').replace(/ /g, '-')}-${jours}-jours-${aujourdhui}-${modele.id}.${ext}`;
 
   async function exporterGif() {
     setErreur(null);
@@ -104,7 +136,7 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
       const gif = GIFEncoder();
       for (let k = 0; k < n; k++) {
         setEtat(`GIF : image ${k + 1} sur ${n}…`);
-        dessiner({ ctx, echelle, contours, vue, donnees: donneesRetenues, i: k, n, mode, modele: modele.libelle.toUpperCase() });
+        dessiner({ ctx, echelle, contours, vue, donnees: donneesRetenues, i: k, n, mode, modele: modele.libelle.toUpperCase(), codes, nomZone, villes: enDepartement });
         const { data } = ctx.getImageData(0, 0, c.width, c.height);
         const palette = quantize(data, 256);
         gif.writeFrame(applyPalette(data, palette), c.width, c.height, { palette, delay: Math.round(1000 / vitesse) + (k === n - 1 ? 1200 : 0) });
@@ -131,7 +163,7 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
       if (!type) throw new Error("Ce navigateur n'enregistre pas de vidéo.");
       const c = canvasHorsEcran(1);
       const ctx = c.getContext('2d')!;
-      dessiner({ ctx, echelle: 1, contours, vue, donnees: donneesRetenues, i: 0, n, mode, modele: modele.libelle.toUpperCase() });
+      dessiner({ ctx, echelle: 1, contours, vue, donnees: donneesRetenues, i: 0, n, mode, modele: modele.libelle.toUpperCase(), codes, nomZone, villes: enDepartement });
       const flux = c.captureStream(vitesse);
       const enregistreur = new MediaRecorder(flux, { mimeType: type, videoBitsPerSecond: 6_000_000 });
       const morceaux: Blob[] = [];
@@ -140,7 +172,7 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
       enregistreur.start();
       for (let k = 0; k < n; k++) {
         setEtat(`Vidéo : image ${k + 1} sur ${n}…`);
-        dessiner({ ctx, echelle: 1, contours, vue, donnees: donneesRetenues, i: k, n, mode, modele: modele.libelle.toUpperCase() });
+        dessiner({ ctx, echelle: 1, contours, vue, donnees: donneesRetenues, i: k, n, mode, modele: modele.libelle.toUpperCase(), codes, nomZone, villes: enDepartement });
         await attendre(1000 / vitesse + (k === n - 1 ? 1200 : 0));
       }
       enregistreur.stop();
@@ -193,6 +225,26 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
           </div>
         </fieldset>
         <label className="text-sm font-medium">
+          <span className="mb-1 block">Zone</span>
+          <select value={zone} onChange={(e) => setZone(e.target.value)} className={selectBarre}>
+            <option value="france">France</option>
+            <optgroup label="Régions">
+              {REGIONS_FR.map((r) => (
+                <option key={r} value={`reg:${r}`}>
+                  {r}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Départements">
+              {CODES_DEPARTEMENTS.map((d) => (
+                <option key={d} value={`dep:${d}`}>
+                  {d} — {DEPARTEMENTS_FR[d] ?? d}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
+        <label className="text-sm font-medium">
           <span className="mb-1 block">Vitesse</span>
           <select value={vitesse} onChange={(e) => setVitesse(Number(e.target.value))} className={selectBarre}>
             {VITESSES.map((v) => (
@@ -220,10 +272,10 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
           className="min-w-48 flex-1"
           aria-label="Image de l'animation"
         />
-        <button type="button" onClick={exporterGif} disabled={!!etat || contours.length === 0} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+        <button type="button" onClick={exporterGif} disabled={!!etat || contours.length === 0 || (enDepartement && !source)} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
           Exporter en GIF
         </button>
-        <button type="button" onClick={exporterVideo} disabled={!!etat || contours.length === 0} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+        <button type="button" onClick={exporterVideo} disabled={!!etat || contours.length === 0 || (enDepartement && !source)} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
           Exporter en vidéo (MP4)
         </button>
         {etat && <span className="text-sm text-muted">{etat}</span>}
@@ -236,7 +288,7 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
 
       <canvas ref={canvasRef} width={LARGEUR_ANIM} height={HAUTEUR_ANIM} className="mt-4 h-auto w-full max-w-5xl rounded-xl border border-border" aria-label="Animation de la pluie et du vent" />
       <p className="mt-2 text-xs text-muted">
-        {n} images ({donnees.pasHeures === 1 ? 'toutes les heures' : `toutes les ${donnees.pasHeures} heures`}), un point par département (sa préfecture). La vidéo est un MP4 dans Chrome et Edge, un WebM dans les
+        {n} images ({donnees.pasHeures === 1 ? 'toutes les heures' : `toutes les ${donnees.pasHeures} heures`}), {enDepartement ? 'un disque par ville' : 'un point par département (sa préfecture)'}. La vidéo est un MP4 dans Chrome et Edge, un WebM dans les
         navigateurs qui n&apos;enregistrent pas le MP4.
       </p>
     </div>

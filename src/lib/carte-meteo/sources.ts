@@ -491,6 +491,23 @@ export async function chargerSeriesAnimation(modele: ModeleSource, debutISO: str
   return { t, pasHeures: pas > 0 ? pas : 1, departements };
 }
 
+/** Pluie et vent des principales villes d'un département (animation d'un département). */
+export async function chargerSeriesAnimationVilles(modele: ModeleSource, debutISO: string, jours: number, dep: string): Promise<SeriesAnimation> {
+  const extrait = await extraitDepartement(modele, dep);
+  const debut = Date.parse(`${debutISO}T00:00:00Z`) - 2 * 3600_000;
+  const fin = debut + jours * 86_400_000;
+  const base = extrait.villes[0]?.serie ?? extrait.chef;
+  const reference = base.t.filter((t) => Date.parse(t) > debut && Date.parse(t) <= fin);
+  if (reference.length < 2) throw new Error(`${LIBELLES[modele]} : aucune donnée pour l'animation`);
+  const departements = extrait.villes.map((v) => {
+    const index = new Map(v.serie.t.map((t, k) => [t, k]));
+    const lire = (champ: (number | null)[]) => reference.map((t) => champ[index.get(t) ?? -1] ?? null);
+    return { code: v.code, nom: v.nom, lat: v.lat, lon: v.lon, pluie: lire(v.serie.pluie), rafale: lire(v.serie.rafale), direction: lire(v.serie.direction) };
+  });
+  const pas = (Date.parse(reference[1]) - Date.parse(reference[0])) / 3600_000;
+  return { t: reference, pasHeures: pas > 0 ? pas : 1, departements };
+}
+
 /** Prévisions des 96 départements pour un modèle et un jour (un point par département). */
 export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: string, finPeriode?: string): Promise<PointCarte[]> {
   if (modele === 'moyenne') throw new Error('La moyenne des modèles est réservée à la vue département');
