@@ -319,7 +319,9 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
         .filter((p) => niveau !== 'france' || !MASQUES_FRANCE.has(p.code))
         .map((p) => {
           const coords = p.lat != null && p.lon != null ? { lat: p.lat, lon: p.lon } : COORDS_DEPARTEMENTS[p.code];
-          const v = theme.valeur(p);
+          const brute = theme.valeur(p);
+          // Prévisions : pluie au-delà de 20 mm et vent (km/h) arrondis de 5 en 5.
+          const v = brute == null ? brute : theme.unite === 'mm' && brute > 20 ? Math.round(brute / 5) * 5 : theme.unite === 'km/h' ? Math.round(brute / 5) * 5 : brute;
           return coords && v != null && Number.isFinite(v)
             ? { code: p.code, nom: p.nom, dep: p.dep ?? (enDepartement ? departement : p.code), lat: coords.lat, lon: coords.lon, valeur: v, direction: theme.direction?.(p) ?? null }
             : null;
