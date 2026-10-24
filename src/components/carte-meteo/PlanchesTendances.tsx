@@ -54,14 +54,16 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
         for (const p of source ?? []) {
           if (MASQUES_FRANCE.has(p.code)) continue;
           const coords = p.lat != null && p.lon != null ? { lat: p.lat, lon: p.lon } : COORDS_DEPARTEMENTS[p.code];
-          const v = themeBase.valeur(p);
+          const brute = themeBase.valeur(p);
+          // Pluie au-delà de 20 mm et rafales : arrondies de 5 en 5 (mm, km/h).
+          const v = brute == null ? brute : themeId === 'pluie' && brute > 20 ? Math.round(brute / 5) * 5 : themeId === 'rafales' ? Math.round(brute / 5) * 5 : brute;
           if (!coords || v == null || !Number.isFinite(v)) continue;
           points.push({ code: p.code, nom: p.nom, dep: p.code, lat: coords.lat, lon: coords.lon, valeur: v, direction: themeBase.direction?.(p) ?? null });
           if (p.pictoPeriode) pictos[p.code] = p.pictoPeriode;
         }
         return { duree, points, pictos, theme: { ...themeBase, titre: reglage.titre(duree) } };
       }),
-    [periodes, themeBase, reglage]
+    [periodes, themeBase, reglage, themeId]
   );
 
   return (
