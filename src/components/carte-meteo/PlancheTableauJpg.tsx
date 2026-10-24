@@ -173,7 +173,7 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
     const nombre = texteInfo(theme, v);
     if (st.valeur === 'texte') {
       return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontFamily: st.policeValeur, fontSize: premiere ? 30 : 26, lineHeight: 1, color: st.texte, fontWeight: premiere ? 700 : 500 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: Math.min(largeurMesure - 40, 150), fontVariantNumeric: 'tabular-nums', fontFamily: st.policeValeur, fontSize: premiere ? 30 : 26, lineHeight: 1, color: st.texte, fontWeight: premiere ? 700 : 500 }}>
           <span style={{ width: 14, height: 14, borderRadius: st.puceRonde ? 14 : 3, background: fond, border: `1px solid ${st.puceBordure}`, display: 'inline-block' }} />
           {nombre}
         </span>
@@ -387,7 +387,6 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
 
             {/* Titres des colonnes (en option) */}
             {avecTitres && <div style={{ height: HAUTEUR_TITRES_COLONNES, display: 'flex', alignItems: 'center', padding: `0 ${marge + (st.ecart ? 20 : 0)}px`, fontSize: 15, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: st.entete, borderBottom: st.traitEntete }}>
-              <div style={{ width: 64 }}>#</div>
               <div style={{ flex: 1 }}>Station</div>
               {colonnesChoisies.map(({ theme }, i) => (
                 <div key={theme.id} style={{ width: largeurMesure, textAlign: 'center', lineHeight: 1.15, color: i === 0 ? st.accent : undefined }}>
@@ -416,7 +415,6 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
                     borderLeft: st.ecart ? `6px solid ${st.accent}` : undefined,
                   }}
                 >
-                  <div style={{ width: 64, fontFamily: st.policeTitre, fontSize: 24, color: st.accent, fontStyle: st.rangItalique ? 'italic' : 'normal', fontWeight: st.titreGras ? 700 : 400 }}>{i + 1}</div>
                   <div style={{ flex: 1, minWidth: 0, fontSize: 22, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {l.nom}
                     <span style={{ marginLeft: 8, fontSize: 17, fontWeight: 400, color: st.secondaire }}>({l.dep})</span>
