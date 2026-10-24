@@ -141,19 +141,49 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
   }
   ctx.restore();
 
-  // Villes d'un département : un disque coloré par ville.
+  // Villes d'un département : champ lissé (pondération par l'inverse du carré de la distance), limité au territoire.
   if (villes) {
-    for (const d of donnees.departements) {
-      const niveau = surPluie ? trouver(NIVEAUX_PLUIE, d.pluie[i] == null ? null : (d.pluie[i] as number) / pas) : trouver(NIVEAUX_VENT, d.rafale[i]);
-      const p = versEcran(versMonde(d.lat, d.lon), vue);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
-      ctx.fillStyle = niveau ? niveau.fond : 'rgba(255,255,255,0.18)';
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+    const pts = donnees.departements.map((d) => {
+      const v = surPluie ? (d.pluie[i] == null ? null : (d.pluie[i] as number) / pas) : d.rafale[i];
+      return { ...versEcran(versMonde(d.lat, d.lon), vue), v };
+    });
+    const niveaux = surPluie ? NIVEAUX_PLUIE : NIVEAUX_VENT;
+    const valides = pts.filter((p) => p.v != null) as { x: number; y: number; v: number }[];
+    const PAS = 5;
+    for (const c of contours) {
+      if (codes && !codes.has(c.code)) continue;
+      ctx.save();
+      ctx.translate(vue.tx, vue.ty);
+      ctx.scale(vue.echelle, vue.echelle);
+      ctx.clip(c.chemin);
+      ctx.setTransform(echelle, 0, 0, echelle, 0, 0);
+      for (let x = 0; x < 870; x += PAS) {
+        for (let y = 90; y < HAUTEUR_ANIM; y += PAS) {
+          let somme = 0;
+          let poids = 0;
+          for (const p of valides) {
+            const d2 = (p.x - x) ** 2 + (p.y - y) ** 2 + 400;
+            somme += p.v / d2;
+            poids += 1 / d2;
+          }
+          const niveau = poids ? trouver(niveaux, somme / poids) : undefined;
+          if (!niveau) continue;
+          ctx.fillStyle = niveau.fond;
+          ctx.fillRect(x, y, PAS + 0.5, PAS + 0.5);
+        }
+      }
+      ctx.restore();
     }
+    // Contours par-dessus
+    ctx.save();
+    ctx.translate(vue.tx, vue.ty);
+    ctx.scale(vue.echelle, vue.echelle);
+    for (const c of contours) {
+      ctx.strokeStyle = codes && !codes.has(c.code) ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 1.2 / vue.echelle;
+      ctx.stroke(c.chemin);
+    }
+    ctx.restore();
   }
 
   // Flèches du vent (là où souffle le vent), plus grandes quand la rafale est forte.
