@@ -62,6 +62,9 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
   const [region, setRegion] = useState('');
   const [altitudeMax, setAltitudeMax] = useState<number>(0);
   const [logoId, setLogoId] = useState('aucun');
+  /** Altitude à côté du nom et bandeau des titres de colonnes : en option, absents par défaut. */
+  const [avecAltitude, setAvecAltitude] = useState(false);
+  const [avecTitres, setAvecTitres] = useState(false);
   const [styleId, setStyleId] = useState(STYLES_TABLEAU[0].id);
   const [titreSaisi, setTitreSaisi] = useState<string | null>(null);
   const [enExport, setEnExport] = useState(false);
@@ -137,7 +140,7 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
   const sousTitre = [classement ? fenetreDe(bilans, classement.id) : '', nomZone.toUpperCase(), altitudeMax ? `STATIONS JUSQU'À ${altitudeMax} M` : ''].filter(Boolean).join(' · ');
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const pasLigne = HAUTEUR_LIGNE + st.ecart;
-  const hauteur = HAUTEUR_ENTETE + HAUTEUR_TITRES_COLONNES + Math.max(lignesTriees.length, 1) * pasLigne + HAUTEUR_PIED;
+  const hauteur = HAUTEUR_ENTETE + (avecTitres ? HAUTEUR_TITRES_COLONNES : 14) + Math.max(lignesTriees.length, 1) * pasLigne + HAUTEUR_PIED;
   // Plus il y a de mesures, plus la colonne « station » se resserre.
   const largeurMesure = st.valeur === 'barre' ? (colonnesChoisies.length > 4 ? 170 : colonnesChoisies.length > 2 ? 210 : 300) : colonnesChoisies.length > 4 ? 150 : 180;
   const marge = st.ecart ? 28 : 36;
@@ -305,6 +308,14 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
             ))}
           </select>
         </label>
+        <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
+          <input type="checkbox" checked={avecAltitude} onChange={(e) => setAvecAltitude(e.target.checked)} />
+          Altitude
+        </label>
+        <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
+          <input type="checkbox" checked={avecTitres} onChange={(e) => setAvecTitres(e.target.checked)} />
+          Titres des colonnes
+        </label>
         <label className="min-w-64 flex-1 text-sm font-medium">
           <span className="mb-1 block">Titre</span>
           <input value={titre} onChange={(e) => setTitreSaisi(e.target.value.toUpperCase())} className={`${selectBarre} w-full`} />
@@ -374,18 +385,18 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
               </div>
             </div>
 
-            {/* Titres des colonnes */}
-            <div style={{ height: HAUTEUR_TITRES_COLONNES, display: 'flex', alignItems: 'center', padding: `0 ${marge + (st.ecart ? 20 : 0)}px`, fontSize: 15, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: st.entete, borderBottom: st.traitEntete }}>
+            {/* Titres des colonnes (en option) */}
+            {avecTitres && <div style={{ height: HAUTEUR_TITRES_COLONNES, display: 'flex', alignItems: 'center', padding: `0 ${marge + (st.ecart ? 20 : 0)}px`, fontSize: 15, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: st.entete, borderBottom: st.traitEntete }}>
               <div style={{ width: 64 }}>#</div>
               <div style={{ flex: 1 }}>Station</div>
-              <div style={{ width: 70, textAlign: 'center' }}>Dép.</div>
               {colonnesChoisies.map(({ theme }, i) => (
                 <div key={theme.id} style={{ width: largeurMesure, textAlign: 'center', lineHeight: 1.15, color: i === 0 ? st.accent : undefined }}>
                   {theme.court}
                   {uniteEntete(theme) ? <span style={{ fontWeight: 400 }}> ({uniteEntete(theme)})</span> : null}
                 </div>
               ))}
-            </div>
+            </div>}
+            {!avecTitres && <div style={{ height: 14 }} />}
 
             {/* Lignes */}
             <div style={{ padding: st.ecart ? `${st.ecart}px ${marge}px 0` : 0 }}>
@@ -408,9 +419,9 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
                   <div style={{ width: 64, fontFamily: st.policeTitre, fontSize: 24, color: st.accent, fontStyle: st.rangItalique ? 'italic' : 'normal', fontWeight: st.titreGras ? 700 : 400 }}>{i + 1}</div>
                   <div style={{ flex: 1, minWidth: 0, fontSize: 22, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {l.nom}
-                    {l.alt != null ? <span style={{ marginLeft: 10, fontSize: 15, fontWeight: 400, color: st.secondaire }}>{l.alt} m</span> : null}
+                    <span style={{ marginLeft: 8, fontSize: 17, fontWeight: 400, color: st.secondaire }}>({l.dep})</span>
+                    {avecAltitude && l.alt != null ? <span style={{ marginLeft: 10, fontSize: 15, fontWeight: 400, color: st.secondaire }}>{l.alt} m</span> : null}
                   </div>
-                  <div style={{ width: 70, textAlign: 'center', fontSize: 18, color: st.secondaire }}>{l.dep}</div>
                   {colonnesChoisies.map(({ theme }, j) => (
                     <div key={theme.id} style={{ width: largeurMesure, display: 'flex', justifyContent: 'center' }}>
                       {valeurDe(l, theme, j === 0)}
