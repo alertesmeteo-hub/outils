@@ -100,6 +100,30 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
   useEffect(() => {
     if (modeDemande) setMode(modeDemande);
   }, [modeDemande]);
+  // Lien direct vers une carte (#carte-tx-fin…) : ouvre la catégorie qui la contient, puis y défile.
+  useEffect(() => {
+    const ouvrirAncre = () => {
+      const cible = decodeURIComponent(window.location.hash.slice(1));
+      if (!cible.startsWith('carte-')) return;
+      const themeId = cible.slice('carte-'.length);
+      const modeCible = ([['prevision', THEMES_PREVISION], ['bilan', THEMES_BILAN], ['climat', THEMES_CLIMAT]] as [Mode, ThemeInfo[]][])
+        .find(([, liste]) => liste.some((t) => t.id === themeId))?.[0];
+      if (!modeCible) return;
+      setMode(modeCible);
+      setGroupeChoisi('tous');
+      // La carte n'existe qu'après le rendu de la catégorie : on attend qu'elle apparaisse.
+      let essais = 0;
+      const defiler = () => {
+        const el = document.getElementById(cible);
+        if (el) el.scrollIntoView();
+        else if (++essais < 40) setTimeout(defiler, 250);
+      };
+      setTimeout(defiler, 0);
+    };
+    ouvrirAncre();
+    window.addEventListener('hashchange', ouvrirAncre);
+    return () => window.removeEventListener('hashchange', ouvrirAncre);
+  }, []);
   const [niveau, setNiveau] = useState<Niveau>('france');
   const [region, setRegion] = useState(REGIONS_FR[0]);
   const [departement, setDepartement] = useState('66');
