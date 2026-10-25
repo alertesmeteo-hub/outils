@@ -149,7 +149,7 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
     });
     const niveaux = surPluie ? NIVEAUX_PLUIE : NIVEAUX_VENT;
     const valides = pts.filter((p) => p.v != null) as { x: number; y: number; v: number }[];
-    const PAS = 5;
+    const PAS = 2;
     for (const c of contours) {
       if (codes && !codes.has(c.code)) continue;
       ctx.save();
