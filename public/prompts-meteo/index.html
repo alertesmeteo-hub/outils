@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nuage de mots – météo et climat</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f27;--mut:#667085;--bd:#e3e6eb;--ac:#2563eb;--hl:#fde68a}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1d2026;--tx:#e8eaee;--mut:#9aa3b2;--bd:#2c313a;--ac:#7fb0ff;--hl:#6b5b0f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,Segoe UI,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0}
+p.sub{color:var(--mut);margin:0 0 14px}
+.cloud{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:22px 16px;display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;align-items:center;line-height:1.1}
+.w{cursor:pointer;text-align:center;border-radius:10px;padding:2px 6px;border:2px solid transparent;transition:.12s}
+.w:hover{border-color:var(--ac)}
+.w.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 10%,transparent)}
+.w b{display:block;font-weight:700}
+.w small{display:block;color:var(--mut);font-size:.5em;font-weight:500;margin-top:2px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+input,select,button{padding:9px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx);font-size:14px}
+input{flex:1 1 240px}
+button{cursor:pointer}
+.info{color:var(--mut);font-size:13px;margin:6px 0 10px}
+.item{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+.item h3{margin:0 0 4px;font-size:16px}
+.meta{font-size:12px;color:var(--mut);display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.tag{border:1px solid var(--bd);border-radius:999px;padding:1px 8px}
+.txt{color:var(--mut);font-size:14px}
+.item.done{border-color:#16a34a;background:color-mix(in srgb,#16a34a 8%,var(--card))}.okl{color:#16a34a;font-weight:600;cursor:pointer}.act{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}.full{white-space:pre-wrap;margin-top:8px;color:var(--tx);font-size:14px}
+mark{background:var(--hl);color:inherit;border-radius:2px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Nuage de mots – météo, climat et nature</h1>
+  <p class="sub">Mots liés à la météo et au climat trouvés dans la 1re phrase des prompts (anglais, traduction en dessous). La taille dépend du nombre de prompts concernés. Cliquez un mot pour voir ses prompts.</p>
+  <div id="cloud" class="cloud"></div>
+  <div class="bar">
+    <input id="q" type="search" placeholder="Filtrer les résultats (mot, catégorie…)">
+    <select id="pack"></select>
+    <select id="st"><option value="">Tous</option><option value="ok">Cochés « ok »</option><option value="todo">Pas encore ok</option></select>
+    <button id="oks" type="button">Liste des OK</button>
+    <button id="all">Tous les mots</button>
+  </div>
+  <div id="info" class="info"></div>
+  <div id="list"></div>
+</main>
+<script src="cats-fr.js"></script>
+<script src="meteo-data.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fc=c=>(window.CATFR&&CATFR[c])||c;
+const M=window.METEO||{fr:{},cloud:[],rows:[]};
+let sel=null;
+const max=M.cloud.length?M.cloud[0][1]:1;
+const hue=w=>{let h=0;for(const c of w)h=(h*31+c.charCodeAt(0))%360;return h};
+function drawCloud(){
+  const items=[...M.cloud].sort((a,b)=>a[0].localeCompare(b[0]));
+  $('cloud').innerHTML=items.map(([w,n])=>{
+    const size=(0.95+2.4*Math.sqrt(n/max)).toFixed(2);
+    return `<span class="w${sel===w?' on':''}" data-w="${esc(w)}" style="font-size:${size}em;color:hsl(${hue(w)} 60% 45%)" title="${n} prompt(s)"><b>${esc(w)}</b><small>${esc(M.fr[w]||'')} · ${n}</small></span>`}).join('');
+}
+function drawList(){
+  $('oks').textContent='Liste des OK ('+M.rows.filter(r=>OK.has(key(r))).length+')';
+  const q=$('q').value.toLowerCase().split(/\s+/).filter(Boolean),p=$('pack').value;
+  const st=$('st').value;
+  const rows=M.rows.filter(r=>(!sel||r.w.includes(sel))&&(!p||r.p===p)&&(!st||(st==='ok')===OK.has(key(r)))&&q.every(t=>(r.t+' '+r.c+' '+fc(r.c)+' '+r.s).toLowerCase().includes(t)));
+  $('info').textContent=`${rows.length} prompt(s)`+(sel?` pour « ${sel} (${M.fr[sel]||''}) »`:' au total')+` sur ${M.rows.length} liés à la météo/climat`;
+  const re=sel?new RegExp('\\b('+sel+'(?:s|es)?)\\b','gi'):null;
+  $('list').innerHTML=rows.slice(0,200).map(r=>{
+    const k=key(r),fr=FR[k];
+    let s=esc(fr?fr.split(/(?<=[.!?])\s+/)[0]:r.s);if(re&&!fr)s=s.replace(re,'<mark>$1</mark>');
+    return `<div class="item${OK.has(k)?' done':''}" data-k="${esc(k)}"><h3>${esc(r.t.toLowerCase()===r.c.toLowerCase()?fc(r.c):r.t)}</h3>
+    <div class="meta"><span class="tag">${esc(r.p)}</span><span class="tag">${esc(r.n)}</span><span class="tag">${esc(fc(r.c))}</span>${r.w.map(w=>`<span class="tag">${esc(w)} (${esc(M.fr[w]||'')})</span>`).join('')}
+      <label class="okl"><input type="checkbox" data-a="ok" ${OK.has(k)?'checked':''}> ok</label></div>
+    <div class="txt">${s}</div>
+    <div class="full" hidden>${esc(fr||r.f)}</div>
+    <div class="act"><button data-a="open">Voir le prompt complet</button><button data-a="copy">Copier le prompt</button><button data-a="tr">${fr?'Voir l’original':'Traduire en français'}</button></div></div>`}).join('')+(rows.length>200?'<div class="info">200 premiers résultats : affinez avec le filtre.</div>':'')||'<div class="info">Aucun résultat.</div>';
+}
+/* état partagé avec index.html (même navigateur) */
+const key=r=>r.p+'|'+r.n;
+
+const OKStore={
+ message:'',
+ read(){
+  try{const raw=localStorage.getItem('ok');const a=JSON.parse(raw||'[]');if(!Array.isArray(a)||!a.every(x=>typeof x==='string'))throw Error('Format invalide');this.message=a.length+' OK retrouvés dans ce navigateur pour cette page.';return new Set(a)}
+  catch(e){this.message='Lecture des OK impossible : '+e.message;return new Set()}
+ },
+ status(){const e=document.getElementById('ok-status');if(e)e.textContent=this.message},
+ save(values){
+  try{const raw=JSON.stringify([...values]);localStorage.setItem('ok',raw);if(localStorage.getItem('ok')!==raw)throw Error('Écriture non confirmée');this.message=values.size+' OK enregistrés dans ce navigateur pour cette page.';this.status();return true}
+  catch(e){this.message='ATTENTION : les OK ne sont pas enregistrés. Exportez une sauvegarde avant de fermer cette page. '+e.message;this.status();return false}
+ },
+ mount(get,set,refresh){
+  const box=document.createElement('div');box.className='info';box.innerHTML='<p id="ok-status" role="status"></p><button type="button" id="ok-backup">Sauvegarder les OK dans un fichier</button> <button type="button" id="ok-restore">Importer une sauvegarde OK</button><input id="ok-file" type="file" accept=".json" hidden><p>Les coches sont conservées dans ce navigateur. Pour les transférer entre les pages ou navigateurs, exportez puis importez la sauvegarde.</p>';
+  document.getElementById('info').after(box);this.status();
+  document.getElementById('ok-backup').onclick=()=>{const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify({format:'historyprompts-ok-v1',savedAt:new Date().toISOString(),keys:[...get()]},null,2)],{type:'application/json'}));a.href=url;a.download='sauvegarde-ok-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+  const input=document.getElementById('ok-file');document.getElementById('ok-restore').onclick=()=>input.click();
+  input.onchange=async()=>{try{if(!input.files[0])return;const j=JSON.parse(await input.files[0].text());let keys;if(j.format==='historyprompts-ok-v1')keys=j.keys;else if(Array.isArray(j))keys=j.map(x=>typeof x==='string'?x:(typeof x.pack==='string'&&x.n!=null?x.pack+'|'+x.n:null));if(!Array.isArray(keys)||!keys.every(x=>typeof x==='string'&&x.includes('|')))throw Error('Sauvegarde OK non reconnue');const merged=new Set([...get(),...keys]);set(merged);this.save(merged);refresh()}catch(e){alert('Import impossible : '+e.message)}finally{input.value=''}};
+ }
+};
+
+let OK=OKStore.read();
+const saveOK=()=>OKStore.save(OK);
+let FR={};
+const db=()=>new Promise((res,rej)=>{const r=indexedDB.open('prompts',2);r.onupgradeneeded=()=>{for(const s of['f','fr'])if(!r.result.objectStoreNames.contains(s))r.result.createObjectStore(s)};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+async function idb(mode,fn){const d=await db();return new Promise((res,rej)=>{const t=d.transaction('fr',mode);const out=fn(t.objectStore('fr'));t.oncomplete=()=>res(out&&out.result);t.onerror=()=>rej(t.error)})}
+async function loadFR(){try{const k=await idb('readonly',s=>s.getAllKeys()),v=await idb('readonly',s=>s.getAll());FR={};k.forEach((x,i)=>FR[x]=v[i])}catch(e){}drawList()}
+
+function googleFallback(text,why){
+  const base='https://translate.google.com/?sl=en&tl=fr&op=translate';
+  const u=base+'&text='+encodeURIComponent(text);
+  if(u.length<7500){
+    window.open(u,'_blank');
+    alert(why+'\n\nJ\'ouvre Google Traduction avec le prompt dans un nouvel onglet.');
+  }else{
+    try{navigator.clipboard.writeText(text)}catch(_){}
+    window.open(base,'_blank');
+    alert(why+'\n\nPrompt trop long pour le lien : il est copié, collez-le (Ctrl+V) dans Google Traduction.');
+  }
+}
+let TR=null;
+async function translate(text,btn){
+  if(!('Translator' in self))throw new Error('Traduction intégrée indisponible dans ce navigateur (utilisez Chrome récent, ou le menu Traduire de Chrome).');
+  if(!TR)TR=await Translator.create({sourceLanguage:'en',targetLanguage:'fr',monitor(m){m.addEventListener('downloadprogress',e=>{btn.textContent='Téléchargement du modèle '+Math.round(e.loaded*100)+'%'})}});
+  const parts=text.split(/(?<=[.!?])\s+/),out=[];let cur='';
+  for(const s of parts){if((cur+' '+s).length>900&&cur){out.push(cur);cur=s}else cur=cur?cur+' '+s:s}
+  if(cur)out.push(cur);
+  const res=[];for(let i=0;i<out.length;i++){btn.textContent='Traduction '+(i+1)+'/'+out.length;res.push(await TR.translate(out[i]))}
+  return res.join(' ');
+}
+$('list').addEventListener('change',e=>{
+  if(e.target.dataset.a!=='ok')return;const it=e.target.closest('.item'),k=it.dataset.k;
+  e.target.checked?OK.add(k):OK.delete(k);saveOK();drawList();
+});
+$('list').addEventListener('click',async e=>{
+  const b=e.target.closest('button');if(!b)return;const it=b.closest('.item'),k=it.dataset.k,r=M.rows.find(x=>key(x)===k);
+  if(b.dataset.a==='open'){const f=it.querySelector('.full');f.hidden=!f.hidden;b.textContent=f.hidden?'Voir le prompt complet':'Réduire'}
+  else if(b.dataset.a==='copy'){const t=FR[k]||r.f;try{await navigator.clipboard.writeText(t)}catch(_){const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();document.execCommand('copy');x.remove()}b.textContent='Copié ✓';setTimeout(()=>b.textContent='Copier le prompt',1200)}
+  else if(b.dataset.a==='tr'){
+    try{
+      if(FR[k]){delete FR[k];await idb('readwrite',s=>s.delete(k))}
+      else{FR[k]=await translate(r.f,b);await idb('readwrite',s=>s.put(FR[k],k))}
+    }catch(err){googleFallback(r.f,'Traduction intégrée indisponible ('+(err.message||err)+').')}
+    const open=!it.querySelector('.full').hidden;drawList();
+    if(open){const n=document.querySelector('.item[data-k="'+CSS.escape(k)+'"]');if(n){n.querySelector('.full').hidden=false;n.querySelector('[data-a=open]').textContent='Réduire'}}
+  }
+});
+$('st').onchange=drawList;
+$('cloud').addEventListener('click',e=>{const w=e.target.closest('.w');if(!w)return;sel=sel===w.dataset.w?null:w.dataset.w;drawCloud();drawList()});
+$('all').onclick=()=>{sel=null;$('q').value='';drawCloud();drawList()};
+$('q').addEventListener('input',drawList);$('pack').onchange=drawList;
+$('pack').innerHTML='<option value="">Tous les packs</option>'+[...new Set(M.rows.map(r=>r.p))].sort().map(p=>`<option>${esc(p)}</option>`).join('');
+drawCloud();drawList();loadFR();
+</script>
+<script>
+$('oks').onclick=()=>{sel=null;$('q').value='';$('pack').value='';$('st').value=$('st').value==='ok'?'':'ok';drawCloud();drawList()};
+OKStore.mount(()=>OK,v=>{OK=v},drawList);
+</script>
+</body>
+</html>

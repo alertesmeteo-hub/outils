@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-/** Protège /admin par authentification HTTP Basic. Sans ADMIN_PASSWORD, l'admin est désactivée (404). */
+/** Protège /admin et /prompts-meteo (nuage de mots des prompts, privé) par authentification HTTP Basic. Sans ADMIN_PASSWORD, ces pages sont désactivées (404). */
 function safeEqual(a: string, b: string) {
   if (a.length !== b.length) return false;
   let r = 0;
@@ -20,12 +20,13 @@ export function middleware(req: NextRequest) {
       if (safeEqual(u, user) && safeEqual(rest.join(':'), pass)) {
         const res = NextResponse.next();
         res.headers.set('X-Robots-Tag', 'noindex, nofollow');
-        res.headers.set('Cache-Control', 'no-store');
+        // Les gros fichiers de données de /prompts-meteo peuvent rester en cache privé ; l'admin jamais.
+        res.headers.set('Cache-Control', req.nextUrl.pathname.startsWith('/prompts-meteo') ? 'private, max-age=300' : 'no-store');
         return res;
       }
     } catch {}
   }
-  return new NextResponse('Authentification requise', { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="Admin", charset="UTF-8"' } });
+  return new NextResponse('Authentification requise', { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="Outils", charset="UTF-8"' } });
 }
 
-export const config = { matcher: ['/admin/:path*'] };
+export const config = { matcher: ['/admin/:path*', '/prompts-meteo/:path*'] };

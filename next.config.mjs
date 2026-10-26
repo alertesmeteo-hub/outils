@@ -27,6 +27,10 @@ const nextConfig = {
   trailingSlash: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  async rewrites() {
+    // Page statique privée (protégée par le middleware) : /prompts-meteo/ sert public/prompts-meteo/index.html.
+    return [{ source: '/prompts-meteo/', destination: '/prompts-meteo/index.html' }];
+  },
   async headers() {
     // EMBED_ALLOWED_ORIGINS : liste d'origines autorisées à intégrer /embed (défaut : toutes).
     const embedAncestors = process.env.EMBED_ALLOWED_ORIGINS?.trim() || '*';
