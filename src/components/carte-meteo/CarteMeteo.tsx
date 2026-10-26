@@ -775,9 +775,19 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   useEffect(() => {
     const colonne = colonneRef.current;
     if (!colonne) return;
-    const observateur = new ResizeObserver(() => setFacteur(Math.min(1, colonne.clientWidth / largeurCarte)));
+    // La carte occupe toute la largeur de la fenêtre à droite du menu (au-delà de la colonne centrale du site).
+    const ajuster = () => {
+      const disponible = Math.max(colonne.clientWidth, document.documentElement.clientWidth - colonne.getBoundingClientRect().left - 16);
+      // … sans dépasser la hauteur de l’écran, pour la voir en entier.
+      setFacteur(Math.min(disponible / largeurCarte, Math.max(1, (window.innerHeight - 24) / HAUTEUR_CARTE)));
+    };
+    const observateur = new ResizeObserver(ajuster);
     observateur.observe(colonne);
-    return () => observateur.disconnect();
+    window.addEventListener('resize', ajuster);
+    return () => {
+      observateur.disconnect();
+      window.removeEventListener('resize', ajuster);
+    };
   }, [largeurCarte]);
   const points = useMemo(() => {
     if (enDepartement) return donneesVilles?.departement === departement ? donneesVilles.points : [];
@@ -1602,8 +1612,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[250px_minmax(0,1fr)] 2xl:grid-cols-[250px_minmax(0,1fr)_240px]">
-      <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:order-1">
+    <div className="grid items-start gap-6 lg:grid-cols-2">
+      <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4">
         <div>
           <p className={titreGroupe}>Pictos</p>
           <fieldset className="mt-2">
@@ -1860,7 +1870,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         </div>
       </aside>
 
-      <div className="order-1 min-w-0 lg:order-2" ref={colonneRef}>
+      <div className="order-1 min-w-0 lg:col-span-2" ref={colonneRef}>
         {figee && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
             <span>
@@ -2156,7 +2166,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         </p>
       </div>
 
-      <aside className="order-3 rounded-xl border border-border bg-surface p-4 lg:col-start-1 2xl:col-start-3 2xl:row-start-1">
+      <aside className="order-3 rounded-xl border border-border bg-surface p-4">
           <p className={titreGroupe}>Textes et logo</p>
           <label className={`${champLabel} mt-2`}>
             Date
