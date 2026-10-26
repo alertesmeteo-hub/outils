@@ -9,6 +9,7 @@ export const PAGES_DE_TRAVAIL = [
   { href: '/outils/carte-meteo/animations/', libelle: 'Animations GIF / MP4' },
   { href: '/outils/carte-meteo-info/', libelle: 'Cartes infos' },
   { href: '/outils/carte-meteo-info/?cartes=europe', libelle: 'Europe : isobares' },
+  { href: '/outils/previsions-saisonnieres/', libelle: 'Prévisions saisonnières' },
   { href: '/outils/observations-en-direct/', libelle: 'Observations en direct' },
   { href: '/outils/temperatures-en-direct/', libelle: 'Températures en direct' },
   { href: '/outils/releves-en-direct/', libelle: 'Super tableau des relevés' },

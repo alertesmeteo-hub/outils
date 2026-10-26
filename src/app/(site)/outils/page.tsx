@@ -64,6 +64,17 @@ export default async function AllTools() {
           </Link>
         </li>
         <li>
+          <Link href="/outils/previsions-saisonnieres/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">🗓️</span>
+            <span>
+              <strong className="block leading-snug">Prévisions saisonnières</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Cartes de l&apos;Occitanie et tableau des écarts de température et de pluie à 8 semaines et 9 mois (CFSv2), export en JPG.
+              </span>
+            </span>
+          </Link>
+        </li>
+        <li>
           <Link href="/outils/temperatures-en-direct/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
             <span aria-hidden className="text-3xl">🌡️</span>
             <span>
