@@ -473,7 +473,6 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [erreurExport, setErreurExport] = useState<string | null>(null);
 
   const [facteur, setFacteur] = useState(1);
-  const [decalage, setDecalage] = useState(0);
   const colonneRef = useRef<HTMLDivElement>(null);
   const carteRef = useRef<HTMLDivElement>(null);
 
@@ -776,14 +775,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   useEffect(() => {
     const colonne = colonneRef.current;
     if (!colonne) return;
-    // La carte occupe toute la largeur de la fenêtre à droite du menu (au-delà de la colonne centrale du site).
+    // La carte remplit sa colonne, agrandie au besoin.
     const ajuster = () => {
-      const largeurFenetre = document.documentElement.clientWidth;
-      const disponible = Math.max(colonne.clientWidth, largeurFenetre - 32);
-      const f = disponible / largeurCarte;
-      setFacteur(f);
-      // Centrée sur la fenêtre, quitte à déborder de la colonne du site de part et d'autre.
-      setDecalage(Math.min(0, (colonne.clientWidth - largeurCarte * f) / 2));
+      setFacteur(colonne.clientWidth / largeurCarte);
     };
     const observateur = new ResizeObserver(ajuster);
     observateur.observe(colonne);
@@ -1616,8 +1610,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-2">
-      <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4">
+    <div className="grid items-start gap-4 lg:ml-[calc(50%-50vw+1rem)] lg:w-[calc(100vw-2rem)] lg:grid-cols-[250px_minmax(0,1fr)_250px]">
+      <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:order-1">
         <div>
           <p className={titreGroupe}>Pictos</p>
           <fieldset className="mt-2">
@@ -1874,7 +1868,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         </div>
       </aside>
 
-      <div className="order-1 min-w-0 lg:col-span-2" ref={colonneRef}>
+      <div className="order-1 min-w-0 lg:order-2" ref={colonneRef}>
         {figee && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
             <span>
@@ -2019,7 +2013,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
         </div>
 
-        <div className="relative" style={{ marginLeft: decalage, marginRight: decalage }}>
+        <div className="relative">
           {erreur && (
             <p role="alert" className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-danger">
               {erreur}
@@ -2170,7 +2164,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         </p>
       </div>
 
-      <aside className="order-3 rounded-xl border border-border bg-surface p-4">
+      <aside className="order-3 rounded-xl border border-border bg-surface p-4 lg:col-start-3 lg:row-start-1">
           <p className={titreGroupe}>Textes et logo</p>
           <label className={`${champLabel} mt-2`}>
             Date
