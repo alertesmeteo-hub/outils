@@ -473,6 +473,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [erreurExport, setErreurExport] = useState<string | null>(null);
 
   const [facteur, setFacteur] = useState(1);
+  const [decalage, setDecalage] = useState(0);
   const colonneRef = useRef<HTMLDivElement>(null);
   const carteRef = useRef<HTMLDivElement>(null);
 
@@ -777,9 +778,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     if (!colonne) return;
     // La carte occupe toute la largeur de la fenêtre à droite du menu (au-delà de la colonne centrale du site).
     const ajuster = () => {
-      const disponible = Math.max(colonne.clientWidth, document.documentElement.clientWidth - colonne.getBoundingClientRect().left - 16);
-      // … sans dépasser la hauteur de l’écran, pour la voir en entier.
-      setFacteur(Math.min(disponible / largeurCarte, Math.max(1, (window.innerHeight - 24) / HAUTEUR_CARTE)));
+      const largeurFenetre = document.documentElement.clientWidth;
+      const disponible = Math.max(colonne.clientWidth, largeurFenetre - 32);
+      const f = disponible / largeurCarte;
+      setFacteur(f);
+      // Centrée sur la fenêtre, quitte à déborder de la colonne du site de part et d'autre.
+      setDecalage(Math.min(0, (colonne.clientWidth - largeurCarte * f) / 2));
     };
     const observateur = new ResizeObserver(ajuster);
     observateur.observe(colonne);
@@ -2015,7 +2019,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
         </div>
 
-        <div className="relative">
+        <div className="relative" style={{ marginLeft: decalage, marginRight: decalage }}>
           {erreur && (
             <p role="alert" className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-danger">
               {erreur}
