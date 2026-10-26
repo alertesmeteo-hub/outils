@@ -1602,7 +1602,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
+    <div className="grid items-start gap-6 lg:grid-cols-[250px_minmax(0,1fr)] 2xl:grid-cols-[250px_minmax(0,1fr)_240px]">
       <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:order-1">
         <div>
           <p className={titreGroupe}>Pictos</p>
@@ -1797,65 +1797,6 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           <p className="mt-2 text-xs text-muted">
             Choisit les pictos de toute la carte d&apos;après la prévision. Pour changer un picto seul, clique dessus sur la carte : emojis et images au choix.
           </p>
-        </div>
-
-        <div className="border-t border-border pt-4">
-          <p className={titreGroupe}>Textes et logo</p>
-          <label className={`${champLabel} mt-2`}>
-            Date
-            <input type="text" value={titre} onChange={(e) => setTitreManuel(e.target.value)} className={champInput} />
-          </label>
-          <label className={`${champLabel} mt-3`}>
-            Sous-titre
-            <input type="text" value={sousTitre} onChange={(e) => setSousTitreManuel(e.target.value)} className={champInput} />
-          </label>
-          {enFrance && (
-            <>
-              <label className={`${champLabel} mt-3`}>
-                Moyenne Nord
-                <input
-                  type="text"
-                  value={valeurMoyenne('nord')}
-                  onChange={(e) => saisieAcceptee(e.target.value, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('nord')]: e.target.value }))}
-                  className={champInput}
-                />
-              </label>
-              <label className={`${champLabel} mt-3`}>
-                Moyenne Sud
-                <input
-                  type="text"
-                  value={valeurMoyenne('sud')}
-                  onChange={(e) => saisieAcceptee(e.target.value, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('sud')]: e.target.value }))}
-                  className={champInput}
-                />
-              </label>
-            </>
-          )}
-          <label className={`${champLabel} mt-3`}>
-            Texte du bas (centré)
-            <input type="text" value={pied} onChange={(e) => setPied(e.target.value)} className={champInput} />
-          </label>
-          <label className={`${champLabel} mt-3`}>
-            Logo
-            <select
-              value={logoPersonnalise ? 'personnalise' : logoId}
-              onChange={(e) => {
-                if (e.target.value === 'personnalise') return;
-                setLogoPersonnalise(null);
-                setLogoPresetId(e.target.value);
-              }}
-              className={champSelect}
-            >
-              {LOGOS_PRESETS.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.nom}
-                  {l.id === logoDefaut.id ? ' (suggéré)' : ''}
-                </option>
-              ))}
-              {logoPersonnalise && <option value="personnalise">Image importée</option>}
-            </select>
-            <input type="file" accept="image/*" onChange={surLogo} className="mt-1.5 text-xs" />
-          </label>
         </div>
 
         <div className="flex flex-col gap-2 border-t border-border pt-4">
@@ -2214,6 +2155,65 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           Contours : IGN Admin Express (Licence ouverte Etalab).{enDepartement && ' Communes : prévisions au point de commune.'}
         </p>
       </div>
+
+      <aside className="order-3 rounded-xl border border-border bg-surface p-4 lg:col-start-1 2xl:col-start-3 2xl:row-start-1">
+          <p className={titreGroupe}>Textes et logo</p>
+          <label className={`${champLabel} mt-2`}>
+            Date
+            <input type="text" value={titre} onChange={(e) => setTitreManuel(e.target.value)} className={champInput} />
+          </label>
+          <label className={`${champLabel} mt-3`}>
+            Sous-titre
+            <input type="text" value={sousTitre} onChange={(e) => setSousTitreManuel(e.target.value)} className={champInput} />
+          </label>
+          {enFrance && (
+            <>
+              <label className={`${champLabel} mt-3`}>
+                Moyenne Nord
+                <input
+                  type="text"
+                  value={valeurMoyenne('nord')}
+                  onChange={(e) => saisieAcceptee(e.target.value, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('nord')]: e.target.value }))}
+                  className={champInput}
+                />
+              </label>
+              <label className={`${champLabel} mt-3`}>
+                Moyenne Sud
+                <input
+                  type="text"
+                  value={valeurMoyenne('sud')}
+                  onChange={(e) => saisieAcceptee(e.target.value, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne('sud')]: e.target.value }))}
+                  className={champInput}
+                />
+              </label>
+            </>
+          )}
+          <label className={`${champLabel} mt-3`}>
+            Texte du bas (centré)
+            <input type="text" value={pied} onChange={(e) => setPied(e.target.value)} className={champInput} />
+          </label>
+          <label className={`${champLabel} mt-3`}>
+            Logo
+            <select
+              value={logoPersonnalise ? 'personnalise' : logoId}
+              onChange={(e) => {
+                if (e.target.value === 'personnalise') return;
+                setLogoPersonnalise(null);
+                setLogoPresetId(e.target.value);
+              }}
+              className={champSelect}
+            >
+              {LOGOS_PRESETS.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.nom}
+                  {l.id === logoDefaut.id ? ' (suggéré)' : ''}
+                </option>
+              ))}
+              {logoPersonnalise && <option value="personnalise">Image importée</option>}
+            </select>
+            <input type="file" accept="image/*" onChange={surLogo} className="mt-1.5 text-xs" />
+          </label>
+      </aside>
     </div>
   );
 }
