@@ -50,7 +50,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   const [tailleRafale, setTailleRafale] = useState(70);
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState('france');
-  const [logoId, setLogoId] = useState('aucun');
+  const [logoId, setLogoId] = useState('alertesmeteo');
   const [donneesDep, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
   const [erreur, setErreur] = useState<string | null>(null);
   const [enExport, setEnExport] = useState(false);

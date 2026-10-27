@@ -39,7 +39,7 @@ interface Props {
 export default function PlanchesTendances({ aujourdhui, modele, periodes }: Props) {
   const [themeId, setThemeId] = useState<(typeof THEMES_TENDANCES)[number]['id']>('pluie');
   const [avecPictos, setAvecPictos] = useState(true);
-  const [logoId, setLogoId] = useState('aucun');
+  const [logoId, setLogoId] = useState('alertesmeteo');
   const [taille, setTaille] = useState(1);
   const [region, setRegion] = useState('');
   const [niveauDetail, setNiveauDetail] = useState<number>(4);

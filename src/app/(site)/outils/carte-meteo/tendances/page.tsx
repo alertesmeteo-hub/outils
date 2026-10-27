@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import PlanchesJours from '@/components/carte-meteo/PlanchesJours';
 import PlanchesTendances from '@/components/carte-meteo/PlanchesTendances';
+import NeufMoisFrance from '@/components/saisonnier/NeufMoisFrance';
+import { chargerFrance } from '@/lib/saisonnier/france';
+import { etiquettesFrance, tracesFrance } from '@/lib/saisonnier/geo-france';
 import { versPointJour, type PointJour } from '@/lib/carte-meteo/planches-jours';
 import { aujourdhuiParis, ajouterJours, DUREES_TENDANCES, estModele, MODELES, type ModeleSource } from '@/lib/carte-meteo/previsions-modeles';
 import { chargerPrevisionsCarteJours, chargerPrevisionsTendances, type PointTendance } from '@/lib/carte-meteo/sources';
@@ -27,6 +30,8 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
   let periodes: Record<number, PointTendance[] | null> = {};
   let jours: Record<string, PointJour[] | null> = {};
   let erreur = false;
+  const [neufMoisBrut, tracesFr] = await Promise.all([chargerFrance(), tracesFrance().catch(() => [])]);
+  const neufMois = neufMoisBrut ? await etiquettesFrance(neufMoisBrut).catch(() => neufMoisBrut) : null;
   try {
     const dates = Array.from({ length: 17 }, (_, k) => ajouterJours(aujourdhui, k));
     const [p, j] = await Promise.all([chargerPrevisionsTendances(modele, aujourdhui, [...DUREES_TENDANCES]), chargerPrevisionsCarteJours(modele, dates, false)]);
@@ -46,6 +51,10 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
         chaque carte se corrige à la main et s&apos;exporte en JPG. Pour une carte jour par jour, voir les{' '}
         <Link href="/outils/carte-meteo/16-jours/" className="underline">
           cartes à 16 jours
+        </Link>
+        . Pour la tendance sur 9 mois, voir plus bas ou les{' '}
+        <Link href="/outils/previsions-saisonnieres/" className="underline">
+          prévisions saisonnières
         </Link>
         .
       </p>
@@ -78,6 +87,22 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
           <h2 className="mt-12 text-2xl font-extrabold">Cartes de tendance par thème</h2>
           <PlanchesTendances aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} periodes={periodes} />
         </>
+      )}
+
+      <h2 id="neuf-mois" className="mt-12 text-2xl font-extrabold">
+        Tendance à 9 mois : France
+      </h2>
+      <p className="mt-2 max-w-3xl text-muted">Plus chaud ou plus frais, plus sec ou plus humide que la normale, mois par mois, d&apos;après le modèle saisonnier CFSv2 (NOAA).</p>
+      {neufMois ? (
+        <NeufMoisFrance donnees={neufMois} traces={tracesFr} />
+      ) : (
+        <p className="mt-4 rounded-lg border border-border bg-surface p-4 text-sm text-muted">
+          La tendance à 9 mois pour la France n&apos;est pas disponible pour le moment. Le détail pour l&apos;Occitanie reste consultable dans les{' '}
+          <Link href="/outils/previsions-saisonnieres/" className="underline">
+            prévisions saisonnières
+          </Link>
+          .
+        </p>
       )}
 
       <p className="mt-8 text-xs text-muted">

@@ -2,25 +2,11 @@
 
 import { useId, useRef, useState } from 'react';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
+import { couleur, fmtP, fmtT, type Variable } from '@/lib/saisonnier/couleurs';
 import { HAUTEUR_CARTE, LARGEUR_CARTE, projeter, type Echeance, type Saisonnier } from '@/lib/saisonnier/cfsv2';
 
-type Variable = 't' | 'pluie';
 type Pas = 'hebdo' | 'mensuel';
 
-/** Couleur d'un écart : bleu → blanc → rouge (température), brun → blanc → vert (pluie). */
-function couleur(v: number | null, variable: Variable): string {
-  if (v === null) return '#d4d4d8';
-  const max = variable === 't' ? 3 : 80;
-  const r = Math.max(-1, Math.min(1, v / max));
-  const [neg, pos] = variable === 't' ? [[37, 99, 235], [220, 38, 38]] : [[180, 120, 40], [22, 140, 80]];
-  const c = r < 0 ? neg : pos;
-  const a = Math.abs(r);
-  const m = (i: number) => Math.round(255 + (c[i] - 255) * a);
-  return `rgb(${m(0)},${m(1)},${m(2)})`;
-}
-
-const fmtT = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1).replace('.', ',')} °C`);
-const fmtP = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v))} %`);
 const valeur = (c: [number, number, number | null, number | null], variable: Variable) => (variable === 't' ? c[2] : c[3]);
 
 /** Pas de la grille (degrés), déduit des mailles. */
