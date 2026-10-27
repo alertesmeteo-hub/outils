@@ -69,15 +69,15 @@ export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }
   const [logoId, setLogoId] = useState('alertesmeteo');
   const [exportEnCours, setExportEnCours] = useState(false);
   const planche = useRef<HTMLDivElement>(null);
+  const tableau = useRef<HTMLDivElement>(null);
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const run = new Date(`${donnees.init}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
-  const exporter = async () => {
-    const noeud = planche.current;
+  const exporter = async (noeud: HTMLDivElement | null, nom: string) => {
     if (!noeud) return;
     setExportEnCours(true);
     try {
-      await exporterEnJpg(noeud, `tendance-${pas === 'hebdo' ? '8-semaines' : '9-mois'}-${variable}-france-${donnees.init}`, noeud.scrollWidth, noeud.scrollHeight);
+      await exporterEnJpg(noeud, `${nom}-${pas === 'hebdo' ? '8-semaines' : '9-mois'}-france-${donnees.init}`, noeud.scrollWidth, noeud.scrollHeight);
     } finally {
       setExportEnCours(false);
     }
@@ -113,7 +113,7 @@ export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }
             ))}
           </select>
         </label>
-        <button type="button" disabled={exportEnCours} onClick={exporter} className="ml-auto rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold hover:border-primary disabled:opacity-50">
+        <button type="button" disabled={exportEnCours} onClick={() => exporter(planche.current, `carte-${variable}`)} className="ml-auto rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold hover:border-primary disabled:opacity-50">
           {exportEnCours ? 'Export…' : 'Exporter la planche en JPG'}
         </button>
       </div>
@@ -133,6 +133,39 @@ export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }
             <Carte key={e.cle} e={e} variable={variable} traces={traces} clip={`clip-fr-${id}-${e.cle}`} />
           ))}
         </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-lg font-bold">Tableau France : {pas === 'hebdo' ? '8 semaines' : '9 mois'}</h3>
+        <button type="button" disabled={exportEnCours} onClick={() => exporter(tableau.current, 'tableau')} className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold hover:border-primary disabled:opacity-50">
+          {exportEnCours ? 'Export…' : 'Exporter le tableau en JPG'}
+        </button>
+      </div>
+      <div ref={tableau} className="overflow-x-auto rounded-xl bg-white p-3 text-zinc-900">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-[#0b2a4a] text-white">
+              <th className="px-2 py-1.5 text-left">{pas === 'hebdo' ? 'Semaine' : 'Mois'}</th>
+              <th className="px-2 py-1.5">Température</th>
+              <th className="px-2 py-1.5">Pluie</th>
+            </tr>
+          </thead>
+          <tbody>
+            {echeances.map((e) => (
+              <tr key={e.cle} className="border-b border-zinc-200">
+                <td className="px-2 py-1.5">
+                  <b>{e.titre}</b> <span className="text-xs text-zinc-500">{e.sousTitre ?? ''}</span>
+                </td>
+                <td className="px-2 py-1.5 text-center font-semibold tabular-nums" style={{ background: couleur(e.t2m, 't') }}>
+                  {fmtT(e.t2m)}
+                </td>
+                <td className="px-2 py-1.5 text-center font-semibold tabular-nums" style={{ background: couleur(e.pluiePct, 'pluie') }}>
+                  {fmtP(e.pluiePct)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="mt-2 text-xs text-zinc-500">Écarts moyens sur la France métropolitaine, modèle CFSv2 (NOAA), run du {run} · www.alertes-meteo.com</p>
       </div>
       <p className="text-xs text-muted">
         Écart à la normale du modèle CFSv2 (NOAA, mailles d&apos;environ 1°), à lire comme une tendance et non comme une prévision jour par jour. Pour l&apos;Occitanie, le détail par semaine et le tableau :{' '}
