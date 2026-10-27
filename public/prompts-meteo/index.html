@@ -139,7 +139,8 @@ $('list').addEventListener('change',e=>{
 $('list').addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b)return;const it=b.closest('.item'),k=it.dataset.k,r=M.rows.find(x=>key(x)===k);
   if(b.dataset.a==='open'){const f=it.querySelector('.full');f.hidden=!f.hidden;b.textContent=f.hidden?'Voir le prompt complet':'Réduire'}
-  else if(b.dataset.a==='copy'){const t=FR[k]||r.f;try{await navigator.clipboard.writeText(t)}catch(_){const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();document.execCommand('copy');x.remove()}b.textContent='Copié ✓';setTimeout(()=>b.textContent='Copier le prompt',1200)}
+  else if(b.dataset.a==='copy'){const t=FR[k]||r.f;try{await navigator.clipboard.writeText(t)}catch(_){const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();document.execCommand('copy');x.remove()}b.textContent='Copié ✓';setTimeout(()=>b.textContent='Copier le prompt',1200);
+    if(!OK.has(k)){OK.add(k);saveOK();it.classList.add('done');const c=it.querySelector('[data-a="ok"]');if(c)c.checked=true;$('oks').textContent='Liste des OK ('+M.rows.filter(x=>OK.has(key(x))).length+')'}}
   else if(b.dataset.a==='tr'){
     try{
       if(FR[k]){delete FR[k];await idb('readwrite',s=>s.delete(k))}
