@@ -19,8 +19,9 @@ function Carte({ e, variable, traces, clip }: { e: EcheanceFrance; variable: Var
   const z = variable === 't' ? fmtT(e.t2m) : fmtP(e.pluiePct);
   return (
     <figure className="overflow-hidden rounded-lg border border-border bg-white text-zinc-900">
-      <figcaption className="bg-[#0b2a4a] px-3 py-1.5 text-white">
+      <figcaption className="flex items-baseline justify-between gap-2 bg-[#0b2a4a] px-3 py-1.5 text-white">
         <strong>{e.titre}</strong>
+        {e.sousTitre ? <span className="text-xs opacity-80">{e.sousTitre}</span> : null}
       </figcaption>
       <svg viewBox={`0 0 ${LARGEUR_FR} ${HAUTEUR_FR}`} className="block w-full" role="img" aria-label={`${e.titre} : écart ${variable === 't' ? 'de température' : 'de pluie'} en France`}>
         <defs>
@@ -60,9 +61,11 @@ function Carte({ e, variable, traces, clip }: { e: EcheanceFrance; variable: Var
 
 const bouton = (actif: boolean) => `rounded-full border px-4 py-1.5 text-sm font-semibold ${actif ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`;
 
-export default function NeufMoisFrance({ donnees, traces }: { donnees: SaisonnierFrance; traces: { code: string; d: string }[] }) {
+export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }: { donnees: SaisonnierFrance; traces: { code: string; d: string }[]; avecSemaines?: boolean }) {
   const id = useId().replace(/:/g, '');
   const [variable, setVariable] = useState<Variable>('t');
+  const [pas, setPas] = useState<'hebdo' | 'mensuel'>(avecSemaines && donnees.hebdo.length ? 'hebdo' : 'mensuel');
+  const echeances = pas === 'hebdo' ? donnees.hebdo : donnees.mensuel;
   const [logoId, setLogoId] = useState('alertesmeteo');
   const [exportEnCours, setExportEnCours] = useState(false);
   const planche = useRef<HTMLDivElement>(null);
@@ -74,7 +77,7 @@ export default function NeufMoisFrance({ donnees, traces }: { donnees: Saisonnie
     if (!noeud) return;
     setExportEnCours(true);
     try {
-      await exporterEnJpg(noeud, `tendance-9-mois-${variable}-france-${donnees.init}`, noeud.scrollWidth, noeud.scrollHeight);
+      await exporterEnJpg(noeud, `tendance-${pas === 'hebdo' ? '8-semaines' : '9-mois'}-${variable}-france-${donnees.init}`, noeud.scrollWidth, noeud.scrollHeight);
     } finally {
       setExportEnCours(false);
     }
@@ -83,6 +86,17 @@ export default function NeufMoisFrance({ donnees, traces }: { donnees: Saisonnie
   return (
     <div className="mt-4 flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
+        {avecSemaines && donnees.hebdo.length ? (
+          <>
+            <button type="button" className={bouton(pas === 'hebdo')} aria-pressed={pas === 'hebdo'} onClick={() => setPas('hebdo')}>
+              8 semaines
+            </button>
+            <button type="button" className={bouton(pas === 'mensuel')} aria-pressed={pas === 'mensuel'} onClick={() => setPas('mensuel')}>
+              9 mois
+            </button>
+            <span className="mx-2 h-6 w-px bg-border" />
+          </>
+        ) : null}
         <button type="button" className={bouton(variable === 't')} aria-pressed={variable === 't'} onClick={() => setVariable('t')}>
           🌡️ Température
         </button>
@@ -110,12 +124,12 @@ export default function NeufMoisFrance({ donnees, traces }: { donnees: Saisonnie
             <img src={logo.fichier} alt="" style={{ height: 72, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
           ) : null}
           <p className="text-center font-bold text-white">
-            {variable === 't' ? 'ÉCART DE TEMPÉRATURE À LA NORMALE' : 'ÉCART DE PLUIE À LA NORMALE'} — FRANCE, 9 PROCHAINS MOIS
+            {variable === 't' ? 'ÉCART DE TEMPÉRATURE À LA NORMALE' : 'ÉCART DE PLUIE À LA NORMALE'} — FRANCE, {pas === 'hebdo' ? '8 PROCHAINES SEMAINES' : '9 PROCHAINS MOIS'}
             <span className="block text-xs font-normal opacity-80">Modèle CFSv2 (NOAA), run du {run} · www.alertes-meteo.com</span>
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {donnees.mensuel.map((e) => (
+          {echeances.map((e) => (
             <Carte key={e.cle} e={e} variable={variable} traces={traces} clip={`clip-fr-${id}-${e.cle}`} />
           ))}
         </div>

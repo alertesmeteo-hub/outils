@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import PrevisionsSaisonnieres from '@/components/saisonnier/PrevisionsSaisonnieres';
+import NeufMoisFrance from '@/components/saisonnier/NeufMoisFrance';
 import { chargerSaisonnier } from '@/lib/saisonnier/cfsv2';
+import { chargerFrance } from '@/lib/saisonnier/france';
+import { etiquettesFrance, tracesFrance } from '@/lib/saisonnier/geo-france';
 import { tracesOccitanie } from '@/lib/saisonnier/geo-occitanie';
 
 // Le fichier CFSv2 est reconstruit une fois par jour : la page se régénère toutes les heures.
@@ -14,13 +17,21 @@ export const metadata: Metadata = {
 };
 
 export default async function PagePrevisionsSaisonnieres() {
-  const [donnees, traces] = await Promise.all([chargerSaisonnier(), tracesOccitanie()]);
+  const [donnees, traces, franceBrute, tracesFr] = await Promise.all([chargerSaisonnier(), tracesOccitanie(), chargerFrance(), tracesFrance().catch(() => [])]);
+  const france = franceBrute ? await etiquettesFrance(franceBrute).catch(() => franceBrute) : null;
   return (
     <>
       <h1 className="text-3xl font-extrabold">Prévisions saisonnières : cartes et tableau</h1>
       <p className="mt-2 max-w-3xl text-muted">
         Plus chaud ou plus frais, plus sec ou plus humide que d’habitude en Occitanie et dans les Pyrénées-Orientales : la tendance du modèle saisonnier CFSv2, semaine par semaine puis mois par mois. Mis à jour chaque jour. C’est une tendance, pas une prévision jour par jour.
       </p>
+      {france ? (
+        <section className="mt-6">
+          <h2 className="text-xl font-bold">France métropolitaine</h2>
+          <NeufMoisFrance donnees={france} traces={tracesFr} avecSemaines />
+        </section>
+      ) : null}
+      {donnees ? <h2 className="mt-10 text-xl font-bold">Occitanie et Pyrénées-Orientales : cartes et tableau</h2> : null}
       {donnees ? (
         <PrevisionsSaisonnieres donnees={donnees} traces={traces} />
       ) : (

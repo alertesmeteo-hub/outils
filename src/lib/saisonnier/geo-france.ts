@@ -1,7 +1,7 @@
 /** Contours simplifiés des départements métropolitains (public/geo/departements-simplifies.json), projetés pour la carte de France : côté serveur seulement. */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { projeterFrance, type SaisonnierFrance } from './france';
+import { projeterFrance, type EcheanceFrance, type SaisonnierFrance } from './france';
 
 export async function tracesFrance(): Promise<{ code: string; d: string }[]> {
   const brut = JSON.parse(await readFile(path.join(process.cwd(), 'public/geo/departements-simplifies.json'), 'utf8')) as Record<string, number[][][]>;
@@ -39,8 +39,10 @@ function dansAnneau(lat: number, lon: number, anneau: Anneau) {
 /** Mailles dont le centre est sur la France : seules celles-là portent une valeur écrite sur la carte (pas les mailles en mer ou à l'étranger). */
 export async function etiquettesFrance(donnees: SaisonnierFrance): Promise<SaisonnierFrance> {
   const anneaux = await contours();
+  const avecEtiquettes = (e: EcheanceFrance): EcheanceFrance => ({ ...e, etiquettes: e.cellules.filter((c) => anneaux.some((a) => dansAnneau(c[0], c[1], a))).map((c) => `${c[0]}-${c[1]}`) });
   return {
     ...donnees,
-    mensuel: donnees.mensuel.map((e) => ({ ...e, etiquettes: e.cellules.filter((c) => anneaux.some((a) => dansAnneau(c[0], c[1], a))).map((c) => `${c[0]}-${c[1]}`) })),
+    hebdo: donnees.hebdo.map(avecEtiquettes),
+    mensuel: donnees.mensuel.map(avecEtiquettes),
   };
 }
