@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
@@ -10,6 +10,8 @@ import { DUREES_TENDANCES } from '@/lib/carte-meteo/previsions-modeles';
 import type { PointTendance } from '@/lib/carte-meteo/sources';
 import CarteInfo, { type PointInfo } from './CarteInfo';
 import { MASQUES_FRANCE } from './CarteMeteo';
+import { ChoixPicto, FenetrePicto } from './ChoixPicto';
+import { estPictoImage } from '@/lib/carte-meteo/pictos';
 
 /** Les cartes de chaque planche : le thème (carte « sur la période » des cartes infos) et son titre pour N jours. */
 const THEMES_TENDANCES = [
@@ -43,6 +45,11 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   const [taille, setTaille] = useState(1);
   const [region, setRegion] = useState('');
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
+  // Pictos changés à la main : « thème|durée|code » → picto ('' = retiré).
+  const [surcharges, setSurcharges] = useState<Record<string, string>>({});
+  const [choix, setChoix] = useState<{ duree: number; code: string } | null>(null);
+  const [partout, setPartout] = useState(false);
+  const ancre = useRef<HTMLElement | null>(null);
 
   const reglage = THEMES_TENDANCES.find((t) => t.id === themeId)!;
   const themeBase = THEMES_PREVISION.find((t) => t.id === reglage.theme) as ThemePrevision;
@@ -63,10 +70,28 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           points.push({ code: p.code, nom: p.nom, dep: p.code, lat: coords.lat, lon: coords.lon, valeur: v, direction: themeBase.direction?.(p) ?? null });
           if (p.pictoPeriode) pictos[p.code] = p.pictoPeriode;
         }
+        for (const code of Object.keys(pictos)) {
+          const o = surcharges[`${themeId}|${duree}|${code}`];
+          if (o === '') delete pictos[code];
+          else if (o) pictos[code] = o;
+        }
         return { duree, points, pictos, theme: { ...themeBase, titre: reglage.titre(duree) } };
       }),
-    [periodes, themeBase, reglage, themeId]
+    [periodes, themeBase, reglage, themeId, surcharges]
   );
+
+  const appliquer = (picto: string) => {
+    if (!choix) return;
+    const actuel = cartes.find((c) => c.duree === choix.duree)?.pictos[choix.code];
+    const suivants: Record<string, string> = {};
+    for (const c of cartes) {
+      for (const [code, id] of Object.entries(c.pictos)) {
+        if ((c.duree === choix.duree && code === choix.code) || (partout && id === actuel)) suivants[`${themeId}|${c.duree}|${code}`] = picto;
+      }
+    }
+    setSurcharges((s) => ({ ...s, ...suivants }));
+    setChoix(null);
+  };
 
   return (
     <>
@@ -91,6 +116,16 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           <input type="checkbox" checked={avecPictos} onChange={(e) => setAvecPictos(e.target.checked)} />
           Avec les pictos (temps dominant)
         </label>
+        {avecPictos && (
+          <p className="pb-1.5 text-sm text-muted">
+            Cliquez sur un picto d&apos;une carte pour le changer.{' '}
+            {Object.keys(surcharges).length > 0 && (
+              <button type="button" className="underline" onClick={() => setSurcharges({})}>
+                Rétablir les pictos d&apos;origine
+              </button>
+            )}
+          </p>
+        )}
         <label className="text-sm font-medium">
           <span className="mb-1 block">Zone</span>
           <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectBarre}>
@@ -151,6 +186,10 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
                   zone={region ? `reg:${region}` : 'france'}
                   points={points}
                   pictos={avecPictos ? pictos : undefined}
+                  onPictoClick={(code, el) => {
+                    ancre.current = el;
+                    setChoix({ duree, code });
+                  }}
                   echelleValeurs={taille / Math.sqrt(NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1)}
                   partValeurs={NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part}
                   sousTitre={`DU ${jourCourt(aujourdhui)} AU ${jourCourt(fin)} · ${modele.libelle}`}
@@ -163,6 +202,28 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           );
         })}
       </div>
+      {choix && (
+        <FenetrePicto ancre={ancre}>
+          <ChoixPicto
+            titre="Changer le picto"
+            actuel={cartes.find((c) => c.duree === choix.duree)?.pictos[choix.code]}
+            onFermer={() => setChoix(null)}
+            onChoisir={(id) => estPictoImage(id) && appliquer(id)}
+            entete={
+              <div className="flex flex-col gap-1 text-xs">
+                <label className="flex items-center gap-1.5">
+                  <input type="checkbox" checked={partout} onChange={(e) => setPartout(e.target.checked)} />
+                  Remplacer ce picto sur toutes les cartes
+                </label>
+                <button type="button" className="self-start underline" onClick={() => appliquer('')}>
+                  Retirer ce picto
+                </button>
+                <span className="text-muted">Les emojis ne s&apos;affichent pas sur ces cartes : choisissez un picto image.</span>
+              </div>
+            }
+          />
+        </FenetrePicto>
+      )}
     </>
   );
 }

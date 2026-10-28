@@ -49,6 +49,8 @@ interface Props {
   echelleValeurs?: number;
   /** Picto à poser au-dessus de la pastille de chaque point (identifiant de picto Alertes Météo, par code de point). */
   pictos?: Record<string, string>;
+  /** Clic sur un picto de la carte (pour le changer) : code du point et élément cliqué. */
+  onPictoClick?: (code: string, el: HTMLElement) => void;
   /** Part du nombre maximal de valeurs affichées (1 = tout ce qui tient ; 0,22 = l'essentiel). */
   partValeurs?: number;
 }
@@ -69,7 +71,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '', echelleValeurs = 1, pictos, partValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '', echelleValeurs = 1, pictos, onPictoClick, partValeurs = 1 }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -440,7 +442,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           return (
             <div key={p.code} className="cinfo-point" style={{ left: x, top: y - 0.725 * taille - (fichierPicto ? TAILLE_PICTO * taille : 0), fontSize: taille }} title={`${p.nom} : ${texteInfo(theme, p.valeur)} ${uniteVisible}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {fichierPicto && <img src={fichierPicto} alt="" crossOrigin="anonymous" style={{ width: `${TAILLE_PICTO}em`, height: `${TAILLE_PICTO}em`, marginBottom: '-0.15em', filter: 'drop-shadow(0 0.04em 0.12em rgba(0,0,0,0.55))' }} />}
+              {fichierPicto && <img src={fichierPicto} alt="" crossOrigin="anonymous" onClick={onPictoClick ? (e) => onPictoClick(p.code, e.currentTarget) : undefined} title={onPictoClick ? 'Changer le picto' : undefined} style={{ cursor: onPictoClick ? 'pointer' : undefined, width: `${TAILLE_PICTO}em`, height: `${TAILLE_PICTO}em`, marginBottom: '-0.15em', filter: 'drop-shadow(0 0.04em 0.12em rgba(0,0,0,0.55))' }} />}
               <div className="cinfo-bulle" style={{ background: palier.fond, color: palier.texte }}>
                 {avecFleche(p) && (
                   <svg viewBox="-12 -12 24 24" aria-hidden>
