@@ -4,23 +4,23 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import type { ReponseBilans } from '@/lib/carte-meteo/cartes-info';
-import { departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { FICHIERS_CONTOURS, normaliser, useContours } from './CarteMeteo';
 
 const LARGEUR = 1600;
 const HAUTEUR = 860;
-const CARTE = { gauche: 30, haut: 40, droite: 650, bas: HAUTEUR - 110 };
+const CARTE = { gauche: 30, haut: 40, droite: 570, bas: HAUTEUR - 110 };
 const POLICE = "'Lato', 'Segoe UI', Arial, sans-serif";
 
 /** Villes du bilan (département 66) : le nom cherché dans celui de la station. */
 const VILLES = [
   { nom: 'Perpignan', cherche: 'PERPIGNAN' },
-  { nom: 'Canet-en-Roussillon', cherche: 'CANET-EN-ROUSSILLON' },
+  { nom: 'Canet-en-Roussillon', cherche: 'CANETENROUSSILLON' },
   { nom: 'Eus', cherche: 'EUS' },
 ];
-const CODES_OCCITANIE = departementsDeLaRegion('Occitanie');
 const DEPARTEMENT = '66';
+/** Fond de carte : le département et ses voisins (Ariège, Aude, Hérault), en grisé. */
+const CODES_CARTE = [DEPARTEMENT, '09', '11', '34'];
 
 type Type = 'temp' | 'pluie' | 'soleil';
 interface Ligne {
@@ -70,6 +70,8 @@ const NOMS_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juill
 /** « octobre 2026 » pour « 2026-10 » (extremes-mois.ts est réservé au serveur). */
 const libelleMois = (mois: string) => `${NOMS_MOIS[Number(mois.slice(5, 7)) - 1]} ${mois.slice(0, 4)}`;
 
+const sansTiret = (nom: string) => normaliser(nom).toUpperCase().replace(/[^A-Z]/g, '');
+
 const signe = (v: number, decimales: number, suffixe: string) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(decimales)}${suffixe}`;
 
 export default function BilanMoisPlanche() {
@@ -115,7 +117,7 @@ export default function BilanMoisPlanche() {
   const lire = useMemo(() => {
     if (!bilans) return null;
     const stations = VILLES.map((v) => {
-      const i = bilans.stations.findIndex((s) => s[2] === DEPARTEMENT && normaliser(s[1]).toUpperCase().includes(v.cherche));
+      const i = bilans.stations.findIndex((s) => s[2] === DEPARTEMENT && sansTiret(s[1]).includes(v.cherche));
       return { ...v, i, station: i >= 0 ? bilans.stations[i] : null };
     });
     const valeur = (carte: string, i: number) => bilans.cartes[carte]?.valeurs.find(([k]) => k === i)?.[1] ?? null;
@@ -142,7 +144,7 @@ export default function BilanMoisPlanche() {
   }, [lire, type]);
 
   const vue = useMemo(() => {
-    const boite = unirBoites(contours.filter((c) => CODES_OCCITANIE.includes(c.code)).map((c) => c.boite));
+    const boite = unirBoites(contours.filter((c) => CODES_CARTE.includes(c.code)).map((c) => c.boite));
     return boite ? ajusterVue(boite, CARTE, 0.02) : null;
   }, [contours]);
 
@@ -218,7 +220,7 @@ export default function BilanMoisPlanche() {
               {vue && (
                 <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
                   {contours
-                    .filter((c) => CODES_OCCITANIE.includes(c.code))
+                    .filter((c) => CODES_CARTE.includes(c.code))
                     .sort((a, b) => Number(a.code === DEPARTEMENT) - Number(b.code === DEPARTEMENT))
                     .map((c) => (
                       <path
@@ -248,7 +250,7 @@ export default function BilanMoisPlanche() {
                   })}
             </svg>
 
-            <div style={{ position: 'absolute', left: 700, right: 40, top: 28 }}>
+            <div style={{ position: 'absolute', left: 610, right: 40, top: 28 }}>
               <div style={{ fontSize: 50, fontWeight: 800, textAlign: 'right', letterSpacing: 0.5, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
                 {style.titre}{prete ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
               </div>
@@ -256,21 +258,21 @@ export default function BilanMoisPlanche() {
               <div style={{ fontSize: 20, textAlign: 'right', opacity: 0.85, marginTop: 8 }}>Pyrénées-Orientales{periode ? ` · ${periode}` : ''}</div>
             </div>
 
-            <div style={{ position: 'absolute', left: 700, right: 40, top: 190, display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div style={{ position: 'absolute', left: 610, right: 40, top: 190, display: 'flex', flexDirection: 'column', gap: 24 }}>
               {lignes.map((l) => (
                 <div key={l.nom} style={{ display: 'flex', gap: 22, height: 170 }}>
-                  <div style={{ width: 280, background: style.case, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 31, fontWeight: 700, textAlign: 'center', padding: 10 }}>{l.nom.toUpperCase()}</div>
+                  <div style={{ width: 270, background: style.case, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 31, fontWeight: 700, textAlign: 'center', padding: 10 }}>{l.nom.toUpperCase()}</div>
                   <div style={{ flex: 1, background: style.case, borderRadius: 22, display: 'flex', alignItems: 'center', position: 'relative', paddingRight: 0, overflow: 'hidden' }}>
                     {[
                       [l.mesure, style.libelles[0]],
                       [l.normale, style.libelles[1]],
                     ].map(([v, lib], k) => (
-                      <div key={k} style={{ width: 235, textAlign: 'center', borderLeft: k ? '2px solid rgba(255,255,255,0.3)' : undefined, margin: k ? 0 : '0 0 0 30px' }}>
-                        <div style={{ fontSize: 46, fontWeight: 700 }}>{v == null ? '—' : `${(v as number).toFixed(decimales)}${style.unite}`}</div>
+                      <div key={k} style={{ width: 215, textAlign: 'center', borderLeft: k ? '2px solid rgba(255,255,255,0.3)' : undefined, margin: 0 }}>
+                        <div style={{ fontSize: 42, fontWeight: 700 }}>{v == null ? '—' : `${(v as number).toFixed(decimales)}${style.unite}`}</div>
                         <div style={{ fontSize: 22, fontStyle: 'italic', marginTop: 6 }}>{lib as string}</div>
                       </div>
                     ))}
-                    <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 230, background: style.tuile, color: style.surTuile, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 52, fontWeight: 800 }}>
+                    <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 205, background: style.tuile, color: style.surTuile, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 46, fontWeight: 800 }}>
                       {type === 'temp' ? signe(l.ecart, 1, '°C') : signe(Math.round(l.ecart), 0, ' %')}
                     </div>
                   </div>
