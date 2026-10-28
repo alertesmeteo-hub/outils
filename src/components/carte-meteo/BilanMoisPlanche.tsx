@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import type { ReponseBilans } from '@/lib/carte-meteo/cartes-info';
-import { libelleMois } from '@/lib/carte-meteo/extremes-mois';
 import { departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { FICHIERS_CONTOURS, normaliser, useContours } from './CarteMeteo';
@@ -66,6 +65,10 @@ const FONDS: Record<Type, { fond: string; carte: string; case: string; titre: st
     surTuile: '#1a3a8f',
   },
 };
+
+const NOMS_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+/** « octobre 2026 » pour « 2026-10 » (extremes-mois.ts est réservé au serveur). */
+const libelleMois = (mois: string) => `${NOMS_MOIS[Number(mois.slice(5, 7)) - 1]} ${mois.slice(0, 4)}`;
 
 const signe = (v: number, decimales: number, suffixe: string) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(decimales)}${suffixe}`;
 
