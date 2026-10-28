@@ -32,7 +32,7 @@ import CarteRendu, {
   LARGEUR_VENT,
   SEUIL_VENT_REDUIT, type Fleuves, type DensiteFleuves, HAUTEUR_CARTE, HAUTEUR_RESSENTI, HAUTEUR_VENT, LARGEUR_CARTE, type BoiteMoyenne, type Contour, type Marqueur, type StyleVent, valeurRafaleSaisie } from './CarteRendu';
 
-type Periode = 'matin' | 'apres-midi' | 'journee';
+type Periode = 'matin' | 'apres-midi' | 'journee' | 'soiree' | 'nuit';
 type NiveauNoms = 'departement' | 'ville';
 type FondContours = 'aucun' | 'departements' | 'regions';
 type Niveau = 'france' | 'region' | 'departement';
@@ -74,6 +74,11 @@ interface Edition {
   pictoM: PictoMeteo;
   pictoAM: PictoMeteo;
   pictoJ: PictoMeteo;
+  /** Soirée et nuit : absents des cartes mémorisées avant leur ajout. */
+  tempS?: string;
+  tempN?: string;
+  pictoS?: PictoMeteo;
+  pictoN?: PictoMeteo;
 }
 
 /** Villes ajoutées d'office sur la carte de France (valeurs de leur département). */
@@ -306,8 +311,10 @@ export function useContours(fichier: string | null): ContourBoite[] {
 const texte = (v: number | null) => (v == null ? '' : String(Math.round(v)));
 
 /** Pictos de l'après-midi et de la journée d'un point, d'après la nébulosité et les précipitations de la période. */
-function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoM: PictoMeteo; pictoAM: PictoMeteo; pictoJ: PictoMeteo } {
+function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoM: PictoMeteo; pictoAM: PictoMeteo; pictoJ: PictoMeteo; pictoS: PictoMeteo; pictoN: PictoMeteo } {
   return {
+    pictoS: pictoDepuisPrevision({ code: p.codeSoiree ?? null, nuages: p.nuagesSoiree ?? null, pluie: p.pluieSoiree ?? null, temperature: p.tempSoiree ?? null, voile: p.voileSoiree, nuit: true }, jeu),
+    pictoN: pictoDepuisPrevision({ code: p.codeNuit ?? null, nuages: p.nuagesNuit ?? null, pluie: p.pluieNuit ?? null, temperature: p.tempNuit ?? null, voile: p.voileNuit, nuit: true }, jeu),
     pictoM: pictoDepuisPrevision({ code: p.codeMatin, nuages: p.nuagesMatin, pluie: p.pluieMatin, temperature: p.tempMatin, voile: p.voileMatin }, jeu),
     pictoAM: pictoDepuisPrevision({ code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: p.pluieApresMidi, temperature: p.tempApresMidi, voile: p.voileApresMidi }, jeu),
     pictoJ: pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: p.pluieJournee, temperature: p.maxi, voile: p.voileJournee }, jeu),
@@ -320,6 +327,8 @@ function construireEditions(points: PointCarte[], jeu: JeuPictos = 'emoji'): Rec
     editions[p.code] = {
       tempM: texte(p.tempMatin),
       tempAM: texte(p.tempApresMidi),
+      tempS: texte(p.tempSoiree ?? null),
+      tempN: texte(p.tempNuit ?? null),
       mini: texte(p.mini),
       maxi: texte(p.maxi),
       ...pictosDuPoint(p, jeu),
@@ -329,7 +338,24 @@ function construireEditions(points: PointCarte[], jeu: JeuPictos = 'emoji'): Rec
 }
 
 const majPicto = (e: Edition, periode: Periode, v: string): Edition =>
-  periode === 'matin' ? { ...e, pictoM: v as PictoMeteo } : periode === 'apres-midi' ? { ...e, pictoAM: v as PictoMeteo } : { ...e, pictoJ: v as PictoMeteo };
+  periode === 'matin'
+    ? { ...e, pictoM: v as PictoMeteo }
+    : periode === 'apres-midi'
+      ? { ...e, pictoAM: v as PictoMeteo }
+      : periode === 'soiree'
+        ? { ...e, pictoS: v as PictoMeteo }
+        : periode === 'nuit'
+          ? { ...e, pictoN: v as PictoMeteo }
+          : { ...e, pictoJ: v as PictoMeteo };
+
+/** Picto et température affichés d'une période (la journée affiche le maxi ; l'après-midi aussi avec « mini et maxi »). */
+const pictoDe = (e: Edition | undefined, periode: Periode): PictoMeteo =>
+  (periode === 'matin' ? e?.pictoM : periode === 'apres-midi' ? e?.pictoAM : periode === 'soiree' ? e?.pictoS : periode === 'nuit' ? e?.pictoN : e?.pictoJ) ?? '☀️';
+const tempDe = (e: Edition, periode: Periode, miniMaxiAM: boolean): string =>
+  periode === 'matin' ? e.tempM : periode === 'apres-midi' && !miniMaxiAM ? e.tempAM : periode === 'soiree' ? e.tempS ?? '' : periode === 'nuit' ? e.tempN ?? '' : e.maxi;
+const majTemp = (e: Edition, periode: Periode, miniMaxiAM: boolean, v: string): Edition =>
+  periode === 'matin' ? { ...e, tempM: v } : periode === 'apres-midi' && !miniMaxiAM ? { ...e, tempAM: v } : periode === 'soiree' ? { ...e, tempS: v } : periode === 'nuit' ? { ...e, tempN: v } : { ...e, maxi: v };
+const SOUS_TITRES: Record<Periode, string> = { matin: 'MATIN', 'apres-midi': 'APRÈS-MIDI', journee: 'JOURNÉE', soiree: 'SOIRÉE', nuit: 'NUIT' };
 
 export const normaliser = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -838,7 +864,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
 
   const valeurPrincipale = (code: string): number | null => {
     const e = editions[code];
-    return e ? nombre(periode === 'matin' ? e.tempM : periode === 'apres-midi' && !miniMaxiAM ? e.tempAM : e.maxi) : null;
+    return e ? nombre(tempDe(e, periode, miniMaxiAM)) : null;
   };
 
   /** Rafale affichée : la valeur corrigée à la main si c'est un nombre (elle donne aussi la couleur), sinon celle du modèle. */
@@ -847,8 +873,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     return rafalesManuelles[`${periode}|${code}`]?.trim() && Number.isFinite(manuelle) ? Math.round(manuelle) : modele;
   };
 
-  const rafaleDe = (p: PointCarte) => (periode === 'matin' ? p.rafaleMatin : periode === 'apres-midi' ? p.rafaleApresMidi : p.rafaleJournee);
-  const ventDe = (p: PointCarte) => (periode === 'matin' ? p.ventMatin : periode === 'apres-midi' ? p.ventApresMidi : p.ventJournee);
+  const rafaleDe = (p: PointCarte) => (periode === 'matin' ? p.rafaleMatin : periode === 'apres-midi' ? p.rafaleApresMidi : periode === 'soiree' ? p.rafaleSoiree ?? null : periode === 'nuit' ? p.rafaleNuit ?? null : p.rafaleJournee);
+  const ventDe = (p: PointCarte) => (periode === 'matin' ? p.ventMatin : periode === 'apres-midi' ? p.ventApresMidi : periode === 'soiree' ? p.ventSoiree ?? null : periode === 'nuit' ? p.ventNuit ?? null : p.ventJournee);
 
   /**
    * Codes des points dont la rafale est signalée : au plus `maxRafales`, les plus fortes à partir du seuil. En France, d'abord la
@@ -1055,13 +1081,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         nom: niveauNoms === 'ville' ? p.ville ?? CHEF_LIEU_PAR_DEPARTEMENT[p.code] ?? p.nom : p.nom,
         // Carte de France : la ville du picto, puis le département (« Marseille — Bouches-du-Rhône »).
         infoBulle: p.ville && p.ville !== p.nom ? `${p.ville} — ${p.nom}` : undefined,
-        picto: (periode === 'matin' ? e?.pictoM : periode === 'apres-midi' ? e?.pictoAM : e?.pictoJ) ?? '☀️',
-        valeur: e ? (periode === 'matin' ? e.tempM : periode === 'apres-midi' && !miniMaxiAM ? e.tempAM : e.maxi) : '',
+        picto: pictoDe(e, periode),
+        valeur: e ? tempDe(e, periode, miniMaxiAM) : '',
         mini: periode === 'journee' || miniMaxiAM ? e?.mini ?? '' : null,
         // Rafale arrondie de 5 en 5 km/h pour l'affichage.
         rafale: rafalesSignalees.has(p.code) && rafale != null && !rafalesRetirees.has(`${periode}|${p.code}`) ? rafaleAffichee(p.code, Math.round(rafale / 5) * 5) : null,
         rafaleTexte: rafalesManuelles[`${periode}|${p.code}`],
-        direction: afficherFleches ? angleFleche(periode === 'matin' ? p.directionRafaleMatin : periode === 'apres-midi' ? p.directionRafaleApresMidi : p.directionRafaleJournee) : null,
+        direction: afficherFleches ? angleFleche(periode === 'matin' ? p.directionRafaleMatin : periode === 'apres-midi' ? p.directionRafaleApresMidi : periode === 'soiree' ? p.directionRafaleSoiree ?? null : periode === 'nuit' ? p.directionRafaleNuit ?? null : p.directionRafaleJournee) : null,
         // Ressenti avec la température affichée (donc modifiable) et le vent moyen à l'heure de la rafale maximale.
         ressenti: afficherRessenti && rafalesSignalees.has(p.code) && rafale != null ? calculerRessenti(v, ventDe(p)) : null,
         ton: periode !== 'journee' && v != null ? (v === plusChaud ? 'chaud' : v === plusFroid ? 'froid' : null) : null,
@@ -1355,7 +1381,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     : [];
 
   const titre = titreManuel ?? libelleJour(dateISO);
-  const sousTitre = sousTitreManuel ?? (periode === 'matin' ? 'MATIN' : periode === 'apres-midi' ? 'APRÈS-MIDI' : 'JOURNÉE');
+  const sousTitre = sousTitreManuel ?? SOUS_TITRES[periode];
   const nomZone = enFrance ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : DEPARTEMENTS_FR[zone.slice(4)];
 
   function changerModele(m: ModeleMeteo) {
@@ -1410,7 +1436,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       if (!e) return prev;
       if (champ === 'picto') return { ...prev, [code]: majPicto(e, periode, valeur) };
       if (champ === 'mini') return { ...prev, [code]: { ...e, mini: valeur } };
-      return { ...prev, [code]: periode === 'matin' ? { ...e, tempM: valeur } : periode === 'apres-midi' && !miniMaxiAM ? { ...e, tempAM: valeur } : { ...e, maxi: valeur } };
+      return { ...prev, [code]: majTemp(e, periode, miniMaxiAM, valeur) };
     });
     if (champ === 'picto') {
       setPaletteOuvertePour(null);
@@ -2007,6 +2033,22 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                   />
                   Journée (mini / maxi)
                 </label>
+                {(['soiree', 'nuit'] as const).map((p) => (
+                  <label key={p} className="text-sm">
+                    <input
+                      type="radio"
+                      name={nom('periode')}
+                      checked={periode === p}
+                      onChange={() => {
+                        setPeriode(p);
+                        setTitreManuel(null);
+                        setSousTitreManuel(null);
+                      }}
+                      className="mr-1.5"
+                    />
+                    {p === 'soiree' ? 'Soirée (T° à 21 h et rafales)' : 'Nuit (T° mini et rafales)'}
+                  </label>
+                ))}
               </div>
             </fieldset>
           </div>

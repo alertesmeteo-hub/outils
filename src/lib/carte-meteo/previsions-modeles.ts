@@ -123,6 +123,23 @@ export interface PointCarte {
   maxiPeriode?: number | null;
   miniPeriode?: number | null;
   finPeriode?: string | null;
+  /** Soirée (18 h-22 h : température de 21 h) et nuit (22 h-6 h, du jour au lendemain : température minimale). Absents des anciennes réponses. */
+  tempSoiree?: number | null;
+  rafaleSoiree?: number | null;
+  directionRafaleSoiree?: number | null;
+  ventSoiree?: number | null;
+  codeSoiree?: number | null;
+  nuagesSoiree?: number | null;
+  pluieSoiree?: number | null;
+  voileSoiree?: boolean;
+  tempNuit?: number | null;
+  rafaleNuit?: number | null;
+  directionRafaleNuit?: number | null;
+  ventNuit?: number | null;
+  codeNuit?: number | null;
+  nuagesNuit?: number | null;
+  pluieNuit?: number | null;
+  voileNuit?: boolean;
 }
 
 /** Durées (jours) des cartes de cumul de pluie. */
@@ -366,6 +383,11 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
   // Température de l'après-midi : le maximum entre 14 h et 18 h (heure de Paris).
   const chaleurApresMidi = jour.filter((l) => l.heure >= 14 && l.heure <= 18).map((l) => l.i);
   const ciel = jour.filter((l) => l.heure >= 7 && l.heure <= 20).map((l) => l.i);
+  // Soirée : 18 h à 22 h (température de 21 h). Nuit : de 22 h à 6 h le lendemain matin.
+  const soiree = jour.filter((l) => l.heure >= 18 && l.heure <= 21).map((l) => l.i);
+  const lendemain = ajouterJours(dateISO, 1);
+  const nuit = locaux.map((l, i) => ({ ...l, i })).filter((l) => (l.date === dateISO && l.heure >= 22) || (l.date === lendemain && l.heure <= 5)).map((l) => l.i);
+  const soiree21 = jour.filter((l) => l.heure >= 19 && l.heure <= 22 && serie.temp[l.i] != null).sort((a, b) => Math.abs(a.heure - 21) - Math.abs(b.heure - 21) || a.heure - b.heure);
   const toute = jour.map((l) => l.i);
   const debutCouvert = jour.length ? Math.min(...jour.map((l) => l.heure)) <= 7 : false;
 
@@ -405,6 +427,22 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
     voileMatin: voilePeriode(serie, matin),
     voileApresMidi: voilePeriode(serie, apresMidi),
     voileJournee: voilePeriode(serie, ciel),
+    tempSoiree: soiree21.length ? arrondi(serie.temp[soiree21[0].i], 1) : null,
+    rafaleSoiree: arrondi(maximum(soiree.map((i) => serie.rafale[i]))),
+    directionRafaleSoiree: directionRafaleMax(serie, soiree),
+    ventSoiree: ventRafaleMax(serie, soiree),
+    codeSoiree: codePeriode(serie, soiree),
+    nuagesSoiree: arrondi(moyenne(soiree.map((i) => serie.nuages[i]))),
+    pluieSoiree: arrondi(somme(soiree.map((i) => serie.pluie[i])), 1),
+    voileSoiree: voilePeriode(serie, soiree),
+    tempNuit: nuit.length >= 4 ? arrondi(minimum(nuit.map((i) => serie.temp[i])), 1) : null,
+    rafaleNuit: arrondi(maximum(nuit.map((i) => serie.rafale[i]))),
+    directionRafaleNuit: directionRafaleMax(serie, nuit),
+    ventNuit: ventRafaleMax(serie, nuit),
+    codeNuit: codePeriode(serie, nuit),
+    nuagesNuit: arrondi(moyenne(nuit.map((i) => serie.nuages[i]))),
+    pluieNuit: arrondi(somme(nuit.map((i) => serie.pluie[i])), 1),
+    voileNuit: voilePeriode(serie, nuit),
   };
 }
 

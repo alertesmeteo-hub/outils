@@ -530,11 +530,12 @@ export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: stri
 const CHAMPS_MOYENNE = [
   'mini', 'maxi', 'tempMatin', 'tempApresMidi',
   'pluieMatin', 'pluieApresMidi', 'pluieJournee', 'nuagesMatin', 'nuagesApresMidi', 'nuagesJournee',
+  'tempSoiree', 'tempNuit', 'pluieSoiree', 'pluieNuit', 'nuagesSoiree', 'nuagesNuit',
 ] as const;
 /** Ciel voilé : retenu si la majorité des modèles le voient. */
-const CHAMPS_VOILE = ['voileMatin', 'voileApresMidi', 'voileJournee'] as const;
+const CHAMPS_VOILE = ['voileMatin', 'voileApresMidi', 'voileJournee', 'voileSoiree', 'voileNuit'] as const;
 /** Temps sensible (codes WMO) : le plus fréquent parmi les modèles ; à égalité, le plus fort (orage avant pluie…). */
-const CHAMPS_CODE = ['codeMatin', 'codeApresMidi', 'codeJournee'] as const;
+const CHAMPS_CODE = ['codeMatin', 'codeApresMidi', 'codeJournee', 'codeSoiree', 'codeNuit'] as const;
 
 /**
  * « Moyenne des modèles » : les villes du premier modèle disponible (AROME, puis Harmonie…), dont il garde le vent et les

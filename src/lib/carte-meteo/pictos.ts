@@ -289,6 +289,8 @@ export interface EntreePicto {
   temperature: number | null;
   /** Ciel voilé : nuages hauts (cirrus) en nombre, peu de nuages bas et moyens (voir pointDepuisSerie). */
   voile?: boolean;
+  /** Période de nuit (soirée, nuit) : lune et nuages de nuit au lieu du soleil. */
+  nuit?: boolean;
 }
 
 const CODES_NEIGE = [71, 73, 75, 77, 85, 86];
@@ -310,12 +312,14 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
     const precipite = mm >= 0.3;
     const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
     if (neige && precipite) return mm >= 3 ? 'am:forte-neige' : ciel < 75 ? 'am:averses-neige' : 'am:neige';
-    if ((code === 45 || code === 48) && !precipite) return 'am:brouillard';
+    if ((code === 45 || code === 48) && !precipite) return e.nuit ? 'am:nuit-brouillard' : 'am:brouillard';
     if (precipite) {
       if (mm >= 8) return 'am:forte-pluie';
-      if (mm >= 2) return ciel < 75 ? 'am:averses' : 'am:pluie';
-      return ciel < 75 ? 'am:averses' : 'am:pluie-faible';
+      const averses = e.nuit ? 'am:averses-nuit' : 'am:averses';
+      if (mm >= 2) return ciel < 75 ? averses : 'am:pluie';
+      return ciel < 75 ? averses : 'am:pluie-faible';
     }
+    if (e.nuit) return ciel < 20 ? 'am:nuit-claire' : ciel < 75 ? 'am:nuit-peu-nuageuse' : 'am:nuit-nuageuse';
     if (e.voile) return 'am:ciel-voile';
     if (ciel < 20) return 'am:soleil';
     if (ciel < 45) return 'am:peu-nuageux';
@@ -335,6 +339,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
       if (mm >= 2) return ciel < 75 ? 'mc:partly-cloudy-day-rain' : 'mc:rain';
       return ciel < 75 ? 'mc:partly-cloudy-day-drizzle' : 'mc:drizzle';
     }
+    if (e.nuit) return ciel < 20 ? 'mc:clear-night' : ciel < 75 ? 'mc:partly-cloudy-night' : 'mc:overcast';
     if (e.voile) return PICTO_VOILE;
     if (ciel < 20) return 'mc:clear-day';
     if (ciel < 45) return 'mc:partly-cloudy-day';
@@ -358,6 +363,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
   }
 
   // Voile de nuages hauts : le soleil passe, mais le ciel n'est ni dégagé ni nuageux (pas d'équivalent dans le jeu d'images).
+  if (e.nuit && !images) return ciel < 45 ? '🌙' : '☁️';
   if (e.voile && !images) return PICTO_VOILE;
   if (ciel < 20) return images ? 'img:1' : '☀️';
   if (ciel < 45) return images ? 'img:101' : '🌤️';
