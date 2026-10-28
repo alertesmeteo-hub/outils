@@ -48,6 +48,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   // Pictos changés à la main : « thème|durée|code » → picto ('' = retiré).
   const [surcharges, setSurcharges] = useState<Record<string, string>>({});
   const [choix, setChoix] = useState<{ duree: number; code: string } | null>(null);
+  const [decalages, setDecalages] = useState<Record<string, [number, number]>>({});
   const [partout, setPartout] = useState(false);
   const ancre = useRef<HTMLElement | null>(null);
 
@@ -118,9 +119,9 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
         </label>
         {avecPictos && (
           <p className="pb-1.5 text-sm text-muted">
-            Cliquez sur un picto d&apos;une carte pour le changer.{' '}
-            {Object.keys(surcharges).length > 0 && (
-              <button type="button" className="underline" onClick={() => setSurcharges({})}>
+            Cliquez sur un picto pour le changer, glissez-le pour le déplacer.{' '}
+            {(Object.keys(surcharges).length > 0 || Object.keys(decalages).length > 0) && (
+              <button type="button" className="underline" onClick={() => { setSurcharges({}); setDecalages({}); }}>
                 Rétablir les pictos d&apos;origine
               </button>
             )}
@@ -186,6 +187,8 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
                   zone={region ? `reg:${region}` : 'france'}
                   points={points}
                   pictos={avecPictos ? pictos : undefined}
+                  decalagesPictos={Object.fromEntries(Object.entries(decalages).filter(([k]) => k.startsWith(`${themeId}|${duree}|`)).map(([k, v]) => [k.split('|')[2], v]))}
+                  onPictoMove={(code, dx, dy) => setDecalages((d) => ({ ...d, [`${themeId}|${duree}|${code}`]: [dx, dy] }))}
                   onPictoClick={(code, el) => {
                     ancre.current = el;
                     setChoix({ duree, code });

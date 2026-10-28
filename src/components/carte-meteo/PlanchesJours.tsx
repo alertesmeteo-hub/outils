@@ -8,11 +8,12 @@ import { PALIERS_TEMPERATURE, palierDe } from '@/lib/carte-meteo/cartes-info';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
 import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
-import { cheminPictoImage } from '@/lib/carte-meteo/pictos';
+import { cheminPictoImage, estPictoImage } from '@/lib/carte-meteo/pictos';
 import { angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { pictoDuJour, pointsParQuart, versPointJour, type PointJour } from '@/lib/carte-meteo/planches-jours';
+import { ChoixPicto, FenetrePicto } from './ChoixPicto';
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, FICHIERS_CONTOURS } from './CarteMeteo';
 
 const LARGEUR = 1600;
@@ -55,6 +56,53 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   const [erreur, setErreur] = useState<string | null>(null);
   const [enExport, setEnExport] = useState(false);
   const [facteur, setFacteur] = useState(1);
+  // Pictos changés ou déplacés à la main, par « date|code » ('' = retiré).
+  const [surcharges, setSurcharges] = useState<Record<string, string>>({});
+  const [decalages, setDecalages] = useState<Record<string, [number, number]>>({});
+  const [choix, setChoix] = useState<string | null>(null);
+  const [partout, setPartout] = useState(false);
+  const ancre = useRef<HTMLElement | null>(null);
+  const pictoActuel = (cle: string) => {
+    for (const c of cartes) for (const { p } of c.points) if (`${c.date}|${p.code}` === cle) return pictoDuJour(p);
+    return undefined;
+  };
+  const appliquer = (picto: string) => {
+    if (!choix) return;
+    const actuel = surcharges[choix] ?? pictoActuel(choix);
+    const suivants: Record<string, string> = { [choix]: picto };
+    if (partout) for (const c of cartes) for (const { p } of c.points) {
+      const cle = `${c.date}|${p.code}`;
+      if ((surcharges[cle] ?? pictoDuJour(p)) === actuel) suivants[cle] = picto;
+    }
+    setSurcharges((s) => ({ ...s, ...suivants }));
+    setChoix(null);
+  };
+  const debutPicto = (e: React.PointerEvent<HTMLImageElement>, cle: string) => {
+    if (e.button !== 0) return;
+    const el = e.currentTarget;
+    const [x0, y0] = decalages[cle] ?? [0, 0];
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let deplace = false;
+    el.setPointerCapture(e.pointerId);
+    const bouge = (m: PointerEvent) => {
+      if (!deplace && Math.hypot(m.clientX - sx, m.clientY - sy) < 4) return;
+      deplace = true;
+      setDecalages((d) => ({ ...d, [cle]: [x0 + (m.clientX - sx) / facteur, y0 + (m.clientY - sy) / facteur] }));
+    };
+    const fin = () => {
+      el.removeEventListener('pointermove', bouge);
+      el.removeEventListener('pointerup', fin);
+      el.removeEventListener('pointercancel', fin);
+      if (!deplace) {
+        ancre.current = el;
+        setChoix(cle);
+      }
+    };
+    el.addEventListener('pointermove', bouge);
+    el.addEventListener('pointerup', fin);
+    el.addEventListener('pointercancel', fin);
+  };
   const colonneRef = useRef<HTMLDivElement>(null);
   const planchRef = useRef<HTMLDivElement>(null);
 
@@ -232,6 +280,14 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
         </p>
       )}
 
+      <p className="mt-2 text-sm text-muted">
+        Cliquez sur un picto pour le changer, glissez-le pour le déplacer.{' '}
+        {(Object.keys(surcharges).length > 0 || Object.keys(decalages).length > 0) && (
+          <button type="button" className="underline" onClick={() => { setSurcharges({}); setDecalages({}); }}>
+            Rétablir les pictos d&apos;origine
+          </button>
+        )}
+      </p>
       <div ref={colonneRef} className="mt-4 min-w-0">
         <div style={{ height: hauteur * facteur }}>
           <div
@@ -277,10 +333,20 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
                     <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: 'rgba(255,255,255,0.94)', color: '#0b2a4a', fontFamily: POLICE, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
                       {jourLibelle(date)}
                     </div>
-                    {points.map(({ p, x, y }) => (
+                    {points.map(({ p, x, y }) => {
+                      const cle = `${date}|${p.code}`;
+                      const pictoId = surcharges[cle] ?? pictoDuJour(p);
+                      const dec = decalages[cle];
+                      return (
                       <div key={p.code} style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -62%)', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={cheminPictoImage(pictoDuJour(p)) ?? ''} alt="" style={{ width: taillePicto, height: taillePicto, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))' }} />
+                        <img
+                          src={pictoId ? cheminPictoImage(pictoId) ?? '' : undefined}
+                          alt=""
+                          title="Cliquer pour changer le picto, glisser pour le déplacer"
+                          onPointerDown={(e) => debutPicto(e, cle)}
+                          style={{ width: taillePicto, height: taillePicto, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden', transform: dec ? `translate(${dec[0]}px, ${dec[1]}px)` : undefined }}
+                        />
                         <span style={{ fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.5), color: '#111', textShadow: '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
                           {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: '0.8em' }}> {Math.round(p.mini)}°</span> : null}
@@ -302,7 +368,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
                           );
                         })()}
                       </div>
-                    ))}
+                      );
+                    })}
                     {premier == null && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cfe3fa', fontSize: 16, textAlign: 'center', padding: 20 }}>
                         {!charge ? 'Chargement…' : vide ? 'Pas encore de prévision pour ce jour' : ''}
@@ -322,6 +389,28 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
           </div>
         </div>
       </div>
+      {choix && (
+        <FenetrePicto ancre={ancre}>
+          <ChoixPicto
+            titre="Changer le picto"
+            actuel={surcharges[choix] ?? pictoActuel(choix)}
+            onFermer={() => setChoix(null)}
+            onChoisir={(id) => estPictoImage(id) && appliquer(id)}
+            entete={
+              <div className="flex flex-col gap-1 text-xs">
+                <label className="flex items-center gap-1.5">
+                  <input type="checkbox" checked={partout} onChange={(e) => setPartout(e.target.checked)} />
+                  Remplacer ce picto sur tous les jours
+                </label>
+                <button type="button" className="self-start underline" onClick={() => appliquer('')}>
+                  Retirer ce picto
+                </button>
+                <span className="text-muted">Les emojis ne s&apos;affichent pas sur les planches : choisissez un picto image.</span>
+              </div>
+            }
+          />
+        </FenetrePicto>
+      )}
     </section>
   );
 }
