@@ -79,6 +79,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   };
   const debutPicto = (e: React.PointerEvent<HTMLImageElement>, cle: string) => {
     if (e.button !== 0) return;
+    e.preventDefault();
     const el = e.currentTarget;
     const [x0, y0] = decalages[cle] ?? [0, 0];
     const sx = e.clientX;
@@ -343,6 +344,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
                         <img
                           src={pictoId ? cheminPictoImage(pictoId) ?? '' : undefined}
                           alt=""
+                          draggable={false}
                           title="Cliquer pour changer le picto, glisser pour le déplacer"
                           onPointerDown={(e) => debutPicto(e, cle)}
                           style={{ width: taillePicto, height: taillePicto, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden', transform: dec ? `translate(${dec[0]}px, ${dec[1]}px)` : undefined }}

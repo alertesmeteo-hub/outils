@@ -83,6 +83,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   // Clic = changer le picto ; glisser (plus de 4 px) = le déplacer. Les pixels écran sont ramenés à ceux de la carte (facteur).
   const debutPicto = (e: React.PointerEvent<HTMLImageElement>, code: string) => {
     if (e.button !== 0) return;
+    e.preventDefault();
     const el = e.currentTarget;
     const [x0, y0] = decalagesPictos?.[code] ?? [0, 0];
     const sx = e.clientX;
@@ -469,7 +470,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           return (
             <div key={p.code} className="cinfo-point" style={{ left: x, top: y - 0.725 * taille - (fichierPicto ? TAILLE_PICTO * taille : 0), fontSize: taille }} title={`${p.nom} : ${texteInfo(theme, p.valeur)} ${uniteVisible}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {fichierPicto && <img src={fichierPicto} alt="" crossOrigin="anonymous" onPointerDown={onPictoClick || onPictoMove ? (e) => debutPicto(e, p.code) : undefined} title={onPictoClick ? 'Cliquer pour changer le picto, glisser pour le déplacer' : undefined} style={{ cursor: onPictoMove ? 'grab' : onPictoClick ? 'pointer' : undefined, touchAction: 'none', transform: decalagesPictos?.[p.code] ? `translate(${decalagesPictos[p.code][0]}px, ${decalagesPictos[p.code][1]}px)` : undefined, width: `${TAILLE_PICTO}em`, height: `${TAILLE_PICTO}em`, marginBottom: '-0.15em', filter: 'drop-shadow(0 0.04em 0.12em rgba(0,0,0,0.55))' }} />}
+              {fichierPicto && <img src={fichierPicto} alt="" draggable={false} crossOrigin="anonymous" onPointerDown={onPictoClick || onPictoMove ? (e) => debutPicto(e, p.code) : undefined} title={onPictoClick ? 'Cliquer pour changer le picto, glisser pour le déplacer' : undefined} style={{ cursor: onPictoMove ? 'grab' : onPictoClick ? 'pointer' : undefined, touchAction: 'none', transform: decalagesPictos?.[p.code] ? `translate(${decalagesPictos[p.code][0]}px, ${decalagesPictos[p.code][1]}px)` : undefined, width: `${TAILLE_PICTO}em`, height: `${TAILLE_PICTO}em`, marginBottom: '-0.15em', filter: 'drop-shadow(0 0.04em 0.12em rgba(0,0,0,0.55))' }} />}
               <div className="cinfo-bulle" style={{ background: palier.fond, color: palier.texte }}>
                 {avecFleche(p) && (
                   <svg viewBox="-12 -12 24 24" aria-hidden>
