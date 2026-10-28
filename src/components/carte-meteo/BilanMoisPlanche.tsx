@@ -16,8 +16,8 @@ const POLICE = "'Lato', 'Segoe UI', Arial, sans-serif";
 /** Villes du bilan (département 66) : le nom cherché dans celui de la station. */
 const VILLES = [
   { nom: 'Perpignan', cherche: 'PERPIGNAN' },
-  { nom: 'Prades', cherche: 'PRADES' },
-  { nom: 'Cerbère', cherche: 'CERBERE' },
+  { nom: 'Canet-en-Roussillon', cherche: 'CANET-EN-ROUSSILLON' },
+  { nom: 'Eus', cherche: 'EUS' },
 ];
 const CODES_OCCITANIE = departementsDeLaRegion('Occitanie');
 const DEPARTEMENT = '66';
@@ -109,6 +109,7 @@ export default function BilanMoisPlanche() {
   }, []);
 
   const moisAffiche = bilans?.mois?.affiche ?? mois ?? '';
+  const prete = !!bilans?.mois;
 
   /** Station de chaque ville et valeur d'une carte du mois. */
   const lire = useMemo(() => {
@@ -249,7 +250,7 @@ export default function BilanMoisPlanche() {
 
             <div style={{ position: 'absolute', left: 700, right: 40, top: 28 }}>
               <div style={{ fontSize: 50, fontWeight: 800, textAlign: 'right', letterSpacing: 0.5, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
-                {style.titre} - {libelleMois(moisAffiche || '2026-01').toUpperCase()}
+                {style.titre}{prete ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
               </div>
               <div style={{ height: 3, background: '#fff', width: 270, marginLeft: 'auto', marginTop: 14 }} />
               <div style={{ fontSize: 20, textAlign: 'right', opacity: 0.85, marginTop: 8 }}>Pyrénées-Orientales{periode ? ` · ${periode}` : ''}</div>
