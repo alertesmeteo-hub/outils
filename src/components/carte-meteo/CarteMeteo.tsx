@@ -425,6 +425,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const jeuRef = useRef<JeuPictos>(jeuInitial);
   jeuRef.current = jeuPictos;
   const [periode, setPeriode] = useState<Periode>('apres-midi');
+  const [theme, setTheme] = useState<'halloween' | null>(null);
   /** Après-midi : afficher aussi le mini et le maxi de la journée (picto de l'après-midi), au lieu de la T° de l'après-midi. */
   const [miniMaxi, setMiniMaxi] = useState(reglages?.miniMaxi ?? false);
   const miniMaxiAM = miniMaxi && periode === 'apres-midi';
@@ -1312,7 +1313,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Mode « ajouter un picto » : un clic sur la carte pose un picto (soleil par défaut) et ouvre sa palette. */
   function ajouterPicto(x: number, y: number) {
     const id = Date.now();
-    setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : jeuPictos === 'alertes' ? 'am:soleil' : '☀️', valeur: '' }]);
+    setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : jeuPictos === 'alertes' ? 'am:soleil' : jeuPictos === 'halloween' ? 'ha:citrouille' : '☀️', valeur: '' }]);
     setPictosSelectionnes(new Set());
     setPaletteOuvertePour(`ajout:${id}`);
   }
@@ -1564,9 +1565,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       carteLocale={!enFrance}
       styleCapture={modeCapture}
       pictosEmoji={jeuPictos === 'emoji'}
+      theme={theme}
       styleVent={styleVent}
       echelleVent={tailleVent / 100}
-      couleurTitre={zone === 'dep:66' ? COULEUR_TITRE_PO : undefined}
+      couleurTitre={zone === 'dep:66' && !theme ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
       onModifierMoyenne={(id, v) => saisieAcceptee(v, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne(id)]: v }))}
       paletteOuvertePour={paletteOuvertePour}
@@ -1639,12 +1641,36 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     <div className="grid items-start gap-4 lg:ml-[calc(50%-50vw+1rem)] lg:w-[calc(100vw-2rem)] lg:grid-cols-[250px_minmax(0,1fr)_250px]">
       <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:order-1">
         <div>
+          <p className={titreGroupe}>Thème</p>
+          <fieldset className="mt-2">
+            <legend className="sr-only">Thème de la carte</legend>
+            {([[null, 'Aucun (carte habituelle)'], ['halloween', '🎃 Halloween']] as const).map(([valeur, libelle]) => (
+              <label key={libelle} className="mt-1 block text-sm">
+                <input
+                  type="radio"
+                  name={nom('theme')}
+                  checked={theme === valeur}
+                  onChange={() => {
+                    setTheme(valeur);
+                    // Halloween : ses pictos (citrouille, fantôme, chauve-souris…) ; en le quittant, retour aux icônes Alertes Météo.
+                    if (valeur === 'halloween') changerJeuPictos('halloween');
+                    else if (jeuPictos === 'halloween') changerJeuPictos('alertes');
+                  }}
+                  className="mr-2"
+                />
+                {libelle}
+              </label>
+            ))}
+          </fieldset>
+        </div>
+        <div>
           <p className={titreGroupe}>Pictos</p>
           <fieldset className="mt-2">
             <legend className="sr-only">Jeu de pictos</legend>
             {(
               [
                 ['alertes', 'Icônes Alertes Météo'],
+                ['halloween', '🎃 Pictos Halloween'],
                 ['emoji', 'Emojis'],
                 ['images', 'Mes pictos (images)'],
                 ['meteocons', 'Meteocons (icônes libres)'],

@@ -73,6 +73,14 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
 }
 .cmap-svg { position: absolute; left: 0; top: 0; }
+.cmap-decor { position: absolute; left: 0; top: 0; pointer-events: none; }
+
+/* Thème Halloween : nuit violette, titre sombre bordé d'orange. */
+.cmap-halloween { background: radial-gradient(ellipse at 70% 15%, #4a2480 0%, #24103f 45%, #0d0618 100%); }
+.cmap-halloween .cmap-titre { background: rgba(20, 10, 36, 0.92); border: 2px solid #ff8a1f; box-shadow: 0 0 14px rgba(255, 138, 31, 0.55); }
+.cmap-halloween .cmap-date { color: #ff9a2e; }
+.cmap-halloween .cmap-sous-titre { color: #ffe1b5; }
+.cmap-halloween .cmap-pied { color: #ffd9a8; }
 
 .cmap-logo {
   position: absolute;

@@ -184,8 +184,48 @@ export const PICTO_VOILE: PictoMeteo = 'mc:ciel-voile';
 
 export const PICTO_DEFAUT: PictoMeteo = '☀️';
 
+/** Pictos du thème Halloween (SVG dessinés pour le site, public/pictos-halloween/). */
+const HALLOWEEN: [string, string][] = [
+  ['citrouille', 'Citrouille (ensoleillé)'],
+  ['citrouille-nuage', 'Citrouille et nuage (éclaircies)'],
+  ['nuage', 'Nuage sombre (couvert)'],
+  ['fantome', 'Fantôme (brouillard)'],
+  ['pluie', 'Pluie'],
+  ['forte-pluie', 'Forte pluie'],
+  ['averses', 'Averses'],
+  ['orage', 'Orage'],
+  ['neige', 'Neige'],
+  ['grele', 'Grêle'],
+  ['vent', 'Vent'],
+  ['chauve-souris', 'Chauve-souris (nuit claire)'],
+  ['lune', 'Lune (nuit peu nuageuse)'],
+  ['lune-nuage', 'Lune et nuages (nuit nuageuse)'],
+  ['nuit-brouillard', 'Nuit de brouillard'],
+  ['toile', 'Toile d’araignée (gel, givre)'],
+  ['sorciere', 'Chapeau de sorcière (tempête)'],
+  ['tornade', 'Tornade'],
+];
+export const PICTOS_HALLOWEEN: PictoImage[] = HALLOWEEN.map(([nom, label]) => ({ id: `ha:${nom}`, fichier: `/pictos-halloween/${nom}.svg`, label }));
+
+/** Icône Alertes Météo → picto Halloween équivalent (les autres icônes restent telles quelles). */
+const VERS_HALLOWEEN: Record<string, string> = {
+  soleil: 'citrouille', 'ciel-voile': 'citrouille-nuage', 'peu-nuageux': 'citrouille-nuage', eclaircies: 'citrouille-nuage', nuageux: 'nuage', couvert: 'nuage',
+  brume: 'fantome', brouillard: 'fantome', 'brouillard-givrant': 'fantome',
+  'nuit-claire': 'chauve-souris', 'nuit-peu-nuageuse': 'lune', 'nuit-nuageuse': 'lune-nuage', 'nuit-brouillard': 'nuit-brouillard',
+  bruine: 'pluie', 'pluie-faible': 'pluie', pluie: 'pluie', 'forte-pluie': 'forte-pluie', averses: 'averses', 'averses-nuit': 'averses',
+  'pluie-verglacante': 'toile', verglas: 'toile', gel: 'toile', givre: 'toile', 'pluie-neige': 'neige',
+  orage: 'orage', 'orage-pluie': 'orage', 'averse-orageuse': 'orage', foudre: 'orage',
+  grele: 'grele', 'forte-grele': 'grele', 'orage-grele': 'grele', 'averse-grele': 'grele', 'pluie-grele': 'grele', gresil: 'grele',
+  'neige-faible': 'neige', neige: 'neige', 'forte-neige': 'neige', 'averses-neige': 'neige', 'tempete-neige': 'neige',
+  vent: 'vent', rafales: 'vent', tempete: 'sorciere', tornade: 'tornade',
+};
+export function enHalloween(picto: string): PictoMeteo {
+  const nom = VERS_HALLOWEEN[picto.replace(/^am:/, '')];
+  return nom ? `ha:${nom}` : picto;
+}
+
 export function estPictoImage(picto: string): boolean {
-  return picto.startsWith('img:') || picto.startsWith('mc:') || picto.startsWith('am:');
+  return picto.startsWith('img:') || picto.startsWith('mc:') || picto.startsWith('am:') || picto.startsWith('ha:');
 }
 
 /** Picto de neige (emojis, images ou Meteocons) : on peut y afficher une altitude (ex. « 2000 m »). */
@@ -193,17 +233,18 @@ export function estPictoNeige(picto: string): boolean {
   if (picto === '🌨️' || picto === '❄️' || picto === '☃️') return true;
   if (picto.startsWith('mc:')) return /snow|sleet/.test(picto);
   if (picto.startsWith('am:')) return /neige|blizzard/.test(picto);
+  if (picto.startsWith('ha:')) return picto === 'ha:neige';
   if (picto.startsWith('img:')) return /neige/i.test(PICTOS_IMAGES.find((p) => p.id === picto)?.label ?? '');
   return false;
 }
 
 export function cheminPictoImage(picto: string): string | undefined {
-  const jeu = picto.startsWith('mc:') ? PICTOS_METEOCONS : picto.startsWith('am:') ? PICTOS_ALERTES : PICTOS_IMAGES;
+  const jeu = picto.startsWith('mc:') ? PICTOS_METEOCONS : picto.startsWith('am:') ? PICTOS_ALERTES : picto.startsWith('ha:') ? PICTOS_HALLOWEEN : PICTOS_IMAGES;
   return jeu.find((p) => p.id === picto)?.fichier;
 }
 
 /** Jeu de pictos appliqué automatiquement à toute la carte : emojis, ou les images fournies (public/pictos). */
-export type JeuPictos = 'emoji' | 'images' | 'meteocons' | 'alertes';
+export type JeuPictos = 'emoji' | 'images' | 'meteocons' | 'alertes' | 'halloween';
 
 /**
  * Code météo WMO → image du jeu fourni : ciel peu nuageux → soleil et petit nuage (101), nuageux → soleil et nuages (102),
@@ -266,6 +307,7 @@ function alertesDepuisCode(code: number | null | undefined): PictoMeteo {
 }
 
 export function pictoDepuisCodeMeteo(code: number | null | undefined, jeu: JeuPictos = 'emoji'): PictoMeteo {
+  if (jeu === 'halloween') return enHalloween(alertesDepuisCode(code));
   if (jeu === 'meteocons') return meteoconsDepuisCode(code);
   if (jeu === 'alertes') return alertesDepuisCode(code);
   if (jeu === 'images') return pictoImageDepuisCode(code);
@@ -302,6 +344,7 @@ const CODES_NEIGE = [71, 73, 75, 77, 85, 86];
  * Sans nébulosité (données absentes), on retombe sur le code météo du modèle.
  */
 export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): PictoMeteo {
+  if (jeu === 'halloween') return enHalloween(pictoDepuisPrevision(e, 'alertes'));
   const { code, nuages, pluie, temperature } = e;
   const images = jeu === 'images';
   if (nuages == null && pluie == null) return pictoDepuisCodeMeteo(code, jeu);

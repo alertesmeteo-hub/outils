@@ -238,6 +238,8 @@ interface Props {
   carteLocale?: boolean;
   /** Style de la carte de référence (France « Moyen ») : température « 15° » au-dessus du picto (voir `.cmap-capture`). */
   styleCapture?: boolean;
+  /** Thème visuel de la carte (fond, couleurs, décors) ; aucun par défaut. */
+  theme?: 'halloween' | null;
   /** Carte en emojis : le ciel voilé (image) prend la taille d'un emoji au lieu de celle des jeux d'images. */
   pictosEmoji?: boolean;
   /** Présentation des rafales (pastille par défaut). */
@@ -315,6 +317,37 @@ const TRAIT_HORS_SELECTION = { ...TRAIT_COMMUN, fill: '#061428', fillOpacity: 0.
 const TRAIT_REGION = { ...TRAIT_COMMUN, fill: 'none', stroke: '#ffffff', strokeOpacity: 0.95, strokeWidth: 2.2 };
 // Sans contours : remplissage opaque et trait de la même couleur, pour que les départements voisins forment une
 // surface continue (avec la transparence, les jointures apparaîtraient comme de fines lignes claires).
+// Thème Halloween : territoire violet, contours orange, fond nuit.
+const HA_SELECTION = { ...TRAIT_SELECTION, fill: '#5a2f91', fillOpacity: 0.95, stroke: '#ff9a2e', strokeOpacity: 0.75 };
+const HA_SELECTION_FRANCE = { ...HA_SELECTION, strokeOpacity: 0.4, strokeWidth: 0.6 };
+const HA_HORS_SELECTION = { ...TRAIT_HORS_SELECTION, fill: '#120a22', fillOpacity: 0.7, stroke: '#8a63c4', strokeOpacity: 0.3 };
+const HA_REGION = { ...TRAIT_REGION, stroke: '#ff9a2e', strokeOpacity: 0.95 };
+
+/** Décors Halloween posés sur le fond (sous les pictos) : toiles d'araignée dans les coins et chauves-souris. */
+function DecorHalloween({ largeur, hauteur }: { largeur: number; hauteur: number }) {
+  const toile = (x: number, y: number, sx: number, sy: number) => (
+    <g transform={`translate(${x} ${y}) scale(${sx} ${sy})`} fill="none" stroke="#f1e6ff" strokeOpacity={0.55} strokeWidth={1.4} strokeLinecap="round">
+      <path d="M0 0 L170 0 M0 0 L0 150 M0 0 L120 120 M0 0 L160 55 M0 0 L55 160" />
+      <path d="M40 0 Q34 34 0 40 M80 0 Q70 70 0 80 M120 0 Q104 104 0 120 M160 0 Q136 136 0 160" />
+      <g fill="#1b0f2e" stroke="none"><circle cx={70} cy={86} r={5} /><path d="M70 86 l-10 8 M70 86 l10 8 M70 86 l-11 -2 M70 86 l11 -2" stroke="#1b0f2e" strokeWidth={1.6} /><path d="M70 0 V70" stroke="#f1e6ff" strokeOpacity={0.5} strokeWidth={1} /></g>
+    </g>
+  );
+  const chauveSouris = (x: number, y: number, s: number) => (
+    <g transform={`translate(${x} ${y}) scale(${s})`} fill="#0e0718">
+      <path d="M0 -4 l3 -5 l2 3 q8 -4 17 2 q-5 1 -6 6 q-4 -3 -8 0 q-3 -3 -5 2 q-1 -4 -3 -4 q-2 0 -3 4 q-2 -5 -5 -2 q-4 -3 -8 0 q-1 -5 -6 -6 q9 -6 17 -2 l2 -3 z" />
+    </g>
+  );
+  return (
+    <svg className="cmap-decor" viewBox={`0 0 ${largeur} ${hauteur}`} width={largeur} height={hauteur} aria-hidden>
+      {toile(largeur, 0, -1, 1)}
+      {toile(0, hauteur, 1, -1)}
+      {chauveSouris(largeur - 330, 70, 1.5)}
+      {chauveSouris(largeur - 240, 40, 1)}
+      {chauveSouris(120, hauteur - 80, 1.3)}
+    </svg>
+  );
+}
+
 const TRAIT_UNI = { ...TRAIT_COMMUN, fill: '#919fe6', fillOpacity: 1, stroke: '#919fe6', strokeOpacity: 1, strokeWidth: 0.7 };
 
 export interface Fleuves {
@@ -340,6 +373,7 @@ export default function CarteRendu({
   carteLocale = false,
   styleCapture = false,
   pictosEmoji = false,
+  theme = null,
   styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
@@ -460,7 +494,7 @@ export default function CarteRendu({
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
         ref={carteRef}
-        className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''}`}
+        className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''} ${theme === 'halloween' ? 'cmap-halloween' : ''}`}
         style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
         onClick={(e) => {
           if (!onClicCarte || (e.target as HTMLElement).closest('.cmap-marqueur, .cmap-palette, .cmap-vent-ajoute')) return;
@@ -478,20 +512,20 @@ export default function CarteRendu({
               </filter>
             )}
             <g filter={couche === 'relief' ? `url(#${idFiltreFond})` : undefined}>
-              {tuilesVisibles(couche, vue, largeur, HAUTEUR_CARTE).map((t) => (
+              {!theme && tuilesVisibles(couche, vue, largeur, HAUTEUR_CARTE).map((t) => (
                 <TuileFond key={t.cle} t={t} couche={couche} />
               ))}
             </g>
             {departements.filter((c) => !selection.has(c.code)).map((c) => (
-              <path key={c.code} d={c.d} {...TRAIT_HORS_SELECTION} {...(regions ? { stroke: 'none' } : {})} />
+              <path key={c.code} d={c.d} {...(theme ? HA_HORS_SELECTION : TRAIT_HORS_SELECTION)} {...(regions ? { stroke: 'none' } : {})} />
             ))}
             {/* Reliefs : le territoire est teinté en transparence (opacité du groupe, donc sans jointures visibles) pour laisser voir le relief. */}
             <g opacity={afficherRelief ? 1 - reliefVisible : 1}>
               {departements.filter((c) => selection.has(c.code)).map((c) =>
                 regions && regions.length === 0 ? (
-                  <path key={c.code} d={c.d} {...TRAIT_UNI} />
+                  <path key={c.code} d={c.d} {...(theme ? { ...TRAIT_UNI, fill: '#5a2f91', stroke: '#5a2f91' } : TRAIT_UNI)} />
                 ) : (
-                  <path key={c.code} d={c.d} {...(carteLocale ? TRAIT_SELECTION : TRAIT_SELECTION_FRANCE)} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} {...(remplissages?.[c.code] ? { fill: remplissages[c.code] } : {})} />
+                  <path key={c.code} d={c.d} {...(theme ? (carteLocale ? HA_SELECTION : HA_SELECTION_FRANCE) : carteLocale ? TRAIT_SELECTION : TRAIT_SELECTION_FRANCE)} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} {...(remplissages?.[c.code] ? { fill: remplissages[c.code] } : {})} />
                 )
               )}
             </g>
@@ -522,9 +556,10 @@ export default function CarteRendu({
                 </g>
               </>
             )}
-            {regions?.map((c) => <path key={c.code} d={c.d} {...TRAIT_REGION} />)}
+            {regions?.map((c) => <path key={c.code} d={c.d} {...(theme ? HA_REGION : TRAIT_REGION)} />)}
           </g>
         </svg>
+        {theme === 'halloween' && <DecorHalloween largeur={largeur} hauteur={HAUTEUR_CARTE} />}
 
         {logoUrl && (
           <img

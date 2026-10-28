@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import {
   LIBELLES_EMOJIS,
   PICTOS_ALERTES,
+  PICTOS_HALLOWEEN,
   PICTOS_DEFAUT_IMAGES,
   PICTOS_IMAGES,
   PICTOS_METEO,
@@ -19,7 +20,7 @@ import {
  * Sert à la fois dans la bulle ouverte sur un picto de la carte et dans le panneau « Modifier plusieurs pictos ».
  */
 
-type Jeu = 'tous' | 'recents' | 'alertes' | 'emoji' | 'images' | 'meteocons';
+type Jeu = 'tous' | 'recents' | 'alertes' | 'emoji' | 'images' | 'meteocons' | 'halloween';
 type Entree = { id: string; label: string; recherche: string; groupe: string; jeu: Exclude<Jeu, 'tous' | 'recents'> };
 
 const sansAccents = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -28,6 +29,7 @@ const MAX_RECENTS = 14;
 
 const ENTREES: Entree[] = [
   ...PICTOS_ALERTES.map((p) => ({ id: p.id, label: p.label, groupe: `Alertes Météo · ${p.categorie}`, jeu: 'alertes' as const, recherche: sansAccents(`${p.label} ${p.categorie} ${p.motsCles} alertes`) })),
+  ...PICTOS_HALLOWEEN.map((p) => ({ id: p.id, label: p.label, groupe: 'Halloween 🎃', jeu: 'halloween' as const, recherche: sansAccents(`${p.label} halloween`) })),
   ...PICTOS_METEO.map((e) => ({ id: e, label: LIBELLES_EMOJIS[e] ?? e, groupe: 'Emojis', jeu: 'emoji' as const, recherche: sansAccents(`${LIBELLES_EMOJIS[e] ?? ''} emoji`) })),
   ...PICTOS_IMAGES.map((p) => ({ id: p.id, label: p.label, groupe: 'Mes pictos', jeu: 'images' as const, recherche: sansAccents(`${p.label} mes pictos images`) })),
   ...[...PICTOS_DEFAUT_IMAGES, ...PICTOS_METEOCONS.filter((p) => !PICTOS_DEFAUT_IMAGES.includes(p))].map((p) => ({
@@ -44,6 +46,7 @@ const FILTRES: [Jeu, string][] = [
   ['tous', 'Tous'],
   ['recents', 'Récents'],
   ['alertes', 'Alertes Météo'],
+  ['halloween', 'Halloween'],
   ['emoji', 'Emojis'],
   ['images', 'Mes pictos'],
   ['meteocons', 'Meteocons'],
@@ -53,6 +56,7 @@ const FILTRES: [Jeu, string][] = [
 function jeuDe(id: string | undefined): Jeu {
   if (!id || id.startsWith('am:')) return 'alertes';
   if (id.startsWith('mc:')) return 'meteocons';
+  if (id.startsWith('ha:')) return 'halloween';
   if (id.startsWith('img:')) return 'images';
   return 'emoji';
 }
