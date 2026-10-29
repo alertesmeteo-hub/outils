@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
-import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
+import { REGIONS_FR, REGION_PAR_DEPARTEMENT } from '@/lib/carte-meteo/regions-fr';
 import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
 import { THEMES_PREVISION, type ThemePrevision } from '@/lib/carte-meteo/cartes-info';
 import { DUREES_TENDANCES } from '@/lib/carte-meteo/previsions-modeles';
@@ -45,6 +45,9 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   const [taille, setTaille] = useState(1);
   const [region, setRegion] = useState('');
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
+  // « Moyenne par région » : une valeur par région (moyenne de ses départements) au lieu d'une par département ; sur la France entière.
+  const [moyenneRegions, setMoyenneRegions] = useState(false);
+  const parRegion = moyenneRegions && !region;
   // Pictos changés à la main : « thème|durée|code » → picto ('' = retiré).
   const [surcharges, setSurcharges] = useState<Record<string, string>>({});
   const [choix, setChoix] = useState<{ duree: number; code: string } | null>(null);
@@ -76,9 +79,32 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           if (o === '') delete pictos[code];
           else if (o) pictos[code] = o;
         }
-        return { duree, points, pictos, theme: { ...themeBase, titre: reglage.titre(duree) } };
+        if (parRegion) {
+          const regions = new Map<string, PointInfo[]>();
+          for (const p of points) {
+            const r = REGION_PAR_DEPARTEMENT[p.code];
+            if (r) (regions.get(r) ?? regions.set(r, []).get(r)!).push(p);
+          }
+          const pointsRegions: PointInfo[] = [];
+          const picsRegions: Record<string, string> = {};
+          const valeursDepartements: Record<string, number> = {};
+          for (const [nom, liste] of regions) {
+            const moy = liste.reduce((a, p) => a + p.valeur, 0) / liste.length;
+            const v = themeId === 'pluie' && moy > 20 ? Math.round(moy / 5) * 5 : themeId === 'rafales' ? Math.round(moy / 5) * 5 : Math.round(moy * 10) / 10;
+            const code = `reg:${nom}`;
+            pointsRegions.push({ code, nom, dep: liste[0].dep, lat: liste.reduce((a, p) => a + p.lat, 0) / liste.length, lon: liste.reduce((a, p) => a + p.lon, 0) / liste.length, valeur: v, direction: null });
+            for (const p of liste) valeursDepartements[p.dep] = v;
+            // Picto de la région : le temps dominant parmi ses départements.
+            const decompte = new Map<string, number>();
+            for (const p of liste) if (pictos[p.code]) decompte.set(pictos[p.code], (decompte.get(pictos[p.code]) ?? 0) + 1);
+            const gagnant = [...decompte.entries()].sort((a, b) => b[1] - a[1])[0];
+            if (gagnant) picsRegions[code] = gagnant[0];
+          }
+          return { duree, points: pointsRegions, pictos: picsRegions, valeursDepartements, theme: { ...themeBase, titre: reglage.titre(duree) } };
+        }
+        return { duree, points, pictos, valeursDepartements: undefined, theme: { ...themeBase, titre: reglage.titre(duree) } };
       }),
-    [periodes, themeBase, reglage, themeId, surcharges]
+    [periodes, themeBase, reglage, themeId, surcharges, parRegion]
   );
 
   const appliquer = (picto: string) => {
@@ -138,6 +164,10 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
             ))}
           </select>
         </label>
+        <label className="flex items-center gap-2 pb-1.5 text-sm font-medium" title="Une valeur par région : la moyenne de ses départements (carte de France entière)">
+          <input type="checkbox" checked={moyenneRegions} disabled={!!region} onChange={(e) => setMoyenneRegions(e.target.checked)} />
+          Moyenne par région
+        </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Quantité d&apos;infos</span>
           <select value={niveauDetail} onChange={(e) => setNiveauDetail(Number(e.target.value))} className={selectBarre}>
@@ -170,10 +200,10 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
       </div>
 
       <div className="mt-8 grid gap-8 xl:grid-cols-2">
-        {cartes.map(({ duree, points, pictos, theme }) => {
+        {cartes.map(({ duree, points, pictos, theme, valeursDepartements }) => {
           const fin = ajouterJours(aujourdhui, duree - 1);
           return (
-            <section key={`${themeId}-${duree}`} aria-label={`${duree} jours`} className="min-w-0">
+            <section key={`${themeId}-${duree}-${parRegion}`} aria-label={`${duree} jours`} className="min-w-0">
               {points.length === 0 ? (
                 <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">
                   <p className="font-bold text-text">{reglage.titre(duree)}</p>
@@ -186,6 +216,8 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
                   theme={theme}
                   zone={region ? `reg:${region}` : 'france'}
                   points={points}
+                  valeursDepartements={valeursDepartements}
+                  parRegion={parRegion}
                   pictos={avecPictos ? pictos : undefined}
                   decalagesPictos={Object.fromEntries(Object.entries(decalages).filter(([k]) => k.startsWith(`${themeId}|${duree}|`)).map(([k, v]) => [k.split('|')[2], v]))}
                   onPictoMove={(code, dx, dy) => setDecalages((d) => ({ ...d, [`${themeId}|${duree}|${code}`]: [dx, dy] }))}

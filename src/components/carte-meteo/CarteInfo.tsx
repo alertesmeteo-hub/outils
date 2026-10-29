@@ -43,6 +43,8 @@ interface Props {
   prefixeFichier: string;
   /** Valeur de chaque département pour sa teinte, quand elle ne se déduit pas des points (projections régionales). */
   valeursDepartements?: Record<string, number>;
+  /** Valeurs par région (moyenne des départements) : le nom de la région remplace le numéro du département. */
+  parRegion?: boolean;
   /** Nature et source des données (texte IA) : « Prévision du modèle AROME (Météo-France) »… */
   contexte?: string;
   /** Taille des pastilles (1 = normale ; plus petites = plus de valeurs placées sans chevauchement). */
@@ -74,7 +76,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, contexte = '', echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, partValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, partValeurs = 1 }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -527,7 +529,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
                 <li key={p.code}>
                   <span>
                     {i + 1}. {p.nom.length > 17 ? `${p.nom.slice(0, 16)}…` : p.nom}
-                    {!enDepartement && !theme.maille && <em> ({p.dep})</em>}
+                    {!enDepartement && !theme.maille && !parRegion && <em> ({p.dep})</em>}
                   </span>
                   <strong>
                     {texteInfo(theme, p.valeur)}
