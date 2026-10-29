@@ -12,7 +12,7 @@ import { saisieAcceptee } from '@/lib/carte-meteo/limites';
 import { DIRECTIONS_VENT, angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { ChoixPicto } from './ChoixPicto';
-import { estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo } from '@/lib/carte-meteo/pictos';
+import { THEMES_CARTE, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo, type ThemeCarte } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { CalqueAnnotations, PanneauAnnotations, type Annotation, type ReglagesAnnotation } from './Annotations';
 import { CREDITS_COUCHES, LIBELLES_COUCHES, coucheParDefaut, type Couche } from '@/lib/carte-meteo/tuiles';
@@ -425,7 +425,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const jeuRef = useRef<JeuPictos>(jeuInitial);
   jeuRef.current = jeuPictos;
   const [periode, setPeriode] = useState<Periode>('apres-midi');
-  const [theme, setTheme] = useState<'halloween' | null>(null);
+  const [theme, setTheme] = useState<ThemeCarte | null>(null);
   /** Après-midi : afficher aussi le mini et le maxi de la journée (picto de l'après-midi), au lieu de la T° de l'après-midi. */
   const [miniMaxi, setMiniMaxi] = useState(reglages?.miniMaxi ?? false);
   const miniMaxiAM = miniMaxi && periode === 'apres-midi';
@@ -1313,7 +1313,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Mode « ajouter un picto » : un clic sur la carte pose un picto (soleil par défaut) et ouvre sa palette. */
   function ajouterPicto(x: number, y: number) {
     const id = Date.now();
-    setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : jeuPictos === 'alertes' ? 'am:soleil' : jeuPictos === 'halloween' ? 'ha:citrouille' : '☀️', valeur: '' }]);
+    setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : jeuPictos === 'alertes' ? 'am:soleil' : THEMES_CARTE.some((t) => t.id === jeuPictos) ? `${THEMES_CARTE.find((t) => t.id === jeuPictos)!.prefixe}:clair` : '☀️', valeur: '' }]);
     setPictosSelectionnes(new Set());
     setPaletteOuvertePour(`ajout:${id}`);
   }
@@ -1644,7 +1644,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           <p className={titreGroupe}>Thème</p>
           <fieldset className="mt-2">
             <legend className="sr-only">Thème de la carte</legend>
-            {([[null, 'Aucun (carte habituelle)'], ['halloween', '🎃 Halloween']] as const).map(([valeur, libelle]) => (
+            {([[null, 'Aucun (carte habituelle)'], ...THEMES_CARTE.map((t) => [t.id, t.libelle] as const)] as const).map(([valeur, libelle]) => (
               <label key={libelle} className="mt-1 block text-sm">
                 <input
                   type="radio"
@@ -1652,9 +1652,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                   checked={theme === valeur}
                   onChange={() => {
                     setTheme(valeur);
-                    // Halloween : ses pictos (citrouille, fantôme, chauve-souris…) ; en le quittant, retour aux icônes Alertes Météo.
-                    if (valeur === 'halloween') changerJeuPictos('halloween');
-                    else if (jeuPictos === 'halloween') changerJeuPictos('alertes');
+                    // Un thème apporte ses pictos (citrouille, bonhomme de neige, poussin…) ; en le quittant, retour aux icônes Alertes Météo.
+                    if (valeur) changerJeuPictos(valeur);
+                    else if (THEMES_CARTE.some((t) => t.id === jeuPictos)) changerJeuPictos('alertes');
                   }}
                   className="mr-2"
                 />
@@ -1670,7 +1670,6 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             {(
               [
                 ['alertes', 'Icônes Alertes Météo'],
-                ['halloween', '🎃 Pictos Halloween'],
                 ['emoji', 'Emojis'],
                 ['images', 'Mes pictos (images)'],
                 ['meteocons', 'Meteocons (icônes libres)'],

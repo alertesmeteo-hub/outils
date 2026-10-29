@@ -75,12 +75,22 @@ body {
 .cmap-svg { position: absolute; left: 0; top: 0; }
 .cmap-decor { position: absolute; left: 0; top: 0; pointer-events: none; }
 
-/* Thème Halloween : nuit violette, titre sombre bordé d'orange. */
-.cmap-halloween { background: radial-gradient(ellipse at 70% 15%, #4a2480 0%, #24103f 45%, #0d0618 100%); }
-.cmap-halloween .cmap-titre { background: rgba(20, 10, 36, 0.92); border: 2px solid #ff8a1f; box-shadow: 0 0 14px rgba(255, 138, 31, 0.55); }
-.cmap-halloween .cmap-date { color: #ff9a2e; }
-.cmap-halloween .cmap-sous-titre { color: #ffe1b5; }
-.cmap-halloween .cmap-pied { color: #ffd9a8; }
+/* Thèmes de carte : fond, bandeau de titre et pied. */
+.cmap-theme-halloween { background: radial-gradient(ellipse at 70% 15%, #4a2480 0%, #24103f 45%, #0d0618 100%); }
+.cmap-theme-halloween .cmap-titre { background: rgba(20, 10, 36, 0.92); border: 2px solid #ff8a1f; box-shadow: 0 0 14px rgba(255, 138, 31, 0.55); }
+.cmap-theme-halloween .cmap-date { color: #ff9a2e; }
+.cmap-theme-halloween .cmap-sous-titre { color: #ffe1b5; }
+.cmap-theme-halloween .cmap-pied { color: #ffd9a8; }
+.cmap-theme-noel { background: radial-gradient(ellipse at 30% 10%, #1d4a82 0%, #0f2a52 50%, #07152c 100%); }
+.cmap-theme-noel .cmap-titre { background: rgba(120, 18, 28, 0.94); border: 2px solid #f2c94c; box-shadow: 0 0 14px rgba(242, 201, 76, 0.5); }
+.cmap-theme-noel .cmap-date { color: #fff; }
+.cmap-theme-noel .cmap-sous-titre { color: #ffe8a8; }
+.cmap-theme-noel .cmap-pied { color: #d9ecff; }
+.cmap-theme-paques { background: linear-gradient(170deg, #cfeaf7 0%, #f4e4f2 55%, #fff6d0 100%); }
+.cmap-theme-paques .cmap-titre { background: rgba(255, 255, 255, 0.95); border: 2px solid #ff9ec0; box-shadow: 0 0 12px rgba(255, 158, 192, 0.6); }
+.cmap-theme-paques .cmap-date { color: #8a3d78; }
+.cmap-theme-paques .cmap-sous-titre { color: #3b8a66; }
+.cmap-theme-paques .cmap-pied { color: #4a3a6a; }
 
 .cmap-logo {
   position: absolute;
