@@ -6,7 +6,7 @@ import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { PALIERS_TEMPERATURE, palierDe } from '@/lib/carte-meteo/cartes-info';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
-import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
+import { REGIONS_FR, REGION_PAR_DEPARTEMENT } from '@/lib/carte-meteo/regions-fr';
 import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
 import { cheminPictoImage, estPictoImage } from '@/lib/carte-meteo/pictos';
 import { angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
@@ -14,6 +14,7 @@ import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } f
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { pictoDuJour, pointsParQuart, versPointJour, type PointJour } from '@/lib/carte-meteo/planches-jours';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
+import TableauPrevisions, { type CelluleJour, type LigneTableau } from './TableauPrevisions';
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, FICHIERS_CONTOURS } from './CarteMeteo';
 
 const LARGEUR = 1600;
@@ -26,6 +27,7 @@ const HAUTEUR_JOUR = 36;
 const COLONNES: Record<number, number> = { 2: 2, 4: 2, 6: 3, 8: 4, 10: 5, 12: 4, 14: 5, 16: 4 };
 /** Rafale (km/h) au-delà de laquelle la pastille de vent s'ajoute au picto. */
 const SEUIL_RAFALE = 80;
+const LARGEUR_TABLEAU_JPG = 1280;
 const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
@@ -44,9 +46,16 @@ interface Props {
  * région ou un département, avec un seul picto par point (le temps de la journée) et ses températures.
  */
 export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
-  const [duree, setDuree] = useState<number>(4);
+  const [dureeChoisie, setDuree] = useState<number>(4);
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
-  const [depart, setDepart] = useState(1);
+  const [departChoisi, setDepart] = useState(1);
+  /** Week-end : deux cartes, le samedi et le dimanche à venir (le jour même s'il s'agit d'un samedi). */
+  const [weekEnd, setWeekEnd] = useState(false);
+  const jourSemaine = new Date(`${aujourdhui}T12:00:00Z`).getUTCDay(); // 0 = dimanche … 6 = samedi
+  const departWeekEnd = jourSemaine === 6 ? 0 : jourSemaine === 0 ? 6 : 6 - jourSemaine;
+  const duree = weekEnd ? 2 : dureeChoisie;
+  const depart = weekEnd ? departWeekEnd : departChoisi;
+  const tableauRef = useRef<HTMLDivElement>(null);
   /** Grosseur de la pastille de rafale (%), plus petite par défaut. */
   const [tailleRafale, setTailleRafale] = useState(70);
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
@@ -180,16 +189,55 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
     [dates, jours, donneesDep, enDepartement, parQuarts, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax, partDetail, taillePicto]
   );
 
+  /** Lignes du tableau : régions pour la France (moyenne de leurs départements), départements pour une région, villes pour un département. */
+  const lignesTableau: LigneTableau[] = useMemo(() => {
+    const brutDuJour = (date: string) => (enDepartement ? donneesDep[`${zone.slice(4)}|${date}`] : jours[date]) ?? [];
+    const cellule = (liste: PointJour[]): CelluleJour | null => {
+      if (!liste.length) return null;
+      const moy = (v: (number | null)[]) => {
+        const n = v.filter((x): x is number => x != null);
+        return n.length ? n.reduce((a, b) => a + b, 0) / n.length : null;
+      };
+      const comptes = new Map<string, number>();
+      for (const p of liste) comptes.set(pictoDuJour(p), (comptes.get(pictoDuJour(p)) ?? 0) + 1);
+      const picto = [...comptes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      const rafales = liste.map((p) => p.rafale ?? 0);
+      return { maxi: moy(liste.map((p) => p.maxi)), mini: moy(liste.map((p) => p.mini)), picto, rafale: Math.max(...rafales) || null };
+    };
+    if (zone === 'france' || parQuarts) {
+      return REGIONS_FR.map((r) => ({ nom: r, cellules: dates.map((d) => cellule(brutDuJour(d).filter((p) => REGION_PAR_DEPARTEMENT[p.code] === r))) })).filter((l) => l.cellules.some(Boolean));
+    }
+    const noms = new Map<string, string>();
+    for (const d of dates) for (const p of brutDuJour(d)) if (enDepartement || codes.has(p.code)) noms.set(p.code, p.nom);
+    return [...noms.entries()]
+      .map(([code, nom]) => ({ nom, cellules: dates.map((d) => cellule(brutDuJour(d).filter((p) => p.code === code))) }))
+      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  }, [zone, parQuarts, enDepartement, dates, jours, donneesDep, codes]);
+
   const nomZone = zone === 'france' ? 'France' : parQuarts ? 'France en 4 zones (NO, NE, SO, SE)' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
-  const titre = `TENDANCE SUR ${duree} JOURS : ${nomZone.toUpperCase()}`;
-  const sousTitre = `DU ${jourLibelle(dates[0])} AU ${jourLibelle(dates[dates.length - 1])} · ${modele.libelle}`;
+  const titre = weekEnd ? `MÉTÉO DU WEEK-END : ${nomZone.toUpperCase()}` : `TENDANCE SUR ${duree} JOURS : ${nomZone.toUpperCase()}`;
+  const sousTitre = weekEnd && dates.length === 2 ? `${jourLibelle(dates[0])} ET ${jourLibelle(dates[1])} · ${modele.libelle}` : `DU ${jourLibelle(dates[0])} AU ${jourLibelle(dates[dates.length - 1])} · ${modele.libelle}`;
+
+  async function exporterTableau() {
+    const noeud = tableauRef.current;
+    if (!noeud) return;
+    setEnExport(true);
+    try {
+      await exporterEnJpg(noeud, `tableau-${weekEnd ? 'week-end' : `${duree}-jours`}-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modele.id}`, LARGEUR_TABLEAU_JPG, noeud.scrollHeight);
+    } catch (e) {
+      console.error('Export du tableau en JPG', e);
+      setErreur("L'export a échoué. Réessayez dans un instant.");
+    } finally {
+      setEnExport(false);
+    }
+  }
 
   async function exporter() {
     if (!planchRef.current) return;
     setEnExport(true);
     try {
-      await exporterEnJpg(planchRef.current, `tendance-${duree}-jours${depart ? '-sans-j0' : ''}-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modele.id}`, LARGEUR, hauteur);
+      await exporterEnJpg(planchRef.current, `${weekEnd ? 'week-end' : `tendance-${duree}-jours${depart ? '-sans-j0' : ''}`}-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modele.id}`, LARGEUR, hauteur);
     } catch (e) {
       console.error('Export de la planche en JPG', e);
       setErreur("L'export a échoué. Réessayez dans un instant.");
@@ -210,13 +258,24 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
           <button
             key={d}
             type="button"
-            aria-pressed={d === duree}
-            onClick={() => setDuree(d)}
-            className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${d === duree ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+            aria-pressed={!weekEnd && d === duree}
+            onClick={() => {
+              setWeekEnd(false);
+              setDuree(d);
+            }}
+            className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${!weekEnd && d === duree ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
           >
             {d} jours
           </button>
         ))}
+        <button
+          type="button"
+          aria-pressed={weekEnd}
+          onClick={() => setWeekEnd(true)}
+          className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${weekEnd ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+        >
+          🏖️ Week-end
+        </button>
       </div>
       <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
         <label className="text-sm font-medium">
@@ -235,7 +294,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
         </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Premier jour</span>
-          <select value={depart} onChange={(e) => setDepart(Number(e.target.value))} className={selectBarre}>
+          <select value={depart} disabled={weekEnd} onChange={(e) => setDepart(Number(e.target.value))} className={selectBarre}>
             <option value={0}>Avec aujourd&apos;hui (J0)</option>
             <option value={1}>Sans la carte J0 (dès demain)</option>
           </select>
@@ -391,6 +450,16 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
           </div>
         </div>
       </div>
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-xl font-extrabold">Tableau : {zone === 'france' || parQuarts ? 'une ligne par région' : enDepartement ? 'une ligne par ville' : 'une ligne par département'}</h3>
+        <button type="button" onClick={exporterTableau} disabled={enExport || lignesTableau.length === 0} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
+          {enExport ? 'Export en cours…' : 'Exporter le tableau en JPG'}
+        </button>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <TableauPrevisions ref={tableauRef} dates={dates} lignes={lignesTableau} titre={titre} sousTitre={sousTitre} logoUrl={logo?.fichier || null} logoFondBlanc={logo?.fondBlanc !== false} />
+      </div>
+
       {choix && (
         <FenetrePicto ancre={ancre}>
           <ChoixPicto
