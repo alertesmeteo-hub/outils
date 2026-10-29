@@ -101,7 +101,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v14'; // v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v15'; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -218,14 +218,23 @@ function repartir<T extends { lat: number; lon: number }>(liste: T[], n: number)
  * le sont d'office), et position du village (lat, lon) quand le point des données en est loin (`centres` : grandes
  * communes de montagne, où le point est au milieu du territoire communal).
  */
-const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[]; exactes?: string[]; centres?: Record<string, [number, number]> }> = {
+const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[]; exactes?: string[]; centres?: Record<string, [number, number]>; altitudes?: Record<string, number> }> = {
   '66': {
     garder: ['Ille-sur-Têt', 'Bourg-Madame', 'Le Barcarès', 'Saint-Cyprien', 'Rivesaltes'],
     ecarter: ['Corbère', 'Osséja', 'Caudiès-de-Fenouillèdes'],
     exactes: ['Prats-de-Mollo-la-Preste', 'Banyuls-sur-Mer'],
     centres: { 'Prats-de-Mollo-la-Preste': [42.4044, 2.4794], 'Banyuls-sur-Mer': [42.4833, 3.1289] },
+    // Altitude du village : le point de grille d'une grande commune de montagne est bien plus haut (Prats-de-Mollo : le modèle donnait des maximales très froides).
+    altitudes: { 'Prats-de-Mollo-la-Preste': 750 },
   },
 };
+
+/** Température ramenée à l'altitude du village quand le point de grille est plus haut (gradient de 0,65 °C par 100 m, au plus 8 °C). */
+function serieALAltitude(serie: Serie, altitudeGrille: number, altitudeVillage?: number): Serie {
+  if (altitudeVillage == null || altitudeGrille <= altitudeVillage) return serie;
+  const correction = Math.min(8, ((altitudeGrille - altitudeVillage) * 0.65) / 100);
+  return { ...serie, temp: serie.temp.map((t) => (t == null ? t : Math.round((t + correction) * 10) / 10)) };
+}
 
 function extraire(dep: string, fichier: FichierDepartement, runTime: string): Extrait {
   const cols = fichier.columns.values;
@@ -271,7 +280,7 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     nom: v.nom,
     lat: retouche?.centres?.[v.nom]?.[0] ?? v.lat,
     lon: retouche?.centres?.[v.nom]?.[1] ?? v.lon,
-    serie: serieDuPoint(fichier, c, v.pointId),
+    serie: serieALAltitude(serieDuPoint(fichier, c, v.pointId), altitude(v.pointId), retouche?.altitudes?.[v.nom]),
     ...(gardees.includes(v) ? { prioritaire: true } : {}),
     ...(gardees.includes(v) || retouche?.exactes?.includes(v.nom) ? { placeExacte: true } : {}),
   }));
