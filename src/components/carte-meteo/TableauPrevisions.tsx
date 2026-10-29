@@ -19,7 +19,7 @@ export interface LigneTableau {
 
 export const LARGEUR_TABLEAU = 1280;
 const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
-const SEUIL_RAFALE = 60;
+const SEUIL_RAFALE = 80;
 
 const jourLong = (dateISO: string) =>
   new Date(`${dateISO}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).toUpperCase();
@@ -53,7 +53,7 @@ const TableauPrevisions = forwardRef<HTMLDivElement, { dates: string[]; lignes: 
           <div key={l.nom} style={{ display: 'flex', alignItems: 'center', background: i % 2 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.18)', minHeight: 62 }}>
             <div style={{ width: colonneNom, padding: '0 14px', fontFamily: POLICE, fontSize: 25, letterSpacing: 0.3 }}>{l.nom.toUpperCase()}</div>
             {l.cellules.map((c, k) => (
-              <div key={k} style={{ width: largeurJour, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, borderLeft: '2px solid rgba(255,255,255,0.25)', alignSelf: 'stretch' }}>
+              <div key={k} style={{ width: largeurJour, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, overflow: 'hidden', borderLeft: '2px solid rgba(255,255,255,0.25)', alignSelf: 'stretch' }}>
                 {c ? (
                   <>
                     {c.picto && cheminPictoImage(c.picto) && <img src={cheminPictoImage(c.picto)} alt="" style={{ width: 50, height: 50, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }} />}
@@ -62,8 +62,8 @@ const TableauPrevisions = forwardRef<HTMLDivElement, { dates: string[]; lignes: 
                     </span>
                     <span style={{ fontFamily: POLICE, fontSize: 26, color: '#9fd0ff', minWidth: 46, textAlign: 'center' }}>{c.mini != null ? `${Math.round(c.mini)}°` : '–'}</span>
                     {c.rafale != null && c.rafale >= SEUIL_RAFALE ? (
-                      <span style={{ fontFamily: POLICE, fontSize: 20, background: couleurRafale(Math.round(c.rafale / 5) * 5).fond, color: couleurRafale(Math.round(c.rafale / 5) * 5).texte, border: '2px solid #fff', borderRadius: 999, padding: '1px 9px', whiteSpace: 'nowrap' }}>
-                        {Math.round(c.rafale / 5) * 5} km/h
+                      <span style={{ fontFamily: POLICE, fontSize: 16, background: couleurRafale(Math.round(c.rafale / 5) * 5).fond, color: couleurRafale(Math.round(c.rafale / 5) * 5).texte, border: '2px solid #fff', borderRadius: 999, padding: '1px 7px', whiteSpace: 'nowrap' }}>
+                        {Math.round(c.rafale / 5) * 5}
                       </span>
                     ) : null}
                   </>
