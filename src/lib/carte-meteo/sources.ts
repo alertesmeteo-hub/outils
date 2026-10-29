@@ -101,7 +101,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v15'; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v16'; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -225,7 +225,7 @@ const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[];
     exactes: ['Prats-de-Mollo-la-Preste', 'Banyuls-sur-Mer'],
     centres: { 'Prats-de-Mollo-la-Preste': [42.4044, 2.4794], 'Banyuls-sur-Mer': [42.4833, 3.1289] },
     // Altitude du village : le point de grille d'une grande commune de montagne est bien plus haut (Prats-de-Mollo : le modèle donnait des maximales très froides).
-    altitudes: { 'Prats-de-Mollo-la-Preste': 750 },
+    altitudes: { 'Prats-de-Mollo-la-Preste': 750, 'Céret': 150, 'Amélie-les-Bains-Palalda': 230 },
   },
 };
 
