@@ -31,6 +31,10 @@ const LARGEUR_TABLEAU_JPG = 1280;
 const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 /** Niveau d'info supplémentaire (réservé à la France) : quatre pictos seulement, un par quart (NO, NE, SO, SE). */
 const NIVEAU_QUATRE_PICTOS = 5;
+/** Risque d'orage (0 à 4) à partir duquel la pastille s'affiche, et neige (cm) minimale. */
+const SEUIL_ORAGE = 2;
+const SEUIL_NEIGE = 1;
+const NIVEAUX_ORAGE = ['', 'FAIBLE', 'MODÉRÉ', 'FORT', 'SÉVÈRE'];
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
 const jourLibelle = (dateISO: string) =>
@@ -59,6 +63,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   const depart = weekEnd ? departWeekEnd : departChoisi;
   const tableauRef = useRef<HTMLDivElement>(null);
   /** Grosseur de la pastille de rafale (%), plus petite par défaut. */
+  const [risques, setRisques] = useState(true);
   const [tailleRafale, setTailleRafale] = useState(70);
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState('france');
@@ -291,6 +296,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
             <option value={NIVEAU_QUATRE_PICTOS}>5 · 4 pictos (NO, NE, SO, SE) — France</option>
           </select>
         </label>
+        <label className="flex items-center gap-1.5 text-sm font-medium">
+          <input type="checkbox" checked={risques} onChange={(e) => setRisques(e.target.checked)} />
+          Risques : gel, orage, neige
+        </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Grosseur des rafales : {tailleRafale} %</span>
           <input type="range" min={40} max={150} step={10} value={tailleRafale} onChange={(e) => setTailleRafale(Number(e.target.value))} className="block w-40" aria-label="Grosseur de la pastille de rafale en pourcentage" />
@@ -429,6 +438,25 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
                               {kmh}
                               <span style={{ fontSize: '0.6em' }}>km/h</span>
                             </span>
+                          );
+                        })()}
+                        {risques && (() => {
+                          const t = Math.round(taillePicto * 0.36);
+                          const pastille = (fond: string, texte: string, icone: React.ReactNode, libelle: string) => (
+                            <span key={libelle} style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 3, background: fond, color: texte, border: '2px solid #fff', borderRadius: 999, padding: '0 7px', fontFamily: POLICE, fontSize: t, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                              <svg viewBox="-12 -12 24 24" width={t} height={t} aria-hidden>{icone}</svg>
+                              {libelle}
+                            </span>
+                          );
+                          return (
+                            <>
+                              {p.orage != null && p.orage >= SEUIL_ORAGE &&
+                                pastille('#ffd400', '#111', <path d="M3 -11 L-7 2 L-1 2 L-4 11 L8 -3 L1 -3 Z" fill="#111" />, `ORAGE ${NIVEAUX_ORAGE[Math.min(4, Math.round(p.orage))]}`)}
+                              {p.neige != null && p.neige >= SEUIL_NEIGE &&
+                                pastille('#e6f1ff', '#0b2a4a', <g stroke="#0b2a4a" strokeWidth={2.4} strokeLinecap="round"><path d="M0 -10V10M-8.7 -5L8.7 5M-8.7 5L8.7 -5" /></g>, `NEIGE ${Math.round(p.neige)} cm`)}
+                              {p.gel &&
+                                pastille('#1f6fe0', '#fff', <g stroke="#fff" strokeWidth={2.4} strokeLinecap="round"><path d="M0 -10V10M-8.7 -5L8.7 5M-8.7 5L8.7 -5" /></g>, 'GEL')}
+                            </>
                           );
                         })()}
                       </div>

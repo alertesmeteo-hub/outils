@@ -18,6 +18,10 @@ export interface PointJour {
   /** Rafale maximale de la journée (km/h) et direction d'où vient le vent (degrés). */
   rafale?: number | null;
   direction?: number | null;
+  /** Risque d'orage (0 à 4), neige fraîche de la journée (cm) et gel (minimale à 0 °C ou moins). */
+  orage?: number | null;
+  neige?: number | null;
+  gel?: boolean;
 }
 
 export function versPointJour(p: PointCarte): PointJour | null {
@@ -35,6 +39,9 @@ export function versPointJour(p: PointCarte): PointJour | null {
     voileJournee: p.voileJournee,
     rafale: p.rafaleJournee,
     direction: p.directionRafaleJournee,
+    orage: p.orageJournee,
+    neige: p.neigeJournee,
+    gel: p.mini != null && p.mini <= 0,
   };
 }
 
@@ -76,6 +83,10 @@ export function pointsParQuart(points: PointJour[]): PointJour[] {
         nuagesJournee: null,
         pluieJournee: null,
         picto,
+        orage: Math.max(0, ...groupe.map((p) => p.orage ?? 0)) || null,
+        neige: Math.max(0, ...groupe.map((p) => p.neige ?? 0)) || null,
+        // Le quart gèle quand le gel touche au moins un tiers de ses départements.
+        gel: groupe.filter((p) => p.gel).length * 3 >= groupe.length,
         rafale: Math.max(...groupe.map((p) => p.rafale ?? 0)) || null,
         direction: groupe.reduce<PointJour | null>((m, p) => ((p.rafale ?? 0) > (m?.rafale ?? 0) ? p : m), null)?.direction ?? null,
       },
