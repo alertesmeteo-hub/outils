@@ -91,7 +91,7 @@ const dateParis = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 
 const legendeBarre = 'mb-1 block text-sm font-medium';
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
-export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: string; /** Catégorie ouverte d'office (?cartes=europe…). */ modeInitial?: string }) {
+export default function CartesInfo({ aujourdhui, modeInitial, departementInitial }: { aujourdhui: string; /** Catégorie ouverte d'office (?cartes=europe…). */ modeInitial?: string; /** Département affiché d'office (page dédiée). */ departementInitial?: string }) {
   const id = useId();
   const nom = (base: string) => `${base}-${id}`;
   const modeDemande = MODES.find(([m]) => m === modeInitial)?.[0];
@@ -124,9 +124,9 @@ export default function CartesInfo({ aujourdhui, modeInitial }: { aujourdhui: st
     window.addEventListener('hashchange', ouvrirAncre);
     return () => window.removeEventListener('hashchange', ouvrirAncre);
   }, []);
-  const [niveau, setNiveau] = useState<Niveau>('france');
+  const [niveau, setNiveau] = useState<Niveau>(departementInitial ? 'departement' : 'france');
   const [region, setRegion] = useState(REGIONS_FR[0]);
-  const [departement, setDepartement] = useState('66');
+  const [departement, setDepartement] = useState(departementInitial ?? '66');
   const [modele, setModele] = useState<ModeleMeteo>('arome');
   const [jour, setJour] = useState(0);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);

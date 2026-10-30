@@ -45,13 +45,15 @@ interface Props {
   modele: { id: string; libelle: string; fournisseur: string };
   /** France : un point par département et par jour (null : jour que le modèle ne couvre pas). */
   jours: Record<string, PointJour[] | null>;
+  /** Zone choisie d'office : « dep:66 », « reg:Occitanie »… (France par défaut). */
+  zoneInitiale?: string;
 }
 
 /**
  * Planches « jours » : un seul JPG avec une carte par jour (2 cartes pour 2 jours, 4 pour 4… 16 pour 16 jours), pour la France, une
  * région ou un département, avec un seul picto par point (le temps de la journée) et ses températures.
  */
-export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
+export default function PlanchesJours({ aujourdhui, modele, jours, zoneInitiale = 'france' }: Props) {
   const [dureeChoisie, setDuree] = useState<number>(4);
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
   const [departChoisi, setDepart] = useState(1);
@@ -66,7 +68,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   const [risques, setRisques] = useState(true);
   const [tailleRafale, setTailleRafale] = useState(70);
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
-  const [zone, setZone] = useState('france');
+  const [zone, setZone] = useState(zoneInitiale);
   const [logoId, setLogoId] = useState('alertesmeteo');
   const [donneesDep, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
   const [erreur, setErreur] = useState<string | null>(null);
@@ -176,7 +178,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
   }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte]);
 
   const partDetail = niveauDetail === NIVEAU_QUATRE_PICTOS ? 0.22 : (NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1);
-  const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 1.7 : 1);
+  const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 2.6 : 1);
   // Moins il y a de points, plus les pictos grossissent (jusqu'à environ deux fois au niveau 4).
   const taillePicto = tailleBase * (parQuarts ? 1 : 1 / Math.sqrt(partDetail));
   /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */

@@ -474,7 +474,7 @@ export interface SeriesAnimation {
   t: string[];
   pasHeures: number;
   /** Par département (sa préfecture) : pluie du pas (mm), rafale (km/h) et direction d'où vient le vent (degrés), alignées sur `t`. */
-  departements: { code: string; nom: string; lat: number; lon: number; pluie: (number | null)[]; rafale: (number | null)[]; direction: (number | null)[] }[];
+  departements: { code: string; nom: string; lat: number; lon: number; pluie: (number | null)[]; rafale: (number | null)[]; direction: (number | null)[]; /** Température (°C) alignée sur `t`. */ temp?: (number | null)[] }[];
 }
 
 /** Pluie et vent des 96 départements de minuit (heure de Paris, environ) de `debutISO` jusqu'à `jours` jours plus tard. */
@@ -492,7 +492,7 @@ export async function chargerSeriesAnimation(modele: ModeleSource, debutISO: str
     if (!reference) reference = indices.map((k) => chef.t[k]);
     const index = new Map(chef.t.map((t, k) => [t, k]));
     const lire = (champ: (number | null)[]) => reference!.map((t) => champ[index.get(t) ?? -1] ?? null);
-    departements.push({ code: dep, nom: DEPARTEMENTS_FR[dep] ?? dep, lat: chefCommune.lat, lon: chefCommune.lon, pluie: lire(chef.pluie), rafale: lire(chef.rafale), direction: lire(chef.direction) });
+    departements.push({ code: dep, nom: DEPARTEMENTS_FR[dep] ?? dep, lat: chefCommune.lat, lon: chefCommune.lon, pluie: lire(chef.pluie), rafale: lire(chef.rafale), direction: lire(chef.direction), temp: lire(chef.temp) });
   });
   const t: string[] = reference ?? [];
   if (!departements.length || t.length < 2) throw new Error(`${LIBELLES[modele]} : aucune donnée pour l'animation`);
@@ -511,7 +511,7 @@ export async function chargerSeriesAnimationVilles(modele: ModeleSource, debutIS
   const departements = extrait.villes.map((v) => {
     const index = new Map(v.serie.t.map((t, k) => [t, k]));
     const lire = (champ: (number | null)[]) => reference.map((t) => champ[index.get(t) ?? -1] ?? null);
-    return { code: v.code, nom: v.nom, lat: v.lat, lon: v.lon, pluie: lire(v.serie.pluie), rafale: lire(v.serie.rafale), direction: lire(v.serie.direction) };
+    return { code: v.code, nom: v.nom, lat: v.lat, lon: v.lon, pluie: lire(v.serie.pluie), rafale: lire(v.serie.rafale), direction: lire(v.serie.direction), temp: lire(v.serie.temp) };
   });
   const pas = (Date.parse(reference[1]) - Date.parse(reference[0])) / 3600_000;
   return { t: reference, pasHeures: pas > 0 ? pas : 1, departements };

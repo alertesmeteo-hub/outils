@@ -31,6 +31,17 @@ export default async function AllTools() {
           </Link>
         </li>
         <li>
+          <Link href="/outils/pyrenees-orientales/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">🏔️</span>
+            <span>
+              <strong className="block leading-snug">Pyrénées-Orientales (66)</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Cartes, planche par jour, tableau, cartes infos et animations pluie, vent et températures du département, sur une page.
+              </span>
+            </span>
+          </Link>
+        </li>
+        <li>
           <Link href="/outils/carte-meteo/16-jours/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
             <span aria-hidden className="text-3xl">📅</span>
             <span>

@@ -13,6 +13,7 @@ const MODES: { id: ModeAnimation; libelle: string }[] = [
   { id: 'pluie', libelle: '🌧️ Pluie' },
   { id: 'vent', libelle: '💨 Vent' },
   { id: 'pluie-vent', libelle: '🌧️💨 Pluie et vent' },
+  { id: 'temperature', libelle: '🌡️ Températures' },
 ];
 const VITESSES = [
   { id: 3, libelle: 'Lente (3 images/s)' },
@@ -33,17 +34,19 @@ interface Props {
   aujourdhui: string;
   modele: { id: string; libelle: string; fournisseur: string };
   donnees: SeriesAnimation;
+  /** Zone choisie d'office : « reg:Occitanie », « dep:66 »… (France par défaut). */
+  zoneInitiale?: string;
 }
 
 /**
  * Animations de la pluie et du vent sur 1 à 5 jours (images toutes les 1 ou 3 heures selon le modèle) : lecture à l'écran,
  * puis export en GIF ou en vidéo (MP4 si le navigateur sait l'enregistrer, sinon WebM).
  */
-export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) {
+export default function AnimationsMeteo({ aujourdhui, modele, donnees, zoneInitiale = 'france' }: Props) {
   const [mode, setMode] = useState<ModeAnimation>('pluie-vent');
   const [jours, setJours] = useState(3);
   const [vitesse, setVitesse] = useState<number>(5);
-  const [zone, setZone] = useState('france');
+  const [zone, setZone] = useState(zoneInitiale);
   const [villesDep, setVillesDep] = useState<{ cle: string; donnees: SeriesAnimation | null } | null>(null);
   const [i, setI] = useState(0);
   const [lecture, setLecture] = useState(true);
@@ -98,6 +101,7 @@ export default function AnimationsMeteo({ aujourdhui, modele, donnees }: Props) 
         pluie: indices.map((k) => d.pluie[k]),
         rafale: indices.map((k) => d.rafale[k]),
         direction: indices.map((k) => d.direction[k]),
+        temp: d.temp ? indices.map((k) => d.temp![k]) : undefined,
       })),
     }),
     [source, donnees, indices]

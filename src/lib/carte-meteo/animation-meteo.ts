@@ -2,7 +2,7 @@ import type { SeriesAnimation } from './sources';
 import { angleFleche } from './vent';
 import { ajusterVue, versEcran, versMonde, type Vue } from './projection-france';
 
-export type ModeAnimation = 'pluie' | 'vent' | 'pluie-vent';
+export type ModeAnimation = 'pluie' | 'vent' | 'pluie-vent' | 'temperature';
 
 export const LARGEUR_ANIM = 1280;
 export const HAUTEUR_ANIM = 720;
@@ -32,6 +32,22 @@ export const NIVEAUX_VENT: Niveau[] = [
   { min: 70, fond: '#ff8c1a', libelle: '70 à 89 km/h' },
   { min: 50, fond: '#f5c400', libelle: '50 à 69 km/h' },
   { min: 30, fond: '#2f7de1', libelle: '30 à 49 km/h' },
+];
+
+/** Température (°C), du plus chaud au plus froid. */
+export const NIVEAUX_TEMP: Niveau[] = [
+  { min: 38, fond: '#5a0a14', libelle: '38 °C et plus' },
+  { min: 34, fond: '#a50f15', libelle: '34 à 37 °C' },
+  { min: 30, fond: '#de2d26', libelle: '30 à 33 °C' },
+  { min: 26, fond: '#f46d43', libelle: '26 à 29 °C' },
+  { min: 22, fond: '#fdae61', libelle: '22 à 25 °C' },
+  { min: 18, fond: '#fee08b', libelle: '18 à 21 °C' },
+  { min: 14, fond: '#d9ef8b', libelle: '14 à 17 °C' },
+  { min: 10, fond: '#8fd19e', libelle: '10 à 13 °C' },
+  { min: 6, fond: '#66c2d7', libelle: '6 à 9 °C' },
+  { min: 2, fond: '#4393c3', libelle: '2 à 5 °C' },
+  { min: -2, fond: '#2b5fa8', libelle: '-2 à 1 °C' },
+  { min: -Infinity, fond: '#5b3a9a', libelle: 'Moins de -2 °C' },
 ];
 
 const SEC = '#143a63';
@@ -119,7 +135,11 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
 
   const parCode = new Map(donnees.departements.map((d) => [d.code, d]));
   const pas = donnees.pasHeures;
-  const surPluie = mode !== 'vent';
+  const surTemp = mode === 'temperature';
+  const surPluie = mode === 'pluie' || mode === 'pluie-vent';
+  const valeurDe = (d: SeriesAnimation['departements'][number]) =>
+    surTemp ? (d.temp?.[i] ?? null) : surPluie ? (d.pluie[i] == null ? null : (d.pluie[i] as number) / pas) : d.rafale[i];
+  const niveauxCarte = surTemp ? NIVEAUX_TEMP : surPluie ? NIVEAUX_PLUIE : NIVEAUX_VENT;
 
   ctx.save();
   ctx.translate(vue.tx, vue.ty);
@@ -130,7 +150,7 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
     const hors = codes != null && !codes.has(c.code);
     if (hors) couleur = '#0c2748';
     if (d && !hors && !villes) {
-      const niveau = surPluie ? trouver(NIVEAUX_PLUIE, d.pluie[i] == null ? null : (d.pluie[i] as number) / pas) : trouver(NIVEAUX_VENT, d.rafale[i]);
+      const niveau = trouver(niveauxCarte, valeurDe(d));
       if (niveau) couleur = niveau.fond;
     }
     ctx.fillStyle = couleur;
@@ -144,10 +164,9 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
   // Villes d'un département : champ lissé (pondération par l'inverse du carré de la distance), limité au territoire.
   if (villes) {
     const pts = donnees.departements.map((d) => {
-      const v = surPluie ? (d.pluie[i] == null ? null : (d.pluie[i] as number) / pas) : d.rafale[i];
-      return { ...versEcran(versMonde(d.lat, d.lon), vue), v };
+      return { ...versEcran(versMonde(d.lat, d.lon), vue), v: valeurDe(d) };
     });
-    const niveaux = surPluie ? NIVEAUX_PLUIE : NIVEAUX_VENT;
+    const niveaux = niveauxCarte;
     const valides = pts.filter((p) => p.v != null) as { x: number; y: number; v: number }[];
     const PAS = 2;
     for (const c of contours) {
@@ -187,7 +206,7 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
   }
 
   // Flèches du vent (là où souffle le vent), plus grandes quand la rafale est forte.
-  if (mode !== 'pluie') {
+  if (mode === 'vent' || mode === 'pluie-vent') {
     const seuil = mode === 'vent' ? 30 : 50;
     for (const d of donnees.departements) {
       if (codes && !villes && !codes.has(d.code)) continue;
@@ -207,7 +226,7 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
   ctx.fillStyle = '#0b2a4a';
   ctx.font = `36px ${POLICE}`;
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(mode === 'pluie' ? 'PLUIE : ANIMATION DES PRÉVISIONS' : mode === 'vent' ? 'RAFALES : ANIMATION DES PRÉVISIONS' : 'PLUIE ET VENT : ANIMATION DES PRÉVISIONS', 42, 50);
+  ctx.fillText(mode === 'temperature' ? 'TEMPÉRATURES : ANIMATION DES PRÉVISIONS' : mode === 'pluie' ? 'PLUIE : ANIMATION DES PRÉVISIONS' : mode === 'vent' ? 'RAFALES : ANIMATION DES PRÉVISIONS' : 'PLUIE ET VENT : ANIMATION DES PRÉVISIONS', 42, 50);
   ctx.fillStyle = '#2563a8';
   ctx.font = `20px ${POLICE}`;
   ctx.fillText(`${nomZone} · PRÉVISION ${modele}`, 42, 73);
@@ -223,7 +242,8 @@ export function dessiner({ ctx, echelle, contours, vue, donnees, i, n, mode, mod
   ctx.fillText((mots[1] ?? '').replace(':', ' H '), 900, 118);
   let y = 170;
   if (surPluie) y = legende(ctx, 900, y, `PLUIE (mm par heure)`, NIVEAUX_PLUIE);
-  if (mode !== 'pluie') legende(ctx, 900, y + (surPluie ? 8 : 0), 'RAFALES + FLÈCHES', NIVEAUX_VENT);
+  if (surTemp) legende(ctx, 900, y, 'TEMPÉRATURE (°C)', NIVEAUX_TEMP);
+  if (mode === 'vent' || mode === 'pluie-vent') legende(ctx, 900, y + (surPluie ? 8 : 0), 'RAFALES + FLÈCHES', NIVEAUX_VENT);
 
   // Barre de progression et pied
   ctx.fillStyle = 'rgba(255,255,255,0.2)';
