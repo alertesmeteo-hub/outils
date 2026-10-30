@@ -29,6 +29,8 @@ const COLONNES: Record<number, number> = { 2: 2, 4: 2, 6: 3, 8: 4, 10: 5, 12: 4,
 const SEUIL_RAFALE = 80;
 const LARGEUR_TABLEAU_JPG = 1280;
 const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
+/** Niveau d'info supplémentaire (réservé à la France) : quatre pictos seulement, un par quart (NO, NE, SO, SE). */
+const NIVEAU_QUATRE_PICTOS = 5;
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
 const jourLibelle = (dateISO: string) =>
@@ -126,7 +128,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
 
   const enDepartement = zone.startsWith('dep:');
   /** France en quatre quarts (NO, NE, SO, SE) : un seul picto et la moyenne par quart. */
-  const parQuarts = zone === 'quarts';
+  const parQuarts = zone === 'quarts' || (zone === 'france' && niveauDetail === NIVEAU_QUATRE_PICTOS);
   const zoneCarte = parQuarts ? 'france' : zone;
   const dates = useMemo(() => Array.from({ length: duree }, (_, k) => ajouterJours(aujourdhui, depart + k)), [aujourdhui, duree, depart]);
 
@@ -168,7 +170,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
     return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : 0.05);
   }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte]);
 
-  const partDetail = NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1;
+  const partDetail = niveauDetail === NIVEAU_QUATRE_PICTOS ? 0.22 : (NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1);
   const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 1.7 : 1);
   // Moins il y a de points, plus les pictos grossissent (jusqu'à environ deux fois au niveau 4).
   const taillePicto = tailleBase * (parQuarts ? 1 : 1 / Math.sqrt(partDetail));
@@ -214,7 +216,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
   }, [zone, parQuarts, enDepartement, dates, jours, donneesDep, codes]);
 
-  const nomZone = zone === 'france' ? 'France' : parQuarts ? 'France en 4 zones (NO, NE, SO, SE)' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
+  const nomZone = parQuarts ? 'France en 4 zones (NO, NE, SO, SE)' : zone === 'france' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const titre = weekEnd ? `MÉTÉO DU WEEK-END : ${nomZone.toUpperCase()}` : `TENDANCE SUR ${duree} JOURS : ${nomZone.toUpperCase()}`;
   const sousTitre = weekEnd && dates.length === 2 ? `${jourLibelle(dates[0])} ET ${jourLibelle(dates[1])} · ${modele.libelle}` : `DU ${jourLibelle(dates[0])} AU ${jourLibelle(dates[dates.length - 1])} · ${modele.libelle}`;
@@ -286,6 +288,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
                 {n.libelle}
               </option>
             ))}
+            <option value={NIVEAU_QUATRE_PICTOS}>5 · 4 pictos (NO, NE, SO, SE) — France</option>
           </select>
         </label>
         <label className="text-sm font-medium">
@@ -408,7 +411,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
                           onPointerDown={(e) => debutPicto(e, cle)}
                           style={{ width: taillePicto, height: taillePicto, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden', transform: dec ? `translate(${dec[0]}px, ${dec[1]}px)` : undefined }}
                         />
-                        <span style={{ fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.5), color: '#111', textShadow: '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.5), color: '#d4101a', textShadow: '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
                           {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: '0.8em' }}> {Math.round(p.mini)}°</span> : null}
                         </span>
@@ -443,7 +446,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours }: Props) {
 
             <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: HAUTEUR_PIED, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${MARGE}px`, fontSize: 16, color: '#cfe3fa' }}>
               <span>
-                Prévisions {modele.libelle} ({modele.fournisseur}) · {parQuarts ? 'moyenne par zone' : `un point par ${enDepartement ? 'ville' : 'département'}`} · maximale puis <span style={{ color: '#7db4ff' }}>minimale</span>
+                Prévisions {modele.libelle} ({modele.fournisseur}) · {parQuarts ? 'moyenne par zone' : `un point par ${enDepartement ? 'ville' : 'département'}`} · <span style={{ color: '#ff8a8a' }}>maximale</span> puis <span style={{ color: '#7db4ff' }}>minimale</span>
               </span>
               <span style={{ fontFamily: POLICE, fontSize: 24, color: '#fff' }}>www.alertes-meteo.com</span>
             </div>
