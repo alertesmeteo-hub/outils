@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import NavPagesDeTravail, { MenuGauche } from '@/components/NavPagesDeTravail';
 
 /** Pages dont la carte prend toute la largeur de l'écran : pas de menu à gauche, les liens restent en haut. */
-const PLEINE_LARGEUR = ['/outils/carte-meteo'];
+const PLEINE_LARGEUR = ['/outils/carte-meteo', '/outils/pyrenees-orientales'];
 
 export default function GrilleOutils({ children }: { children: React.ReactNode }) {
   const chemin = (usePathname() ?? '').replace(/\/$/, '');
