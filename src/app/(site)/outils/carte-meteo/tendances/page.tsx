@@ -52,6 +52,10 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
         <Link href="/outils/carte-meteo/16-jours/" className="underline">
           cartes à 16 jours
         </Link>
+        . Pour la météo du week-end (samedi et dimanche), utilisez le bouton « 🏖️ Week-end » de la{' '}
+        <a href="#planches-jours" className="underline">
+          planche par jour
+        </a>
         . Pour la tendance sur 9 mois, voir plus bas ou les{' '}
         <Link href="/outils/previsions-saisonnieres/" className="underline">
           prévisions saisonnières
