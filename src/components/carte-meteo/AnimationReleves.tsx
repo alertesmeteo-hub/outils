@@ -20,7 +20,7 @@ const VITESSES = [
   { id: 3, libelle: 'Normale (3 images/s)' },
   { id: 6, libelle: 'Rapide (6 images/s)' },
 ] as const;
-const TAILLES = { petite: 0.85, normale: 1, grande: 1.25 } as const;
+const TAILLES = { petite: 0.85, normale: 1, grande: 1.25, xxl: 1.6, xxxl: 2 } as const;
 /** Rayon d'influence d'une station sur le fond coloré. */
 const RAYON_KM = 45;
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
@@ -44,6 +44,7 @@ export default function AnimationReleves() {
   const [duree, setDuree] = useState(24);
   const [vitesse, setVitesse] = useState<number>(3);
   const [taille, setTaille] = useState<keyof typeof TAILLES>('normale');
+  const [avecRelief, setAvecRelief] = useState(true);
   const [i, setI] = useState(0);
   const [lecture, setLecture] = useState(true);
   const [etat, setEtat] = useState<string | null>(null);
@@ -101,6 +102,42 @@ export default function AnimationReleves() {
     return Math.max(24, Math.abs(b.y - a.y));
   }, [vue]);
 
+  // Relief (public/geo/relief-france.png, voir scripts/relief-france.mjs) : altitude d'un point de l'écran.
+  const [relief, setRelief] = useState<{ x0: number; y0: number; largeur: number; hauteur: number; pas: number; data: Uint8ClampedArray } | null>(null);
+  useEffect(() => {
+    let actif = true;
+    (async () => {
+      const meta = (await (await fetch('/geo/relief-france.json')).json()) as { x0: number; y0: number; largeur: number; hauteur: number; pasMetres: number };
+      const image = new Image();
+      image.src = '/geo/relief-france.png';
+      await image.decode();
+      const c = document.createElement('canvas');
+      c.width = meta.largeur;
+      c.height = meta.hauteur;
+      const ctx = c.getContext('2d', { willReadFrequently: true })!;
+      ctx.drawImage(image, 0, 0);
+      if (actif) setRelief({ ...meta, pas: meta.pasMetres, data: ctx.getImageData(0, 0, c.width, c.height).data });
+    })().catch(() => {});
+    return () => {
+      actif = false;
+    };
+  }, []);
+  const altitude = useMemo(() => {
+    if (!relief) return null;
+    const { x0, y0, largeur, hauteur, pas, data } = relief;
+    const lire = (i: number, j: number) => data[(Math.min(hauteur - 1, Math.max(0, j)) * largeur + Math.min(largeur - 1, Math.max(0, i))) * 4] * pas;
+    return (x: number, y: number) => {
+      // Écran → pixels monde → pixel de l'image, interpolation bilinéaire.
+      const u = (x - vue.tx) / vue.echelle - x0 - 0.5;
+      const v = (y - vue.ty) / vue.echelle - y0 - 0.5;
+      const i = Math.floor(u);
+      const j = Math.floor(v);
+      const fu = u - i;
+      const fv = v - j;
+      return (lire(i, j) * (1 - fu) + lire(i + 1, j) * fu) * (1 - fv) + (lire(i, j + 1) * (1 - fu) + lire(i + 1, j + 1) * fu) * fv;
+    };
+  }, [relief, vue]);
+
   // Heures retenues : les `duree` dernières (au plus ce que contient la réponse).
   const debut = donnees ? Math.max(0, donnees.heures.length - duree) : 0;
   const n = donnees ? donnees.heures.length - debut : 0;
@@ -129,12 +166,12 @@ export default function AnimationReleves() {
       const parK = new Map(stations.map((s) => [String(s.k), s]));
       const points = liste.map((p) => {
         const s = parK.get(p.code)!;
-        return { x: s.x, y: s.y, v: p.valeur, dansZone: !codes || codes.has(s.dep) };
+        return { x: s.x, y: s.y, v: p.valeur, dansZone: !codes || codes.has(s.dep), z: s.alt ?? altitude?.(s.x, s.y) ?? null };
       });
       memo.set(j, points);
       return points;
     };
-  }, [donnees, param, debut, stations, codes]);
+  }, [donnees, param, debut, stations, codes, altitude]);
 
   useEffect(() => setI(n > 0 ? n - 1 : 0), [n, param]);
   useEffect(() => {
@@ -146,7 +183,7 @@ export default function AnimationReleves() {
   const dessiner = (ctx: CanvasRenderingContext2D, echelle: number, j: number) =>
     donnees &&
     terres &&
-    dessinerReleves({ ctx, echelle, vue, contours, terres, etranger, codes, points: pointsDe(j), param, heure: donnees.heures[debut + j], nomZone, i: j, n, rayon, taille: TAILLES[taille] });
+    dessinerReleves({ ctx, echelle, vue, contours, terres, etranger, codes, points: pointsDe(j), param, heure: donnees.heures[debut + j], nomZone, i: j, n, rayon, taille: TAILLES[taille], altitude: avecRelief ? altitude : null });
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -273,12 +310,20 @@ export default function AnimationReleves() {
             ))}
           </select>
         </label>
+        {param === 't' && (
+          <label className="flex items-center gap-2 self-center text-sm font-medium" title="Le fond coloré suit le relief : 0,65 °C de moins tous les 100 m">
+            <input type="checkbox" checked={avecRelief} onChange={(e) => setAvecRelief(e.target.checked)} />
+            Correction du relief
+          </label>
+        )}
         <label className="text-sm font-medium">
           <span className="mb-1 block">Taille des valeurs</span>
           <select value={taille} onChange={(e) => setTaille(e.target.value as keyof typeof TAILLES)} className={selectBarre}>
             <option value="petite">Petites (plus de stations)</option>
             <option value="normale">Normales</option>
             <option value="grande">Grandes</option>
+            <option value="xxl">XXL</option>
+            <option value="xxxl">XXXL</option>
           </select>
         </label>
       </div>
@@ -316,7 +361,7 @@ export default function AnimationReleves() {
 
       <canvas ref={canvasRef} width={COTE_RELEVES} height={COTE_RELEVES} className="mt-4 h-auto w-full max-w-3xl rounded-xl border border-border" aria-label="Animation des relevés des stations" />
       <p className="mt-2 text-xs text-muted">
-        {n} images (une par heure), relevés horaires des stations Météo-France. Le fond coloré est lissé entre les stations (à moins de {RAYON_KM} km) ; sur une carte chargée, les
+        {n} images (une par heure), relevés horaires des stations Météo-France. Le fond coloré est lissé entre les stations (à moins de {RAYON_KM} km) ; pour les températures, il suit le relief (0,65 °C de moins tous les 100 m) ; sur une carte chargée, les
         valeurs qui se chevauchent sont omises (« Petites » en montre davantage). Températures contrôlées par les stations voisines : un capteur qui s&apos;écarte de plus de 8° est écarté.
       </p>
     </div>

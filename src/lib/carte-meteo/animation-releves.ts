@@ -76,6 +76,9 @@ export const PALETTES: Record<ParametreReleve, { titre: string; unite: string; p
   },
 };
 
+/** Gradient vertical moyen de la température (°C par mètre). */
+export const GRADIENT_ALTITUDE = 0.0065;
+
 /** Fond des terres sans valeur (pluie nulle) et de la mer. */
 const TERRE = [238, 236, 228] as const;
 const MER = '#1d5fa8';
@@ -102,6 +105,8 @@ export interface PointReleve {
   v: number;
   /** Station de la zone choisie : son étiquette passe avant celles des voisines. */
   dansZone: boolean;
+  /** Altitude de la station (m) : correction du relief des températures. */
+  z?: number | null;
 }
 
 export const heureReleve = (iso: string) => {
@@ -131,13 +136,18 @@ interface Params {
   /** Rayon d'influence d'une station (pixels écran). */
   rayon: number;
   taille: number;
+  /** Altitude (m) d'un point de l'écran : avec elle, le champ des températures suit le relief. */
+  altitude?: ((x: number, y: number) => number) | null;
 }
 
 /**
  * Champ coloré par pondération inverse au carré de la distance des stations à moins de `rayon`, calculé sur une grille
  * grossière puis agrandi avec lissage par le navigateur (dégradé continu).
  */
-function champ(points: PointReleve[], param: ParametreReleve, rayon: number): HTMLCanvasElement {
+function champ(points: PointReleve[], param: ParametreReleve, rayon: number, altitude: Params['altitude']): HTMLCanvasElement {
+  // Correction du relief : les températures sont ramenées au niveau de la mer avant d'être lissées, puis chaque point de la
+  // grille reprend le gradient de son altitude (vallées plus chaudes, sommets plus froids, comme sur les cartes d'observation).
+  const relief = param === 't' && altitude ? altitude : null;
   const PAS = 4;
   const l = Math.ceil(COTE_RELEVES / PAS);
   const h = Math.ceil(BAS_CARTE / PAS);
@@ -171,13 +181,13 @@ function champ(points: PointReleve[], param: ParametreReleve, rayon: number): HT
             if (d2 > r2) continue;
             // Le poids s'annule au bord du rayon : pas de cassure nette entre deux zones de stations.
             const w = (1 - d2 / r2) ** 2 / (d2 + lissage);
-            somme += p.v * w;
+            somme += (relief && p.z != null ? p.v + GRADIENT_ALTITUDE * p.z : p.v) * w;
             poids += w;
           }
         }
       }
       const o = (gy * l + gx) * 4;
-      const coul = poids > 0 ? couleur(param, somme / poids) : null;
+      const coul = poids > 0 ? couleur(param, somme / poids - (relief ? GRADIENT_ALTITUDE * relief(x, y) : 0)) : null;
       const [r, g, b] = coul ?? TERRE;
       img.data[o] = r;
       img.data[o + 1] = g;
@@ -229,7 +239,7 @@ function legende(ctx: CanvasRenderingContext2D, param: ParametreReleve) {
 }
 
 /** Dessine l'image `i` : champ coloré, contours, valeur de chaque station, titre et heure (1080 × 1080 logiques × `echelle`). */
-export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger, codes, points, param, heure, nomZone, i, n, rayon, taille }: Params) {
+export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger, codes, points, param, heure, nomZone, i, n, rayon, taille, altitude = null }: Params) {
   ctx.save();
   ctx.setTransform(echelle, 0, 0, echelle, 0, 0);
   ctx.fillStyle = MER;
@@ -244,7 +254,7 @@ export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger,
   }
 
   // Champ coloré, sur les terres seulement.
-  const image = champ(points, param, rayon);
+  const image = champ(points, param, rayon, altitude);
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, COTE_RELEVES, BAS_CARTE);
@@ -312,7 +322,7 @@ export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger,
   ctx.fillText(h, 28, 128);
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.font = '14px Arial, sans-serif';
-  ctx.fillText('Stations Météo-France', 300, 128);
+  ctx.fillText(param === 't' && altitude ? 'Stations Météo-France · relief corrigé' : 'Stations Météo-France', 300, 128);
 
   // Progression
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
