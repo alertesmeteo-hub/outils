@@ -243,7 +243,7 @@ export default function BilanMoisPlanche() {
               )}
               {vue &&
                 lire?.stations
-                  .filter((s) => s.station && lignes.some((l) => l.nom === s.nom))
+                  .filter((s) => s.station && (type === 'tous' ? lignes.length > 0 : lignes.some((l) => l.nom === s.nom)))
                   .map((s) => {
                     const p = versEcran(versMonde(s.station![3], s.station![4]), vue);
                     return (
