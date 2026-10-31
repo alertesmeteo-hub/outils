@@ -13,6 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/classements/`, priority: 0.8 },
     { url: `${SITE_URL}/outils/records-temperature/`, priority: 0.8 },
     { url: `${SITE_URL}/outils/temperatures-en-direct/`, priority: 0.8 },
+    { url: `${SITE_URL}/outils/animation-releves/`, priority: 0.7 },
     { url: `${SITE_URL}/outils/observations-en-direct/`, priority: 0.8 },
     { url: `${SITE_URL}/outils/releves-en-direct/`, priority: 0.8 },
     { url: `${SITE_URL}/outils/nuits-tropicales/`, priority: 0.8 },

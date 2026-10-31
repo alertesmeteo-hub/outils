@@ -18,6 +18,7 @@ export const PAGES_DE_TRAVAIL = [
   { href: '/outils/previsions-saisonnieres/', libelle: 'Prévisions saisonnières' },
   { href: '/outils/observations-en-direct/', libelle: 'Observations en direct' },
   { href: '/outils/temperatures-en-direct/', libelle: 'Températures en direct' },
+  { href: '/outils/animation-releves/', libelle: 'Animation des relevés' },
   { href: '/outils/releves-en-direct/', libelle: 'Super tableau des relevés' },
   { href: '/outils/records-temperature/', libelle: 'Records de température' },
   { href: '/outils/nuits-tropicales/', libelle: 'Nuits tropicales' },

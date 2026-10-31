@@ -107,6 +107,17 @@ export default async function AllTools() {
           </Link>
         </li>
         <li>
+          <Link href="/outils/animation-releves/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">🎞️</span>
+            <span>
+              <strong className="block leading-snug">Animation des relevés</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Températures, rafales ou pluie relevées heure par heure sur 6 à 48 h, valeur de chaque station, export GIF ou MP4.
+              </span>
+            </span>
+          </Link>
+        </li>
+        <li>
           <Link href="/outils/observations-en-direct/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
             <span aria-hidden className="text-3xl">📡</span>
             <span>
