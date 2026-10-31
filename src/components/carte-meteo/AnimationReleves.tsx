@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointInfo } from './CarteInfo';
-import { BAS_CARTE, COTE_RELEVES, dessinerReleves, ecranStation, type ParametreReleve, type PointReleve, type ReponseRelevesAnimation } from '@/lib/carte-meteo/animation-releves';
+import { basCarte, COTE_RELEVES, HAUTEUR_CARRE, HAUTEUR_TIKTOK, dessinerReleves, ecranStation, type ParametreReleve, type PointReleve, type ReponseRelevesAnimation } from '@/lib/carte-meteo/animation-releves';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { ajusterVue, unirBoites, versMonde } from '@/lib/carte-meteo/projection-france';
 import { depStation, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
@@ -45,9 +45,12 @@ export default function AnimationReleves({ departementImpose }: { departementImp
   const [vitesse, setVitesse] = useState<number>(3);
   const [taille, setTaille] = useState<keyof typeof TAILLES>('normale');
   const [avecRelief, setAvecRelief] = useState(true);
+  const [format, setFormat] = useState<'carre' | 'tiktok'>('carre');
   const [i, setI] = useState(0);
   const [lecture, setLecture] = useState(true);
   const [etat, setEtat] = useState<string | null>(null);
+  const hauteur = format === 'tiktok' ? HAUTEUR_TIKTOK : HAUTEUR_CARRE;
+  const bas = basCarte(hauteur);
   const zone = useZone('zone-animation-releves', departementImpose);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -93,8 +96,8 @@ export default function AnimationReleves({ departementImpose }: { departementImp
   const codes = useMemo(() => (zone.zone === 'france' ? null : new Set(codesDeLaZone(zone.zone))), [zone.zone]);
   const vue = useMemo(() => {
     const boite = (codes && unirBoites(contoursBruts.filter((c) => codes.has(c.code)).map((c) => c.boite))) || BOITE_FRANCE;
-    return ajusterVue(boite, { gauche: 0, haut: 0, droite: COTE_RELEVES, bas: BAS_CARTE }, codes ? 0.04 : 0.01);
-  }, [codes, contoursBruts]);
+    return ajusterVue(boite, { gauche: 0, haut: 0, droite: COTE_RELEVES, bas }, codes ? 0.04 : 0.01);
+  }, [codes, contoursBruts, bas]);
   const nomZone = zone.zone === 'france' ? 'FRANCE' : zone.zone.startsWith('reg:') ? zone.zone.slice(4).toUpperCase() : `${DEPARTEMENTS_FR[zone.zone.slice(4)] ?? ''} (${zone.zone.slice(4)})`.toUpperCase();
   const rayon = useMemo(() => {
     const a = ecranStation(46, 2, vue);
@@ -147,8 +150,8 @@ export default function AnimationReleves({ departementImpose }: { departementImp
     if (!donnees) return [];
     return donnees.stations
       .map(([nom, dep, lat, lon, alt], k) => ({ k, nom, dep: depStation(dep, lat), lat, lon, alt, ...ecranStation(lat, lon, vue) }))
-      .filter((s) => s.x > -rayon && s.x < COTE_RELEVES + rayon && s.y > -rayon && s.y < BAS_CARTE + rayon);
-  }, [donnees, vue, rayon]);
+      .filter((s) => s.x > -rayon && s.x < COTE_RELEVES + rayon && s.y > -rayon && s.y < bas + rayon);
+  }, [donnees, vue, rayon, bas]);
 
   /** Points de l'image `j` ; températures contrôlées par les stations voisines (capteur défaillant écarté). */
   const pointsDe = useMemo(() => {
@@ -183,7 +186,7 @@ export default function AnimationReleves({ departementImpose }: { departementImp
   const dessiner = (ctx: CanvasRenderingContext2D, echelle: number, j: number) =>
     donnees &&
     terres &&
-    dessinerReleves({ ctx, echelle, vue, contours, terres, etranger, codes, points: pointsDe(j), param, heure: donnees.heures[debut + j], nomZone, i: j, n, rayon, taille: TAILLES[taille], altitude: avecRelief ? altitude : null });
+    dessinerReleves({ ctx, echelle, vue, contours, terres, etranger, codes, points: pointsDe(j), param, heure: donnees.heures[debut + j], nomZone, i: j, n, rayon, taille: TAILLES[taille], altitude: avecRelief ? altitude : null, hauteur });
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -194,10 +197,11 @@ export default function AnimationReleves({ departementImpose }: { departementImp
 
   function canvasHorsEcran(echelle: number) {
     const c = document.createElement('canvas');
-    c.width = c.height = Math.round(COTE_RELEVES * echelle);
+    c.width = Math.round(COTE_RELEVES * echelle);
+    c.height = Math.round(hauteur * echelle);
     return c;
   }
-  const nomFichier = (ext: string) => `releves-${param}-${zone.nomFichier}-${duree}h-${(donnees ? new Date(donnees.heures[debut + n - 1]).toLocaleString('sv-SE', { timeZone: 'Europe/Paris' }) : '').slice(0, 13).replace(' ', '-')}h.${ext}`;
+  const nomFichier = (ext: string) => `releves-${param}-${zone.nomFichier}-${duree}h${format === 'tiktok' ? '-tiktok' : ''}-${(donnees ? new Date(donnees.heures[debut + n - 1]).toLocaleString('sv-SE', { timeZone: 'Europe/Paris' }) : '').slice(0, 13).replace(' ', '-')}h.${ext}`;
 
   async function exporterGif() {
     setErreur(null);
@@ -284,6 +288,22 @@ export default function AnimationReleves({ departementImpose }: { departementImp
           </div>
         </fieldset>
         <fieldset>
+          <legend className="mb-1 text-sm font-medium">Format</legend>
+          <div className="flex flex-wrap gap-2">
+            {([['carre', '⬜ Carré (1080 × 1080)'], ['tiktok', '📱 TikTok (1080 × 1920)']] as const).map(([id, libelle]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={id === format}
+                onClick={() => setFormat(id)}
+                className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${id === format ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+              >
+                {libelle}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset>
           <legend className="mb-1 text-sm font-medium">Durée</legend>
           <div className="flex flex-wrap gap-2">
             {DUREES.map((d) => (
@@ -359,7 +379,7 @@ export default function AnimationReleves({ departementImpose }: { departementImp
       )}
       {!donnees && !erreur && <p className="mt-4 text-sm text-muted">Chargement des relevés…</p>}
 
-      <canvas ref={canvasRef} width={COTE_RELEVES} height={COTE_RELEVES} className="mt-4 h-auto w-full max-w-3xl rounded-xl border border-border" aria-label="Animation des relevés des stations" />
+      <canvas ref={canvasRef} width={COTE_RELEVES} height={hauteur} className={`mt-4 h-auto w-full ${format === 'tiktok' ? 'max-w-sm' : 'max-w-3xl'} rounded-xl border border-border`} aria-label="Animation des relevés des stations" />
       <p className="mt-2 text-xs text-muted">
         {n} images (une par heure), relevés horaires des stations Météo-France. Le fond coloré est lissé entre les stations (à moins de {RAYON_KM} km) ; pour les températures, il suit le relief (0,65 °C de moins tous les 100 m) ; sur une carte chargée, les
         valeurs qui se chevauchent sont omises (« Petites » en montre davantage). Températures contrôlées par les stations voisines : un capteur qui s&apos;écarte de plus de 8° est écarté.
