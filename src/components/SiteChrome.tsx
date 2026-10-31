@@ -8,7 +8,7 @@ export function Header() {
     <header className="border-b border-border bg-surface">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 text-lg font-extrabold">
-          <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-white">☁</span>
+          <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-[#e00020] text-white">☁</span>
           {SITE_NAME}
         </Link>
         <div className="flex items-center gap-4 text-sm font-medium">
