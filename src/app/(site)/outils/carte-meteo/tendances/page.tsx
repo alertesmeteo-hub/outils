@@ -63,6 +63,17 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
         .
       </p>
 
+      <Link
+        href="/outils/carte-meteo/tendances-par-theme/"
+        className="mt-4 flex items-center gap-3 rounded-xl border-2 border-primary bg-primary/10 px-4 py-3 font-semibold hover:bg-primary/20"
+      >
+        <span aria-hidden className="text-3xl">🗺️</span>
+        <span>
+          <span className="block text-lg">Cartes de tendance par thème : page dédiée</span>
+          <span className="block text-sm font-normal text-muted">Pluie, rafales, maxi, mini, neige sur 2 à 16 jours, seules sur une page →</span>
+        </span>
+      </Link>
+
       <nav aria-label="Modèle" className="mt-4 flex flex-wrap gap-2">
         {MODELES_LONGUE_ECHEANCE.map((id) => {
           const m = MODELES.find((x) => x.id === id)!;

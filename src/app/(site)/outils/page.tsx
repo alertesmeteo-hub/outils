@@ -18,6 +18,16 @@ export default async function AllTools() {
     <>
       <h1 className="text-3xl font-extrabold">Tous les outils</h1>
       <div className="mt-6 max-w-2xl"><SearchBox items={tools.map(toSearchItem)} /></div>
+      <Link
+        href="/outils/carte-meteo/tendances-par-theme/"
+        className="mt-8 flex items-center gap-4 rounded-2xl border-2 border-primary bg-primary/10 p-5 transition-shadow hover:shadow-lg"
+      >
+        <span aria-hidden className="text-5xl">🗺️</span>
+        <span>
+          <strong className="block text-xl leading-snug">Cartes de tendance par thème</strong>
+          <span className="mt-1 block text-muted">Pluie, rafales, maxi, mini et neige sur 2, 4, 6… 16 jours : huit cartes de France par thème, export en JPG.</span>
+        </span>
+      </Link>
       <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <li>
           <Link href="/outils/carte-meteo/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
