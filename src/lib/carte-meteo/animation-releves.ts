@@ -20,6 +20,8 @@ export const HAUTEUR_CARRE = COTE_RELEVES;
 export const HAUTEUR_TIKTOK = 1920;
 /** Facebook : portrait 4:5. */
 export const HAUTEUR_FACEBOOK = 1350;
+/** YouTube : paysage 16:9, 1920 × 1080. */
+export const LARGEUR_YOUTUBE = 1920;
 /** Bas de la carte (au-dessus de la légende) pour une image de hauteur `hauteur`. */
 export const basCarte = (hauteur: number) => hauteur - 64;
 
@@ -144,20 +146,22 @@ interface Params {
   taille: number;
   /** Altitude (m) d'un point de l'écran : avec elle, le champ des températures suit le relief. */
   altitude?: ((x: number, y: number) => number) | null;
-  /** Hauteur de l'image en pixels logiques (la largeur est COTE_RELEVES). */
+  /** Hauteur de l'image en pixels logiques (1080 par défaut). */
   hauteur?: number;
+  /** Largeur de l'image en pixels logiques (COTE_RELEVES par défaut). */
+  largeur?: number;
 }
 
 /**
  * Champ coloré par pondération inverse au carré de la distance des stations à moins de `rayon`, calculé sur une grille
  * grossière puis agrandi avec lissage par le navigateur (dégradé continu).
  */
-function champ(points: PointReleve[], param: ParametreReleve, rayon: number, altitude: Params['altitude'], hauteur: number): HTMLCanvasElement {
+function champ(points: PointReleve[], param: ParametreReleve, rayon: number, altitude: Params['altitude'], hauteur: number, largeur: number): HTMLCanvasElement {
   // Correction du relief : les températures sont ramenées au niveau de la mer avant d'être lissées, puis chaque point de la
   // grille reprend le gradient de son altitude (vallées plus chaudes, sommets plus froids, comme sur les cartes d'observation).
   const relief = param === 't' && altitude ? altitude : null;
   const PAS = 4;
-  const l = Math.ceil(COTE_RELEVES / PAS);
+  const l = Math.ceil(largeur / PAS);
   const h = Math.ceil(basCarte(hauteur) / PAS);
   const c = document.createElement('canvas');
   c.width = l;
@@ -210,13 +214,13 @@ function champ(points: PointReleve[], param: ParametreReleve, rayon: number, alt
 /** Valeur affichée : entier pour la température et les rafales, une décimale pour une petite pluie. */
 const texteValeur = (param: ParametreReleve, v: number) => (param === 'rr' && v < 10 ? v.toFixed(1).replace('.', ',') : String(Math.round(v)));
 
-function legende(ctx: CanvasRenderingContext2D, param: ParametreReleve, hauteur: number) {
+function legende(ctx: CanvasRenderingContext2D, param: ParametreReleve, hauteur: number, largeur: number) {
   const { titre, unite, graduations } = PALETTES[param];
   const y = basCarte(hauteur);
   ctx.fillStyle = '#0b2a4a';
-  ctx.fillRect(0, y, COTE_RELEVES, hauteur - y);
+  ctx.fillRect(0, y, largeur, hauteur - y);
   const x0 = 200;
-  const x1 = COTE_RELEVES - 260;
+  const x1 = largeur - 260;
   const min = graduations[0];
   const max = graduations[graduations.length - 1];
   // Pluie : échelle logarithmique (0,1 à 40 mm), sinon linéaire.
@@ -242,17 +246,17 @@ function legende(ctx: CanvasRenderingContext2D, param: ParametreReleve, hauteur:
   ctx.fillText(`${titre.split(' ')[0]} (${unite})`, 20, y + 40);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#ffffff';
-  ctx.fillText('www.alertes-meteo.com', COTE_RELEVES - 20, y + 40);
+  ctx.fillText('www.alertes-meteo.com', largeur - 20, y + 40);
   ctx.textAlign = 'left';
 }
 
-/** Dessine l'image `i` : champ coloré, contours, valeur de chaque station, titre et heure (1080 de large × `hauteur` logiques × `echelle`). */
-export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger, codes, points, param, heure, nomZone, i, n, rayon, taille, altitude = null, hauteur = HAUTEUR_CARRE }: Params) {
+/** Dessine l'image `i` : champ coloré, contours, valeur de chaque station, titre et heure (`largeur` × `hauteur` logiques × `echelle`). */
+export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger, codes, points, param, heure, nomZone, i, n, rayon, taille, altitude = null, hauteur = HAUTEUR_CARRE, largeur = COTE_RELEVES }: Params) {
   const bas = basCarte(hauteur);
   ctx.save();
   ctx.setTransform(echelle, 0, 0, echelle, 0, 0);
   ctx.fillStyle = MER;
-  ctx.fillRect(0, 0, COTE_RELEVES, hauteur);
+  ctx.fillRect(0, 0, largeur, hauteur);
   if (etranger) {
     ctx.save();
     ctx.translate(vue.tx, vue.ty);
@@ -263,10 +267,10 @@ export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger,
   }
 
   // Champ coloré, sur les terres seulement.
-  const image = champ(points, param, rayon, altitude, hauteur);
+  const image = champ(points, param, rayon, altitude, hauteur, largeur);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, 0, COTE_RELEVES, bas);
+  ctx.rect(0, 0, largeur, bas);
   ctx.clip();
   ctx.translate(vue.tx, vue.ty);
   ctx.scale(vue.echelle, vue.echelle);
@@ -274,7 +278,7 @@ export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger,
   ctx.setTransform(echelle, 0, 0, echelle, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(image, 0, 0, COTE_RELEVES, bas);
+  ctx.drawImage(image, 0, 0, largeur, bas);
   ctx.restore();
 
   // Limites des départements, celles de la zone choisie plus marquées.
@@ -299,7 +303,7 @@ export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger,
   const ordre = [...points].sort((a, b) => Number(b.dansZone) - Number(a.dansZone));
   for (const p of ordre) {
     if (param === 'rr' && p.v < 0.1) continue;
-    if (p.x < 4 || p.x > COTE_RELEVES - 4 || p.y < 4 || p.y > bas - 4) continue;
+    if (p.x < 4 || p.x > largeur - 4 || p.y < 4 || p.y > bas - 4) continue;
     const texte = texteValeur(param, p.v);
     const l = ctx.measureText(texte).width / 2 + 1;
     const boite = { x0: p.x - l, y0: p.y - police / 2, x1: p.x + l, y1: p.y + police / 2 };
@@ -319,7 +323,7 @@ export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger,
   const titreCartouche = `${PALETTES[param].titre} · ${nomZone}`;
   ctx.font = `24px ${POLICE}`;
   // Le cartouche s'élargit avec le titre (nom de zone long) au lieu de le laisser déborder.
-  const largeurCartouche = Math.min(COTE_RELEVES - 24, Math.max(520, Math.ceil(ctx.measureText(titreCartouche).width) + 44));
+  const largeurCartouche = Math.min(largeur - 24, Math.max(520, Math.ceil(ctx.measureText(titreCartouche).width) + 44));
   ctx.fillStyle = 'rgba(11,42,74,0.86)';
   ctx.beginPath();
   ctx.roundRect(12, 12, largeurCartouche, 132, 12);
@@ -338,11 +342,11 @@ export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger,
 
   // Progression
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillRect(0, bas - 6, COTE_RELEVES, 6);
+  ctx.fillRect(0, bas - 6, largeur, 6);
   ctx.fillStyle = '#ffd21a';
-  ctx.fillRect(0, bas - 6, (COTE_RELEVES * (i + 1)) / n, 6);
+  ctx.fillRect(0, bas - 6, (largeur * (i + 1)) / n, 6);
 
-  legende(ctx, param, hauteur);
+  legende(ctx, param, hauteur, largeur);
   ctx.restore();
 }
 
