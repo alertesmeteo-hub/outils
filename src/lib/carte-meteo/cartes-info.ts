@@ -668,4 +668,6 @@ export interface ReponseBilans {
   /** [id, nom, département, lat, lon, altitude] */
   stations: [string, string, string, number, number, number | null][];
   cartes: Record<string, { fenetre: string; valeurs: [number, number][] }>;
+  /** Records mensuels (clé « 1 »…« 12 ») et absolus des stations du 66 : valeur et date (AAAA-MM-JJ). */
+  recordsStations?: Record<string, { monthly?: Record<string, { tx?: { v: number; d: string }; tn?: { v: number; d: string }; rr24?: { v: number; d: string } }>; absolute?: { tx?: { v: number; d: string }; tn?: { v: number; d: string }; rr24?: { v: number; d: string } } }>;
 }

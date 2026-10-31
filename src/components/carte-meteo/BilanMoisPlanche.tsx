@@ -17,6 +17,8 @@ const FORMATS = {
 } as const;
 type FormatPlanche = keyof typeof FORMATS;
 const ECART_LIGNES = 24;
+/** Hauteur d'une ligne de la table des records des 12 mois. */
+const HAUTEUR_TABLE = 36;
 const POLICE = "'Lato', 'Segoe UI', Arial, sans-serif";
 
 /** Villes du bilan (département 66) : le nom cherché dans celui de la station. */
@@ -27,8 +29,8 @@ const DEPARTEMENT = '66';
 /** Fond de carte : le département seul, pour qu'il remplisse le cadre. */
 const CODES_CARTE = [DEPARTEMENT];
 
-type Type = 'temp' | 'pluie' | 'soleil';
-type Affichage = Type | 'tous';
+type Type = 'temp' | 'pluie' | 'soleil' | 'chaud' | 'froid';
+type Affichage = Type | 'tous' | 'records' | 'annee';
 interface Ligne {
   nom: string;
   mesure: number;
@@ -38,7 +40,7 @@ interface Ligne {
   type: Type;
 }
 
-const FONDS: Record<Type, { fond: string; carte: string; case: string; titre: string; unite: string; ecartTexte: string; libelles: [string, string]; tuile: string; surTuile: string }> = {
+const FONDS_BASE: Record<'temp' | 'pluie' | 'soleil', { fond: string; carte: string; case: string; titre: string; unite: string; ecartTexte: string; libelles: [string, string]; tuile: string; surTuile: string }> = {
   temp: {
     fond: 'linear-gradient(135deg, #e0242b 0%, #b30f17 50%, #7a0a10 100%)',
     carte: '#fcdd09',
@@ -74,7 +76,13 @@ const FONDS: Record<Type, { fond: string; carte: string; case: string; titre: st
   },
 };
 
-const TITRES_LIGNE: Record<Type, string> = { temp: 'Températures', pluie: 'Pluviométrie', soleil: 'Ensoleillement' };
+const FONDS = {
+  ...FONDS_BASE,
+  chaud: { ...FONDS_BASE.temp, titre: 'RECORDS DU MOIS', unite: '°C', libelles: ['Maxi du mois', 'Record du mois'] as [string, string] },
+  froid: { ...FONDS_BASE.temp, titre: 'RECORDS DU MOIS', unite: '°C', libelles: ['Mini du mois', 'Record du mois'] as [string, string] },
+};
+
+const TITRES_LIGNE: Record<Type, string> = { temp: 'Températures', pluie: 'Pluviométrie', soleil: 'Ensoleillement', chaud: 'Chaleur', froid: 'Froid' };
 
 const NOMS_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 /** « octobre 2026 » pour « 2026-10 » (extremes-mois.ts est réservé au serveur). */
@@ -147,6 +155,11 @@ export default function BilanMoisPlanche() {
         const ecart = ntx != null && ntn != null ? (ntx + ntn) / 2 : null;
         return ecart == null ? null : { nom, type: t, mesure, ecart, normale: mesure - ecart };
       }
+      if (t === 'chaud' || t === 'froid') {
+        const [m, rec] = t === 'chaud' ? [v('tx-mois'), v('record-mois-tx')] : [v('tn-mois'), v('record-mois-tn')];
+        if (m == null || rec == null) return null;
+        return { nom, type: t, mesure: m, normale: rec, ecart: Math.round((m - rec) * 10) / 10 };
+      }
       const [m, e] = t === 'pluie' ? [v('rr-mois'), v('nrr-mois')] : [v('insol-mois'), v('ninsol-mois')];
       if (m == null || e == null) return null;
       return { nom, type: t, mesure: m, ecart: e, normale: 1 + e / 100 > 0.01 ? m / (1 + e / 100) : null };
@@ -156,11 +169,27 @@ export default function BilanMoisPlanche() {
       if (!s) return [];
       return (['temp', 'pluie', 'soleil'] as Type[]).map((t) => ligneDe(TITRES_LIGNE[t], s.i, t)).filter((l): l is Ligne => l != null);
     }
-    return lire.stations.flatMap((s) => (s.i < 0 ? [] : [ligneDe(s.nom, s.i, type)])).filter((l): l is Ligne => l != null);
+    if (type === 'records') {
+      const s = lire.stations.find((x) => x.i >= 0);
+      if (!s) return [];
+      return (['chaud', 'froid'] as Type[]).map((t) => ligneDe(TITRES_LIGNE[t], s.i, t)).filter((l): l is Ligne => l != null);
+    }
+    if (type === 'annee') return [];
+    return lire.stations.flatMap((s) => (s.i < 0 ? [] : [ligneDe(s.nom, s.i, type as Type)])).filter((l): l is Ligne => l != null);
   }, [lire, type]);
 
+  /** Records de chaque mois de l'année à la station de la planche (Perpignan), pour « Records des 12 mois ». */
+  const annee = useMemo(() => {
+    const s = lire?.stations.find((x) => x.i >= 0);
+    const mensuels = s && bilans?.recordsStations?.[s.station![0]]?.monthly;
+    if (!mensuels) return [];
+    return NOMS_MOIS.map((nom, k) => ({ nom, ...mensuels[String(k + 1)] }));
+  }, [lire, bilans]);
+  const avecDonnees = type === 'annee' ? annee.length > 0 : lignes.length > 0;
+  const moisNumero = Number(moisAffiche.slice(5, 7));
+
   // Disposition : en paysage, la carte à gauche et les lignes à droite ; en portrait ou carré, le titre, la carte, puis les lignes en bas.
-  const blocLignes = Math.max(1, lignes.length) * HAUTEUR_LIGNE + Math.max(0, lignes.length - 1) * ECART_LIGNES;
+  const blocLignes = type === 'annee' ? 13 * HAUTEUR_TABLE + 12 * 4 : Math.max(1, lignes.length) * HAUTEUR_LIGNE + Math.max(0, lignes.length - 1) * ECART_LIGNES;
   const bas = HAUTEUR - 130;
   const hautLignes = vertical ? bas - blocLignes : 190;
   const CARTE = vertical ? { gauche: 40, haut: 215, droite: LARGEUR - 40, bas: hautLignes - 16 } : { gauche: 30, haut: 40, droite: 570, bas: HAUTEUR - 110 };
@@ -171,7 +200,7 @@ export default function BilanMoisPlanche() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contours, CARTE.gauche, CARTE.haut, CARTE.droite, CARTE.bas]);
 
-  const style = FONDS[type === 'tous' ? 'temp' : type];
+  const style = FONDS[type === 'tous' ? 'temp' : type === 'records' || type === 'annee' ? 'chaud' : type];
   const decimales = type === 'temp' ? 1 : 1;
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const periode = bilans?.cartes['rr-mois']?.fenetre.split(' · ')[0] ?? '';
@@ -180,7 +209,7 @@ export default function BilanMoisPlanche() {
     if (!planche.current) return;
     setEnExport(true);
     try {
-      await exporterEnJpg(planche.current, `bilan-${type === 'tous' ? 'complet' : type === 'temp' ? 'temperatures' : type === 'pluie' ? 'pluviometrie' : 'ensoleillement'}-${moisAffiche}-pyrenees-orientales${format === 'paysage' ? '' : `-${format}`}`, LARGEUR, HAUTEUR);
+      await exporterEnJpg(planche.current, `bilan-${type === 'annee' ? 'records-12-mois' : type === 'records' ? 'records-du-mois' : type === 'tous' ? 'complet' : type === 'temp' ? 'temperatures' : type === 'pluie' ? 'pluviometrie' : 'ensoleillement'}-${moisAffiche}-pyrenees-orientales${format === 'paysage' ? '' : `-${format}`}`, LARGEUR, HAUTEUR);
     } catch (e) {
       console.error('Export du bilan en JPG', e);
       setErreur("L'export a échoué. Réessayez dans un instant.");
@@ -198,7 +227,7 @@ export default function BilanMoisPlanche() {
         <fieldset>
           <legend className="mb-1 text-sm font-medium">Bilan</legend>
           <div className="flex flex-wrap gap-2">
-            {([['tous', '📊 Les trois'], ['temp', '🌡️ Températures'], ['pluie', '🌧️ Pluviométrie'], ['soleil', '☀️ Ensoleillement']] as [Affichage, string][]).map(([id, l]) => (
+            {([['tous', '📊 Les trois'], ['records', '🏆 Records du mois'], ['annee', '📅 Records des 12 mois'], ['temp', '🌡️ Températures'], ['pluie', '🌧️ Pluviométrie'], ['soleil', '☀️ Ensoleillement']] as [Affichage, string][]).map(([id, l]) => (
               <button key={id} type="button" aria-pressed={type === id} className={bouton(type === id)} onClick={() => setType(id)}>
                 {l}
               </button>
@@ -235,7 +264,7 @@ export default function BilanMoisPlanche() {
             ))}
           </select>
         </label>
-        <button type="button" onClick={exporter} disabled={enExport || !bilans || lignes.length === 0} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
+        <button type="button" onClick={exporter} disabled={enExport || !bilans || !avecDonnees} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
           {enExport ? 'Export en cours…' : 'Exporter en JPG'}
         </button>
       </div>
@@ -244,7 +273,7 @@ export default function BilanMoisPlanche() {
           {erreur}
         </p>
       )}
-      {bilans && lignes.length === 0 && <p className="mt-3 text-sm text-muted">Aucune des trois stations n&apos;a de valeur pour ce bilan et ce mois.</p>}
+      {bilans && !avecDonnees && <p className="mt-3 text-sm text-muted">Aucune des trois stations n&apos;a de valeur pour ce bilan et ce mois.</p>}
 
       <div ref={colonne} className="mt-4 min-w-0">
         <div style={{ height: HAUTEUR * facteur }}>
@@ -271,7 +300,7 @@ export default function BilanMoisPlanche() {
               )}
               {vue &&
                 lire?.stations
-                  .filter((s) => s.station && (type === 'tous' ? lignes.length > 0 : lignes.some((l) => l.nom === s.nom)))
+                  .filter((s) => s.station && (type === 'tous' || type === 'records' || type === 'annee' ? avecDonnees : lignes.some((l) => l.nom === s.nom)))
                   .map((s) => {
                     const p = versEcran(versMonde(s.station![3], s.station![4]), vue);
                     return (
@@ -287,11 +316,32 @@ export default function BilanMoisPlanche() {
 
             <div style={{ position: 'absolute', left: vertical ? 40 : 610, right: 40, top: vertical ? 40 : 28 }}>
               <div style={{ fontSize: vertical ? 44 : 50, fontWeight: 800, textAlign: vertical ? 'center' : 'right', letterSpacing: 0.5, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
-                {type === 'tous' ? 'BILAN DU MOIS' : style.titre}{prete ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
+                {type === 'tous' ? 'BILAN DU MOIS' : type === 'annee' ? 'RECORDS DES 12 MOIS' : style.titre}{prete && type !== 'annee' ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
               </div>
               <div style={{ height: 3, background: '#fff', width: 270, marginLeft: vertical ? 'auto' : 'auto', marginRight: vertical ? 'auto' : undefined, marginTop: 14 }} />
-              <div style={{ fontSize: 20, textAlign: vertical ? 'center' : 'right', opacity: 0.85, marginTop: 8 }}>Pyrénées-Orientales{periode ? ` · ${periode}` : ''}</div>
+              <div style={{ fontSize: 20, textAlign: vertical ? 'center' : 'right', opacity: 0.85, marginTop: 8 }}>{type === 'annee' ? 'Perpignan · records de chaque mois (Météo-France)' : `Pyrénées-Orientales${periode ? ` · ${periode}` : ''}`}</div>
             </div>
+
+            {type === 'annee' && (
+              <div style={{ position: 'absolute', left: vertical ? 40 : 610, right: 40, top: hautLignes, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 21 }}>
+                {([{ nom: 'Mois', entete: true } as { nom: string; entete?: boolean; tx?: { v: number; d: string }; tn?: { v: number; d: string }; rr24?: { v: number; d: string } }] as { nom: string; entete?: boolean; tx?: { v: number; d: string }; tn?: { v: number; d: string }; rr24?: { v: number; d: string } }[]).concat(annee).map((m, k) => {
+                  const entete = !!m.entete;
+                  const rec = (r?: { v: number; d: string }, unite = '°C') => (r ? `${r.v.toFixed(1).replace('.', ',')}${unite} (${r.d.slice(0, 4)})` : '—');
+                  const courant = !entete && k === moisNumero;
+                  const col = (txt: string, w: number | null, gras = false) => (
+                    <div style={{ width: w ?? undefined, flex: w == null ? 1 : undefined, textAlign: 'center', fontWeight: gras ? 700 : 500, whiteSpace: 'nowrap' }}>{txt}</div>
+                  );
+                  return (
+                    <div key={m.nom} style={{ display: 'flex', alignItems: 'center', height: HAUTEUR_TABLE, borderRadius: 10, background: entete ? 'rgba(0,0,0,0.35)' : courant ? '#fcdd09' : 'rgba(70,4,8,0.8)', color: courant ? '#7a0a10' : '#fff', padding: '0 10px' }}>
+                      {col(entete ? 'MOIS' : m.nom.toUpperCase(), 150, true)}
+                      {col(entete ? 'CHALEUR' : rec(m.tx), null, entete)}
+                      {col(entete ? 'FROID' : rec(m.tn), null, entete)}
+                      {col(entete ? 'PLUIE EN 24 H' : rec(m.rr24, ' mm'), null, entete)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             <div style={{ position: 'absolute', left: vertical ? 40 : 610, right: 40, top: hautLignes, display: 'flex', flexDirection: 'column', gap: ECART_LIGNES }}>
               {lignes.map((l) => {
@@ -310,7 +360,7 @@ export default function BilanMoisPlanche() {
                       </div>
                     ))}
                     <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 205, background: sl.tuile, color: sl.surTuile, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 46, fontWeight: 800 }}>
-                      {l.type === 'temp' ? signe(l.ecart, 1, '°C') : signe(Math.round(l.ecart), 0, ' %')}
+                      {l.type === 'chaud' ? (l.ecart >= 0 ? 'RECORD !' : signe(l.ecart, 1, '°C')) : l.type === 'froid' ? (l.ecart <= 0 ? 'RECORD !' : signe(l.ecart, 1, '°C')) : l.type === 'temp' ? signe(l.ecart, 1, '°C') : signe(Math.round(l.ecart), 0, ' %')}
                     </div>
                   </div>
                 </div>

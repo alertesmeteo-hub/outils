@@ -219,6 +219,8 @@ export async function GET(req: Request) {
           majA: snap.updatedAt,
           stations: stations.map((s) => [s.id, s.name, s.dept, s.lat!, s.lon!, s.alt ?? null]),
           cartes,
+          // Records de chaque mois, pour la planche « Records des 12 mois » (stations du 66 seulement : la réponse reste légère).
+          recordsStations: Object.fromEntries(stations.filter((s) => s.id.startsWith('66') && records[s.id]?.monthly).map((s) => [s.id, { monthly: records[s.id]!.monthly, absolute: records[s.id]!.absolute }])),
           mois: { affiche: moisAffiche, courant, disponibles },
         },
       };
