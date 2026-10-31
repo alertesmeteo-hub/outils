@@ -12,6 +12,7 @@ export const PAGES_DE_TRAVAIL = [
   { href: '/outils/carte-meteo/tendances-par-theme/', libelle: '🗺️ Tendances par thème' },
   { href: '/outils/pyrenees-orientales/', libelle: 'Pyrénées-Orientales (66)', logo: LOGO_66 },
   { href: '/outils/carte-meteo/bilan-mois/', libelle: 'Bilan du mois (66)', logo: LOGO_66 },
+  { href: '/outils/pyrenees-orientales/#animation', libelle: 'Animations pluie, vent (66)', logo: LOGO_66 },
   { href: '/outils/carte-meteo/animations/', libelle: 'Animations GIF / MP4' },
   { href: '/outils/carte-meteo-info/', libelle: 'Cartes infos' },
   { href: '/outils/carte-meteo-info/?cartes=europe', libelle: 'Europe : isobares' },

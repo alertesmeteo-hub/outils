@@ -11,7 +11,7 @@ export default function MenuLateral() {
     <nav aria-label="Pages de travail" className="sticky top-14 hidden max-h-[calc(100vh-4.5rem)] flex-col gap-0.5 overflow-y-auto pr-1 text-[13px] xl:flex">
       <span className="mb-1 px-2 text-[11px] font-bold uppercase tracking-wide text-muted">Pages de travail</span>
       {PAGES_DE_TRAVAIL.map((x) => {
-        const actif = x.href.split('?')[0].replace(/\/$/, '') === chemin && !x.href.includes('?');
+        const actif = x.href.split('#')[0].split('?')[0].replace(/\/$/, '') === chemin && !x.href.includes('?') && !x.href.includes('#');
         return (
           <Link
             key={x.href}
