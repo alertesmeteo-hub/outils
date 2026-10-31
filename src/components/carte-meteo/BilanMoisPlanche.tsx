@@ -17,8 +17,8 @@ const VILLES = [
   { nom: 'Perpignan', cherche: 'PERPIGNAN' },
 ];
 const DEPARTEMENT = '66';
-/** Fond de carte : le département et ses voisins (Ariège, Aude, Hérault), en grisé. */
-const CODES_CARTE = [DEPARTEMENT, '09', '11', '34'];
+/** Fond de carte : le département seul, pour qu'il remplisse le cadre. */
+const CODES_CARTE = [DEPARTEMENT];
 
 type Type = 'temp' | 'pluie' | 'soleil';
 type Affichage = Type | 'tous';
