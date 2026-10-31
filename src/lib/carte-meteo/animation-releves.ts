@@ -18,6 +18,8 @@ export const HAUT_CARTE = 0;
 /** Hauteur de l'image : carrée, ou verticale 9:16 pour TikTok, Reels et Shorts. */
 export const HAUTEUR_CARRE = COTE_RELEVES;
 export const HAUTEUR_TIKTOK = 1920;
+/** Facebook : portrait 4:5. */
+export const HAUTEUR_FACEBOOK = 1350;
 /** Bas de la carte (au-dessus de la légende) pour une image de hauteur `hauteur`. */
 export const basCarte = (hauteur: number) => hauteur - 64;
 
@@ -314,13 +316,16 @@ export function dessinerReleves({ ctx, echelle, vue, contours, terres, etranger,
 
   // Titre, date et heure (en haut à gauche, sur un cartouche).
   const { jour, heure: h } = heureReleve(heure);
+  const titreCartouche = `${PALETTES[param].titre} · ${nomZone}`;
+  ctx.font = `24px ${POLICE}`;
+  // Le cartouche s'élargit avec le titre (nom de zone long) au lieu de le laisser déborder.
+  const largeurCartouche = Math.min(COTE_RELEVES - 24, Math.max(520, Math.ceil(ctx.measureText(titreCartouche).width) + 44));
   ctx.fillStyle = 'rgba(11,42,74,0.86)';
   ctx.beginPath();
-  ctx.roundRect(12, 12, 520, 132, 12);
+  ctx.roundRect(12, 12, largeurCartouche, 132, 12);
   ctx.fill();
   ctx.fillStyle = '#ffffff';
-  ctx.font = `24px ${POLICE}`;
-  ctx.fillText(`${PALETTES[param].titre} · ${nomZone}`, 28, 44);
+  ctx.fillText(titreCartouche, 28, 44);
   ctx.fillStyle = '#9fd3ff';
   ctx.font = `22px ${POLICE}`;
   ctx.fillText(jour, 28, 76);
