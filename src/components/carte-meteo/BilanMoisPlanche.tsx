@@ -15,8 +15,6 @@ const POLICE = "'Lato', 'Segoe UI', Arial, sans-serif";
 /** Villes du bilan (département 66) : le nom cherché dans celui de la station. */
 const VILLES = [
   { nom: 'Perpignan', cherche: 'PERPIGNAN' },
-  { nom: 'Canet-en-Roussillon', cherche: 'CANETENROUSSILLON' },
-  { nom: 'Eus', cherche: 'EUS' },
 ];
 const DEPARTEMENT = '66';
 /** Fond de carte : le département et ses voisins (Ariège, Aude, Hérault), en grisé. */
