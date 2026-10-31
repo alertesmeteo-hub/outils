@@ -73,10 +73,10 @@ export default async function PagePyreneesOrientales({ searchParams }: { searchP
       </div>
 
       <h2 id="animation" className="mt-12 scroll-mt-4 text-2xl font-extrabold">
-        Animations pluie, vent et températures : Occitanie
+        Animations pluie, vent et températures : Pyrénées-Orientales
       </h2>
       <p className="mt-2 max-w-3xl text-muted">
-        Sur 1 à 5 jours, d&apos;après {infos.libelle} ({infos.fournisseur}) ; la zone se règle sur l&apos;Occitanie ou sur le département. Export en GIF ou en vidéo MP4.
+        Sur 1 à 5 jours, d&apos;après {infos.libelle} ({infos.fournisseur}) ; la zone se règle sur le département, l&apos;Occitanie ou la France. Export en GIF ou en vidéo MP4.
       </p>
       <nav aria-label="Modèle des animations" className="mt-4 flex flex-wrap gap-2">
         {MODELES_ANIMATION.map((id) => {
@@ -94,7 +94,7 @@ export default async function PagePyreneesOrientales({ searchParams }: { searchP
         })}
       </nav>
       {animation ? (
-        <AnimationsMeteo aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} donnees={animation} zoneInitiale="reg:Occitanie" />
+        <AnimationsMeteo aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} donnees={animation} zoneInitiale={`dep:${DEPARTEMENT}`} />
       ) : (
         <p role="alert" className="mt-6 rounded-lg border border-border bg-surface p-4 text-danger">
           Animations momentanément indisponibles. Réessayez dans quelques minutes.

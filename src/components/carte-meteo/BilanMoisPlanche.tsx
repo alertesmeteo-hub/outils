@@ -21,11 +21,14 @@ const DEPARTEMENT = '66';
 const CODES_CARTE = [DEPARTEMENT, '09', '11', '34'];
 
 type Type = 'temp' | 'pluie' | 'soleil';
+type Affichage = Type | 'tous';
 interface Ligne {
   nom: string;
   mesure: number;
   normale: number | null;
   ecart: number;
+  /** Bilan de la ligne (utile quand les trois sont affichés ensemble). */
+  type: Type;
 }
 
 const FONDS: Record<Type, { fond: string; carte: string; case: string; titre: string; unite: string; ecartTexte: string; libelles: [string, string]; tuile: string; surTuile: string }> = {
@@ -64,6 +67,8 @@ const FONDS: Record<Type, { fond: string; carte: string; case: string; titre: st
   },
 };
 
+const TITRES_LIGNE: Record<Type, string> = { temp: 'Températures', pluie: 'Pluviométrie', soleil: 'Ensoleillement' };
+
 const NOMS_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 /** « octobre 2026 » pour « 2026-10 » (extremes-mois.ts est réservé au serveur). */
 const libelleMois = (mois: string) => `${NOMS_MOIS[Number(mois.slice(5, 7)) - 1]} ${mois.slice(0, 4)}`;
@@ -76,7 +81,7 @@ export default function BilanMoisPlanche() {
   const [bilans, setBilans] = useState<ReponseBilans | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [mois, setMois] = useState<string | null>(null);
-  const [type, setType] = useState<Type>('temp');
+  const [type, setType] = useState<Affichage>('tous');
   const [logoId, setLogoId] = useState('alertesmeteo');
   const [facteur, setFacteur] = useState(1);
   const [enExport, setEnExport] = useState(false);
@@ -124,21 +129,25 @@ export default function BilanMoisPlanche() {
 
   const lignes: Ligne[] = useMemo(() => {
     if (!lire) return [];
-    const res: (Ligne | null)[] = lire.stations.map((s) => {
-      if (s.i < 0) return null;
-      const v = (c: string) => lire.valeur(c, s.i);
-      if (type === 'temp') {
+    const ligneDe = (nom: string, i: number, t: Type): Ligne | null => {
+      const v = (c: string) => lire.valeur(c, i);
+      if (t === 'temp') {
         const [tx, tn, ntx, ntn] = [v('txm-mois'), v('tnm-mois'), v('ntx-mois'), v('ntn-mois')];
         if (tx == null || tn == null) return null;
         const mesure = (tx + tn) / 2;
         const ecart = ntx != null && ntn != null ? (ntx + ntn) / 2 : null;
-        return ecart == null ? null : { nom: s.nom, mesure, ecart, normale: mesure - ecart };
+        return ecart == null ? null : { nom, type: t, mesure, ecart, normale: mesure - ecart };
       }
-      const [m, e] = type === 'pluie' ? [v('rr-mois'), v('nrr-mois')] : [v('insol-mois'), v('ninsol-mois')];
+      const [m, e] = t === 'pluie' ? [v('rr-mois'), v('nrr-mois')] : [v('insol-mois'), v('ninsol-mois')];
       if (m == null || e == null) return null;
-      return { nom: s.nom, mesure: m, ecart: e, normale: 1 + e / 100 > 0.01 ? m / (1 + e / 100) : null };
-    });
-    return res.filter((l): l is Ligne => l != null);
+      return { nom, type: t, mesure: m, ecart: e, normale: 1 + e / 100 > 0.01 ? m / (1 + e / 100) : null };
+    };
+    if (type === 'tous') {
+      const s = lire.stations.find((x) => x.i >= 0);
+      if (!s) return [];
+      return (['temp', 'pluie', 'soleil'] as Type[]).map((t) => ligneDe(TITRES_LIGNE[t], s.i, t)).filter((l): l is Ligne => l != null);
+    }
+    return lire.stations.flatMap((s) => (s.i < 0 ? [] : [ligneDe(s.nom, s.i, type)])).filter((l): l is Ligne => l != null);
   }, [lire, type]);
 
   const vue = useMemo(() => {
@@ -146,7 +155,7 @@ export default function BilanMoisPlanche() {
     return boite ? ajusterVue(boite, CARTE, 0.02) : null;
   }, [contours]);
 
-  const style = FONDS[type];
+  const style = FONDS[type === 'tous' ? 'temp' : type];
   const decimales = type === 'temp' ? 1 : 1;
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const periode = bilans?.cartes['rr-mois']?.fenetre.split(' · ')[0] ?? '';
@@ -155,7 +164,7 @@ export default function BilanMoisPlanche() {
     if (!planche.current) return;
     setEnExport(true);
     try {
-      await exporterEnJpg(planche.current, `bilan-${type === 'temp' ? 'temperatures' : type === 'pluie' ? 'pluviometrie' : 'ensoleillement'}-${moisAffiche}-pyrenees-orientales`, LARGEUR, HAUTEUR);
+      await exporterEnJpg(planche.current, `bilan-${type === 'tous' ? 'complet' : type === 'temp' ? 'temperatures' : type === 'pluie' ? 'pluviometrie' : 'ensoleillement'}-${moisAffiche}-pyrenees-orientales`, LARGEUR, HAUTEUR);
     } catch (e) {
       console.error('Export du bilan en JPG', e);
       setErreur("L'export a échoué. Réessayez dans un instant.");
@@ -173,7 +182,7 @@ export default function BilanMoisPlanche() {
         <fieldset>
           <legend className="mb-1 text-sm font-medium">Bilan</legend>
           <div className="flex flex-wrap gap-2">
-            {([['temp', '🌡️ Températures'], ['pluie', '🌧️ Pluviométrie'], ['soleil', '☀️ Ensoleillement']] as [Type, string][]).map(([id, l]) => (
+            {([['tous', '📊 Les trois'], ['temp', '🌡️ Températures'], ['pluie', '🌧️ Pluviométrie'], ['soleil', '☀️ Ensoleillement']] as [Affichage, string][]).map(([id, l]) => (
               <button key={id} type="button" aria-pressed={type === id} className={bouton(type === id)} onClick={() => setType(id)}>
                 {l}
               </button>
@@ -250,32 +259,35 @@ export default function BilanMoisPlanche() {
 
             <div style={{ position: 'absolute', left: 610, right: 40, top: 28 }}>
               <div style={{ fontSize: 50, fontWeight: 800, textAlign: 'right', letterSpacing: 0.5, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
-                {style.titre}{prete ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
+                {type === 'tous' ? 'BILAN DU MOIS' : style.titre}{prete ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
               </div>
               <div style={{ height: 3, background: '#fff', width: 270, marginLeft: 'auto', marginTop: 14 }} />
               <div style={{ fontSize: 20, textAlign: 'right', opacity: 0.85, marginTop: 8 }}>Pyrénées-Orientales{periode ? ` · ${periode}` : ''}</div>
             </div>
 
             <div style={{ position: 'absolute', left: 610, right: 40, top: 190, display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {lignes.map((l) => (
+              {lignes.map((l) => {
+                const sl = FONDS[l.type];
+                return (
                 <div key={l.nom} style={{ display: 'flex', gap: 22, height: 170 }}>
-                  <div style={{ width: 270, background: style.case, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 31, fontWeight: 700, textAlign: 'center', padding: 10 }}>{l.nom.toUpperCase()}</div>
-                  <div style={{ flex: 1, background: style.case, borderRadius: 22, display: 'flex', alignItems: 'center', position: 'relative', paddingRight: 0, overflow: 'hidden' }}>
+                  <div style={{ width: 270, background: sl.case, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 31, fontWeight: 700, textAlign: 'center', padding: 10 }}>{l.nom.toUpperCase()}</div>
+                  <div style={{ flex: 1, background: sl.case, borderRadius: 22, display: 'flex', alignItems: 'center', position: 'relative', paddingRight: 0, overflow: 'hidden' }}>
                     {[
-                      [l.mesure, style.libelles[0]],
-                      [l.normale, style.libelles[1]],
+                      [l.mesure, sl.libelles[0]],
+                      [l.normale, sl.libelles[1]],
                     ].map(([v, lib], k) => (
                       <div key={k} style={{ width: 215, textAlign: 'center', borderLeft: k ? '2px solid rgba(255,255,255,0.3)' : undefined, margin: 0 }}>
-                        <div style={{ fontSize: 42, fontWeight: 700 }}>{v == null ? '—' : `${(v as number).toFixed(decimales)}${style.unite}`}</div>
+                        <div style={{ fontSize: 42, fontWeight: 700 }}>{v == null ? '—' : `${(v as number).toFixed(decimales)}${sl.unite}`}</div>
                         <div style={{ fontSize: 22, fontStyle: 'italic', marginTop: 6 }}>{lib as string}</div>
                       </div>
                     ))}
-                    <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 205, background: style.tuile, color: style.surTuile, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 46, fontWeight: 800 }}>
-                      {type === 'temp' ? signe(l.ecart, 1, '°C') : signe(Math.round(l.ecart), 0, ' %')}
+                    <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 205, background: sl.tuile, color: sl.surTuile, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 46, fontWeight: 800 }}>
+                      {l.type === 'temp' ? signe(l.ecart, 1, '°C') : signe(Math.round(l.ecart), 0, ' %')}
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <div style={{ position: 'absolute', left: 40, right: 40, bottom: 22, borderTop: '2px solid rgba(255,255,255,0.8)', paddingTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 20 }}>
