@@ -37,7 +37,7 @@ const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Animation des relevés horaires des stations Météo-France (température, rafales ou pluie de l'heure) sur 6 à 48 heures :
  * fond coloré lissé et valeur de chaque station, image par image ; export en GIF ou en vidéo.
  */
-export default function AnimationReleves() {
+export default function AnimationReleves({ departementImpose }: { departementImpose?: string } = {}) {
   const [donnees, setDonnees] = useState<ReponseRelevesAnimation | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [param, setParam] = useState<ParametreReleve>('t');
@@ -48,7 +48,7 @@ export default function AnimationReleves() {
   const [i, setI] = useState(0);
   const [lecture, setLecture] = useState(true);
   const [etat, setEtat] = useState<string | null>(null);
-  const zone = useZone('zone-animation-releves');
+  const zone = useZone('zone-animation-releves', departementImpose);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {

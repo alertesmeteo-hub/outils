@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import AnimationReleves from '@/components/carte-meteo/AnimationReleves';
 import Link from 'next/link';
 import AnimationsMeteo from '@/components/carte-meteo/AnimationsMeteo';
 import BilanMoisPlanche from '@/components/carte-meteo/BilanMoisPlanche';
@@ -45,6 +46,7 @@ export default async function PagePyreneesOrientales({ searchParams }: { searchP
           ['#carte', 'Carte du jour'],
           ['#planche', 'Planche et tableau'],
           ['#infos', 'Cartes infos'],
+          ['#animation-releves', 'Relevés animés'],
           ['#animation', 'Animations'],
           ['#bilan', 'Bilan du mois'],
         ].map(([href, libelle]) => (
@@ -70,6 +72,16 @@ export default async function PagePyreneesOrientales({ searchParams }: { searchP
       </h2>
       <div className="mt-6">
         <CartesInfo aujourdhui={aujourdhui} departementInitial={DEPARTEMENT} />
+      </div>
+
+      <h2 id="animation-releves" className="mt-12 scroll-mt-4 text-2xl font-extrabold">
+        Animation des relevés : Pyrénées-Orientales
+      </h2>
+      <p className="mt-2 max-w-3xl text-muted">
+        Températures, rafales ou pluie relevées heure par heure dans les stations Météo-France du département, sur les 6 à 48 dernières heures. Export en GIF ou en vidéo MP4.
+      </p>
+      <div className="mt-6">
+        <AnimationReleves departementImpose={DEPARTEMENT} />
       </div>
 
       <h2 id="animation" className="mt-12 scroll-mt-4 text-2xl font-extrabold">

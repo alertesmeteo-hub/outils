@@ -13,12 +13,13 @@ const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
  * stations trouvent leur place (sur la carte de France, un petit département comme les Pyrénées-Orientales n'en garde
  * que deux ou trois). Le choix est mémorisé dans le navigateur (`cle`).
  */
-export function useZone(cle: string) {
-  const [niveau, setNiveau] = useState<Niveau>('france');
+export function useZone(cle: string, departementImpose?: string) {
+  const [niveau, setNiveau] = useState<Niveau>(departementImpose ? 'departement' : 'france');
   const [region, setRegion] = useState(REGIONS_FR[0]);
-  const [departement, setDepartement] = useState('66');
+  const [departement, setDepartement] = useState(departementImpose ?? '66');
 
   useEffect(() => {
+    if (departementImpose) return;
     try {
       const memo = JSON.parse(localStorage.getItem(cle) ?? 'null') as { niveau?: Niveau; region?: string; departement?: string } | null;
       if (memo?.niveau) setNiveau(memo.niveau);
@@ -27,14 +28,15 @@ export function useZone(cle: string) {
     } catch {
       // Stockage indisponible (navigation privée…) : France par défaut.
     }
-  }, [cle]);
+  }, [cle, departementImpose]);
   useEffect(() => {
+    if (departementImpose) return;
     try {
       localStorage.setItem(cle, JSON.stringify({ niveau, region, departement }));
     } catch {
       // Sans stockage, le choix vaut pour la visite.
     }
-  }, [cle, niveau, region, departement]);
+  }, [cle, niveau, region, departement, departementImpose]);
 
   const zone = niveau === 'france' ? 'france' : niveau === 'region' ? `reg:${region}` : `dep:${departement}`;
   /** Morceau du nom des fichiers exportés : « france », « pyrenees-orientales »… */
