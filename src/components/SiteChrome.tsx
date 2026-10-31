@@ -5,27 +5,27 @@ import ThemeToggle from './ThemeToggle';
 
 export function Header() {
   return (
-    <header className="border-b border-border bg-surface">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 text-lg font-extrabold">
-          <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-[#e00020] text-white">☁</span>
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
+      <div className="mx-auto flex h-11 max-w-[1700px] items-center gap-4 px-4">
+        <Link href="/" className="flex shrink-0 items-center gap-2 text-[15px] font-extrabold">
+          <span aria-hidden className="grid h-7 w-7 place-items-center rounded-md bg-[#e00020] text-sm text-white">☁</span>
           {SITE_NAME}
         </Link>
-        <div className="flex items-center gap-4 text-sm font-medium">
-          <a href="https://secheresse.alertes-meteo.com/" className="hover:underline">Sécheresse</a>
-          <a href="https://alertes-meteo.systeme.io/meteodujour" className="hover:underline">Météo par mail</a>
+        <nav aria-label="Catégories" className="min-w-0 flex-1 overflow-x-auto">
+          <ul className="flex gap-0.5 text-[13px] font-medium">
+            <li><Link href="/outils/" className="block whitespace-nowrap rounded-md px-2.5 py-1.5 hover:bg-bg">Tous les outils</Link></li>
+            <li><Link href="/classements/" className="block whitespace-nowrap rounded-md px-2.5 py-1.5 hover:bg-bg">Classements</Link></li>
+            {categories.map((c) => (
+              <li key={c.slug}><Link href={`/${c.slug}/`} className="block whitespace-nowrap rounded-md px-2.5 py-1.5 hover:bg-bg">{c.name}</Link></li>
+            ))}
+          </ul>
+        </nav>
+        <div className="flex shrink-0 items-center gap-3 text-[13px] font-medium">
+          <a href="https://secheresse.alertes-meteo.com/" className="hidden hover:underline md:inline">Sécheresse</a>
+          <a href="https://alertes-meteo.systeme.io/meteodujour" className="hidden hover:underline md:inline">Météo par mail</a>
           <ThemeToggle />
         </div>
       </div>
-      <nav aria-label="Catégories" className="border-t border-border">
-        <ul className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 py-1 text-sm font-medium">
-          <li><Link href="/outils/" className="block whitespace-nowrap rounded-md px-3 py-2 hover:bg-bg">Tous les outils</Link></li>
-          <li><Link href="/classements/" className="block whitespace-nowrap rounded-md px-3 py-2 hover:bg-bg">Classements</Link></li>
-          {categories.map((c) => (
-            <li key={c.slug}><Link href={`/${c.slug}/`} className="block whitespace-nowrap rounded-md px-3 py-2 hover:bg-bg">{c.name}</Link></li>
-          ))}
-        </ul>
-      </nav>
     </header>
   );
 }

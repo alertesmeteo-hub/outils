@@ -1638,7 +1638,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }
 
   return (
-    <div className="grid items-start gap-4 lg:ml-[calc(50%-50vw+1rem)] lg:w-[calc(100vw-2rem)] lg:grid-cols-[250px_minmax(0,1fr)_250px]">
+    <div className="grid items-start gap-4 lg:grid-cols-[230px_minmax(0,1fr)_230px]">
       <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:order-1">
         <div>
           <p className={titreGroupe}>Thème</p>
