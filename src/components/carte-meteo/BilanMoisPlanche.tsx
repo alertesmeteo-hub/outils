@@ -7,9 +7,16 @@ import type { ReponseBilans } from '@/lib/carte-meteo/cartes-info';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { FICHIERS_CONTOURS, normaliser, useContours } from './CarteMeteo';
 
-const LARGEUR = 1600;
-const HAUTEUR = 860;
-const CARTE = { gauche: 30, haut: 40, droite: 570, bas: HAUTEUR - 110 };
+/** Formats de la planche (pixels de conception, l'export les agrandit) : paysage, 16:9 (YouTube), carré, 4:5 (Facebook), 9:16 (TikTok). */
+const FORMATS = {
+  paysage: { libelle: '🖼️ Paysage', l: 1600, h: 860, vertical: false, ligne: 170 },
+  youtube: { libelle: '▶️ YouTube 16:9', l: 1600, h: 900, vertical: false, ligne: 170 },
+  carre: { libelle: '⬜ Carré 1:1', l: 1080, h: 1080, vertical: true, ligne: 130 },
+  facebook: { libelle: '👍 Facebook 4:5', l: 1080, h: 1350, vertical: true, ligne: 170 },
+  tiktok: { libelle: '📱 TikTok 9:16', l: 1080, h: 1920, vertical: true, ligne: 170 },
+} as const;
+type FormatPlanche = keyof typeof FORMATS;
+const ECART_LIGNES = 24;
 const POLICE = "'Lato', 'Segoe UI', Arial, sans-serif";
 
 /** Villes du bilan (département 66) : le nom cherché dans celui de la station. */
@@ -83,6 +90,8 @@ export default function BilanMoisPlanche() {
   const [mois, setMois] = useState<string | null>(null);
   const [type, setType] = useState<Affichage>('tous');
   const [logoId, setLogoId] = useState('alertesmeteo');
+  const [format, setFormat] = useState<FormatPlanche>('paysage');
+  const { l: LARGEUR, h: HAUTEUR, vertical, ligne: HAUTEUR_LIGNE } = FORMATS[format];
   const [facteur, setFacteur] = useState(1);
   const [enExport, setEnExport] = useState(false);
   const colonne = useRef<HTMLDivElement>(null);
@@ -111,7 +120,7 @@ export default function BilanMoisPlanche() {
     const o = new ResizeObserver(() => setFacteur(Math.min(1, c.clientWidth / LARGEUR)));
     o.observe(c);
     return () => o.disconnect();
-  }, []);
+  }, [LARGEUR]);
 
   const moisAffiche = bilans?.mois?.affiche ?? mois ?? '';
   const prete = !!bilans?.mois;
@@ -150,10 +159,17 @@ export default function BilanMoisPlanche() {
     return lire.stations.flatMap((s) => (s.i < 0 ? [] : [ligneDe(s.nom, s.i, type)])).filter((l): l is Ligne => l != null);
   }, [lire, type]);
 
+  // Disposition : en paysage, la carte à gauche et les lignes à droite ; en portrait ou carré, le titre, la carte, puis les lignes en bas.
+  const blocLignes = Math.max(1, lignes.length) * HAUTEUR_LIGNE + Math.max(0, lignes.length - 1) * ECART_LIGNES;
+  const bas = HAUTEUR - 130;
+  const hautLignes = vertical ? bas - blocLignes : 190;
+  const CARTE = vertical ? { gauche: 40, haut: 215, droite: LARGEUR - 40, bas: hautLignes - 16 } : { gauche: 30, haut: 40, droite: 570, bas: HAUTEUR - 110 };
+
   const vue = useMemo(() => {
     const boite = unirBoites(contours.filter((c) => CODES_CARTE.includes(c.code)).map((c) => c.boite));
     return boite ? ajusterVue(boite, CARTE, 0.02) : null;
-  }, [contours]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contours, CARTE.gauche, CARTE.haut, CARTE.droite, CARTE.bas]);
 
   const style = FONDS[type === 'tous' ? 'temp' : type];
   const decimales = type === 'temp' ? 1 : 1;
@@ -164,7 +180,7 @@ export default function BilanMoisPlanche() {
     if (!planche.current) return;
     setEnExport(true);
     try {
-      await exporterEnJpg(planche.current, `bilan-${type === 'tous' ? 'complet' : type === 'temp' ? 'temperatures' : type === 'pluie' ? 'pluviometrie' : 'ensoleillement'}-${moisAffiche}-pyrenees-orientales`, LARGEUR, HAUTEUR);
+      await exporterEnJpg(planche.current, `bilan-${type === 'tous' ? 'complet' : type === 'temp' ? 'temperatures' : type === 'pluie' ? 'pluviometrie' : 'ensoleillement'}-${moisAffiche}-pyrenees-orientales${format === 'paysage' ? '' : `-${format}`}`, LARGEUR, HAUTEUR);
     } catch (e) {
       console.error('Export du bilan en JPG', e);
       setErreur("L'export a échoué. Réessayez dans un instant.");
@@ -185,6 +201,16 @@ export default function BilanMoisPlanche() {
             {([['tous', '📊 Les trois'], ['temp', '🌡️ Températures'], ['pluie', '🌧️ Pluviométrie'], ['soleil', '☀️ Ensoleillement']] as [Affichage, string][]).map(([id, l]) => (
               <button key={id} type="button" aria-pressed={type === id} className={bouton(type === id)} onClick={() => setType(id)}>
                 {l}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend className="mb-1 text-sm font-medium">Format</legend>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(FORMATS) as FormatPlanche[]).map((id) => (
+              <button key={id} type="button" aria-pressed={format === id} className={bouton(format === id)} onClick={() => setFormat(id)}>
+                {FORMATS[id].libelle}
               </button>
             ))}
           </div>
@@ -259,19 +285,19 @@ export default function BilanMoisPlanche() {
                   })}
             </svg>
 
-            <div style={{ position: 'absolute', left: 610, right: 40, top: 28 }}>
-              <div style={{ fontSize: 50, fontWeight: 800, textAlign: 'right', letterSpacing: 0.5, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
+            <div style={{ position: 'absolute', left: vertical ? 40 : 610, right: 40, top: vertical ? 40 : 28 }}>
+              <div style={{ fontSize: vertical ? 44 : 50, fontWeight: 800, textAlign: vertical ? 'center' : 'right', letterSpacing: 0.5, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
                 {type === 'tous' ? 'BILAN DU MOIS' : style.titre}{prete ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
               </div>
-              <div style={{ height: 3, background: '#fff', width: 270, marginLeft: 'auto', marginTop: 14 }} />
-              <div style={{ fontSize: 20, textAlign: 'right', opacity: 0.85, marginTop: 8 }}>Pyrénées-Orientales{periode ? ` · ${periode}` : ''}</div>
+              <div style={{ height: 3, background: '#fff', width: 270, marginLeft: vertical ? 'auto' : 'auto', marginRight: vertical ? 'auto' : undefined, marginTop: 14 }} />
+              <div style={{ fontSize: 20, textAlign: vertical ? 'center' : 'right', opacity: 0.85, marginTop: 8 }}>Pyrénées-Orientales{periode ? ` · ${periode}` : ''}</div>
             </div>
 
-            <div style={{ position: 'absolute', left: 610, right: 40, top: 190, display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div style={{ position: 'absolute', left: vertical ? 40 : 610, right: 40, top: hautLignes, display: 'flex', flexDirection: 'column', gap: ECART_LIGNES }}>
               {lignes.map((l) => {
                 const sl = FONDS[l.type];
                 return (
-                <div key={l.nom} style={{ display: 'flex', gap: 22, height: 170 }}>
+                <div key={l.nom} style={{ display: 'flex', gap: 22, height: HAUTEUR_LIGNE }}>
                   <div style={{ width: 270, background: sl.case, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 31, fontWeight: 700, textAlign: 'center', padding: 10 }}>{l.nom.toUpperCase()}</div>
                   <div style={{ flex: 1, background: sl.case, borderRadius: 22, display: 'flex', alignItems: 'center', position: 'relative', paddingRight: 0, overflow: 'hidden' }}>
                     {[
