@@ -14,7 +14,8 @@ export const metadata: Metadata = {
   alternates: { canonical: '/outils/carte-meteo/tendances-par-theme/' },
 };
 
-const MODELES_LONGUE_ECHEANCE: ModeleSource[] = ['cep', 'gfs', 'arpege'];
+// Tous les modèles publiés pour toute la France (Harmonie 2 km ne couvre que le 66). Les modèles courts (AROME, Harmonie, ARPEGE) n'ont pas les cartes au-delà de leur échéance.
+const MODELES_LONGUE_ECHEANCE: ModeleSource[] = ['arome', 'harmonie', 'arpege', 'cep', 'gfs'];
 
 export default async function PageTendancesParTheme({ searchParams }: { searchParams: Promise<{ modele?: string }> }) {
   const { modele: demande } = await searchParams;
