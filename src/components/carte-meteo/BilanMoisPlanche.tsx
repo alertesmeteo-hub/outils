@@ -33,37 +33,37 @@ interface Ligne {
 
 const FONDS: Record<Type, { fond: string; carte: string; case: string; titre: string; unite: string; ecartTexte: string; libelles: [string, string]; tuile: string; surTuile: string }> = {
   temp: {
-    fond: 'linear-gradient(135deg, #b9a98d 0%, #6b4a2e 45%, #3a2415 100%)',
-    carte: '#fff1d6',
-    case: 'rgba(48,27,14,0.78)',
+    fond: 'linear-gradient(135deg, #e0242b 0%, #b30f17 50%, #7a0a10 100%)',
+    carte: '#fcdd09',
+    case: 'rgba(70,4,8,0.8)',
     titre: 'BILAN DES TEMPÉRATURES',
     unite: '°C',
-    ecartTexte: '#e8883a',
+    ecartTexte: '#da121a',
     libelles: ['Moyenne', 'Normales'],
     tuile: '#fff',
-    surTuile: '#e8883a',
+    surTuile: '#da121a',
   },
   pluie: {
-    fond: 'linear-gradient(135deg, #3d5a3a 0%, #17301c 50%, #0b1a0f 100%)',
-    carte: '#e2ecd9',
-    case: 'rgba(8,20,10,0.78)',
+    fond: 'linear-gradient(135deg, #b30f17 0%, #8a0b13 50%, #560710 100%)',
+    carte: '#fcdd09',
+    case: 'rgba(50,3,8,0.8)',
     titre: 'BILAN DE LA PLUVIOMÉTRIE',
     unite: ' mm',
-    ecartTexte: '#e8883a',
+    ecartTexte: '#da121a',
     libelles: ['Relevés', 'Normales'],
     tuile: '#fff',
-    surTuile: '#e8883a',
+    surTuile: '#da121a',
   },
   soleil: {
-    fond: 'linear-gradient(135deg, #1f3f94 0%, #2c5d9a 55%, #2a5183 100%)',
-    carte: '#fff1d6',
-    case: 'rgba(8,38,100,0.78)',
+    fond: 'linear-gradient(135deg, #f08a00 0%, #d9461a 50%, #a8101a 100%)',
+    carte: '#fcdd09',
+    case: 'rgba(80,10,6,0.8)',
     titre: 'BILAN DE L’ENSOLEILLEMENT',
     unite: ' h',
-    ecartTexte: '#1a3a8f',
+    ecartTexte: '#da121a',
     libelles: ['Relevés', 'Normales'],
     tuile: '#fff',
-    surTuile: '#1a3a8f',
+    surTuile: '#da121a',
   },
 };
 
@@ -223,6 +223,8 @@ export default function BilanMoisPlanche() {
       <div ref={colonne} className="mt-4 min-w-0">
         <div style={{ height: HAUTEUR * facteur }}>
           <div ref={planche} style={{ width: LARGEUR, height: HAUTEUR, transform: `scale(${facteur})`, transformOrigin: 'top left', background: style.fond, color: '#fff', fontFamily: POLICE, position: 'relative', overflow: 'hidden' }}>
+            {/* Senyera : bandes jaunes et rouges en haut de la planche. */}
+            <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 18, background: 'repeating-linear-gradient(to bottom, #fcdd09 0 2px, #da121a 2px 4px)' }} />
             <svg width={LARGEUR} height={HAUTEUR} style={{ position: 'absolute', left: 0, top: 0 }}>
               {vue && (
                 <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
@@ -234,7 +236,7 @@ export default function BilanMoisPlanche() {
                         key={c.code}
                         d={c.d}
                         fill={c.code === DEPARTEMENT ? style.carte : 'rgba(255,255,255,0.2)'}
-                        stroke={c.code === DEPARTEMENT ? 'rgba(80,60,40,0.5)' : 'rgba(255,255,255,0.4)'}
+                        stroke={c.code === DEPARTEMENT ? 'rgba(120,10,16,0.8)' : 'rgba(255,255,255,0.4)'}
                         strokeWidth={1 / vue.echelle}
                         style={c.code === DEPARTEMENT ? { filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' } : undefined}
                       />
@@ -248,8 +250,8 @@ export default function BilanMoisPlanche() {
                     const p = versEcran(versMonde(s.station![3], s.station![4]), vue);
                     return (
                       <g key={s.nom}>
-                        <circle cx={p.x} cy={p.y} r={5} fill="#3a1f0f" />
-                        <text x={p.x} y={p.y - 12} textAnchor="middle" fontSize={20} fontWeight={700} fill="#3a1f0f" stroke="rgba(255,255,255,0.85)" strokeWidth={4} paintOrder="stroke">
+                        <circle cx={p.x} cy={p.y} r={5} fill="#7a0a10" />
+                        <text x={p.x} y={p.y - 12} textAnchor="middle" fontSize={20} fontWeight={700} fill="#7a0a10" stroke="rgba(255,255,255,0.85)" strokeWidth={4} paintOrder="stroke">
                           {s.nom.toUpperCase()}
                         </text>
                       </g>
