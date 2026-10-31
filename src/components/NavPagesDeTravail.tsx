@@ -1,5 +1,8 @@
 import Link from 'next/link';
 
+/** Logo Météo Pays Catalan, devant les pages du 66 dans les menus. */
+const LOGO_66 = '/logos/meteo-pays-catalan-hd.png';
+
 /** Pages de travail du site (outils de cartes, relevés et records), liées en haut des classements. */
 export const PAGES_DE_TRAVAIL = [
   { href: '/outils/', libelle: 'Tous les outils' },
@@ -7,8 +10,8 @@ export const PAGES_DE_TRAVAIL = [
   { href: '/outils/carte-meteo/16-jours/', libelle: 'Cartes à 16 jours' },
   { href: '/outils/carte-meteo/tendances/', libelle: 'Planches tendances' },
   { href: '/outils/carte-meteo/tendances-par-theme/', libelle: '🗺️ Tendances par thème' },
-  { href: '/outils/pyrenees-orientales/', libelle: 'Pyrénées-Orientales (66)' },
-  { href: '/outils/carte-meteo/bilan-mois/', libelle: 'Bilan du mois (66)' },
+  { href: '/outils/pyrenees-orientales/', libelle: 'Pyrénées-Orientales (66)', logo: LOGO_66 },
+  { href: '/outils/carte-meteo/bilan-mois/', libelle: 'Bilan du mois (66)', logo: LOGO_66 },
   { href: '/outils/carte-meteo/animations/', libelle: 'Animations GIF / MP4' },
   { href: '/outils/carte-meteo-info/', libelle: 'Cartes infos' },
   { href: '/outils/carte-meteo-info/?cartes=europe', libelle: 'Europe : isobares' },
@@ -18,7 +21,7 @@ export const PAGES_DE_TRAVAIL = [
   { href: '/outils/releves-en-direct/', libelle: 'Super tableau des relevés' },
   { href: '/outils/records-temperature/', libelle: 'Records de température' },
   { href: '/outils/nuits-tropicales/', libelle: 'Nuits tropicales' },
-] as const;
+] as { href: string; libelle: string; logo?: string }[];
 
 /** Liens vers toutes les pages de travail, en haut de chacune. */
 export default function NavPagesDeTravail() {
@@ -27,6 +30,10 @@ export default function NavPagesDeTravail() {
       <span className="font-semibold">Pages de travail</span>
       {PAGES_DE_TRAVAIL.map((x) => (
         <Link key={x.href} href={x.href} className="whitespace-nowrap rounded-md border border-border bg-surface px-3 py-1.5 hover:border-primary">
+          {x.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={x.logo} alt="" className="mr-1.5 inline-block h-5 w-5 align-[-4px] object-contain" />
+          ) : null}
           {x.libelle}
         </Link>
       ))}
@@ -41,6 +48,10 @@ export function MenuGauche() {
       <span className="mb-1 px-3 font-semibold">Pages de travail</span>
       {PAGES_DE_TRAVAIL.map((x) => (
         <Link key={x.href} href={x.href} className="rounded-md border border-border bg-surface px-3 py-2 hover:border-primary">
+          {x.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={x.logo} alt="" className="mr-1.5 inline-block h-5 w-5 align-[-4px] object-contain" />
+          ) : null}
           {x.libelle}
         </Link>
       ))}
