@@ -22,6 +22,48 @@ export interface PointJour {
   orage?: number | null;
   neige?: number | null;
   gel?: boolean;
+  /** Valeurs par moment de la journée (matin, après-midi, soirée, nuit) : voir pointDeLaPeriode. */
+  periodes?: Partial<Record<PeriodeJour, ValeursPeriode>>;
+}
+
+export type PeriodeJour = 'matin' | 'apres-midi' | 'soiree' | 'nuit';
+export type PeriodePlanche = PeriodeJour | 'journee' | 'apres-midi-mini-maxi';
+interface ValeursPeriode {
+  t: number | null;
+  rafale: number | null;
+  direction: number | null;
+  code: number | null;
+  nuages: number | null;
+  pluie: number | null;
+  voile?: boolean;
+}
+
+export const PERIODES_PLANCHE: { id: PeriodePlanche; libelle: string }[] = [
+  { id: 'matin', libelle: 'Matin (T° et rafales)' },
+  { id: 'apres-midi', libelle: 'Après-midi (T° et rafales)' },
+  { id: 'apres-midi-mini-maxi', libelle: 'Après-midi avec mini et maxi' },
+  { id: 'journee', libelle: 'Journée (mini / maxi)' },
+  { id: 'soiree', libelle: 'Soirée (T° à 21 h et rafales)' },
+  { id: 'nuit', libelle: 'Nuit (T° mini et rafales)' },
+];
+
+/**
+ * Le point tel qu'il s'affiche pour la période choisie : picto, rafale et température du moment. Une seule température
+ * (rangée en « maxi », ou en « mini » pour la nuit) sauf pour la journée et l'après-midi avec mini et maxi.
+ */
+export function pointDeLaPeriode(p: PointJour, periode: PeriodePlanche): PointJour {
+  if (periode === 'journee' || p.picto) return p;
+  const v = p.periodes?.[periode === 'apres-midi-mini-maxi' ? 'apres-midi' : periode];
+  if (!v) return p;
+  // Modèle à pas de 3 ou 6 h (CEP, GFS loin) : pas assez d'échéances pour le moment demandé, on garde les valeurs de la journée.
+  const ciel = v.code != null || v.nuages != null || v.pluie != null;
+  const temps = {
+    ...(ciel ? { codeJournee: v.code, nuagesJournee: v.nuages, pluieJournee: v.pluie, voileJournee: v.voile } : {}),
+    ...(v.rafale != null ? { rafale: v.rafale, direction: v.direction } : {}),
+  };
+  if (periode === 'apres-midi-mini-maxi') return { ...p, ...temps };
+  if (periode === 'nuit') return { ...p, ...temps, maxi: null, mini: v.t ?? p.mini };
+  return { ...p, ...temps, maxi: v.t, mini: null };
 }
 
 export function versPointJour(p: PointCarte): PointJour | null {
@@ -42,6 +84,12 @@ export function versPointJour(p: PointCarte): PointJour | null {
     orage: p.orageJournee,
     neige: p.neigeJournee,
     gel: p.mini != null && p.mini <= 0,
+    periodes: {
+      matin: { t: p.tempMatin, rafale: p.rafaleMatin, direction: p.directionRafaleMatin, code: p.codeMatin, nuages: p.nuagesMatin, pluie: p.pluieMatin, voile: p.voileMatin },
+      'apres-midi': { t: p.tempApresMidi, rafale: p.rafaleApresMidi, direction: p.directionRafaleApresMidi, code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: p.pluieApresMidi, voile: p.voileApresMidi },
+      soiree: { t: p.tempSoiree ?? null, rafale: p.rafaleSoiree ?? null, direction: p.directionRafaleSoiree ?? null, code: p.codeSoiree ?? null, nuages: p.nuagesSoiree ?? null, pluie: p.pluieSoiree ?? null, voile: p.voileSoiree },
+      nuit: { t: p.tempNuit ?? null, rafale: p.rafaleNuit ?? null, direction: p.directionRafaleNuit ?? null, code: p.codeNuit ?? null, nuages: p.nuagesNuit ?? null, pluie: p.pluieNuit ?? null, voile: p.voileNuit },
+    },
   };
 }
 

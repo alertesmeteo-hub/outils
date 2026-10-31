@@ -12,7 +12,7 @@ import { cheminPictoImage, estPictoImage } from '@/lib/carte-meteo/pictos';
 import { angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
-import { pictoDuJour, pointsParQuart, versPointJour, type PointJour } from '@/lib/carte-meteo/planches-jours';
+import { PERIODES_PLANCHE, pictoDuJour, pointDeLaPeriode, pointsParQuart, versPointJour, type PeriodePlanche, type PointJour } from '@/lib/carte-meteo/planches-jours';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
 import TableauPrevisions, { type CelluleJour, type LigneTableau } from './TableauPrevisions';
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, FICHIERS_CONTOURS } from './CarteMeteo';
@@ -25,8 +25,6 @@ const HAUTEUR_PIED = 44;
 const HAUTEUR_JOUR = 36;
 /** Colonnes de la grille selon le nombre de cartes : 2 cartes côte à côte, 16 cartes en 4 × 4… */
 const COLONNES: Record<number, number> = { 2: 2, 4: 2, 6: 3, 8: 4, 10: 5, 12: 4, 14: 5, 16: 4 };
-/** Rafale (km/h) au-delà de laquelle la pastille de vent s'ajoute au picto. */
-const SEUIL_RAFALE = 80;
 const LARGEUR_TABLEAU_JPG = 1280;
 const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 /** Niveau d'info supplémentaire (réservé à la France) : quatre pictos seulement, un par quart (NO, NE, SO, SE). */
@@ -53,7 +51,7 @@ interface Props {
  * Planches « jours » : un seul JPG avec une carte par jour (2 cartes pour 2 jours, 4 pour 4… 16 pour 16 jours), pour la France, une
  * région ou un département, avec un seul picto par point (le temps de la journée) et ses températures.
  */
-export default function PlanchesJours({ aujourdhui, modele, jours, zoneInitiale = 'france' }: Props) {
+export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france' }: Props) {
   const [dureeChoisie, setDuree] = useState<number>(4);
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
   const [departChoisi, setDepart] = useState(1);
@@ -66,11 +64,18 @@ export default function PlanchesJours({ aujourdhui, modele, jours, zoneInitiale 
   const tableauRef = useRef<HTMLDivElement>(null);
   /** Grosseur de la pastille de rafale (%), plus petite par défaut. */
   const [risques, setRisques] = useState(true);
-  const [tailleRafale, setTailleRafale] = useState(70);
+  const [tailleRafale, setTailleRafale] = useState(115);
+  /** Rafale (km/h) à partir de laquelle la pastille de vent s'ajoute au picto. */
+  const [seuilRafale, setSeuilRafale] = useState(80);
+  const [periode, setPeriode] = useState<PeriodePlanche>('journee');
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState(zoneInitiale);
   const [logoId, setLogoId] = useState('alertesmeteo');
-  const [donneesDep, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
+  const [donneesDepBrutes, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
+  // Valeurs du moment choisi (matin, après-midi…) : pictos, températures, rafales et tableau suivent la période.
+  const auMoment = useMemo(() => (liste: PointJour[] | null | undefined) => (liste ? liste.map((p) => pointDeLaPeriode(p, periode)) : liste), [periode]);
+  const donneesDep = useMemo(() => Object.fromEntries(Object.entries(donneesDepBrutes).map(([k, v]) => [k, auMoment(v) ?? null])), [donneesDepBrutes, auMoment]);
+  const jours = useMemo(() => Object.fromEntries(Object.entries(joursBruts).map(([k, v]) => [k, auMoment(v) ?? null])), [joursBruts, auMoment]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enExport, setEnExport] = useState(false);
   const [facteur, setFacteur] = useState(1);
@@ -148,7 +153,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours, zoneInitiale 
     (async () => {
       for (const date of dates) {
         const cle = `${dep}|${date}`;
-        if (donneesDep[cle] !== undefined) continue;
+        if (donneesDepBrutes[cle] !== undefined) continue;
         try {
           const r = await fetch(`/api/carte-meteo/previsions/?modele=${modele.id}&date=${date}&dep=${dep}`, { signal: controleur.signal });
           const points = r.ok ? ((await r.json()) as { points: PointCarte[] }).points.map(versPointJour).filter((p): p is PointJour => p != null) : null;
@@ -226,7 +231,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours, zoneInitiale 
   const nomZone = parQuarts ? 'France en 4 zones (NO, NE, SO, SE)' : zone === 'france' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const titre = weekEnd ? `MÉTÉO DU WEEK-END : ${nomZone.toUpperCase()}` : `TENDANCE SUR ${duree} JOURS : ${nomZone.toUpperCase()}`;
-  const sousTitre = weekEnd && dates.length === 2 ? `${jourLibelle(dates[0])} ET ${jourLibelle(dates[1])} · ${modele.libelle}` : `DU ${jourLibelle(dates[0])} AU ${jourLibelle(dates[dates.length - 1])} · ${modele.libelle}`;
+  const moment = periode === 'journee' ? '' : ` · ${(PERIODES_PLANCHE.find((x) => x.id === periode)?.libelle ?? '').replace(/ \(.*\)$/, '').toUpperCase()}`;
+  const sousTitre = (weekEnd && dates.length === 2 ? `${jourLibelle(dates[0])} ET ${jourLibelle(dates[1])} · ${modele.libelle}` : `DU ${jourLibelle(dates[0])} AU ${jourLibelle(dates[dates.length - 1])} · ${modele.libelle}`) + moment;
 
   async function exporterTableau() {
     const noeud = tableauRef.current;
@@ -303,8 +309,22 @@ export default function PlanchesJours({ aujourdhui, modele, jours, zoneInitiale 
           Risques : gel, orage, neige
         </label>
         <label className="text-sm font-medium">
-          <span className="mb-1 block">Grosseur des rafales : {tailleRafale} %</span>
-          <input type="range" min={40} max={150} step={10} value={tailleRafale} onChange={(e) => setTailleRafale(Number(e.target.value))} className="block w-40" aria-label="Grosseur de la pastille de rafale en pourcentage" />
+          <span className="mb-1 block">Période</span>
+          <select value={periode} onChange={(e) => setPeriode(e.target.value as PeriodePlanche)} className={selectBarre}>
+            {PERIODES_PLANCHE.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.libelle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Taille des rafales : {tailleRafale} %</span>
+          <input type="range" min={50} max={200} step={5} value={tailleRafale} onChange={(e) => setTailleRafale(Number(e.target.value))} className="block w-40" aria-label="Taille des pastilles de rafale en pourcentage" />
+        </label>
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Rafales à partir de (km/h)</span>
+          <input type="number" min={0} max={200} step={5} value={seuilRafale} onChange={(e) => setSeuilRafale(Math.max(0, Number(e.target.value) || 0))} className={`${selectBarre} w-24`} />
         </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Premier jour</span>
@@ -426,7 +446,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours, zoneInitiale 
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
                           {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: '0.8em' }}> {Math.round(p.mini)}°</span> : null}
                         </span>
-                        {p.rafale != null && p.rafale > SEUIL_RAFALE && (() => {
+                        {p.rafale != null && p.rafale >= seuilRafale && (() => {
                           const kmh = Math.round(p.rafale / 5) * 5;
                           const c = couleurRafale(kmh);
                           const angle = angleFleche(p.direction);
