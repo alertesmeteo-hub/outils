@@ -182,8 +182,6 @@ export default function ObservationsDirect() {
               ))}
             </div>
           </div>
-            ))}
-          </div>
           <CarteInfo
             key={theme.id}
             theme={theme}
