@@ -655,8 +655,8 @@ export function texteInfo(theme: ThemeInfo, v: number): string {
   if (theme.texteValeur) return theme.texteValeur(v);
   const n = theme.decimales ? v.toFixed(theme.decimales).replace('.', ',') : String(Math.round(v));
   const signe = theme.signe && v > 0 ? '+' : '';
-  // Hors températures, « 4,0 j » s'écrit « 4 j ».
-  const nombre = theme.unite === '°' ? n : n.replace(/,0+$/, '');
+  // Un nombre rond s'écrit sans décimale : « 20° », « 4 j » (jamais « 20,0° »).
+  const nombre = n.replace(/,0+$/, '');
   return `${signe}${nombre.replace(/^-0(,0+)?$/, '0')}${theme.unite === '°' ? '°' : ''}`;
 }
 
