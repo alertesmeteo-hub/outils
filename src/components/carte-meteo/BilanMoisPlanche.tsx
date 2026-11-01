@@ -364,7 +364,7 @@ export default function BilanMoisPlanche() {
             </svg>
 
             <div style={{ position: 'absolute', left: vertical ? 40 : 610, right: 40, top: vertical ? 40 : 28 }}>
-              <div style={{ fontSize: vertical ? 44 : 50, fontWeight: 800, textAlign: vertical ? 'center' : 'right', letterSpacing: 0.5, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
+              <div style={{ fontSize: vertical ? 40 : type === 'records' ? 42 : 50, whiteSpace: vertical ? 'normal' : 'nowrap', fontWeight: 800, textAlign: vertical ? 'center' : 'right', letterSpacing: 0.5, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
                 {type === 'tous' ? 'BILAN DU MOIS' : type === 'annee' ? 'RECORDS DES 12 MOIS' : style.titre}{prete && type !== 'annee' ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
               </div>
               <div style={{ height: 3, background: '#fff', width: 270, marginLeft: vertical ? 'auto' : 'auto', marginRight: vertical ? 'auto' : undefined, marginTop: 14 }} />
@@ -385,10 +385,10 @@ export default function BilanMoisPlanche() {
                       <div style={{ fontSize: vertical ? 26 : 30, fontWeight: 800 }}>{l.titre}</div>
                       <div style={{ fontSize: 17, fontStyle: 'italic', opacity: 0.85, marginTop: 4, lineHeight: 1.15 }}>{l.sous}</div>
                     </div>
-                    <div style={{ flex: 1, textAlign: 'center', fontSize: 42, fontWeight: 800 }}>{l.obs}</div>
+                    <div style={{ flex: 1, textAlign: 'center', fontSize: 40, fontWeight: 800, whiteSpace: 'nowrap' }}>{l.obs}</div>
                     <div style={{ flex: 1, textAlign: 'center' }}>
-                      <div style={{ fontSize: 42, fontWeight: 700 }}>{l.record}</div>
-                      {l.annee && <div style={{ fontSize: 19, fontStyle: 'italic', opacity: 0.85 }}>{l.annee}</div>}
+                      <div style={{ fontSize: 40, fontWeight: 700, whiteSpace: 'nowrap' }}>{l.record}</div>
+                      {l.annee && <div style={{ fontSize: 19, fontStyle: 'italic', opacity: 0.85, whiteSpace: 'nowrap' }}>{l.annee}</div>}
                     </div>
                     <div style={{ width: vertical ? 230 : 260, height: 76, borderRadius: 16, background: l.battu ? '#fcdd09' : l.verdict ? '#fff' : 'transparent', color: '#da121a', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: l.battu ? 28 : 26, fontWeight: 800, lineHeight: 1.1, padding: '0 8px' }}>
                       {l.verdict}
