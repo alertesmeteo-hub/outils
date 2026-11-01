@@ -69,6 +69,7 @@ export default function ObservationsDirect() {
             const valeur = table[`${normaliserNom(nom)}|${depStation(dep, lat)}`];
             if (valeur != null) ajoutes.push({ code, nom, dep: depStation(dep, lat), lat, lon, alt, valeur });
           }
+          if (t.id === 'obs-raf24') for (const s of complements.rafales24Ajouts ?? []) ajoutes.push({ code: `mc:${s.nom}`, nom: s.nom, dep: s.dep, lat: s.lat, lon: s.lon, alt: s.alt, valeur: s.valeur });
         } else {
           for (const s of complements.temperatures) ajoutes.push({ code: `mc:${s.nom}`, nom: s.nom, dep: s.dep, lat: s.lat, lon: s.lon, alt: s.alt, valeur: s.valeur });
         }

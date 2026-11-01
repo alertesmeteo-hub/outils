@@ -15,14 +15,18 @@ const AGENT = 'Mozilla/5.0 (compatible; AlertesMeteo-Outils/1.0; +https://outils
 
 /** Stations sans point sur la carte : code Météo-Ciel, nom affiché et position approximative. */
 const STATIONS_T = [
-  { code: '53', nom: 'Perpignan - El Vernet', dep: '66', lat: 42.714, lon: 2.91, alt: 30 },
-  { code: '146', nom: 'Cabestany', dep: '66', lat: 42.688, lon: 2.936, alt: 30 },
+  { code: '53', nom: 'Perpignan - El Vernet', dep: '66', lat: 42.711, lon: 2.89, alt: 30 },
+  { code: '146', nom: 'Cabestany', dep: '66', lat: 42.686, lon: 2.937, alt: 30 },
 ];
+/** Stations du classement des rafales sans point sur la carte (aucune station Météo-France du même nom) : position de la commune. */
+const STATIONS_RAFALES = [{ nom: 'Cerbère', dep: '66', lat: 42.4433, lon: 3.1647, alt: 20 }];
 
 export interface ReponseComplements {
   /** Clé « NOM|dép. » (nom normalisé) → valeur. */
   rafales24: Record<string, number>;
   pluies24: Record<string, number>;
+  /** Rafales sur 24 h des stations du classement qui n'ont pas de point sur la carte (Cerbère). */
+  rafales24Ajouts: { nom: string; dep: string; lat: number; lon: number; alt: number; valeur: number }[];
   temperatures: { nom: string; dep: string; lat: number; lon: number; alt: number; valeur: number; heure: string }[];
   majA: string;
 }
@@ -46,7 +50,8 @@ async function lirePage(chemin: string): Promise<string> {
 /** Lignes « Nom (dép.) | valeur unité » d'un classement. */
 function lireClassement(html: string): Record<string, number> {
   const valeurs: Record<string, number> = {};
-  for (const m of html.matchAll(/<a href='\/temps-reel\/obs_villes\.php\?code2=\d+'>([^<]+?)\s*\((\w{2,3})\)<\/a><\/td><td[^>]*>\s*(-?\d+(?:[.,]\d+)?)\s*(?:km\/h|mm)/g)) {
+  // Le nom peut être en italique ou en gras (<i>Cerbère (66)</i>) : balises ignorées.
+  for (const m of html.matchAll(/<a href='\/temps-reel\/obs_villes\.php\?code2=\d+'>(?:<[^>]+>)*([^<]+?)\s*\((\w{2,3})\)(?:<\/[^>]+>)*<\/a><\/td><td[^>]*>\s*(-?\d+(?:[.,]\d+)?)\s*(?:km\/h|mm)/g)) {
     const dep = m[2] === '20' ? m[2] : m[2].padStart(2, '0');
     valeurs[`${normaliser(m[1])}|${dep}`] = Number(m[3].replace(',', '.'));
   }
@@ -74,7 +79,12 @@ export async function GET() {
       const t = lireTemperature(pagesT[i]);
       return t ? [{ nom: s.nom, dep: s.dep, lat: s.lat, lon: s.lon, alt: s.alt, valeur: t.valeur, heure: t.heure }] : [];
     });
-    const reponse: ReponseComplements = { rafales24: lireClassement(rafales), pluies24: lireClassement(pluies), temperatures, majA: new Date().toISOString() };
+    const rafales24 = lireClassement(rafales);
+    const rafales24Ajouts = STATIONS_RAFALES.flatMap((s) => {
+      const valeur = rafales24[`${normaliser(s.nom)}|${s.dep}`];
+      return valeur == null ? [] : [{ ...s, valeur }];
+    });
+    const reponse: ReponseComplements = { rafales24, pluies24: lireClassement(pluies), rafales24Ajouts, temperatures, majA: new Date().toISOString() };
     cache = { lu: Date.now(), reponse };
     return NextResponse.json(reponse);
   } catch (erreur) {
