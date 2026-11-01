@@ -289,6 +289,8 @@ body {
 .cmap-marqueur-mobile .cmap-picto { cursor: grab; touch-action: none; }
 .cmap-marqueur-mobile:active .cmap-picto { cursor: grabbing; }
 .cmap-marqueur:hover > .cmap-supprimer-survol, .cmap-marqueur:focus-within > .cmap-supprimer-survol { display: block; }
+/* Picto ajouté à la main : croix visible sans survol sur écran tactile seulement. */
+@media (hover: none) { .cmap-marqueur > .cmap-supprimer-tactile { display: block; } }
 /* Croix de suppression d'une rafale : visible au survol de la pastille. */
 .cmap-supprimer-vent { top: -0.45em; left: auto; right: -0.45em; z-index: 3; display: none; }
 .cmap-vent-place:hover .cmap-supprimer-vent, .cmap-vent-place:focus-within .cmap-supprimer-vent { display: block; }
