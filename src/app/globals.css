@@ -326,6 +326,11 @@ body {
 .cinfo-nom { margin-top: 0.12em; font-size: 0.6em; font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 3px #000, 0 0 3px #000; }
 .cinfo-mention { position: absolute; left: 8px; bottom: 3px; z-index: 3; font-size: 10px; line-height: 1; color: rgba(255, 255, 255, 0.8); text-shadow: 0 0 3px #000, 0 0 3px #000; pointer-events: none; }
 .cinfo-encadre { position: absolute; z-index: 3; background: rgba(13, 20, 40, 0.9); border: 2px solid #f5c400; border-radius: 8px; padding: 6px 9px 7px; color: #fff; font-size: 13px; line-height: 1.2; }
+.cinfo-top-rouge { background: rgba(150, 12, 22, 0.96); border-color: #ffd21a; border-width: 3px; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45); }
+.cinfo-top-rouge .cinfo-encadre-titre { color: #ffd21a; }
+.cinfo-top-rouge ol li { font-weight: 700; }
+.cinfo-top-rouge ol li strong { color: #fff; }
+.cinfo-top-rouge ol li em { color: #ffd9d9; }
 .cinfo-encadre-titre { font-family: Impact, 'Arial Narrow', sans-serif; text-transform: uppercase; font-size: 16px; letter-spacing: 0.02em; color: #f5c400; margin-bottom: 4px; }
 .cinfo-encadre ol, .cinfo-encadre ul { list-style: none; margin: 0; padding: 0; }
 .cinfo-encadre ol li { display: flex; justify-content: space-between; gap: 6px; height: 19px; align-items: center; white-space: nowrap; }

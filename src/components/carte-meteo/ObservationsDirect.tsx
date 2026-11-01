@@ -34,6 +34,7 @@ export default function ObservationsDirect() {
   const { bilans, erreur, reessayer } = useBilans();
   const [taille, setTaille] = useState<keyof typeof TAILLES>('tres-grande');
   const [logoId, setLogoId] = useState('aucun');
+  const [echelleTop, setEchelleTop] = useState(2);
   const zone = useZone('zone-observations-en-direct');
   const [themeId, setThemeId] = useState(THEMES_OBS[0]?.id ?? '');
   const [pluieId, setPluieId] = useState(THEMES_PLUIE[0]?.id ?? '');
@@ -99,6 +100,15 @@ export default function ObservationsDirect() {
             <option value="tres-grande">Très grandes</option>
             <option value="extra">Extra</option>
             <option value="extra-plus">Extra+</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Tableau « Les plus fortes »</span>
+          <select value={echelleTop} onChange={(e) => setEchelleTop(Number(e.target.value))} className={selectBarre}>
+            <option value={1}>Taille normale</option>
+            <option value={2}>× 2</option>
+            <option value={3}>× 3</option>
+            <option value={4}>× 4</option>
           </select>
         </label>
         <label className="text-sm font-medium">
@@ -192,6 +202,8 @@ export default function ObservationsDirect() {
             prefixeFichier={`observations-en-direct-${zone.nomFichier}`}
             contexte="Observations des stations Météo-France"
             mention={pointsEtAjouts.nbAjoutes[theme.id] ? 'Stations complémentaires : Météo-Ciel' : ''}
+            echelleTop={echelleTop}
+            topRouge
             echelleValeurs={TAILLES[taille]}
           />
         </div>
@@ -229,6 +241,8 @@ export default function ObservationsDirect() {
             prefixeFichier={`pluie-en-direct-${zone.nomFichier}`}
             contexte="Pluie relevée par les stations Météo-France, normales 1991-2020 et records de chaque station (fiches climatologiques Météo-France)"
             echelleValeurs={TAILLES[taille]}
+            echelleTop={echelleTop}
+            topRouge
           />
         </section>
       )}

@@ -49,6 +49,9 @@ interface Props {
   contexte?: string;
   /** Mention discrète en bas à gauche de la carte (source de valeurs complémentaires). */
   mention?: string;
+  /** Agrandissement du tableau « Les plus fortes » (1 = taille habituelle) et son habillage rouge, bien lisible. */
+  echelleTop?: number;
+  topRouge?: boolean;
   /** Taille des pastilles (1 = normale ; plus petites = plus de valeurs placées sans chevauchement). */
   echelleValeurs?: number;
   /** Picto à poser au-dessus de la pastille de chaque point (identifiant de picto Alertes Météo, par code de point). */
@@ -78,7 +81,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, partValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', echelleTop = 1, topRouge = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, partValeurs = 1 }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -225,12 +228,15 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
 
   const hauteurLegende = 30 + legende.length * 19;
   // Largeur du classement : rang + nom (17 caractères au plus) + département + valeur, en 13 px.
-  const largeurTop = Math.max(
+  const largeurTop0 = Math.max(
     LARGEUR_ENCADRE,
     ...top.map((p) => Math.round(34 + Math.min(17, p.nom.length) * 7 + (enDepartement || theme.maille ? 0 : 30) + texteInfo(theme, p.valeur).length * 9 + (uniteVisible ? 30 : 0)))
   );
   // Titre de l'encadré sur deux lignes s'il dépasse la largeur (≈ 9 px par lettre en 16 px condensé).
-  const hauteurTop = top.length && !theme.sansTop ? 34 + top.length * 19 + (titreTop.length * 9 > largeurTop - 18 ? 18 : 0) : 0;
+  const hauteurTop0 = top.length && !theme.sansTop ? 34 + top.length * 19 + (titreTop.length * 9 > largeurTop0 - 18 ? 18 : 0) : 0;
+  // Agrandi (échelle du tableau) : l'encadré garde sa mise en page et est mis à l'échelle depuis son coin haut-gauche.
+  const largeurTop = Math.round(largeurTop0 * echelleTop);
+  const hauteurTop = Math.round(hauteurTop0 * echelleTop);
   // Sans logo, le titre prend le coin en haut à gauche (sinon : à droite en France, centré en région et en département).
   const titreAGauche = !logoUrl;
   // Bandeau du titre : Impact 32 px (≈ 15,5 px par lettre) et sous-titre 19 px (≈ 10 px par lettre), plus les marges.
@@ -524,7 +530,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         {texteIA.calque}
 
         {hauteurTop > 0 && (
-          <div className="cinfo-encadre" style={{ left: rectTop.x, top: rectTop.y, width: rectTop.w }}>
+          <div className={`cinfo-encadre ${topRouge ? 'cinfo-top-rouge' : ''}`} style={{ left: rectTop.x, top: rectTop.y, width: largeurTop0, ...(echelleTop !== 1 ? { transform: `scale(${echelleTop})`, transformOrigin: '0 0' } : {}) }}>
             <div className="cinfo-encadre-titre">{titreTop}</div>
             <ol>
               {top.map((p, i) => (
