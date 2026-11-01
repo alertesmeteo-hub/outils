@@ -53,7 +53,7 @@ const AUTRES_GRANDES_VILLES: [string, string][] = [
   ['Calvi', '2B'], ['Porto-Vecchio', '2A'], ['Figari', '2A'], ['Perpignan', '66'], ['Toulouse', '31'], ['Lyon', '69'], ['Marseille', '13'], ['Paris', '75'],
 ];
 
-const normaliserNom = (nom: string) =>
+export const normaliserNom = (nom: string) =>
   nom
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

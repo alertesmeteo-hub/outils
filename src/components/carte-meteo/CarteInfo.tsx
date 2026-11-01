@@ -47,6 +47,8 @@ interface Props {
   parRegion?: boolean;
   /** Nature et source des données (texte IA) : « Prévision du modèle AROME (Météo-France) »… */
   contexte?: string;
+  /** Mention discrète en bas à gauche de la carte (source de valeurs complémentaires). */
+  mention?: string;
   /** Taille des pastilles (1 = normale ; plus petites = plus de valeurs placées sans chevauchement). */
   echelleValeurs?: number;
   /** Picto à poser au-dessus de la pastille de chaque point (identifiant de picto Alertes Météo, par code de point). */
@@ -76,7 +78,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, partValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, partValeurs = 1 }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -551,6 +553,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
             ))}
           </div>
         )}
+
+        {mention && <div className="cinfo-mention">{mention}</div>}
 
         <div className="cinfo-encadre" style={{ left: rectLegende.x, top: rectLegende.y, width: rectLegende.w }}>
           <div className="cinfo-encadre-titre">{theme.unite && theme.unite !== '°' && !theme.texteValeur ? `Légende (${theme.unite})` : 'Légende'}</div>

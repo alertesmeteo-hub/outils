@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { GROUPE_OBS, GROUPE_PLUIE_DIRECT, RUBRIQUES_OBS, THEMES_BILAN } from '@/lib/carte-meteo/cartes-info';
-import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
+import { depStation, normaliserNom, pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
+import type { ReponseComplements } from '@/app/api/carte-meteo/complements/route';
 import CarteInfo, { type PointInfo } from './CarteInfo';
 import { useBilans } from './useBilans';
 import ChoixZone, { useZone } from './ChoixZone';
@@ -12,6 +13,8 @@ const THEMES_OBS = THEMES_BILAN.filter((t) => t.groupe === GROUPE_OBS);
 /** Pluie en direct : relevés, cumuls moyens du mois et de l'année, records de 24 h du mois et absolus, battus ? */
 const THEMES_PLUIE = THEMES_BILAN.filter((t) => t.groupe === GROUPE_PLUIE_DIRECT);
 const TAILLES = { petite: 0.8, normale: 1, grande: 1.25, 'tres-grande': 1.5, extra: 1.9, 'extra-plus': 2.4 } as const;
+/** Cartes dont les valeurs manquantes peuvent être complétées (rafales et pluie sur 24 h, température du moment). */
+const THEMES_COMPLETES = ['obs-raf24', 'obs-rr24', 'obs-t'];
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 /** Couleur des boutons de chaque rubrique (bouton choisi : couleur du site). */
 const COULEURS: Record<(typeof RUBRIQUES_OBS)[number], string> = {
@@ -34,17 +37,49 @@ export default function ObservationsDirect() {
   const zone = useZone('zone-observations-en-direct');
   const [themeId, setThemeId] = useState(THEMES_OBS[0]?.id ?? '');
   const [pluieId, setPluieId] = useState(THEMES_PLUIE[0]?.id ?? '');
+  // Valeurs complémentaires importées sur demande (stations sans valeur dans les relevés Météo-France).
+  const [complements, setComplements] = useState<ReponseComplements | null>(null);
+  const [import_, setImport] = useState<{ etat: 'attente' | 'ok' | 'erreur'; n?: number }>({ etat: 'ok' });
+  const importer = async () => {
+    setImport({ etat: 'attente' });
+    try {
+      const r = await fetch('/api/carte-meteo/complements/');
+      if (!r.ok) throw new Error('indisponible');
+      setComplements((await r.json()) as ReponseComplements);
+      setImport({ etat: 'ok' });
+    } catch {
+      setImport({ etat: 'erreur' });
+    }
+  };
 
   /** Points de chaque carte ; les températures sont contrôlées par les stations voisines (pas la pluie ni les rafales). */
-  const points = useMemo(() => {
+  const pointsEtAjouts = useMemo(() => {
     const resultat: Record<string, PointInfo[]> = {};
-    if (!bilans) return resultat;
+    const nbAjoutes: Record<string, number> = {};
+    if (!bilans) return { resultat, nbAjoutes };
     for (const t of [...THEMES_OBS, ...THEMES_PLUIE]) {
       const liste = pointsDuBilan(bilans, t.id);
-      resultat[t.id] = t.obs?.controle ? sansValeursAberrantes(liste) : liste;
+      const ajoutes: PointInfo[] = [];
+      if (complements && THEMES_COMPLETES.includes(t.id)) {
+        const presents = new Set(liste.map((p) => p.code));
+        const table = t.id === 'obs-raf24' ? complements.rafales24 : t.id === 'obs-rr24' ? complements.pluies24 : null;
+        if (table) {
+          for (const [code, nom, dep, lat, lon, alt] of bilans.stations) {
+            if (presents.has(code)) continue;
+            const valeur = table[`${normaliserNom(nom)}|${depStation(dep, lat)}`];
+            if (valeur != null) ajoutes.push({ code, nom, dep: depStation(dep, lat), lat, lon, alt, valeur });
+          }
+        } else {
+          for (const s of complements.temperatures) ajoutes.push({ code: `mc:${s.nom}`, nom: s.nom, dep: s.dep, lat: s.lat, lon: s.lon, alt: s.alt, valeur: s.valeur });
+        }
+      }
+      const toutes = [...liste, ...ajoutes];
+      resultat[t.id] = t.obs?.controle ? sansValeursAberrantes(toutes) : toutes;
+      nbAjoutes[t.id] = ajoutes.filter((a) => resultat[t.id].includes(a)).length;
     }
-    return resultat;
-  }, [bilans]);
+    return { resultat, nbAjoutes };
+  }, [bilans, complements]);
+  const points = pointsEtAjouts.resultat;
 
   const theme = THEMES_OBS.find((t) => t.id === themeId) ?? THEMES_OBS[0];
   const pluie = THEMES_PLUIE.find((t) => t.id === pluieId) ?? THEMES_PLUIE[0];
@@ -75,6 +110,19 @@ export default function ObservationsDirect() {
             ))}
           </select>
         </label>
+        {bilans && (
+          <div className="text-sm">
+            <button type="button" onClick={importer} disabled={import_.etat === 'attente'} className="rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold disabled:opacity-60" title="Complète les rafales et pluies sur 24 h, et les températures de Perpignan - El Vernet et Cabestany">
+              {import_.etat === 'attente' ? 'Import en cours…' : 'Importer les valeurs manquantes'}
+            </button>
+            {complements && import_.etat === 'ok' && (
+              <span className="ml-2 text-muted">
+                {Object.values(pointsEtAjouts.nbAjoutes).reduce((a, b) => a + b, 0)} valeur(s) ajoutée(s) (rafales et pluie sur 24 h, températures).
+              </span>
+            )}
+            {import_.etat === 'erreur' && <span className="ml-2 text-danger">Import momentanément indisponible.</span>}
+          </div>
+        )}
         {bilans?.majA && (
           <p className="text-sm text-muted">
             Observations Météo-France, mise à jour{' '}
@@ -124,6 +172,7 @@ export default function ObservationsDirect() {
             logoId={logoId}
             prefixeFichier={`observations-en-direct-${zone.nomFichier}`}
             contexte="Observations des stations Météo-France"
+            mention={pointsEtAjouts.nbAjoutes[theme.id] ? 'Stations complémentaires : Météo-Ciel' : ''}
             echelleValeurs={TAILLES[taille]}
           />
         </div>
