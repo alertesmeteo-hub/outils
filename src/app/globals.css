@@ -274,7 +274,8 @@ body {
 /* Rafale ajoutée à la main : point d'ancrage (centre de la pastille) ; clic sur la pastille = choix de la direction. */
 .cmap-vent-ajoute { position: absolute; width: 0; height: 0; z-index: 5; line-height: 1; }
 .cmap-vent-ajoute .cmap-vent-place { cursor: pointer; }
-.cmap-vent-ajoute .cmap-supprimer-vent { display: block; }
+/* Croix de la rafale ajoutée : au survol seulement (toujours visible sur écran tactile, sans survol). */
+@media (hover: none) { .cmap-vent-ajoute .cmap-supprimer-vent { display: block; } }
 .cmap-palette-direction { width: auto; left: 0; }
 .cmap-rose { display: grid; grid-template-columns: repeat(3, 44px); gap: 3px; }
 .cmap-palette .cmap-rose button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px; font-size: 11px; font-weight: 700; color: #111; border: 1px solid #e2e8f0; }
