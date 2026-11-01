@@ -9,9 +9,9 @@ const sansAncre = (href: string) => href.split('#')[0].split('?')[0].replace(/\/
 /** Menu vertical à gauche de toutes les pages du site (grands écrans) : rubriques repliables et sous-menus ; la page ouverte est repérée. */
 export default function MenuLateral() {
   const chemin = (usePathname() ?? '').replace(/\/$/, '') || '/';
-  const lien = (actif: boolean) => `flex items-center gap-2 rounded-md px-2 py-1.5 leading-tight ${actif ? 'bg-primary font-semibold text-white' : 'hover:bg-surface'}`;
+  const lien = (actif: boolean) => `flex items-center gap-2 rounded-md px-2 py-2 leading-tight ${actif ? 'bg-primary font-semibold text-white' : 'hover:bg-surface'}`;
   return (
-    <nav aria-label="Pages de travail" className="sticky top-14 hidden max-h-[calc(100vh-4.5rem)] flex-col gap-1 overflow-y-auto pr-1 text-[13px] xl:flex">
+    <nav aria-label="Pages de travail" className="sticky top-14 hidden max-h-[calc(100vh-4.5rem)] flex-col gap-1 overflow-y-auto pr-1 text-[15px] xl:flex">
       <Link href="/outils/" aria-current={chemin === '/outils' ? 'page' : undefined} className={lien(chemin === '/outils')}>
         Tous les outils
       </Link>
@@ -19,7 +19,7 @@ export default function MenuLateral() {
         const dedans = (g.href && sansAncre(g.href) === chemin) || g.pages.some((x) => sansAncre(x.href) === chemin && !x.href.includes('?'));
         return (
           <details key={g.titre} open={k === 0 || dedans} className="group">
-            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-muted hover:bg-surface [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] font-bold uppercase tracking-wide text-muted hover:bg-surface [&::-webkit-details-marker]:hidden">
               <span aria-hidden className="inline-block transition-transform group-open:rotate-90">▸</span>
               {g.logo ? (
                 // eslint-disable-next-line @next/next/no-img-element
