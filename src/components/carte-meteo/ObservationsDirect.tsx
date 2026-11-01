@@ -144,24 +144,44 @@ export default function ObservationsDirect() {
 
       {bilans && theme && (
         <div id="carte-observations" className="mx-auto mt-6 max-w-5xl">
-          <div className="mb-3 grid gap-2">
-            {RUBRIQUES_OBS.map((rubrique) => (
-              <div key={rubrique} className="flex flex-wrap items-center justify-center gap-2">
-                <span className="w-full text-center text-xs font-bold uppercase tracking-wide text-muted sm:w-36 sm:text-right">{rubrique}</span>
-                {THEMES_OBS.filter((t) => t.obs?.rubrique === rubrique).map((t) => (
+          {/* Menu à deux niveaux : la rubrique (onglets), puis les mesures de cette rubrique. */}
+          <div className="mb-4 rounded-xl border border-border bg-surface p-3">
+            <div role="tablist" aria-label="Rubrique" className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {RUBRIQUES_OBS.map((rubrique) => {
+                const active = theme.obs?.rubrique === rubrique;
+                return (
                   <button
-                    key={t.id}
+                    key={rubrique}
                     type="button"
-                    aria-pressed={theme.id === t.id}
-                    onClick={() => setThemeId(t.id)}
-                    className={`rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wide shadow-sm ${
-                      theme.id === t.id ? 'bg-primary text-white' : `${COULEURS[rubrique]} hover:opacity-90`
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setThemeId(THEMES_OBS.find((t) => t.obs?.rubrique === rubrique)?.id ?? themeId)}
+                    className={`rounded-lg px-3 py-2.5 text-sm font-extrabold uppercase tracking-wide transition ${
+                      active ? `${COULEURS[rubrique]} shadow` : 'bg-bg text-muted hover:text-text'
                     }`}
                   >
-                    {t.court}
+                    {rubrique}
+                    <span className="ml-1.5 text-xs font-semibold opacity-70">{THEMES_OBS.filter((t) => t.obs?.rubrique === rubrique).length}</span>
                   </button>
-                ))}
-              </div>
+                );
+              })}
+            </div>
+            <div role="group" aria-label="Mesure" className="mt-3 flex flex-wrap justify-center gap-1.5">
+              {THEMES_OBS.filter((t) => t.obs?.rubrique === theme.obs?.rubrique).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={theme.id === t.id}
+                  onClick={() => setThemeId(t.id)}
+                  className={`rounded-full border px-3.5 py-1.5 text-[13px] font-semibold ${
+                    theme.id === t.id ? 'border-[#e00020] bg-[#e00020] text-white' : 'border-border bg-bg hover:border-[#e00020]'
+                  }`}
+                >
+                  {t.court}
+                </button>
+              ))}
+            </div>
+          </div>
             ))}
           </div>
           <CarteInfo
