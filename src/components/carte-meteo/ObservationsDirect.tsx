@@ -204,6 +204,7 @@ export default function ObservationsDirect() {
             mention={pointsEtAjouts.nbAjoutes[theme.id] ? 'Stations complémentaires : Météo-Ciel' : ''}
             echelleTop={echelleTop}
             topRouge
+            titreDroite
             echelleValeurs={TAILLES[taille]}
           />
         </div>
@@ -243,6 +244,7 @@ export default function ObservationsDirect() {
             echelleValeurs={TAILLES[taille]}
             echelleTop={echelleTop}
             topRouge
+            titreDroite
           />
         </section>
       )}

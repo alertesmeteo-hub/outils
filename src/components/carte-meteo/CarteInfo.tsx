@@ -52,6 +52,8 @@ interface Props {
   /** Agrandissement du tableau « Les plus fortes » (1 = taille habituelle) et son habillage rouge, bien lisible. */
   echelleTop?: number;
   topRouge?: boolean;
+  /** Titre en haut à droite (le tableau « Les plus fortes » reste à gauche). */
+  titreDroite?: boolean;
   /** Taille des pastilles (1 = normale ; plus petites = plus de valeurs placées sans chevauchement). */
   echelleValeurs?: number;
   /** Picto à poser au-dessus de la pastille de chaque point (identifiant de picto Alertes Météo, par code de point). */
@@ -81,7 +83,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', echelleTop = 1, topRouge = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, partValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, partValeurs = 1 }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -230,7 +232,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   // Largeur du classement : rang + nom (17 caractères au plus) + département + valeur, en 13 px.
   const largeurTop0 = Math.max(
     LARGEUR_ENCADRE,
-    ...top.map((p) => Math.round(34 + Math.min(17, p.nom.length) * 7 + (enDepartement || theme.maille ? 0 : 30) + texteInfo(theme, p.valeur).length * 9 + (uniteVisible ? 30 : 0)))
+    // Nom en entier (jamais coupé), valeur en Impact 15 px et unité : marge pour que « 81 km/h » reste dans le cadre.
+    ...top.map((p) => Math.round(40 + Math.min(32, p.nom.length) * 9.5 + (enDepartement || theme.maille ? 0 : 30) + texteInfo(theme, p.valeur).length * 10 + (uniteVisible ? 48 : 0)))
   );
   // Titre de l'encadré sur deux lignes s'il dépasse la largeur (≈ 9 px par lettre en 16 px condensé).
   const hauteurTop0 = top.length && !theme.sansTop ? 34 + top.length * 19 + (titreTop.length * 9 > largeurTop0 - 18 ? 18 : 0) : 0;
@@ -238,17 +241,19 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const largeurTop = Math.round(largeurTop0 * echelleTop);
   const hauteurTop = Math.round(hauteurTop0 * echelleTop);
   // Sans logo, le titre prend le coin en haut à gauche (sinon : à droite en France, centré en région et en département).
-  const titreAGauche = !logoUrl;
+  const titreAGauche = !logoUrl && !titreDroite;
   // Bandeau du titre : Impact 32 px (≈ 15,5 px par lettre) et sous-titre 19 px (≈ 10 px par lettre), plus les marges.
   const largeurTitre = Math.round(Math.max(titre.length * 15.5, sousTitreAffiche.length * 10) + 34);
   const rectTitre: Rect = titreAGauche
     ? { x: MARGE_COLONNE, y: 6, w: largeurTitre, h: 76 }
+    : titreDroite
+      ? { x: largeur - 28 - largeurTitre, y: 6, w: largeurTitre, h: 76 }
     : enFrance
       ? { x: largeur - 28 - 430, y: 6, w: 430, h: 76 }
       : { x: largeur / 2 - 320, y: 6, w: 640, h: 76 };
   const rectTop: Rect = enFrance
     ? { x: largeur - MARGE_COLONNE - largeurTop, y: titreAGauche ? 24 : 96, w: largeurTop, h: hauteurTop }
-    : { x: MARGE_COLONNE, y: logoUrl ? 21 + hauteurLogo + 14 : rectTitre.y + rectTitre.h + 14, w: largeurTop, h: hauteurTop };
+    : { x: MARGE_COLONNE, y: logoUrl ? 21 + hauteurLogo + 14 : titreDroite ? 24 : rectTitre.y + rectTitre.h + 14, w: largeurTop, h: hauteurTop };
   // Seuils comptés (chaleur) : un encadré sous le classement, « N sur M ont atteint ou dépassé … ».
   const comptes = theme.seuils?.map((s) => ({ ...s, n: dansZone.filter((p) => p.valeur >= s.valeur).length })) ?? [];
   const hauteurSeuils = comptes.length ? 30 + comptes.length * 36 : 0;
@@ -465,7 +470,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         logoFondBlanc={logo?.fondBlanc !== false}
         hauteurLogo={hauteurLogo || undefined}
         pied="www.alertes-meteo.com"
-        titreADroite={enFrance && !titreAGauche}
+        titreADroite={(enFrance && !titreAGauche) || titreDroite}
         titreGauche={titreAGauche ? MARGE_COLONNE : undefined}
         moyennes={[]}
         paletteOuvertePour={null}
@@ -536,7 +541,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
               {top.map((p, i) => (
                 <li key={p.code}>
                   <span>
-                    {i + 1}. {p.nom.length > 17 ? `${p.nom.slice(0, 16)}…` : p.nom}
+                    {i + 1}. {p.nom}
                     {!enDepartement && !theme.maille && !parRegion && <em> ({p.dep})</em>}
                   </span>
                   <strong>

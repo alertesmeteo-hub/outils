@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import type { ReponseBilans } from '@/lib/carte-meteo/cartes-info';
+import type { ReponseHistorique } from '@/app/api/carte-meteo/bilan-historique/route';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { FICHIERS_CONTOURS, normaliser, useContours } from './CarteMeteo';
 
@@ -100,6 +101,15 @@ export default function BilanMoisPlanche() {
   const [bilans, setBilans] = useState<ReponseBilans | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [mois, setMois] = useState<string | null>(null);
+  // Mois d'avant l'archive des relevés du site : bilans mensuels de Perpignan de Météo-France (depuis 1950), chargés à part.
+  const [histo, setHisto] = useState<ReponseHistorique | null>(null);
+  const [moisHisto, setMoisHisto] = useState<string | null>(null);
+  useEffect(() => {
+    fetch('/api/carte-meteo/bilan-historique/')
+      .then((r) => (r.ok ? (r.json() as Promise<ReponseHistorique>) : Promise.reject()))
+      .then(setHisto)
+      .catch(() => {});
+  }, []);
   const [type, setType] = useState<Affichage>('tous');
   const [logoId, setLogoId] = useState('alertesmeteo');
   const [format, setFormat] = useState<FormatPlanche>('paysage');
@@ -134,7 +144,7 @@ export default function BilanMoisPlanche() {
     return () => o.disconnect();
   }, [LARGEUR]);
 
-  const moisAffiche = bilans?.mois?.affiche ?? mois ?? '';
+  const moisAffiche = moisHisto ?? bilans?.mois?.affiche ?? mois ?? '';
   const prete = !!bilans?.mois;
 
   /** Station de chaque ville et valeur d'une carte du mois. */
@@ -144,9 +154,31 @@ export default function BilanMoisPlanche() {
       const i = bilans.stations.findIndex((s) => s[2] === DEPARTEMENT && sansTiret(s[1]).includes(v.cherche));
       return { ...v, i, station: i >= 0 ? bilans.stations[i] : null };
     });
-    const valeur = (carte: string, i: number) => bilans.cartes[carte]?.valeurs.find(([k]) => k === i)?.[1] ?? null;
+    const valeurArchive = (carte: string, i: number) => bilans.cartes[carte]?.valeurs.find(([k]) => k === i)?.[1] ?? null;
+    // Mois ancien : valeurs de la station de Perpignan lues dans la base mensuelle ; écarts calculés sur les normales 1991-2020.
+    const h = moisHisto ? histo?.mois[moisHisto] : null;
+    const n = moisHisto ? histo?.normales[String(Number(moisHisto.slice(5, 7)))] : null;
+    const ecart = (v: number | null | undefined, norme: number | null | undefined) => (v == null || norme == null ? null : Math.round((v - norme) * 10) / 10);
+    const pourcent = (v: number | null | undefined, norme: number | null | undefined) => (v == null || norme == null || norme <= 0 ? null : Math.round((v / norme - 1) * 100));
+    const valeur = (carte: string, i: number): number | null => {
+      if (!h || !n) return moisHisto ? null : valeurArchive(carte, i);
+      switch (carte) {
+        case 'txm-mois': return h.tx;
+        case 'tnm-mois': return h.tn;
+        case 'ntx-mois': return ecart(h.tx, n.tx);
+        case 'ntn-mois': return ecart(h.tn, n.tn);
+        case 'tx-mois': return h.txab;
+        case 'tn-mois': return h.tnab;
+        case 'rr-mois': return h.rr;
+        case 'nrr-mois': return pourcent(h.rr, n.rr);
+        case 'insol-mois': return h.insol;
+        case 'ninsol-mois': return pourcent(h.insol, n.insol);
+        case 'raf-mois': return h.raf;
+        default: return null; // records du mois : lus dans les records de la station (recordsStations)
+      }
+    };
     return { stations, valeur };
-  }, [bilans]);
+  }, [bilans, histo, moisHisto]);
 
   const lignes: Ligne[] = useMemo(() => {
     if (!lire) return [];
@@ -252,7 +284,7 @@ export default function BilanMoisPlanche() {
   const style = FONDS[type === 'tous' ? 'temp' : type === 'records' || type === 'annee' ? 'chaud' : type];
   const decimales = type === 'temp' ? 1 : 1;
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
-  const periode = bilans?.cartes['rr-mois']?.fenetre.split(' · ')[0] ?? '';
+  const periode = moisHisto ? '' : (bilans?.cartes['rr-mois']?.fenetre.split(' · ')[0] ?? '');
 
   const exporter = async () => {
     if (!planche.current) return;
@@ -295,12 +327,38 @@ export default function BilanMoisPlanche() {
         </fieldset>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Mois</span>
-          <select value={moisAffiche} onChange={(e) => setMois(e.target.value)} className={selectBarre}>
-            {(bilans?.mois?.disponibles ?? (moisAffiche ? [moisAffiche] : [])).map((m) => (
-              <option key={m} value={m}>
-                {libelleMois(m)}
-              </option>
-            ))}
+          <select
+            value={moisAffiche}
+            onChange={(e) => {
+              const m = e.target.value;
+              // Mois de l'archive du site : relevés de toutes les stations ; plus ancien : base mensuelle de Perpignan.
+              if (bilans?.mois?.disponibles.includes(m)) {
+                setMoisHisto(null);
+                setMois(m);
+              } else setMoisHisto(m);
+            }}
+            className={selectBarre}
+          >
+            <optgroup label="Archive du site">
+              {(bilans?.mois?.disponibles ?? (moisAffiche ? [moisAffiche] : [])).map((m) => (
+                <option key={m} value={m}>
+                  {libelleMois(m)}
+                </option>
+              ))}
+            </optgroup>
+            {histo && (
+              <optgroup label="Anciens mois (Perpignan, Météo-France)">
+                {Object.keys(histo.mois)
+                  .filter((m) => !bilans?.mois?.disponibles.includes(m) && histo.mois[m].tx != null)
+                  .sort()
+                  .reverse()
+                  .map((m) => (
+                    <option key={m} value={m}>
+                      {libelleMois(m)}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
           </select>
         </label>
         <label className="text-sm font-medium">
