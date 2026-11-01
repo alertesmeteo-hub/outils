@@ -398,6 +398,8 @@ interface Props {
   reglages?: { niveau?: Niveau; departement?: string; jour?: number; miniMaxi?: boolean; modele?: ModeleMeteo };
   /** Vignette : seulement la carte et son bouton d'export (page des 16 jours), sans les menus de réglage. */
   compact?: boolean;
+  /** Habillage léger aux couleurs catalanes (page Pyrénées-Orientales). */
+  habillage?: 'catalan' | null;
 }
 
 /** Une sauvegarde par carte de la page (chacune a ses réglages de départ). */
@@ -405,7 +407,7 @@ const cleCarteFigee = (reglages: unknown) => `carte-meteo-figee-v1:${JSON.string
 /** Paramètres mémorisés : un jeu par carte de la page, comme la carte figée. */
 const cleParametres = (reglages: unknown) => `carte-meteo-parametres-v1:${JSON.stringify(reglages ?? {})}`;
 
-export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, reglages, compact = false }: Props) {
+export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, reglages, compact = false, habillage = null }: Props) {
   const idCarte = useId();
   const nom = (base: string) => `${base}-${idCarte}`;
   const [modele, setModele] = useState<ModeleMeteo>(initial?.modele ?? initialVilles?.modele ?? 'arome');
@@ -1566,6 +1568,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       styleCapture={modeCapture}
       pictosEmoji={jeuPictos === 'emoji'}
       theme={theme}
+      habillage={habillage}
       styleVent={styleVent}
       echelleVent={tailleVent / 100}
       couleurTitre={zone === 'dep:66' && !theme ? COULEUR_TITRE_PO : undefined}

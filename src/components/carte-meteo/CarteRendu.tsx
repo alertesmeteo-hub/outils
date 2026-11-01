@@ -241,6 +241,8 @@ interface Props {
   styleCapture?: boolean;
   /** Thème visuel de la carte (fond, couleurs, décors) ; aucun par défaut. */
   theme?: ThemeCarte | null;
+  /** Habillage léger aux couleurs catalanes (bandes de la senyera, cartouche crème) : carte des Pyrénées-Orientales. */
+  habillage?: 'catalan' | null;
   /** Carte en emojis : le ciel voilé (image) prend la taille d'un emoji au lieu de celle des jeux d'images. */
   pictosEmoji?: boolean;
   /** Présentation des rafales (pastille par défaut). */
@@ -443,6 +445,7 @@ export default function CarteRendu({
   styleCapture = false,
   pictosEmoji = false,
   theme = null,
+  habillage = null,
   styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
@@ -563,7 +566,7 @@ export default function CarteRendu({
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
         ref={carteRef}
-        className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''} ${theme ? `cmap-theme cmap-theme-${theme}` : ''}`}
+        className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''} ${theme ? `cmap-theme cmap-theme-${theme}` : ''} ${habillage === 'catalan' ? 'cmap-catalan' : ''}`}
         style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
         onClick={(e) => {
           if (!onClicCarte || (e.target as HTMLElement).closest('.cmap-marqueur, .cmap-palette, .cmap-vent-ajoute')) return;
