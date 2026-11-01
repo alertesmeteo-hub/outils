@@ -19,6 +19,10 @@ type FormatPlanche = keyof typeof FORMATS;
 const ECART_LIGNES = 24;
 /** Hauteur d'une ligne de la table des records des 12 mois. */
 const HAUTEUR_TABLE = 36;
+/** Table « Records du mois » : en-tête, hauteur d'une ligne et écart. */
+const HAUTEUR_ENTETE_REC = 40;
+const HAUTEUR_REC = 108;
+const ECART_REC = 14;
 const POLICE = "'Lato', 'Segoe UI', Arial, sans-serif";
 
 /** Villes du bilan (département 66) : le nom cherché dans celui de la station. */
@@ -169,12 +173,7 @@ export default function BilanMoisPlanche() {
       if (!s) return [];
       return (['temp', 'pluie', 'soleil'] as Type[]).map((t) => ligneDe(TITRES_LIGNE[t], s.i, t)).filter((l): l is Ligne => l != null);
     }
-    if (type === 'records') {
-      const s = lire.stations.find((x) => x.i >= 0);
-      if (!s) return [];
-      return (['chaud', 'froid'] as Type[]).map((t) => ligneDe(TITRES_LIGNE[t], s.i, t)).filter((l): l is Ligne => l != null);
-    }
-    if (type === 'annee') return [];
+    if (type === 'records' || type === 'annee') return [];
     return lire.stations.flatMap((s) => (s.i < 0 ? [] : [ligneDe(s.nom, s.i, type as Type)])).filter((l): l is Ligne => l != null);
   }, [lire, type]);
 
@@ -185,11 +184,61 @@ export default function BilanMoisPlanche() {
     if (!mensuels) return [];
     return NOMS_MOIS.map((nom, k) => ({ nom, ...mensuels[String(k + 1)] }));
   }, [lire, bilans]);
-  const avecDonnees = type === 'annee' ? annee.length > 0 : lignes.length > 0;
   const moisNumero = Number(moisAffiche.slice(5, 7));
+  /** « Records du mois » : maxi, mini, rafales et précipitations de ce mois comparés au record du même mois (Perpignan). */
+  const recordsMois = useMemo(() => {
+    const s = lire?.stations.find((x) => x.i >= 0);
+    if (!s || !lire) return [];
+    const v = (c: string) => lire.valeur(c, s.i);
+    const rec = bilans?.recordsStations?.[s.station![0]]?.monthly?.[String(moisNumero)];
+    const dec = (x: number, u: string) => `${x.toFixed(1).replace('.', ',')}${u}`;
+    const [tx, tn, raf, rr, nrr] = [v('tx-mois'), v('tn-mois'), v('raf-mois'), v('rr-mois'), v('nrr-mois')];
+    const recTx = rec?.tx?.v ?? v('record-mois-tx');
+    const recTn = rec?.tn?.v ?? v('record-mois-tn');
+    const lignesRec: { titre: string; sous: string; obs: string; record: string; annee: string; verdict: string; battu: boolean }[] = [
+      {
+        titre: 'MAXIMALE',
+        sous: 'la plus chaude du mois',
+        obs: tx == null ? '—' : dec(tx, '°C'),
+        record: recTx == null ? '—' : dec(recTx, '°C'),
+        annee: rec?.tx ? rec.tx.d.slice(0, 4) : '',
+        verdict: tx == null || recTx == null ? '—' : tx >= recTx ? 'RECORD BATTU !' : `${signe(Math.round((tx - recTx) * 10) / 10, 1, '°C')} du record`,
+        battu: tx != null && recTx != null && tx >= recTx,
+      },
+      {
+        titre: 'MINIMALE',
+        sous: 'la plus froide du mois',
+        obs: tn == null ? '—' : dec(tn, '°C'),
+        record: recTn == null ? '—' : dec(recTn, '°C'),
+        annee: rec?.tn ? rec.tn.d.slice(0, 4) : '',
+        verdict: tn == null || recTn == null ? '—' : tn <= recTn ? 'RECORD BATTU !' : `${signe(Math.round((tn - recTn) * 10) / 10, 1, '°C')} du record`,
+        battu: tn != null && recTn != null && tn <= recTn,
+      },
+      {
+        titre: 'RAFALES',
+        sous: 'la plus forte du mois',
+        obs: raf == null ? '—' : `${Math.round(raf)} km/h`,
+        record: '—',
+        annee: '',
+        verdict: '',
+        battu: false,
+      },
+      {
+        titre: 'PRÉCIPITATIONS',
+        sous: 'cumul du mois · record sur 24 h',
+        obs: rr == null ? '—' : `${Math.round(rr)} mm`,
+        record: rec?.rr24 ? dec(rec.rr24.v, ' mm') : '—',
+        annee: rec?.rr24 ? `${rec.rr24.d.slice(0, 4)} · en 24 h` : '',
+        verdict: nrr == null ? '' : `${signe(Math.round(nrr), 0, ' %')} / normale`,
+        battu: false,
+      },
+    ];
+    return rec || tx != null ? lignesRec : [];
+  }, [lire, bilans, moisNumero]);
+  const avecDonnees = type === 'annee' ? annee.length > 0 : type === 'records' ? recordsMois.length > 0 : lignes.length > 0;
 
   // Disposition : en paysage, la carte à gauche et les lignes à droite ; en portrait ou carré, le titre, la carte, puis les lignes en bas.
-  const blocLignes = type === 'annee' ? 13 * HAUTEUR_TABLE + 12 * 4 : Math.max(1, lignes.length) * HAUTEUR_LIGNE + Math.max(0, lignes.length - 1) * ECART_LIGNES;
+  const blocLignes = type === 'records' ? HAUTEUR_ENTETE_REC + ECART_REC + 4 * HAUTEUR_REC + 3 * ECART_REC : type === 'annee' ? 13 * HAUTEUR_TABLE + 12 * 4 : Math.max(1, lignes.length) * HAUTEUR_LIGNE + Math.max(0, lignes.length - 1) * ECART_LIGNES;
   const bas = HAUTEUR - 130;
   const hautLignes = vertical ? bas - blocLignes : 190;
   const CARTE = vertical ? { gauche: 40, haut: 215, droite: LARGEUR - 40, bas: hautLignes - 16 } : { gauche: 30, haut: 40, droite: 570, bas: HAUTEUR - 110 };
@@ -319,8 +368,35 @@ export default function BilanMoisPlanche() {
                 {type === 'tous' ? 'BILAN DU MOIS' : type === 'annee' ? 'RECORDS DES 12 MOIS' : style.titre}{prete && type !== 'annee' ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
               </div>
               <div style={{ height: 3, background: '#fff', width: 270, marginLeft: vertical ? 'auto' : 'auto', marginRight: vertical ? 'auto' : undefined, marginTop: 14 }} />
-              <div style={{ fontSize: 20, textAlign: vertical ? 'center' : 'right', opacity: 0.85, marginTop: 8 }}>{type === 'annee' ? 'Perpignan · records de chaque mois (Météo-France)' : `Pyrénées-Orientales${periode ? ` · ${periode}` : ''}`}</div>
+              <div style={{ fontSize: 20, textAlign: vertical ? 'center' : 'right', opacity: 0.85, marginTop: 8 }}>{type === 'annee' ? 'Perpignan · records de chaque mois (Météo-France)' : type === 'records' ? 'Perpignan · comparé aux records du même mois (Météo-France)' : `Pyrénées-Orientales${periode ? ` · ${periode}` : ''}`}</div>
             </div>
+
+            {type === 'records' && (
+              <div style={{ position: 'absolute', left: vertical ? 40 : 610, right: 40, top: hautLignes, display: 'flex', flexDirection: 'column', gap: ECART_REC }}>
+                <div style={{ display: 'flex', alignItems: 'center', height: HAUTEUR_ENTETE_REC, borderRadius: 12, background: 'rgba(0,0,0,0.35)', padding: '0 18px', fontSize: 20, fontWeight: 800, letterSpacing: 1 }}>
+                  <div style={{ width: vertical ? 230 : 270 }} />
+                  <div style={{ flex: 1, textAlign: 'center' }}>CE MOIS-CI</div>
+                  <div style={{ flex: 1, textAlign: 'center' }}>RECORD DU MOIS</div>
+                  <div style={{ width: vertical ? 230 : 260, textAlign: 'center' }}>RÉSULTAT</div>
+                </div>
+                {recordsMois.map((l) => (
+                  <div key={l.titre} style={{ display: 'flex', alignItems: 'center', height: HAUTEUR_REC, borderRadius: 18, background: 'rgba(70,4,8,0.8)', padding: '0 18px' }}>
+                    <div style={{ width: vertical ? 230 : 270 }}>
+                      <div style={{ fontSize: vertical ? 26 : 30, fontWeight: 800 }}>{l.titre}</div>
+                      <div style={{ fontSize: 17, fontStyle: 'italic', opacity: 0.85, marginTop: 4, lineHeight: 1.15 }}>{l.sous}</div>
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'center', fontSize: 42, fontWeight: 800 }}>{l.obs}</div>
+                    <div style={{ flex: 1, textAlign: 'center' }}>
+                      <div style={{ fontSize: 42, fontWeight: 700 }}>{l.record}</div>
+                      {l.annee && <div style={{ fontSize: 19, fontStyle: 'italic', opacity: 0.85 }}>{l.annee}</div>}
+                    </div>
+                    <div style={{ width: vertical ? 230 : 260, height: 76, borderRadius: 16, background: l.battu ? '#fcdd09' : l.verdict ? '#fff' : 'transparent', color: '#da121a', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: l.battu ? 28 : 26, fontWeight: 800, lineHeight: 1.1, padding: '0 8px' }}>
+                      {l.verdict}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {type === 'annee' && (
               <div style={{ position: 'absolute', left: vertical ? 40 : 610, right: 40, top: hautLignes, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 21 }}>
