@@ -1,5 +1,5 @@
 // Fond de carte Europe des isobares (/outils/carte-meteo-info/, catégorie Europe) : terres et frontières terrestres de
-// Natural Earth 1:50m (domaine public), réduites au cadre de la carte et arrondies à 0,05°.
+// Natural Earth 1:50m (domaine public), réduites au cadre de la carte et arrondies à 0,01°.
 // Usage : node scripts/europe-geo.mjs <ne_50m_land.geojson> <ne_50m_admin_0_boundary_lines_land.geojson>
 // Écrit public/geo/europe.json : { terres: [[lon, lat, lon, lat, …], …], frontieres: [[…], …] }.
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const [fichierTerres, fichierFrontieres] = process.argv.slice(2);
 if (!fichierTerres || !fichierFrontieres) throw new Error('Fichiers Natural Earth manquants');
 const CADRE = { ouest: -42, est: 56, sud: 26, nord: 77 };
-const PAS = 0.05;
+const PAS = 0.01;
 const arrondi = (v) => Math.round(v / PAS) * PAS;
 const dedans = ([lon, lat]) => lon >= CADRE.ouest && lon <= CADRE.est && lat >= CADRE.sud && lat <= CADRE.nord;
 const borne = ([lon, lat]) => [Math.min(CADRE.est, Math.max(CADRE.ouest, lon)), Math.min(CADRE.nord, Math.max(CADRE.sud, lat))];
