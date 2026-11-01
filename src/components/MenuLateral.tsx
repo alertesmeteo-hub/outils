@@ -15,6 +15,27 @@ const PAGES = new Map(GROUPES_DE_PAGES.flatMap((g) => g.pages.map((x) => [x.href
 export default function MenuLateral() {
   const chemin = (usePathname() ?? '').replace(/\/$/, '') || '/';
   const [favoris, setFavoris] = useState<string[]>([]);
+  // Section de la page actuellement à l'écran (liens du menu en #ancre) : suit le défilement et les clics.
+  const [ancre, setAncre] = useState<string | null>(null);
+  useEffect(() => {
+    const ids = GROUPES_DE_PAGES.flatMap((g) => g.pages).filter((x) => x.href.includes('#') && sansAncre(x.href) === chemin).map((x) => x.href.split('#')[1]);
+    setAncre(null);
+    if (ids.length === 0) return;
+    const visibles = new Set<string>();
+    const choisir = () => setAncre(ids.find((id) => visibles.has(id)) ?? null);
+    const observateur = new IntersectionObserver(
+      (entrees) => {
+        for (const e of entrees) (e.isIntersecting ? visibles.add(e.target.id) : visibles.delete(e.target.id));
+        choisir();
+      },
+      { rootMargin: '-15% 0px -65% 0px' }
+    );
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) observateur.observe(el);
+    }
+    return () => observateur.disconnect();
+  }, [chemin]);
   useEffect(() => {
     try {
       const memo = JSON.parse(localStorage.getItem(CLE_FAVORIS) ?? '[]') as unknown;
@@ -57,7 +78,7 @@ export default function MenuLateral() {
       </button>
     </li>
   );
-  const estActif = (href: string) => !href.includes('#') && !href.includes('?') && sansAncre(href) === chemin;
+  const estActif = (href: string) => (href.includes('#') ? sansAncre(href) === chemin && href.split('#')[1] === ancre : !href.includes('?') && sansAncre(href) === chemin);
 
   return (
     <nav aria-label="Pages de travail" className="sticky top-14 hidden max-h-[calc(100vh-4.5rem)] flex-col gap-1 overflow-y-auto pr-1 text-[15px] xl:flex">
@@ -90,7 +111,7 @@ export default function MenuLateral() {
             <ul className="ml-3 mt-0.5 flex flex-col gap-0.5 border-l border-border pl-2">
               {g.href && (
                 <li className="flex items-center">
-                  <Link href={g.href} aria-current={sansAncre(g.href) === chemin ? 'page' : undefined} className={lien(sansAncre(g.href) === chemin)}>
+                  <Link href={g.href} aria-current={sansAncre(g.href) === chemin && !ancre ? 'page' : undefined} className={lien(sansAncre(g.href) === chemin && !ancre)}>
                     Vue d&apos;ensemble
                   </Link>
                 </li>
