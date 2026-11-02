@@ -353,7 +353,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
     if (code != null && code >= 95) return code >= 96 ? 'am:orage-grele' : mm >= 2 ? 'am:orage-pluie' : ciel < 75 ? 'am:averse-orageuse' : 'am:orage';
     const precipite = mm >= 0.3;
     const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
-    if (neige && precipite) return mm >= 3 ? 'am:forte-neige' : ciel < 75 ? 'am:averses-neige' : 'am:neige';
+    if (neige) return mm >= 3 ? 'am:forte-neige' : ciel < 75 ? 'am:averses-neige' : 'am:neige';
     if ((code === 45 || code === 48) && !precipite) return e.nuit ? 'am:nuit-brouillard' : 'am:brouillard';
     if (precipite) {
       if (mm >= 8) return 'am:forte-pluie';
@@ -374,7 +374,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
     if (code != null && code >= 95) return code >= 96 ? 'mc:thunderstorms-hail' : mm >= 2 ? 'mc:thunderstorms-rain' : 'mc:thunderstorms-day';
     const precipite = mm >= 0.3;
     const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
-    if (neige && precipite) return mm >= 3 ? 'mc:extreme-snow' : ciel < 75 ? 'mc:partly-cloudy-day-snow' : 'mc:overcast-snow';
+    if (neige) return mm >= 3 ? 'mc:extreme-snow' : ciel < 75 ? 'mc:partly-cloudy-day-snow' : 'mc:overcast-snow';
     if ((code === 45 || code === 48) && !precipite) return 'mc:fog';
     if (precipite) {
       if (mm >= 8) return 'mc:extreme-day-rain';
@@ -392,7 +392,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
   if (code != null && code >= 95) return images ? (code >= 96 ? 'img:26' : 'img:12') : '⛈️';
   const precipite = (pluie ?? 0) >= 0.3;
   const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
-  if (neige && precipite) return images ? ((pluie ?? 0) >= 3 ? 'img:16' : 'img:13') : '🌨️';
+  if (neige) return images ? ((pluie ?? 0) >= 3 ? 'img:16' : 'img:13') : '🌨️';
   if ((code === 45 || code === 48) && !precipite) return images ? 'img:3' : '🌫️';
 
   const ciel = nuages ?? 50;
