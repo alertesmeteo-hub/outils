@@ -220,7 +220,7 @@ function repartir<T extends { lat: number; lon: number }>(liste: T[], n: number)
  */
 const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[]; exactes?: string[]; centres?: Record<string, [number, number]>; altitudes?: Record<string, number> }> = {
   '66': {
-    garder: ['Ille-sur-Têt', 'Bourg-Madame', 'Le Barcarès', 'Saint-Cyprien', 'Rivesaltes'],
+    garder: ['Ille-sur-Têt', 'Bourg-Madame', 'Prats-de-Mollo-la-Preste', 'Le Barcarès', 'Saint-Cyprien', 'Rivesaltes'],
     ecarter: ['Corbère', 'Osséja', 'Caudiès-de-Fenouillèdes'],
     exactes: ['Prats-de-Mollo-la-Preste', 'Banyuls-sur-Mer'],
     centres: { 'Prats-de-Mollo-la-Preste': [42.4044, 2.4794], 'Banyuls-sur-Mer': [42.4833, 3.1289] },
