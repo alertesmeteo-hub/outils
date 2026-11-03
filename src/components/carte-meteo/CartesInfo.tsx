@@ -938,8 +938,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           )}
           {groupesAffiches.map((g) => (
             <section key={g.groupe} className="mt-8">
-              <h2 className="border-b border-border pb-1 text-xl font-extrabold">{nomGroupe(g.groupe)}</h2>
-              <div className="mt-4 grid grid-cols-1 gap-8 xl:grid-cols-2">
+              <h2 className={`border-b border-border pb-1 text-xl font-extrabold ${uneCarte ? 'mx-auto max-w-[1100px]' : ''}`}>{nomGroupe(g.groupe)}</h2>
+              <div className={`mt-4 grid grid-cols-1 gap-8 ${uneCarte ? 'mx-auto max-w-[1100px]' : 'xl:grid-cols-2'}`}>
                 {g.themes.map((theme) => (
                   <div key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">
                     {mode === 'prevision' && (theme as ThemePrevision).cumulJours ? (
