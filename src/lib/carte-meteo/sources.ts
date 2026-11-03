@@ -500,6 +500,51 @@ export async function chargerZonesTendances(modele: ModeleSource, debutISO: stri
   return sortie;
 }
 
+/**
+ * Découpage automatique : chaque département en `n` zones (regroupement k-means des communes du modèle, initialisé du plus éloigné
+ * au plus éloigné), une valeur par zone d'après la commune la plus proche de son centre. Pour la carte de pluie seulement :
+ * le point ne porte que le cumul de la période (pas de picto), pour garder la page légère.
+ */
+export async function chargerZonesAutomatiques(modele: ModeleSource, debutISO: string, durees: number[], n: number): Promise<Record<number, PointTendance[] | null>> {
+  const resultats = await enParallele(CODES_DEPARTEMENTS, CONCURRENCE, (dep) => extraitDepartement(modele, dep));
+  const sortie: Record<number, PointTendance[]> = Object.fromEntries(durees.map((d) => [d, []]));
+  let echecs = 0;
+  resultats.forEach((r, i) => {
+    const dep = CODES_DEPARTEMENTS[i];
+    if (r.status === 'rejected') {
+      echecs++;
+      return;
+    }
+    const vus = new Set<string>();
+    const communes = [...r.value.villes, ...r.value.montagne].filter((v) => !vus.has(v.code) && vus.add(v.code));
+    if (communes.length === 0) return;
+    const k = Math.min(n, communes.length);
+    // Centres de départ : la commune la plus à l'ouest, puis à chaque fois la plus éloignée des centres déjà pris.
+    let centres = [communes.reduce((a, b) => (b.lon < a.lon ? b : a))].map((v) => ({ lat: v.lat, lon: v.lon }));
+    while (centres.length < k) {
+      const loin = communes.reduce((a, b) => (Math.min(...centres.map((c) => distance(c, b))) > Math.min(...centres.map((c) => distance(c, a))) ? b : a));
+      centres.push({ lat: loin.lat, lon: loin.lon });
+    }
+    let groupes: Ville[][] = [];
+    for (let tour = 0; tour < 12; tour++) {
+      groupes = centres.map(() => []);
+      for (const v of communes) groupes[centres.reduce((m, c, j) => (distance(c, v) < distance(centres[m], v) ? j : m), 0)].push(v);
+      centres = centres.map((c, j) => (groupes[j].length ? { lat: groupes[j].reduce((s, v) => s + v.lat, 0) / groupes[j].length, lon: groupes[j].reduce((s, v) => s + v.lon, 0) / groupes[j].length } : c));
+    }
+    const nomDep = DEPARTEMENTS_FR[dep] ?? dep;
+    centres.forEach((c, j) => {
+      if (!groupes[j].length) return;
+      const ville = groupes[j].reduce((a, b) => (distance(c, b) < distance(c, a) ? b : a));
+      for (const duree of durees) {
+        const p = pointDepuisSerie(dep, nomDep, ville.serie, debutISO, ajouterJours(debutISO, duree - 1));
+        sortie[duree].push({ code: `${dep}-z${j + 1}`, nom: `${nomDep} (zone ${j + 1})`, ville: ville.nom, lat: c.lat, lon: c.lon, pluiePeriode: p.pluiePeriode, pictoPeriode: null } as unknown as PointTendance);
+      }
+    });
+  });
+  if (echecs === CODES_DEPARTEMENTS.length) throw new Error(`${LIBELLES[modele]} : aucun département disponible`);
+  return sortie;
+}
+
 /** Séries de pluie et de vent des départements, pas à pas, pour les animations (images toutes les 1 ou 3 heures). */
 export interface SeriesAnimation {
   /** Échéances (ISO UTC) et durée de chaque pas (heures). */

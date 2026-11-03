@@ -40,9 +40,12 @@ interface Props {
   periodes: Record<number, PointTendance[] | null>;
   /** Pyrénées-Orientales en 10 zones, par durée (carte de pluie) ; null si indisponible. */
   zones66?: Record<number, PointTendance[] | null> | null;
+  /** Départements découpés automatiquement en `nbZones` zones (carte de pluie) ; null / 0 si non demandé. */
+  zonesAuto?: Record<number, PointTendance[] | null> | null;
+  nbZones?: number;
 }
 
-export default function PlanchesTendances({ aujourdhui, modele, periodes, zones66 }: Props) {
+export default function PlanchesTendances({ aujourdhui, modele, periodes, zones66, zonesAuto, nbZones = 0 }: Props) {
   const [themeId, setThemeId] = useState<(typeof THEMES_TENDANCES)[number]['id']>('pluie');
   // Pictos du temps dominant : retirés d'office sur la carte Pluie (les valeurs restent lisibles), proposés sur les autres.
   const [sansPictos, setSansPictos] = useState<Record<string, boolean>>({ pluie: true });
@@ -62,6 +65,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
   const [moyenneRegions, setMoyenneRegions] = useState(false);
   // Carte de pluie : les Pyrénées-Orientales découpées en 10 zones (région '66' = ce découpage).
   const enZones66 = region === 'zones-66' && themeId === 'pluie' && !!zones66;
+  const enZonesAuto = !enZones66 && themeId === 'pluie' && !!zonesAuto && nbZones > 0;
   const regionCarte = region === 'zones-66' ? '' : region;
   const parRegion = moyenneRegions && !region;
   // Pictos changés à la main : « thème|durée|code » → picto ('' = retiré).
@@ -78,11 +82,11 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
   const cartes = useMemo(
     () =>
       DUREES_TENDANCES.map((duree) => {
-        const source = enZones66 ? zones66![duree] : periodes[duree];
+        const source = enZones66 ? zones66![duree] : enZonesAuto ? zonesAuto![duree] : periodes[duree];
         const points: PointInfo[] = [];
         const pictos: Record<string, string> = {};
         for (const p of source ?? []) {
-          if (!enZones66 && MASQUES_FRANCE.has(p.code)) continue;
+          if (!enZones66 && MASQUES_FRANCE.has(p.code.split('-')[0])) continue;
           const coords = p.lat != null && p.lon != null ? { lat: p.lat, lon: p.lon } : COORDS_DEPARTEMENTS[p.code];
           const brute = themeBase.valeur(p);
           // Pluie au-delà de 20 mm et rafales : arrondies de 5 en 5 (mm, km/h).
@@ -90,7 +94,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
           if (!coords || v == null || !Number.isFinite(v)) continue;
           if (themeId === 'rafales' && v < seuilRafales) continue;
           if (themeId === 'pluie' && v < seuilPluie) continue;
-          points.push({ code: p.code, nom: p.nom, dep: enZones66 ? '66' : p.code, lat: coords.lat, lon: coords.lon, valeur: v, direction: themeBase.direction?.(p) ?? null });
+          points.push({ code: p.code, nom: p.nom, dep: enZones66 ? '66' : enZonesAuto ? p.code.split('-')[0] : p.code, lat: coords.lat, lon: coords.lon, valeur: v, direction: themeBase.direction?.(p) ?? null });
           if (p.pictoPeriode) pictos[p.code] = p.pictoPeriode;
         }
         for (const code of Object.keys(pictos)) {
@@ -123,7 +127,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
         }
         return { duree, points, pictos, valeursDepartements: undefined, theme: { ...themeBase, titre: reglage.titre(duree) } };
       }),
-    [periodes, zones66, enZones66, themeBase, reglage, themeId, surcharges, parRegion, seuilRafales, seuilPluie]
+    [periodes, zones66, zonesAuto, enZones66, enZonesAuto, themeBase, reglage, themeId, surcharges, parRegion, seuilRafales, seuilPluie]
   );
 
   const appliquer = (picto: string) => {
@@ -262,6 +266,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
                   points={points}
                   valeursDepartements={valeursDepartements}
                   parRegion={parRegion}
+                  zonesParDepartement={enZonesAuto ? nbZones : 1}
                   pictos={avecPictos ? pictos : undefined}
                   decalagesPictos={Object.fromEntries(Object.entries(decalages).filter(([k]) => k.startsWith(`${themeId}|${duree}|`)).map(([k, v]) => [k.split('|')[2], v]))}
                   onPictoMove={(code, dx, dy) => setDecalages((d) => ({ ...d, [`${themeId}|${duree}|${code}`]: [dx, dy] }))}

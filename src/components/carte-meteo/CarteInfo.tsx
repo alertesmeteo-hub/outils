@@ -66,6 +66,8 @@ interface Props {
   decalagesPictos?: Record<string, [number, number]>;
   /** Valeurs (bulles) déplaçables à la main : décalage en px par point, et rappel appelé pendant le glissement. */
   decalagesValeurs?: Record<string, [number, number]>;
+  /** Découpage automatique : nombre de zones par département (plusieurs points par département en vue France). */
+  zonesParDepartement?: number;
   onValeurMove?: (code: string, dx: number, dy: number) => void;
   onPictoMove?: (code: string, dx: number, dy: number) => void;
   /** Part du nombre maximal de valeurs affichées (1 = tout ce qui tient ; 0,22 = l'essentiel). */
@@ -88,7 +90,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, partValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1 }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -307,8 +309,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   // « Toutes les stations » : pastilles plus petites pour en placer le plus possible.
   const taille = Math.round((theme.toutes ? (enFrance ? 10 : 13) : enFrance ? 16 : enDepartement ? 19 : 17) * echelleValeurs * 10) / 10;
   // partValeurs = 0 : aucune valeur sur la carte.
-  const plafond = partValeurs === 0 ? 0 : Math.max(4, Math.round((theme.toutes ? 500 : PLAFOND[niveau]) * partValeurs));
-  const parDepartementMax = theme.toutes ? Infinity : PAR_DEPARTEMENT[niveau];
+  const plafond = partValeurs === 0 ? 0 : Math.max(4, Math.round((theme.toutes ? 500 : PLAFOND[niveau] * zonesParDepartement) * partValeurs));
+  const parDepartementMax = theme.toutes ? Infinity : PAR_DEPARTEMENT[niveau] * zonesParDepartement;
   const avecFleche = (p: PointInfo) => p.direction != null && Number.isFinite(p.direction);
 
   const places = useMemo(() => {

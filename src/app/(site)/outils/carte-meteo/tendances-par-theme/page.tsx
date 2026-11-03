@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import PlanchesTendances from '@/components/carte-meteo/PlanchesTendances';
 import { aujourdhuiParis, DUREES_TENDANCES, estModele, MODELES, type ModeleSource } from '@/lib/carte-meteo/previsions-modeles';
-import { chargerPrevisionsTendances, chargerZonesTendances, type PointTendance } from '@/lib/carte-meteo/sources';
+import { chargerPrevisionsTendances, chargerZonesAutomatiques, chargerZonesTendances, type PointTendance } from '@/lib/carte-meteo/sources';
 
 // La date « du jour » doit être celle de la requête ; les fichiers de prévisions sont mis en cache côté serveur.
 export const dynamic = 'force-dynamic';
@@ -17,18 +17,21 @@ export const metadata: Metadata = {
 // Tous les modèles publiés pour toute la France (Harmonie 2 km ne couvre que le 66). Les modèles courts (AROME, Harmonie, ARPEGE) n'ont pas les cartes au-delà de leur échéance.
 const MODELES_LONGUE_ECHEANCE: ModeleSource[] = ['arome', 'harmonie', 'arpege', 'cep', 'gfs'];
 
-export default async function PageTendancesParTheme({ searchParams }: { searchParams: Promise<{ modele?: string }> }) {
-  const { modele: demande } = await searchParams;
+export default async function PageTendancesParTheme({ searchParams }: { searchParams: Promise<{ modele?: string; zones?: string }> }) {
+  const { modele: demande, zones: zonesDemandees } = await searchParams;
+  const nbZones = [2, 3, 4, 5, 6].includes(Number(zonesDemandees)) ? Number(zonesDemandees) : 0;
   const modele: ModeleSource = estModele(demande ?? null) && MODELES_LONGUE_ECHEANCE.includes(demande as ModeleSource) ? (demande as ModeleSource) : 'cep';
   const infos = MODELES.find((m) => m.id === modele)!;
   const aujourdhui = aujourdhuiParis();
 
   let periodes: Record<number, PointTendance[] | null> = {};
   let zones66: Record<number, PointTendance[] | null> | null = null;
+  let zonesAuto: Record<number, PointTendance[] | null> | null = null;
   let erreur = false;
   try {
     periodes = await chargerPrevisionsTendances(modele, aujourdhui, [...DUREES_TENDANCES]);
     // Les 10 zones des Pyrénées-Orientales (carte de pluie) : un échec ne bloque pas le reste de la page.
+    if (nbZones) zonesAuto = await chargerZonesAutomatiques(modele, aujourdhui, [...DUREES_TENDANCES], nbZones).catch(() => null);
     zones66 = await chargerZonesTendances(modele, aujourdhui, [...DUREES_TENDANCES]).catch(() => null);
   } catch (e) {
     console.error('Cartes de tendance par thème indisponibles', modele, e);
@@ -63,13 +66,27 @@ export default async function PageTendancesParTheme({ searchParams }: { searchPa
         })}
       </nav>
 
+      <nav aria-label="Découpage en zones (carte de pluie)" className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium">Carte de pluie, zones par département :</span>
+        {[0, 2, 3, 4, 5, 6].map((n) => (
+          <Link
+            key={n}
+            href={`/outils/carte-meteo/tendances-par-theme/?modele=${modele}${n ? `&zones=${n}` : ''}`}
+            aria-current={n === nbZones ? 'page' : undefined}
+            className={`rounded-full border px-3 py-1 font-semibold ${n === nbZones ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+          >
+            {n ? `${n} zones` : 'Départements'}
+          </Link>
+        ))}
+      </nav>
+
       {erreur ? (
         <p role="alert" className="mt-8 rounded-lg border border-border bg-surface p-4 text-danger">
           Prévisions momentanément indisponibles. Réessayez dans quelques minutes.
         </p>
       ) : (
         <div className="mt-6">
-          <PlanchesTendances aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} periodes={periodes} zones66={zones66} />
+          <PlanchesTendances aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} periodes={periodes} zones66={zones66} zonesAuto={zonesAuto} nbZones={zonesAuto ? nbZones : 0} />
         </div>
       )}
 
