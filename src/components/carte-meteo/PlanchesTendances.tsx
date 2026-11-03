@@ -43,6 +43,8 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   const [avecPictos, setAvecPictos] = useState(true);
   /** Carte Rafales : valeurs affichées à partir de ce seuil (km/h), 0 = toutes. */
   const [seuilRafales, setSeuilRafales] = useState(0);
+  /** Carte Pluie : valeurs affichées à partir de ce seuil (mm), 0 = toutes ; 10 mm par défaut. */
+  const [seuilPluie, setSeuilPluie] = useState(10);
   const [logoId, setLogoId] = useState('alertesmeteo');
   const [taille, setTaille] = useState(1);
   const [region, setRegion] = useState('');
@@ -74,6 +76,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           const v = brute == null ? brute : themeId === 'pluie' && brute > 20 ? Math.round(brute / 5) * 5 : themeId === 'rafales' ? Math.round(brute / 5) * 5 : brute;
           if (!coords || v == null || !Number.isFinite(v)) continue;
           if (themeId === 'rafales' && v < seuilRafales) continue;
+          if (themeId === 'pluie' && v < seuilPluie) continue;
           points.push({ code: p.code, nom: p.nom, dep: p.code, lat: coords.lat, lon: coords.lon, valeur: v, direction: themeBase.direction?.(p) ?? null });
           if (p.pictoPeriode) pictos[p.code] = p.pictoPeriode;
         }
@@ -107,7 +110,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
         }
         return { duree, points, pictos, valeursDepartements: undefined, theme: { ...themeBase, titre: reglage.titre(duree) } };
       }),
-    [periodes, themeBase, reglage, themeId, surcharges, parRegion, seuilRafales]
+    [periodes, themeBase, reglage, themeId, surcharges, parRegion, seuilRafales, seuilPluie]
   );
 
   const appliquer = (picto: string) => {
@@ -146,6 +149,12 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           <label className="text-sm font-medium">
             <span className="mb-1 block">Rafales à partir de (km/h)</span>
             <input type="number" min={0} max={200} step={5} value={seuilRafales} onChange={(e) => setSeuilRafales(Math.max(0, Number(e.target.value) || 0))} className={`${selectBarre} w-24`} />
+          </label>
+        )}
+        {themeId === 'pluie' && (
+          <label className="text-sm font-medium">
+            <span className="mb-1 block">Pluie à partir de (mm)</span>
+            <input type="number" min={0} max={500} step={5} value={seuilPluie} onChange={(e) => setSeuilPluie(Math.max(0, Number(e.target.value) || 0))} className={`${selectBarre} w-24`} />
           </label>
         )}
         <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
