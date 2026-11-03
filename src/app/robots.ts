@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
-import { SITE_URL } from '@/lib/config';
 
+// Site privé (mot de passe) : aucun moteur de recherche ni robot n'a le droit d'explorer quoi que ce soit.
 export default function robots(): MetadataRoute.Robots {
-  return { rules: { userAgent: '*', allow: '/', disallow: ['/admin/', '/api/', '/embed/', '/prompts-meteo/'] }, sitemap: `${SITE_URL}/sitemap.xml` };
+  return { rules: { userAgent: '*', disallow: '/' } };
 }

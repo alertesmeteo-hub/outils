@@ -6,6 +6,8 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+  // Site privé : aucune indexation, aucune copie en cache chez les moteurs.
+  { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive, nosnippet' },
 ];
 // Next.js a besoin de scripts/styles inline ; à durcir avec des nonces si besoin.
 const csp = (frameAncestors) =>

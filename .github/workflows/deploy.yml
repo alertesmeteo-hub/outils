@@ -105,7 +105,7 @@ jobs:
         run: |
           code=000
           for i in 1 2 3 4 5 6 7 8; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' https://outils.alertes-meteo.com/outils/carte-meteo/ || true)
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://outils.alertes-meteo.com/acces/ || true)
             [ "$code" = "200" ] && { echo "Site en ligne (200)"; exit 0; }
             sleep 5
           done

@@ -4,6 +4,7 @@ import { toolRegistry } from '@/lib/tools/registry';
 import { getOverrides } from '@/lib/tools/resolve';
 import { getCategory } from '@/lib/tools/categories';
 import { saveOverride } from './actions';
+import { lireDemandes } from '@/lib/acces-demandes';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Administration', robots: { index: false, follow: false } };
@@ -11,6 +12,7 @@ export const metadata: Metadata = { title: 'Administration', robots: { index: fa
 export default async function Admin() {
   const hasDb = !!getDb();
   const ov = await getOverrides();
+  const demandes = await lireDemandes();
   return (
     <>
       <h1 className="text-3xl font-extrabold">Administration</h1>
@@ -18,6 +20,24 @@ export default async function Admin() {
         Textes SEO, FAQ, CTA, sources et activation des outils. Les champs vides reprennent la valeur du code. Les champs de formulaire, les calculs et les catégories
         se modifient dans <code>src/lib/tools</code> (voir <code>docs/ADD_TOOL.md</code>).
       </p>
+      <section className="card mt-6 p-4">
+        <h2 className="text-xl font-bold">Demandes d&apos;accès au site ({demandes.length})</h2>
+        {demandes.length === 0 ? (
+          <p className="mt-2 text-muted">Aucune demande pour l&apos;instant.</p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {demandes.slice(0, 50).map((d) => (
+              <li key={d.date + d.email} className="border-t border-border pt-3 first:border-0 first:pt-0">
+                <p className="font-semibold">
+                  {d.nom} — <a href={`mailto:${d.email}`} className="underline">{d.email}</a>
+                  <span className="ml-2 text-sm font-normal text-muted">{new Date(d.date).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}</span>
+                </p>
+                {d.message && <p className="mt-1 whitespace-pre-wrap text-sm">{d.message}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       {!hasDb && (
         <p role="alert" className="card mt-4 border-danger p-4">
           Aucune base de données (<code>DATABASE_URL</code> absente) : l’édition est désactivée. Le site fonctionne avec les valeurs du code.
