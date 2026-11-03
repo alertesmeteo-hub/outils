@@ -55,6 +55,14 @@ const libelleMoisCourt = (m: string) => {
   return nom.charAt(0).toUpperCase() + nom.slice(1);
 };
 
+/** « DU MAR. 3 NOV. 18 H AU MER. 4 NOV. 18 H » : fenêtre de N heures qui commence maintenant (heure de Paris, arrondie à l'heure). */
+const fenetreDepuisMaintenant = (heures: number) => {
+  const fmt = (ms: number) =>
+    new Date(ms).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', timeZone: 'Europe/Paris' }).replace(':00', '').replace(/\s+/g, ' ').toUpperCase();
+  const debut = Math.round(Date.now() / 3_600_000) * 3_600_000;
+  return `DU ${fmt(debut)} H AU ${fmt(debut + heures * 3_600_000)} H`;
+};
+
 /** Rubrique de la carte « l'essentiel » à partir d'un thème (prévision ou bilan). */
 const rubrique = (themes: ThemeInfo[], id: string, libelle: string, icone: string, points: Record<string, PointInfo[]>): RubriqueSynthese => ({
   libelle,
@@ -139,6 +147,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [groupeChoisi, setGroupeChoisi] = useState(uneCarte ? 'Températures' : 'tous');
   const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
   const [recherche, setRecherche] = useState('');
+  const [filtreGroupe, setFiltreGroupe] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
   const [climatCommunes, setClimatCommunes] = useState<{ dep: string; communes: ClimatCommune[] } | null>(null);
   const [erreurClimat, setErreurClimat] = useState<string | null>(null);
@@ -441,7 +450,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   useEffect(() => {
     if (carteEffective && carteEffective.groupe !== groupeChoisi) setGroupeChoisi(carteEffective.groupe);
   }, [carteEffective, groupeChoisi]);
-  const resultatsRecherche = uneCarte ? tousThemes.filter((t) => normaliser(`${t.titre} ${t.court} ${t.groupe}`).includes(normaliser(recherche))) : [];
+  const resultatsRecherche = uneCarte ? tousThemes.filter((t) => (!filtreGroupe || t.groupe === filtreGroupe) && normaliser(`${t.titre} ${t.court} ${t.groupe}`).includes(normaliser(recherche))) : [];
   /** Nom affiché d'un groupe : le bilan du mois porte le nom du mois choisi (« Octobre 2026 »). */
   const nomGroupe = (groupe: string) => (groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe);
   const avecSynthese = !uneCarte && mode !== 'climat' && (groupeChoisi === 'tous' || groupeChoisi === ESSENTIEL);
@@ -734,24 +743,47 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 <span className={legendeBarre}>Rechercher une carte</span>
                 <input type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="ex. neige, rafales, maxi, pluie…" className={`${selectBarre} w-full`} />
               </label>
-              <ul className="mt-1 max-h-56 overflow-auto rounded-lg border border-border bg-surface">
-                {resultatsRecherche.length === 0 && <li className="px-3 py-2 text-muted">Aucune carte ne correspond.</li>}
-                {resultatsRecherche.map((t) => (
-                  <li key={t.id}>
-                    <button
-                      type="button"
-                      aria-pressed={t.id === carteEffective?.id}
-                      onClick={() => {
-                        setCarteChoisie(t.id);
-                        setGroupeChoisi(t.groupe);
-                      }}
-                      className={`flex w-full items-baseline justify-between gap-3 px-3 py-1.5 text-left ${t.id === carteEffective?.id ? 'bg-primary text-white' : 'hover:bg-bg'}`}
-                    >
-                      <span>{t.court}</span>
-                      <small className="opacity-70">{nomGroupe(t.groupe)}</small>
-                    </button>
-                  </li>
+              <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Thème">
+                {[{ groupe: '' }, ...groupes].map((g) => (
+                  <button
+                    key={g.groupe || 'tous'}
+                    type="button"
+                    aria-pressed={filtreGroupe === g.groupe}
+                    onClick={() => setFiltreGroupe(g.groupe)}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${filtreGroupe === g.groupe ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+                  >
+                    {g.groupe ? nomGroupe(g.groupe) : 'Tous'}
+                  </button>
                 ))}
+              </div>
+              <ul className="mt-2 max-h-72 overflow-auto rounded-lg border border-border bg-surface">
+                {resultatsRecherche.length === 0 && <li className="px-3 py-2 text-muted">Aucune carte ne correspond.</li>}
+                {groupes.map((g) => {
+                  const dansGroupe = resultatsRecherche.filter((t) => t.groupe === g.groupe);
+                  if (dansGroupe.length === 0) return null;
+                  return (
+                    <li key={g.groupe}>
+                      <p className="sticky top-0 bg-bg px-3 py-1 text-xs font-bold uppercase tracking-wide text-muted">{nomGroupe(g.groupe)}</p>
+                      <ul>
+                        {dansGroupe.map((t) => (
+                          <li key={t.id}>
+                            <button
+                              type="button"
+                              aria-pressed={t.id === carteEffective?.id}
+                              onClick={() => {
+                                setCarteChoisie(t.id);
+                                setGroupeChoisi(t.groupe);
+                              }}
+                              className={`block w-full px-3 py-1.5 text-left ${t.id === carteEffective?.id ? 'bg-primary text-white' : 'hover:bg-bg'}`}
+                            >
+                              {t.court}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -977,7 +1009,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
                         sousTitre={
-                          (theme as ThemePrevision).periode
+                          (theme as ThemePrevision).fenetreHeures
+                            ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!)
+                            : (theme as ThemePrevision).periode
                             ? (theme as ThemePrevision).montagne
                               ? `${sousTitrePeriode} · 1 000 M ET PLUS`
                               : sousTitrePeriode

@@ -100,6 +100,9 @@ export interface PointCarte {
   ressentiMin?: number | null;
   /** Cumuls de pluie (mm) sur 3, 5, 10 et 16 jours à partir du jour demandé (null si la série ne couvre pas la période),
    * et dernière échéance prise en compte (ISO UTC). Absents des anciennes réponses. */
+  /** Pluie (mm) dans les 24 et 36 prochaines heures, à partir de maintenant (pas de minuit). */
+  pluie24h?: number | null;
+  pluie36h?: number | null;
   pluie3j?: number | null;
   pluie5j?: number | null;
   pluie10j?: number | null;
@@ -309,13 +312,19 @@ function cumulsPluie(
   dateISO: string
 ): Pick<
   PointCarte,
-  | 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'finPrevision'
+  | 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'pluie24h' | 'pluie36h' | 'finPrevision'
   | 'rafale3j' | 'rafale5j' | 'rafale10j' | 'rafale16j' | 'directionRafale3j' | 'directionRafale5j' | 'directionRafale10j' | 'directionRafale16j'
 > {
   const debut = minuitParis(dateISO);
+  // Fenêtres glissantes depuis l'instant présent : pluie des 24 et 36 prochaines heures.
+  const maintenant = Date.now();
+  const c24 = cumulEntre(serie, maintenant, maintenant + 24 * 3_600_000);
+  const c36 = cumulEntre(serie, maintenant, maintenant + 36 * 3_600_000);
   const [c3, c5, c10, c16] = DUREES_CUMUL.map((jours) => cumulEntre(serie, debut, debut + jours * 86_400_000));
   const [r3, r5, r10, r16] = DUREES_CUMUL.map((jours) => rafaleEntre(serie, debut, debut + jours * 86_400_000));
   return {
+    pluie24h: c24.valeur,
+    pluie36h: c36.valeur,
     pluie3j: c3.valeur,
     pluie5j: c5.valeur,
     pluie10j: c10.valeur,
