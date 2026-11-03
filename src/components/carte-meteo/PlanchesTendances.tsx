@@ -213,6 +213,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
                 {n.libelle}
               </option>
             ))}
+            <option value={0}>Aucune (pas de valeurs)</option>
           </select>
         </label>
         <label className="text-sm font-medium">
@@ -265,7 +266,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
                     setChoix({ duree, code });
                   }}
                   echelleValeurs={taille / Math.sqrt(NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1)}
-                  partValeurs={NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part}
+                  partValeurs={niveauDetail === 0 ? 0 : NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part}
                   sousTitre={`DU ${jourCourt(aujourdhui)} AU ${jourCourt(fin)} · ${modele.libelle}`}
                   bandeau={bandeau}
                   logoId={logoId}

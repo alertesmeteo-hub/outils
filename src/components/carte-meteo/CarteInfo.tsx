@@ -306,12 +306,13 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
 
   // « Toutes les stations » : pastilles plus petites pour en placer le plus possible.
   const taille = Math.round((theme.toutes ? (enFrance ? 10 : 13) : enFrance ? 16 : enDepartement ? 19 : 17) * echelleValeurs * 10) / 10;
-  const plafond = Math.max(4, Math.round((theme.toutes ? 500 : PLAFOND[niveau]) * partValeurs));
+  // partValeurs = 0 : aucune valeur sur la carte.
+  const plafond = partValeurs === 0 ? 0 : Math.max(4, Math.round((theme.toutes ? 500 : PLAFOND[niveau]) * partValeurs));
   const parDepartementMax = theme.toutes ? Infinity : PAR_DEPARTEMENT[niveau];
   const avecFleche = (p: PointInfo) => p.direction != null && Number.isFinite(p.direction);
 
   const places = useMemo(() => {
-    if (contoursDep.length === 0) return [];
+    if (contoursDep.length === 0 || plafond === 0) return [];
     // Températures relevées (stations) : la station de la grande ville du département d'abord (Paris-Montsouris, Lyon-Bron,
     // Perpignan…), placée en priorité ; sinon la plus marquante. Le classement garde, lui, les vrais extrêmes.
     const grandesVilles = new Set(
