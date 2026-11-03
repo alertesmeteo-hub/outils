@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { COOKIE_ACCES, cleAcces, egalSur } from '@/lib/acces';
+import { SITE_URL } from '@/lib/config';
 
 /**
  * 1. Robots : moteurs de recherche, collecteurs SEO et robots d'entraînement d'IA reçoivent un 403 (sauf robots.txt, qui leur interdit tout).
@@ -58,8 +59,8 @@ export async function middleware(req: NextRequest) {
     res.headers.set('Cache-Control', 'private, no-store');
     return res;
   }
-  // Redirection relative : derrière le proxy du serveur, l'adresse vue par l'application est localhost:3001, pas celle du site.
-  return new NextResponse(null, { status: 307, headers: { Location: `/acces/?suite=${encodeURIComponent(pathname + req.nextUrl.search)}` } });
+  // Adresse du site (et non celle vue par l'application, localhost:3001 derrière le proxy du serveur) ; Next.js exige une adresse absolue.
+  return NextResponse.redirect(new URL(`/acces/?suite=${encodeURIComponent(pathname + req.nextUrl.search)}`, SITE_URL));
 }
 
 // Tout, sauf les ressources internes de Next.
