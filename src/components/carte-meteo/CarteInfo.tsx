@@ -576,7 +576,11 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         )}
 
         {mention && <div className="cinfo-mention">{mention}</div>}
-        {bandeau && <div className="cinfo-bandeau">{bandeau}</div>}
+        {bandeau && (
+          <div className="cinfo-bandeau" style={{ left: MARGE_COLONNE, top: logoUrl ? 21 + hauteurLogo + 8 : rectTitre.y + rectTitre.h + 6 }}>
+            {bandeau}
+          </div>
+        )}
 
         <div className="cinfo-encadre" style={{ left: rectLegende.x, top: rectLegende.y, width: rectLegende.w }}>
           <div className="cinfo-encadre-titre">{theme.unite && theme.unite !== '°' && !theme.texteValeur ? `Légende (${theme.unite})` : 'Légende'}</div>
