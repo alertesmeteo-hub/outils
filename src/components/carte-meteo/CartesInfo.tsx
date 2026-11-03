@@ -531,12 +531,13 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
     );
   }
 
+  const legende = uneCarte ? 'mb-1 block text-xs font-bold uppercase tracking-wide text-primary' : legendeBarre;
   return (
     <div>
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-          <fieldset>
-            <legend className={legendeBarre}>Cartes</legend>
+      <div className={uneCarte ? 'flex flex-col gap-3 rounded-2xl border-2 border-primary/30 bg-primary/5 p-5 shadow-sm' : 'flex flex-col gap-3 rounded-xl border border-border bg-surface p-4'}>
+        <div className={uneCarte ? 'grid grid-cols-1 items-start gap-x-6 gap-y-4 lg:grid-cols-12' : 'flex flex-wrap items-end gap-x-6 gap-y-3'}>
+          <fieldset className={uneCarte ? 'lg:col-span-12' : undefined}>
+            <legend className={legende}>Cartes</legend>
             <div className="flex flex-wrap gap-2">
               {MODES.map(([valeur, libelle]) => (
                 <button
@@ -570,9 +571,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               </a>
             </div>
           </fieldset>
-          <fieldset>
-            <legend className={legendeBarre}>Zone</legend>
-            <div className="flex flex-wrap items-center gap-3">
+          <fieldset className={uneCarte ? 'lg:col-span-7 lg:col-start-6' : undefined}>
+            <legend className={legende}>Zone</legend>
+            <div className={`flex flex-wrap items-center gap-3 ${uneCarte ? 'min-h-10' : ''}`}>
               {(
                 [
                   ['france', 'France'],
@@ -626,9 +627,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           </fieldset>
           {mode === 'prevision' && (
             <>
-              <fieldset>
-                <legend className={legendeBarre}>Modèle</legend>
-                <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <fieldset className={uneCarte ? 'lg:col-span-7 lg:col-start-6' : undefined}>
+                <legend className={legende}>Modèle</legend>
+                <div className={`flex flex-wrap gap-x-3 gap-y-1 ${uneCarte ? 'min-h-[3.25rem]' : ''}`}>
                   {MODELES.filter((m) => !m.departements && (!m.vueDepartement || m.id === 'moyenne')).map((m) => (
                     <label key={m.id} className="text-sm">
                       <input
@@ -647,9 +648,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                   ))}
                 </div>
               </fieldset>
-              <label className="text-sm font-medium">
-                <span className={legendeBarre}>Jour</span>
-                <select value={jour} onChange={(e) => changerJour(Number(e.target.value))} className={selectBarre}>
+              <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2 lg:col-start-6' : ''}`}>
+                <span className={legende}>Jour</span>
+                <select value={jour} onChange={(e) => changerJour(Number(e.target.value))} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`}>
                   {Array.from({ length: ECHEANCE_MAX.cep + 1 }, (_, n) => (
                     <option key={n} value={n}>
                       {NOM_ECHEANCE(n)}
@@ -658,8 +659,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                   ))}
                 </select>
               </label>
-              <fieldset>
-                <legend className={legendeBarre}>Période (cartes « sur une période »)</legend>
+              <fieldset className={uneCarte ? 'lg:col-span-5' : undefined}>
+                <legend className={legende}>Période (cartes « sur une période »)</legend>
                 <div className="flex items-center gap-2 text-sm">
                   du
                   <select
@@ -700,10 +701,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               </fieldset>
             </>
           )}
-          {(mode === 'bilan' || (mode === 'prevision' && jour === 0)) && (
-            <label className="text-sm font-medium">
-              <span className={legendeBarre}>Stations jusqu&apos;à</span>
-              <select value={altitudeMax} onChange={(e) => setAltitudeMax(Number(e.target.value))} className={selectBarre} title="Écarte les stations de haute montagne des bilans (sauf la neige au sol)">
+          {(uneCarte || mode === 'bilan' || (mode === 'prevision' && jour === 0)) && (
+            <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-3 lg:col-start-6' : ''} ${uneCarte && !(mode === 'bilan' || (mode === 'prevision' && jour === 0)) ? 'invisible' : ''}`}>
+              <span className={legende}>Stations jusqu&apos;à</span>
+              <select value={altitudeMax} onChange={(e) => setAltitudeMax(Number(e.target.value))} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Écarte les stations de haute montagne des bilans (sauf la neige au sol)">
                 {ALTITUDES_MAX.map((a) => (
                   <option key={a} value={a}>
                     {a === 0 ? 'Toutes altitudes' : `${a.toLocaleString('fr-FR')} m d'altitude`}
@@ -714,7 +715,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           )}
           {mode === 'bilan' && bilans?.mois && bilans.mois.disponibles.length > 1 && (
             <label className="text-sm font-medium">
-              <span className={legendeBarre}>Mois</span>
+              <span className={legende}>Mois</span>
               <select
                 value={moisBilan ?? bilans.mois.affiche}
                 onChange={(e) => {
@@ -737,7 +738,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           )}
           {mode === 'climat' && (
             <fieldset>
-              <legend className={legendeBarre}>Horizon</legend>
+              <legend className={legende}>Horizon</legend>
               <div className="flex gap-3">
                 {([2050, 2100] as const).map((h) => (
                   <label key={h} className="text-sm">
@@ -749,9 +750,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </fieldset>
           )}
           {uneCarte && (
-            <div className="min-w-72 text-sm font-medium">
+            <div className="min-w-72 rounded-xl border border-primary/30 bg-surface p-4 text-sm font-medium lg:col-span-5 lg:col-start-1 lg:row-span-5 lg:row-start-2">
               <label>
-                <span className={legendeBarre}>Rechercher une carte</span>
+                <span className={legende}>Rechercher une carte</span>
                 <input type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="ex. neige, rafales, maxi, pluie…" className={`${selectBarre} w-full`} />
               </label>
               <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Thème">
@@ -767,7 +768,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                   </button>
                 ))}
               </div>
-              <ul className="mt-2 max-h-40 overflow-auto rounded-lg border border-border bg-surface">
+              <ul className="mt-2 max-h-60 overflow-auto rounded-lg border border-border bg-surface">
                 {resultatsRecherche.length === 0 && <li className="px-3 py-2 text-muted">Aucune carte ne correspond.</li>}
                 {groupes.map((g) => {
                   const dansGroupe = resultatsRecherche.filter((t) => t.groupe === g.groupe);
@@ -800,7 +801,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           )}
           {!uneCarte && (
           <label className="text-sm font-medium">
-            <span className={legendeBarre}>Thème</span>
+            <span className={legende}>Thème</span>
             <select value={groupeChoisi} onChange={(e) => setGroupeChoisi(e.target.value)} className={selectBarre}>
               <option value="tous">Tous les thèmes</option>
               {mode !== 'climat' && <option value={ESSENTIEL}>{ESSENTIEL} (maxi, mini, rafales, pluie)</option>}
@@ -812,9 +813,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </select>
           </label>
           )}
-          <label className="text-sm font-medium">
-            <span className={legendeBarre}>Logo</span>
-            <select value={logoId} onChange={(e) => setLogoChoisi(e.target.value)} className={selectBarre}>
+          <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
+            <span className={legende}>Logo</span>
+            <select value={logoId} onChange={(e) => setLogoChoisi(e.target.value)} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`}>
               {LOGOS_PRESETS.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.nom}
@@ -822,9 +823,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               ))}
             </select>
           </label>
-          <label className="text-sm font-medium">
-            <span className={legendeBarre}>Taille des valeurs</span>
-            <select value={tailleValeurs} onChange={(e) => setTailleValeurs(e.target.value as typeof tailleValeurs)} className={selectBarre} title="Petites : plus de valeurs sur la carte ; grandes : plus lisibles">
+          <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
+            <span className={legende}>Taille des valeurs</span>
+            <select value={tailleValeurs} onChange={(e) => setTailleValeurs(e.target.value as typeof tailleValeurs)} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Petites : plus de valeurs sur la carte ; grandes : plus lisibles">
               <option value="petite">Petites (plus de valeurs)</option>
               <option value="normale">Normales</option>
               <option value="grande">Grandes</option>
@@ -832,7 +833,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </select>
           </label>
         </div>
-        <nav aria-label="Aller à une carte" hidden={uneCarte} className="flex flex-col gap-1.5 border-t border-border pt-3">
+        {!uneCarte && (
+        <nav aria-label="Aller à une carte" className="flex flex-col gap-1.5 border-t border-border pt-3">
           {avecSynthese && (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{ESSENTIEL}</span>
@@ -852,6 +854,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </div>
           ))}
         </nav>
+        )}
       </div>
 
       {erreurAffichee && (
