@@ -7,6 +7,9 @@ import { GROUPES_DE_PAGES } from './NavPagesDeTravail';
 
 const sansAncre = (href: string) => href.split('#')[0].split('?')[0].replace(/\/$/, '') || '/';
 const CLE_FAVORIS = 'mo:favoris';
+const CLE_FAVORIS_PROPOSES = 'mo:favoris-proposes-v1';
+/** Favoris proposés d'office (une fois par navigateur). */
+const FAVORIS_PAR_DEFAUT = ['/outils/carte-meteo/carte-au-choix/'];
 
 /** Libellé et logo de chaque page du menu, pour la rubrique « Favoris ». */
 const PAGES = new Map(GROUPES_DE_PAGES.flatMap((g) => g.pages.map((x) => [x.href, { libelle: x.libelle, logo: x.logo ?? g.logo }] as const)));
@@ -38,8 +41,16 @@ export default function MenuLateral() {
   }, [chemin]);
   useEffect(() => {
     try {
-      const memo = JSON.parse(localStorage.getItem(CLE_FAVORIS) ?? '[]') as unknown;
-      if (Array.isArray(memo)) setFavoris(memo.filter((h): h is string => typeof h === 'string' && PAGES.has(h)));
+      const enregistre = localStorage.getItem(CLE_FAVORIS);
+      const memo = (enregistre == null ? [] : JSON.parse(enregistre)) as unknown;
+      let liste = Array.isArray(memo) ? memo.filter((h): h is string => typeof h === 'string' && PAGES.has(h)) : [];
+      // Favoris proposés d'office, une seule fois par navigateur : retirés ensuite, ils ne reviennent pas.
+      if (localStorage.getItem(CLE_FAVORIS_PROPOSES) == null) {
+        liste = [...FAVORIS_PAR_DEFAUT.filter((h) => !liste.includes(h)), ...liste];
+        localStorage.setItem(CLE_FAVORIS, JSON.stringify(liste));
+        localStorage.setItem(CLE_FAVORIS_PROPOSES, '1');
+      }
+      setFavoris(liste);
     } catch {
       // Stockage indisponible : pas de favoris pour cette visite.
     }

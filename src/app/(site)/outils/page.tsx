@@ -19,8 +19,18 @@ export default async function AllTools() {
       <h1 className="text-3xl font-extrabold">Tous les outils</h1>
       <div className="mt-6 max-w-2xl"><SearchBox items={tools.map(toSearchItem)} /></div>
       <Link
-        href="/outils/carte-meteo/tendances-par-theme/"
+        href="/outils/carte-meteo/carte-au-choix/"
         className="mt-8 flex items-center gap-4 rounded-2xl border-2 border-primary bg-primary/10 p-5 transition-shadow hover:shadow-lg"
+      >
+        <span aria-hidden className="text-5xl">🔎</span>
+        <span>
+          <strong className="block text-xl leading-snug">Une carte au choix</strong>
+          <span className="mt-1 block text-muted">Toutes les infos sur une carte de France, d&apos;une région ou d&apos;un département : cherchez le thème (maxi, pluie, rafales, neige, orages…), export en JPG.</span>
+        </span>
+      </Link>
+      <Link
+        href="/outils/carte-meteo/tendances-par-theme/"
+        className="mt-4 flex items-center gap-4 rounded-2xl border-2 border-primary bg-primary/10 p-5 transition-shadow hover:shadow-lg"
       >
         <span aria-hidden className="text-5xl">🗺️</span>
         <span>

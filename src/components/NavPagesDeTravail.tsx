@@ -34,11 +34,11 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
   {
     titre: 'Cartes et prévisions',
     pages: [
+      { href: '/outils/carte-meteo/carte-au-choix/', libelle: '🔎 Une carte au choix' },
       { href: '/outils/carte-meteo/', libelle: 'Carte météo (pictos)' },
       { href: '/outils/carte-meteo/16-jours/', libelle: 'Cartes à 16 jours' },
       { href: '/outils/carte-meteo/tendances/', libelle: 'Planches tendances' },
       { href: '/outils/carte-meteo/tendances-par-theme/', libelle: '🗺️ Tendances par thème' },
-      { href: '/outils/carte-meteo/carte-au-choix/', libelle: '🔎 Une carte au choix' },
       { href: '/outils/carte-meteo-info/', libelle: 'Cartes infos' },
       { href: '/outils/carte-meteo-info/?cartes=europe', libelle: 'Europe : isobares' },
       { href: '/outils/previsions-saisonnieres/', libelle: 'Prévisions saisonnières' },
