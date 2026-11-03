@@ -62,6 +62,9 @@ interface Props {
   onPictoClick?: (code: string, el: HTMLElement) => void;
   /** Décalage (px de la carte) des pictos déplacés à la main, par code de point ; onPictoMove le met à jour. */
   decalagesPictos?: Record<string, [number, number]>;
+  /** Valeurs (bulles) déplaçables à la main : décalage en px par point, et rappel appelé pendant le glissement. */
+  decalagesValeurs?: Record<string, [number, number]>;
+  onValeurMove?: (code: string, dx: number, dy: number) => void;
   onPictoMove?: (code: string, dx: number, dy: number) => void;
   /** Part du nombre maximal de valeurs affichées (1 = tout ce qui tient ; 0,22 = l'essentiel). */
   partValeurs?: number;
@@ -83,18 +86,18 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, partValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, partValeurs = 1 }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
   const [enExport, setEnExport] = useState(false);
   // Clic = changer le picto ; glisser (plus de 4 px) = le déplacer. Les pixels écran sont ramenés à ceux de la carte (facteur).
-  const debutPicto = (e: React.PointerEvent<HTMLImageElement>, code: string) => {
+  const debutPicto = (e: React.PointerEvent<HTMLElement>, code: string, decalages = decalagesPictos, onMove = onPictoMove, onClic: typeof onPictoClick = onPictoClick) => {
     if (e.button !== 0) return;
     e.preventDefault();
     const el = e.currentTarget;
-    const [x0, y0] = decalagesPictos?.[code] ?? [0, 0];
+    const [x0, y0] = decalages?.[code] ?? [0, 0];
     const sx = e.clientX;
     const sy = e.clientY;
     let deplace = false;
@@ -102,13 +105,13 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     const bouge = (m: PointerEvent) => {
       if (!deplace && Math.hypot(m.clientX - sx, m.clientY - sy) < 4) return;
       deplace = true;
-      onPictoMove?.(code, x0 + (m.clientX - sx) / facteur, y0 + (m.clientY - sy) / facteur);
+      onMove?.(code, x0 + (m.clientX - sx) / facteur, y0 + (m.clientY - sy) / facteur);
     };
     const fin = () => {
       el.removeEventListener('pointermove', bouge);
       el.removeEventListener('pointerup', fin);
       el.removeEventListener('pointercancel', fin);
-      if (!deplace) onPictoClick?.(code, el);
+      if (!deplace) onClic?.(code, el);
     };
     el.addEventListener('pointermove', bouge);
     el.addEventListener('pointerup', fin);
@@ -486,7 +489,12 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
             <div key={p.code} className="cinfo-point" style={{ left: x, top: y - 0.725 * taille - (fichierPicto ? TAILLE_PICTO * taille : 0), fontSize: taille }} title={`${p.nom} : ${texteInfo(theme, p.valeur)} ${uniteVisible}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {fichierPicto && <img src={fichierPicto} alt="" draggable={false} crossOrigin="anonymous" onPointerDown={onPictoClick || onPictoMove ? (e) => debutPicto(e, p.code) : undefined} title={onPictoClick ? 'Cliquer pour changer le picto, glisser pour le déplacer' : undefined} style={{ cursor: onPictoMove ? 'grab' : onPictoClick ? 'pointer' : undefined, touchAction: 'none', transform: decalagesPictos?.[p.code] ? `translate(${decalagesPictos[p.code][0]}px, ${decalagesPictos[p.code][1]}px)` : undefined, width: `${TAILLE_PICTO}em`, height: `${TAILLE_PICTO}em`, marginBottom: '-0.15em', filter: 'drop-shadow(0 0.04em 0.12em rgba(0,0,0,0.55))' }} />}
-              <div className="cinfo-bulle" style={{ background: palier.fond, color: palier.texte }}>
+              <div
+                className="cinfo-bulle"
+                onPointerDown={onValeurMove && !edition ? (e) => debutPicto(e, p.code, decalagesValeurs, onValeurMove, undefined) : undefined}
+                title={onValeurMove && !edition ? 'Glisser pour déplacer la valeur' : undefined}
+                style={{ background: palier.fond, color: palier.texte, cursor: onValeurMove && !edition ? 'grab' : undefined, touchAction: onValeurMove && !edition ? 'none' : undefined, transform: decalagesValeurs?.[p.code] ? `translate(${decalagesValeurs[p.code][0]}px, ${decalagesValeurs[p.code][1]}px)` : undefined }}
+              >
                 {avecFleche(p) && (
                   <svg viewBox="-12 -12 24 24" aria-hidden>
                     <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" fill={palier.texte} transform={`rotate(${angleFleche(p.direction)})`} />

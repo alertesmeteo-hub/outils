@@ -56,6 +56,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   const [surcharges, setSurcharges] = useState<Record<string, string>>({});
   const [choix, setChoix] = useState<{ duree: number; code: string } | null>(null);
   const [decalages, setDecalages] = useState<Record<string, [number, number]>>({});
+  const [decalagesValeurs, setDecalagesValeurs] = useState<Record<string, [number, number]>>({});
   const [partout, setPartout] = useState(false);
   const ancre = useRef<HTMLElement | null>(null);
 
@@ -163,10 +164,10 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
         </label>
         {avecPictos && (
           <p className="pb-1.5 text-sm text-muted">
-            Cliquez sur un picto pour le changer, glissez-le pour le déplacer.{' '}
-            {(Object.keys(surcharges).length > 0 || Object.keys(decalages).length > 0) && (
-              <button type="button" className="underline" onClick={() => { setSurcharges({}); setDecalages({}); }}>
-                Rétablir les pictos d&apos;origine
+            Cliquez sur un picto pour le changer ; glissez un picto ou une valeur pour le déplacer.{' '}
+            {(Object.keys(surcharges).length > 0 || Object.keys(decalages).length > 0 || Object.keys(decalagesValeurs).length > 0) && (
+              <button type="button" className="underline" onClick={() => { setSurcharges({}); setDecalages({}); setDecalagesValeurs({}); }}>
+                Rétablir pictos et valeurs
               </button>
             )}
           </p>
@@ -239,6 +240,8 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
                   pictos={avecPictos ? pictos : undefined}
                   decalagesPictos={Object.fromEntries(Object.entries(decalages).filter(([k]) => k.startsWith(`${themeId}|${duree}|`)).map(([k, v]) => [k.split('|')[2], v]))}
                   onPictoMove={(code, dx, dy) => setDecalages((d) => ({ ...d, [`${themeId}|${duree}|${code}`]: [dx, dy] }))}
+                  decalagesValeurs={Object.fromEntries(Object.entries(decalagesValeurs).filter(([k]) => k.startsWith(`${themeId}|${duree}|`)).map(([k, v]) => [k.split('|')[2], v]))}
+                  onValeurMove={(code, dx, dy) => setDecalagesValeurs((d) => ({ ...d, [`${themeId}|${duree}|${code}`]: [dx, dy] }))}
                   onPictoClick={(code, el) => {
                     ancre.current = el;
                     setChoix({ duree, code });
