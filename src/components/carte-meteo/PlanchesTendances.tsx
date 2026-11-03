@@ -38,9 +38,11 @@ interface Props {
   modele: { id: string; libelle: string; fournisseur: string };
   /** Valeurs de chaque département, par durée ; null si le modèle ne couvre pas la durée. */
   periodes: Record<number, PointTendance[] | null>;
+  /** Pyrénées-Orientales en 10 zones, par durée (carte de pluie) ; null si indisponible. */
+  zones66?: Record<number, PointTendance[] | null> | null;
 }
 
-export default function PlanchesTendances({ aujourdhui, modele, periodes }: Props) {
+export default function PlanchesTendances({ aujourdhui, modele, periodes, zones66 }: Props) {
   const [themeId, setThemeId] = useState<(typeof THEMES_TENDANCES)[number]['id']>('pluie');
   // Pictos du temps dominant : retirés d'office sur la carte Pluie (les valeurs restent lisibles), proposés sur les autres.
   const [sansPictos, setSansPictos] = useState<Record<string, boolean>>({ pluie: true });
@@ -58,6 +60,9 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   // « Moyenne par région » : une valeur par région (moyenne de ses départements) au lieu d'une par département ; sur la France entière.
   const [moyenneRegions, setMoyenneRegions] = useState(false);
+  // Carte de pluie : les Pyrénées-Orientales découpées en 10 zones (région '66' = ce découpage).
+  const enZones66 = region === 'zones-66' && themeId === 'pluie' && !!zones66;
+  const regionCarte = region === 'zones-66' ? '' : region;
   const parRegion = moyenneRegions && !region;
   // Pictos changés à la main : « thème|durée|code » → picto ('' = retiré).
   const [surcharges, setSurcharges] = useState<Record<string, string>>({});
@@ -73,11 +78,11 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
   const cartes = useMemo(
     () =>
       DUREES_TENDANCES.map((duree) => {
-        const source = periodes[duree];
+        const source = enZones66 ? zones66![duree] : periodes[duree];
         const points: PointInfo[] = [];
         const pictos: Record<string, string> = {};
         for (const p of source ?? []) {
-          if (MASQUES_FRANCE.has(p.code)) continue;
+          if (!enZones66 && MASQUES_FRANCE.has(p.code)) continue;
           const coords = p.lat != null && p.lon != null ? { lat: p.lat, lon: p.lon } : COORDS_DEPARTEMENTS[p.code];
           const brute = themeBase.valeur(p);
           // Pluie au-delà de 20 mm et rafales : arrondies de 5 en 5 (mm, km/h).
@@ -85,7 +90,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           if (!coords || v == null || !Number.isFinite(v)) continue;
           if (themeId === 'rafales' && v < seuilRafales) continue;
           if (themeId === 'pluie' && v < seuilPluie) continue;
-          points.push({ code: p.code, nom: p.nom, dep: p.code, lat: coords.lat, lon: coords.lon, valeur: v, direction: themeBase.direction?.(p) ?? null });
+          points.push({ code: p.code, nom: p.nom, dep: enZones66 ? '66' : p.code, lat: coords.lat, lon: coords.lon, valeur: v, direction: themeBase.direction?.(p) ?? null });
           if (p.pictoPeriode) pictos[p.code] = p.pictoPeriode;
         }
         for (const code of Object.keys(pictos)) {
@@ -118,7 +123,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
         }
         return { duree, points, pictos, valeursDepartements: undefined, theme: { ...themeBase, titre: reglage.titre(duree) } };
       }),
-    [periodes, themeBase, reglage, themeId, surcharges, parRegion, seuilRafales, seuilPluie]
+    [periodes, zones66, enZones66, themeBase, reglage, themeId, surcharges, parRegion, seuilRafales, seuilPluie]
   );
 
   const appliquer = (picto: string) => {
@@ -194,6 +199,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
           <span className="mb-1 block">Zone</span>
           <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectBarre}>
             <option value="">France</option>
+            {themeId === 'pluie' && zones66 && <option value="zones-66">Pyrénées-Orientales (10 zones)</option>}
             {REGIONS_FR.map((r) => (
               <option key={r} value={r}>
                 {r}
@@ -252,7 +258,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
               ) : (
                 <CarteInfo
                   theme={theme}
-                  zone={region ? `reg:${region}` : 'france'}
+                  zone={enZones66 ? 'dep:66' : regionCarte ? `reg:${regionCarte}` : 'france'}
                   points={points}
                   valeursDepartements={valeursDepartements}
                   parRegion={parRegion}

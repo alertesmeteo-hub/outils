@@ -468,6 +468,35 @@ export async function chargerPrevisionsTendances(modele: ModeleSource, debutISO:
   return sortie;
 }
 
+/** Zones géographiques des Pyrénées-Orientales (carte des cumuls de pluie) : nom et centre ; la commune du modèle la plus proche donne les valeurs. */
+const ZONES_66: { nom: string; lat: number; lon: number }[] = [
+  { nom: 'Côte Vermeille', lat: 42.483, lon: 3.129 },
+  { nom: 'Salanque et littoral', lat: 42.75, lon: 3.02 },
+  { nom: 'Plaine du Roussillon', lat: 42.7, lon: 2.89 },
+  { nom: 'Aspres', lat: 42.55, lon: 2.78 },
+  { nom: 'Vallespir', lat: 42.49, lon: 2.69 },
+  { nom: 'Haut-Vallespir', lat: 42.4, lon: 2.48 },
+  { nom: 'Fenouillèdes', lat: 42.8, lon: 2.5 },
+  { nom: 'Conflent', lat: 42.57, lon: 2.4 },
+  { nom: 'Capcir', lat: 42.57, lon: 2.07 },
+  { nom: 'Cerdagne', lat: 42.45, lon: 1.97 },
+];
+
+/** Planches tendances du 66 découpé en 10 zones (une valeur par zone, d'après la commune du modèle la plus proche de son centre), par durée. */
+export async function chargerZonesTendances(modele: ModeleSource, debutISO: string, durees: number[]): Promise<Record<number, PointTendance[] | null>> {
+  const { villes, montagne } = await extraitDepartement(modele, '66');
+  const communes = [...villes, ...montagne];
+  const sortie: Record<number, PointTendance[]> = Object.fromEntries(durees.map((d) => [d, []]));
+  ZONES_66.forEach((z, k) => {
+    const ville = communes.reduce((a, b) => (distance(z, b) < distance(z, a) ? b : a));
+    for (const duree of durees) {
+      const point = pointDepuisSerie(`z66-${k + 1}`, z.nom, ville.serie, debutISO, ajouterJours(debutISO, duree - 1));
+      sortie[duree].push({ ...point, ville: ville.nom, lat: z.lat, lon: z.lon, pictoPeriode: null });
+    }
+  });
+  return sortie;
+}
+
 /** Séries de pluie et de vent des départements, pas à pas, pour les animations (images toutes les 1 ou 3 heures). */
 export interface SeriesAnimation {
   /** Échéances (ISO UTC) et durée de chaque pas (heures). */

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import PlanchesTendances from '@/components/carte-meteo/PlanchesTendances';
 import { aujourdhuiParis, DUREES_TENDANCES, estModele, MODELES, type ModeleSource } from '@/lib/carte-meteo/previsions-modeles';
-import { chargerPrevisionsTendances, type PointTendance } from '@/lib/carte-meteo/sources';
+import { chargerPrevisionsTendances, chargerZonesTendances, type PointTendance } from '@/lib/carte-meteo/sources';
 
 // La date « du jour » doit être celle de la requête ; les fichiers de prévisions sont mis en cache côté serveur.
 export const dynamic = 'force-dynamic';
@@ -24,9 +24,12 @@ export default async function PageTendancesParTheme({ searchParams }: { searchPa
   const aujourdhui = aujourdhuiParis();
 
   let periodes: Record<number, PointTendance[] | null> = {};
+  let zones66: Record<number, PointTendance[] | null> | null = null;
   let erreur = false;
   try {
     periodes = await chargerPrevisionsTendances(modele, aujourdhui, [...DUREES_TENDANCES]);
+    // Les 10 zones des Pyrénées-Orientales (carte de pluie) : un échec ne bloque pas le reste de la page.
+    zones66 = await chargerZonesTendances(modele, aujourdhui, [...DUREES_TENDANCES]).catch(() => null);
   } catch (e) {
     console.error('Cartes de tendance par thème indisponibles', modele, e);
     erreur = true;
@@ -66,7 +69,7 @@ export default async function PageTendancesParTheme({ searchParams }: { searchPa
         </p>
       ) : (
         <div className="mt-6">
-          <PlanchesTendances aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} periodes={periodes} />
+          <PlanchesTendances aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} periodes={periodes} zones66={zones66} />
         </div>
       )}
 
