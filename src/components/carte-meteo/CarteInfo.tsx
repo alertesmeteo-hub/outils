@@ -49,6 +49,8 @@ interface Props {
   contexte?: string;
   /** Mention discrète en bas à gauche de la carte (source de valeurs complémentaires). */
   mention?: string;
+  /** Texte d'alerte en gros caractères rouges sur la carte (ex. « ÉPISODE MÉDITERRANÉEN »). */
+  bandeau?: string;
   /** Agrandissement du tableau « Les plus fortes » (1 = taille habituelle) et son habillage rouge, bien lisible. */
   echelleTop?: number;
   topRouge?: boolean;
@@ -86,7 +88,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, partValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, partValeurs = 1 }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
@@ -574,6 +576,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         )}
 
         {mention && <div className="cinfo-mention">{mention}</div>}
+        {bandeau && <div className="cinfo-bandeau">{bandeau}</div>}
 
         <div className="cinfo-encadre" style={{ left: rectLegende.x, top: rectLegende.y, width: rectLegende.w }}>
           <div className="cinfo-encadre-titre">{theme.unite && theme.unite !== '°' && !theme.texteValeur ? `Légende (${theme.unite})` : 'Légende'}</div>

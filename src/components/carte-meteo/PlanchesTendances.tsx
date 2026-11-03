@@ -27,6 +27,8 @@ const jourCourt = (dateISO: string) =>
 
 const ajouterJours = (dateISO: string, n: number) => new Date(Date.parse(`${dateISO}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
+const BANDEAUX = ['ÉPISODE MÉDITERRANÉEN', 'TEMPÊTE', 'NEIGE', 'ORAGES'] as const;
+
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
 interface Props {
@@ -40,7 +42,12 @@ interface Props {
 
 export default function PlanchesTendances({ aujourdhui, modele, periodes }: Props) {
   const [themeId, setThemeId] = useState<(typeof THEMES_TENDANCES)[number]['id']>('pluie');
-  const [avecPictos, setAvecPictos] = useState(true);
+  // Pictos du temps dominant : retirés d'office sur la carte Pluie (les valeurs restent lisibles), proposés sur les autres.
+  const [sansPictos, setSansPictos] = useState<Record<string, boolean>>({ pluie: true });
+  const avecPictos = !sansPictos[themeId];
+  const setAvecPictos = (v: boolean) => setSansPictos((s) => ({ ...s, [themeId]: !v }));
+  // Texte d'alerte en rouge sur la carte (« ÉPISODE MÉDITERRANÉEN »…) ; '' = aucun.
+  const [bandeau, setBandeau] = useState('');
   /** Carte Rafales : valeurs affichées à partir de ce seuil (km/h), 0 = toutes. */
   const [seuilRafales, setSeuilRafales] = useState(0);
   /** Carte Pluie : valeurs affichées à partir de ce seuil (mm), 0 = toutes ; 10 mm par défaut. */
@@ -158,6 +165,17 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
             <input type="number" min={0} max={500} step={5} value={seuilPluie} onChange={(e) => setSeuilPluie(Math.max(0, Number(e.target.value) || 0))} className={`${selectBarre} w-24`} />
           </label>
         )}
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Texte d&apos;alerte en rouge</span>
+          <select value={bandeau} onChange={(e) => setBandeau(e.target.value)} className={selectBarre}>
+            <option value="">Aucun</option>
+            {BANDEAUX.map((b) => (
+              <option key={b} value={b}>
+                {b.charAt(0) + b.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
           <input type="checkbox" checked={avecPictos} onChange={(e) => setAvecPictos(e.target.checked)} />
           Avec les pictos (temps dominant)
@@ -249,6 +267,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes }: Prop
                   echelleValeurs={taille / Math.sqrt(NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1)}
                   partValeurs={NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part}
                   sousTitre={`DU ${jourCourt(aujourdhui)} AU ${jourCourt(fin)} · ${modele.libelle}`}
+                  bandeau={bandeau}
                   logoId={logoId}
                   prefixeFichier={`tendance-${aujourdhui}-${duree}-jours-${modele.id}`}
                   contexte={`Prévision du modèle ${modele.libelle} (${modele.fournisseur}), ${themeBase.court.toLowerCase()} sur ${duree} jours à partir d'aujourd'hui`}
