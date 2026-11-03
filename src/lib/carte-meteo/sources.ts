@@ -101,7 +101,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v16'; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v17'; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -233,7 +233,10 @@ const VILLES_RETOUCHEES: Record<string, { garder?: string[]; ecarter?: string[];
 function serieALAltitude(serie: Serie, altitudeGrille: number, altitudeVillage?: number): Serie {
   if (altitudeVillage == null || altitudeGrille <= altitudeVillage) return serie;
   const correction = Math.min(8, ((altitudeGrille - altitudeVillage) * 0.65) / 100);
-  return { ...serie, temp: serie.temp.map((t) => (t == null ? t : Math.round((t + correction) * 10) / 10)) };
+  const temp = serie.temp.map((t) => (t == null ? t : Math.round((t + correction) * 10) / 10));
+  // La neige du point de grille (en altitude) ne tombe pas au village : au-dessus de 2 °C à son altitude, c'est de la pluie.
+  const neige = serie.neige.map((n, i) => ((temp[i] ?? -99) > 2 ? 0 : n));
+  return { ...serie, temp, neige };
 }
 
 function extraire(dep: string, fichier: FichierDepartement, runTime: string): Extrait {
