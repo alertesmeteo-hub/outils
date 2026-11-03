@@ -257,7 +257,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   }, [groupesAvecMontagnePeriode, cleMontagnePeriode, montagnePeriode?.cle, erreurMontagnePeriode, modele, debutPeriodeISO, finPeriodeISO, requeteZone]);
 
   // Cartes de montagne (neige, maxi) : communes au-dessus de 1 000 m, requête à part (les autres cartes utilisent des points de plaine).
-  const groupesAvecMontagne = mode === 'prevision' && (groupeChoisi === 'tous' || THEMES_PREVISION.some((t) => t.montagne && t.groupe === groupeChoisi));
+  const groupesAvecMontagne = mode === 'prevision' && (groupeChoisi === 'tous' || THEMES_PREVISION.some((t) => (t.montagne || t.pluieEtNeige) && t.groupe === groupeChoisi));
   useEffect(() => {
     if (!groupesAvecMontagne || montagne?.cle === cleMontagne || erreurMontagne) return;
     const controleur = new AbortController();
@@ -382,6 +382,17 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           : previsions?.cle === cle
             ? previsions.points
             : null;
+      if (theme.pluieEtNeige) {
+        // Pluie en plaine (villes) + neige des communes de montagne : une commune de montagne remplace la ville de même code.
+        if (previsions?.cle === cle && montagne?.cle === cleMontagne) {
+          const neige = versPoints({ ...theme, valeur: (p: PointCarte) => p.neige36h, unite: 'cm' } as typeof theme, montagne.points)
+            .filter((p) => p.valeur > 0)
+            .map((p) => ({ ...p, neige: true }));
+          const codesNeige = new Set(neige.map((p) => p.code));
+          resultat[theme.id] = [...versPoints(theme, previsions.points).filter((p) => !codesNeige.has(p.code)), ...neige];
+        }
+        continue;
+      }
       if (source) resultat[theme.id] = versPoints(theme, source);
     }
     return resultat;
@@ -756,7 +767,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                   </button>
                 ))}
               </div>
-              <ul className="mt-2 max-h-72 overflow-auto rounded-lg border border-border bg-surface">
+              <ul className="mt-2 max-h-40 overflow-auto rounded-lg border border-border bg-surface">
                 {resultatsRecherche.length === 0 && <li className="px-3 py-2 text-muted">Aucune carte ne correspond.</li>}
                 {groupes.map((g) => {
                   const dansGroupe = resultatsRecherche.filter((t) => t.groupe === g.groupe);
@@ -821,7 +832,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </select>
           </label>
         </div>
-        <nav aria-label="Aller à une carte" className="flex flex-col gap-1.5 border-t border-border pt-3">
+        <nav aria-label="Aller à une carte" hidden={uneCarte} className="flex flex-col gap-1.5 border-t border-border pt-3">
           {avecSynthese && (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{ESSENTIEL}</span>
@@ -937,8 +948,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </section>
           )}
           {groupesAffiches.map((g) => (
-            <section key={g.groupe} className="mt-8">
-              <h2 className={`border-b border-border pb-1 text-xl font-extrabold ${uneCarte ? 'mx-auto max-w-[1100px]' : ''}`}>{nomGroupe(g.groupe)}</h2>
+            <section key={g.groupe} className={uneCarte ? 'mt-4' : 'mt-8'}>
+              {!uneCarte && <h2 className="border-b border-border pb-1 text-xl font-extrabold">{nomGroupe(g.groupe)}</h2>}
               <div className={`mt-4 grid grid-cols-1 gap-8 ${uneCarte ? 'mx-auto max-w-[1100px]' : 'xl:grid-cols-2'}`}>
                 {g.themes.map((theme) => (
                   <div key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">

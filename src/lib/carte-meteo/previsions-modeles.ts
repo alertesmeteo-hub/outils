@@ -103,6 +103,8 @@ export interface PointCarte {
   /** Pluie (mm) dans les 24 et 36 prochaines heures, à partir de maintenant (pas de minuit). */
   pluie24h?: number | null;
   pluie36h?: number | null;
+  /** Neige fraîche (cm, estimée) dans les 36 prochaines heures. */
+  neige36h?: number | null;
   pluie3j?: number | null;
   pluie5j?: number | null;
   pluie10j?: number | null;
@@ -287,12 +289,12 @@ function minuitParis(dateISO: string): number {
 }
 
 /** Pluie (mm) entre deux instants (ms), si la série couvre assez de la période ; `derniere` : dernière échéance comptée. */
-function cumulEntre(serie: Serie, debut: number, fin: number): { valeur: number | null; derniere: number | null } {
-  const indices = serie.t.map((t, i) => ({ t: Date.parse(t), i })).filter(({ t, i }) => t > debut && t <= fin && serie.pluie[i] != null);
+function cumulEntre(serie: Serie, debut: number, fin: number, champ: 'pluie' | 'neige' = 'pluie'): { valeur: number | null; derniere: number | null } {
+  const indices = serie.t.map((t, i) => ({ t: Date.parse(t), i })).filter(({ t, i }) => t > debut && t <= fin && serie[champ][i] != null);
   if (!indices.length) return { valeur: null, derniere: null };
   const derniere = indices[indices.length - 1].t;
   return {
-    valeur: (derniere - debut) / (fin - debut) >= COUVERTURE_MIN_CUMUL ? arrondi(somme(indices.map(({ i }) => serie.pluie[i])), 1) : null,
+    valeur: (derniere - debut) / (fin - debut) >= COUVERTURE_MIN_CUMUL ? arrondi(somme(indices.map(({ i }) => serie[champ][i])), 1) : null,
     derniere,
   };
 }
@@ -312,7 +314,7 @@ function cumulsPluie(
   dateISO: string
 ): Pick<
   PointCarte,
-  | 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'pluie24h' | 'pluie36h' | 'finPrevision'
+  | 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'pluie24h' | 'pluie36h' | 'neige36h' | 'finPrevision'
   | 'rafale3j' | 'rafale5j' | 'rafale10j' | 'rafale16j' | 'directionRafale3j' | 'directionRafale5j' | 'directionRafale10j' | 'directionRafale16j'
 > {
   const debut = minuitParis(dateISO);
@@ -320,11 +322,13 @@ function cumulsPluie(
   const maintenant = Date.now();
   const c24 = cumulEntre(serie, maintenant, maintenant + 24 * 3_600_000);
   const c36 = cumulEntre(serie, maintenant, maintenant + 36 * 3_600_000);
+  const n36 = cumulEntre(serie, maintenant, maintenant + 36 * 3_600_000, 'neige');
   const [c3, c5, c10, c16] = DUREES_CUMUL.map((jours) => cumulEntre(serie, debut, debut + jours * 86_400_000));
   const [r3, r5, r10, r16] = DUREES_CUMUL.map((jours) => rafaleEntre(serie, debut, debut + jours * 86_400_000));
   return {
     pluie24h: c24.valeur,
     pluie36h: c36.valeur,
+    neige36h: n36.valeur,
     pluie3j: c3.valeur,
     pluie5j: c5.valeur,
     pluie10j: c10.valeur,

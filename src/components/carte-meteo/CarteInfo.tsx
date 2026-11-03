@@ -9,7 +9,7 @@ import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { cheminPictoImage } from '@/lib/carte-meteo/pictos';
 import { angleFleche } from '@/lib/carte-meteo/vent';
-import { palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
+import { PALIERS_NEIGE, palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
 import { BOITE_FRANCE, FICHIERS_CONTOURS, LARGEUR_FRANCE, ZONE_FRANCE, ZONE_UTILE, codesDeLaZone, normaliser, useContours, useFleuves } from './CarteMeteo';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
@@ -30,6 +30,8 @@ export interface PointInfo {
   valeur: number;
   /** Direction d'où vient le vent (degrés) : flèche dans la pastille (rafales). */
   direction?: number | null;
+  /** Neige fraîche (cm) sur une carte mixte pluie + neige : couleurs et unité de la neige. */
+  neige?: boolean;
 }
 
 interface Props {
@@ -199,7 +201,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     () => [...dansZone].sort((a, b) => (theme.ordre === 'desc' ? b.valeur - a.valeur : a.valeur - b.valeur) || a.nom.localeCompare(b.nom, 'fr')),
     [dansZone, theme.ordre]
   );
-  const top = useMemo(() => tries.filter((p) => !palierDe(theme.paliers, p.valeur).neutre).slice(0, NOMBRE_TOP), [tries, theme.paliers]);
+  const top = useMemo(() => tries.filter((p) => !p.neige && !palierDe(theme.paliers, p.valeur).neutre).slice(0, NOMBRE_TOP), [tries, theme.paliers]);
 
   /** Teinte des départements : valeur la plus marquante du département (moyenne pour les écarts et les nuages). */
   const remplissages = useMemo(() => {
@@ -231,11 +233,19 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     return theme.paliers.slice(Math.min(...indices), Math.max(...indices) + 1);
   }, [dansZone, theme.paliers]);
 
+  // Carte mixte pluie + neige : les points de neige ont leur légende (cm) sous celle de la pluie.
+  const legendeNeige = useMemo(() => {
+    const valeurs = dansZone.filter((p) => p.neige).map((p) => p.valeur);
+    if (valeurs.length === 0) return [];
+    const indices = valeurs.map((v) => PALIERS_NEIGE.indexOf(palierDe(PALIERS_NEIGE, v)));
+    return PALIERS_NEIGE.slice(Math.min(...indices), Math.max(...indices) + 1);
+  }, [dansZone]);
   const uniteVisible = !theme.texteValeur && theme.unite && theme.unite !== '°' ? theme.unite : '';
+  const uniteDe = (p: PointInfo) => (p.neige ? 'cm' : uniteVisible);
   // Encadrés : France → classement à droite (mer au large de l'Alsace et des Alpes) et légende en bas à gauche (golfe de Gascogne) ;
   // régions et départements → les deux dans la colonne de gauche laissée libre par le cadrage.
 
-  const hauteurLegende = 30 + legende.length * 19;
+  const hauteurLegende = 30 + legende.length * 19 + (legendeNeige.length ? 30 + legendeNeige.length * 19 : 0);
   // Largeur du classement : rang + nom (17 caractères au plus) + département + valeur, en 13 px.
   const largeurTop0 = Math.max(
     LARGEUR_ENCADRE,
@@ -324,7 +334,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     // Candidats : les plus marquants de chaque département (un seul en vue France), et les extrêmes de la zone.
     const parDep = new Map<string, number>();
     const candidats = ordre.filter((p) => {
-      if (palierDe(theme.paliers, p.valeur).neutre && !theme.neutresVisibles) return false;
+      if (palierDe(p.neige ? PALIERS_NEIGE : theme.paliers, p.valeur).neutre && !theme.neutresVisibles) return false;
       const n = parDep.get(p.dep) ?? 0;
       parDep.set(p.dep, n + 1);
       return n < parDepartementMax;
@@ -339,7 +349,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       .slice(0, plafond * 2)
       .map((e) => {
         const texte = texteInfo(theme, e.p.valeur);
-        const largeurBulle = (texte.length * 0.56 + (uniteVisible ? uniteVisible.length * 0.42 + 0.25 : 0) + 0.95 + (avecFleche(e.p) ? 1.05 : 0)) * taille;
+        const largeurBulle = (texte.length * 0.56 + (uniteDe(e.p) ? uniteDe(e.p).length * 0.42 + 0.25 : 0) + 0.95 + (avecFleche(e.p) ? 1.05 : 0)) * taille;
         const hauteurBulle = 1.45 * taille;
         const largeurNom = enDepartement ? e.p.nom.length * 0.33 * taille + 6 : 0;
         const avecPicto = !!pictos?.[e.p.code];
@@ -488,10 +498,10 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         remplissages={remplissages}
       >
         {places.map(({ p, x, y }) => {
-          const palier = palierDe(theme.paliers, p.valeur);
+          const palier = palierDe(p.neige ? PALIERS_NEIGE : theme.paliers, p.valeur);
           const fichierPicto = pictos?.[p.code] ? cheminPictoImage(pictos[p.code]) : undefined;
           return (
-            <div key={p.code} className="cinfo-point" style={{ left: x, top: y - 0.725 * taille - (fichierPicto ? TAILLE_PICTO * taille : 0), fontSize: taille }} title={`${p.nom} : ${texteInfo(theme, p.valeur)} ${uniteVisible}`}>
+            <div key={p.code} className="cinfo-point" style={{ left: x, top: y - 0.725 * taille - (fichierPicto ? TAILLE_PICTO * taille : 0), fontSize: taille }} title={`${p.nom} : ${texteInfo(theme, p.valeur)} ${uniteDe(p)}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {fichierPicto && <img src={fichierPicto} alt="" draggable={false} crossOrigin="anonymous" onPointerDown={onPictoClick || onPictoMove ? (e) => debutPicto(e, p.code) : undefined} title={onPictoClick ? 'Cliquer pour changer le picto, glisser pour le déplacer' : undefined} style={{ cursor: onPictoMove ? 'grab' : onPictoClick ? 'pointer' : undefined, touchAction: 'none', transform: decalagesPictos?.[p.code] ? `translate(${decalagesPictos[p.code][0]}px, ${decalagesPictos[p.code][1]}px)` : undefined, width: `${TAILLE_PICTO}em`, height: `${TAILLE_PICTO}em`, marginBottom: '-0.15em', filter: 'drop-shadow(0 0.04em 0.12em rgba(0,0,0,0.55))' }} />}
               <div
@@ -527,7 +537,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
                 ) : (
                   <strong>{texteInfo(theme, p.valeur)}</strong>
                 )}
-                {uniteVisible && <small>{uniteVisible}</small>}
+                {uniteDe(p) && <small>{uniteDe(p)}</small>}
               </div>
               {enDepartement && <div className="cinfo-nom">{p.nom}</div>}
               {edition && (
@@ -595,6 +605,21 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
               </li>
             ))}
           </ul>
+          {legendeNeige.length > 0 && (
+            <>
+              <div className="cinfo-encadre-titre" style={{ marginTop: 8 }}>
+                Neige (cm)
+              </div>
+              <ul>
+                {legendeNeige.map((x) => (
+                  <li key={x.libelle}>
+                    <i style={{ background: x.fond }} />
+                    {x.libelle}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       </CarteRendu>
       {texteIA.panneau}

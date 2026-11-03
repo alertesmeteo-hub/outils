@@ -18,9 +18,7 @@ export default function PageCarteAuChoix() {
     <>
       <h1 className="text-3xl font-extrabold">Une carte au choix</h1>
       <p className="mt-2 max-w-3xl text-muted">
-        Toutes les infos que l&apos;on peut avoir sur une carte, au même endroit : choisissez la zone (France, région ou département), le modèle et le jour, puis
-        cherchez le thème voulu (maxi, pluie, rafales, neige, orages, brouillard, bilans, climat…). La carte s&apos;exporte en JPG. Pour toutes les cartes à la
-        suite, voir les{' '}
+        Choisissez la zone, le modèle et le jour, puis le thème. Export en JPG. Toutes les cartes à la suite :{' '}
         <Link href="/outils/carte-meteo-info/" className="underline">
           cartes infos
         </Link>

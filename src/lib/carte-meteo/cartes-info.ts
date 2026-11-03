@@ -64,6 +64,8 @@ export interface ThemePrevision extends ThemeInfo {
   periode?: boolean;
   /** Fenêtre glissante : pluie des N prochaines heures à partir de maintenant (et non d'un jour entier). */
   fenetreHeures?: number;
+  /** Carte mixte : pluie (mm) en plaine et neige fraîche (cm) sur les communes de montagne (lues à part, ?montagne=1). */
+  pluieEtNeige?: boolean;
 }
 
 /** Cartes du réchauffement climatique : fiches régionales Météo-France (TRACC) ou pluies DRIAS par commune. */
@@ -194,7 +196,7 @@ const PALIERS_ORAGE: Palier[] = [
   p(-Infinity, '#e5e7eb', NOIR, 'Pas d’orage', true),
 ];
 
-const PALIERS_NEIGE: Palier[] = [
+export const PALIERS_NEIGE: Palier[] = [
   p(50, '#3b0545', BLANC, '50 cm et plus'),
   p(30, '#7b2cbf', BLANC, '30 à 49 cm'),
   p(15, '#4c1d95', BLANC, '15 à 29 cm'),
@@ -429,6 +431,7 @@ export const THEMES_PREVISION: ThemePrevision[] = [
   { id: 'pluie', groupe: 'Pluie', titre: 'CUMULS DE PLUIE', court: 'Cumuls de pluie', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluieJournee },
   { id: 'pluie-24h', groupe: 'Pluie', fenetreHeures: 24, titre: 'PLUIE DANS LES 24 PROCHAINES HEURES', court: 'Pluie 24 h (prochaines heures)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie24h },
   { id: 'pluie-36h', groupe: 'Pluie', fenetreHeures: 36, titre: 'PLUIE DANS LES 36 PROCHAINES HEURES', court: 'Pluie 36 h (prochaines heures)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie36h },
+  { id: 'pluie-neige-36h', groupe: 'Pluie', fenetreHeures: 36, pluieEtNeige: true, sansTeinte: true, titre: 'PLUIE ET NEIGE EN MONTAGNE · 36 PROCHAINES HEURES', court: 'Pluie + neige en montagne (36 h)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie36h },
   { id: 'pluie-3j', groupe: 'Pluie', cumulJours: 3, titre: 'CUMULS DE PLUIE SUR 3 JOURS', court: 'Pluie sur 3 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie3j },
   { id: 'pluie-5j', groupe: 'Pluie', cumulJours: 5, titre: 'CUMULS DE PLUIE SUR 5 JOURS', court: 'Pluie sur 5 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie5j },
   { id: 'pluie-10j', groupe: 'Pluie', cumulJours: 10, titre: 'CUMULS DE PLUIE SUR 10 JOURS', court: 'Pluie sur 10 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie10j },
