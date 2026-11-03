@@ -91,7 +91,7 @@ const dateParis = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 
 const legendeBarre = 'mb-1 block text-sm font-medium';
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
-export default function CartesInfo({ aujourdhui, modeInitial, departementInitial }: { aujourdhui: string; /** Catégorie ouverte d'office (?cartes=europe…). */ modeInitial?: string; /** Département affiché d'office (page dédiée). */ departementInitial?: string }) {
+export default function CartesInfo({ aujourdhui, modeInitial, departementInitial, uneCarte = false }: { aujourdhui: string; /** Une seule carte à la fois, choisie par une recherche sur les thèmes (page « Une carte au choix »). */ uneCarte?: boolean; /** Catégorie ouverte d'office (?cartes=europe…). */ modeInitial?: string; /** Département affiché d'office (page dédiée). */ departementInitial?: string }) {
   const id = useId();
   const nom = (base: string) => `${base}-${id}`;
   const modeDemande = MODES.find(([m]) => m === modeInitial)?.[0];
@@ -136,7 +136,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [horizon, setHorizon] = useState<Horizon>(2050);
   const [altitudeMax, setAltitudeMax] = useState(ALTITUDE_MAX_DEFAUT);
   /** Thème affiché (« tous » : toutes les cartes de la catégorie, rangées par thème). */
-  const [groupeChoisi, setGroupeChoisi] = useState('tous');
+  const [groupeChoisi, setGroupeChoisi] = useState(uneCarte ? 'Températures' : 'tous');
+  const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
+  const [recherche, setRecherche] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
   const [climatCommunes, setClimatCommunes] = useState<{ dep: string; communes: ClimatCommune[] } | null>(null);
   const [erreurClimat, setErreurClimat] = useState<string | null>(null);
@@ -430,10 +432,19 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
   // « Températures en direct » et « Observations en direct » ont leur propre page (/outils/temperatures-en-direct/, /outils/observations-en-direct/) : pas ici.
   const groupes = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT && g.groupe !== GROUPE_JOURNEE && g.groupe !== GROUPE_OBS && g.groupe !== GROUPE_PLUIE_DIRECT);
-  const groupesAffiches = groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
+  const tousThemes = groupes.flatMap((g) => g.themes);
+  const carteEffective = uneCarte ? tousThemes.find((t) => t.id === carteChoisie) ?? tousThemes[0] : undefined;
+  const groupesAffiches = uneCarte
+    ? groupes.map((g) => ({ ...g, themes: g.themes.filter((t) => t.id === carteEffective?.id) })).filter((g) => g.themes.length > 0)
+    : groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
+  // Les données à charger (cumuls, périodes, montagne) dépendent du groupe : il suit toujours la carte affichée.
+  useEffect(() => {
+    if (carteEffective && carteEffective.groupe !== groupeChoisi) setGroupeChoisi(carteEffective.groupe);
+  }, [carteEffective, groupeChoisi]);
+  const resultatsRecherche = uneCarte ? tousThemes.filter((t) => normaliser(`${t.titre} ${t.court} ${t.groupe}`).includes(normaliser(recherche))) : [];
   /** Nom affiché d'un groupe : le bilan du mois porte le nom du mois choisi (« Octobre 2026 »). */
   const nomGroupe = (groupe: string) => (groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe);
-  const avecSynthese = mode !== 'climat' && (groupeChoisi === 'tous' || groupeChoisi === ESSENTIEL);
+  const avecSynthese = !uneCarte && mode !== 'climat' && (groupeChoisi === 'tous' || groupeChoisi === ESSENTIEL);
   const chargement =
     mode === 'prevision'
       ? previsions?.cle !== cle && !erreur
@@ -717,6 +728,34 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               </div>
             </fieldset>
           )}
+          {uneCarte && (
+            <div className="min-w-72 text-sm font-medium">
+              <label>
+                <span className={legendeBarre}>Rechercher une carte</span>
+                <input type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="ex. neige, rafales, maxi, pluie…" className={`${selectBarre} w-full`} />
+              </label>
+              <ul className="mt-1 max-h-56 overflow-auto rounded-lg border border-border bg-surface">
+                {resultatsRecherche.length === 0 && <li className="px-3 py-2 text-muted">Aucune carte ne correspond.</li>}
+                {resultatsRecherche.map((t) => (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      aria-pressed={t.id === carteEffective?.id}
+                      onClick={() => {
+                        setCarteChoisie(t.id);
+                        setGroupeChoisi(t.groupe);
+                      }}
+                      className={`flex w-full items-baseline justify-between gap-3 px-3 py-1.5 text-left ${t.id === carteEffective?.id ? 'bg-primary text-white' : 'hover:bg-bg'}`}
+                    >
+                      <span>{t.court}</span>
+                      <small className="opacity-70">{nomGroupe(t.groupe)}</small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {!uneCarte && (
           <label className="text-sm font-medium">
             <span className={legendeBarre}>Thème</span>
             <select value={groupeChoisi} onChange={(e) => setGroupeChoisi(e.target.value)} className={selectBarre}>
@@ -729,6 +768,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               ))}
             </select>
           </label>
+          )}
           <label className="text-sm font-medium">
             <span className={legendeBarre}>Logo</span>
             <select value={logoId} onChange={(e) => setLogoChoisi(e.target.value)} className={selectBarre}>
