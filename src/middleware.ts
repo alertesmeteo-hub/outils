@@ -58,10 +58,8 @@ export async function middleware(req: NextRequest) {
     res.headers.set('Cache-Control', 'private, no-store');
     return res;
   }
-  const url = req.nextUrl.clone();
-  url.pathname = '/acces/';
-  url.search = `?suite=${encodeURIComponent(pathname + req.nextUrl.search)}`;
-  return NextResponse.redirect(url);
+  // Redirection relative : derrière le proxy du serveur, l'adresse vue par l'application est localhost:3001, pas celle du site.
+  return new NextResponse(null, { status: 307, headers: { Location: `/acces/?suite=${encodeURIComponent(pathname + req.nextUrl.search)}` } });
 }
 
 // Tout, sauf les ressources internes de Next.
