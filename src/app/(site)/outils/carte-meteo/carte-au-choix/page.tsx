@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import CartesInfo from '@/components/carte-meteo/CartesInfo';
+import CarteAuChoix from '@/components/carte-meteo/CarteAuChoix';
 import { aujourdhuiParis } from '@/lib/carte-meteo/previsions-modeles';
 
 // La date « du jour » doit être celle de la requête.
@@ -25,7 +25,7 @@ export default function PageCarteAuChoix() {
         .
       </p>
       <div className="mt-6">
-        <CartesInfo aujourdhui={aujourdhuiParis()} uneCarte />
+        <CarteAuChoix aujourdhui={aujourdhuiParis()} />
       </div>
     </>
   );
