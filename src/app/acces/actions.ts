@@ -17,6 +17,9 @@ export async function connexion(formData: FormData) {
   // 8 essais par 10 minutes et par adresse : pas de devinette en série.
   if (!motDePasse || !rateLimit(`acces:${await adresseIp()}`, 8, 10 * 60_000)) redirect(`/acces/?erreur=1&suite=${encodeURIComponent(suite)}`);
   const saisi = String(formData.get('motdepasse') ?? '');
+  // Identifiant exigé seulement si SITE_IDENTIFIANT est défini dans le .env du serveur ; sinon, tout identifiant est accepté.
+  const identifiant = process.env.SITE_IDENTIFIANT;
+  if (identifiant && !egalSur(String(formData.get('identifiant') ?? '').trim(), identifiant)) redirect(`/acces/?erreur=1&suite=${encodeURIComponent(suite)}`);
   if (!egalSur(saisi, motDePasse)) redirect(`/acces/?erreur=1&suite=${encodeURIComponent(suite)}`);
   (await cookies()).set(COOKIE_ACCES, await cleAcces(motDePasse), {
     httpOnly: true,

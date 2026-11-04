@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { suiteSure } from '@/lib/acces';
 import { connexion } from './actions';
+import { boutonAcces, champAcces } from './styles';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,36 +9,34 @@ export default async function PageAcces({ searchParams }: { searchParams: Promis
   const { erreur, suite } = await searchParams;
   const ouvert = !process.env.SITE_PASSWORD;
   return (
-    <div className="card p-6">
-      <h1 className="text-2xl font-extrabold">Accès réservé</h1>
-      <p className="mt-2 text-muted">Ce site est réservé aux personnes autorisées. Entrez le mot de passe pour continuer.</p>
+    <div className="rounded-3xl border border-white/15 bg-white/5 p-7 shadow-2xl backdrop-blur">
+      <h1 className="text-center text-3xl font-extrabold tracking-wide">Météo Outils</h1>
+      <p className="mt-2 text-center text-sm text-white/80">Accès réservé — identifiez-vous</p>
       {ouvert ? (
-        <p className="mt-4 rounded-lg border border-border p-3 text-sm">
+        <p className="mt-6 rounded-xl border border-white/20 p-3 text-sm">
           Aucun mot de passe n&apos;est défini sur le serveur : le site est ouvert.{' '}
           <Link href="/" className="underline">
             Aller au site
           </Link>
         </p>
       ) : (
-        <form action={connexion} className="mt-5 grid gap-3">
+        <form action={connexion} className="mt-7 grid gap-4">
           <input type="hidden" name="suite" value={suiteSure(suite)} />
-          <label className="text-sm font-medium">
-            <span className="mb-1 block">Mot de passe</span>
-            <input type="password" name="motdepasse" required autoFocus autoComplete="current-password" className="w-full rounded-lg border border-border bg-surface p-2.5" />
-          </label>
+          <input name="identifiant" placeholder="Identifiant" autoComplete="username" autoCapitalize="none" className={champAcces} />
+          <input type="password" name="motdepasse" placeholder="Mot de passe" required autoFocus autoComplete="current-password" className={champAcces} />
           {erreur && (
-            <p role="alert" className="text-sm text-danger">
-              Mot de passe incorrect, ou trop d&apos;essais : réessayez dans quelques minutes.
+            <p role="alert" className="text-center text-sm text-red-300">
+              Identifiant ou mot de passe incorrect, ou trop d&apos;essais : réessayez dans quelques minutes.
             </p>
           )}
-          <button type="submit" className="btn-primary rounded-lg px-4 py-2.5 font-semibold">
-            Entrer
+          <button type="submit" className={boutonAcces}>
+            Se connecter
           </button>
         </form>
       )}
-      <p className="mt-6 border-t border-border pt-4 text-sm">
-        Pas de mot de passe ?{' '}
-        <Link href="/acces/demande/" className="font-semibold underline">
+      <p className="mt-7 border-t border-white/15 pt-5 text-center text-sm text-white/80">
+        Pas d&apos;accès ?{' '}
+        <Link href="/acces/demande/" className="font-semibold text-white underline">
           Demander l&apos;accès
         </Link>
       </p>
