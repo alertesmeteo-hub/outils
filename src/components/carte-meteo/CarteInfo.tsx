@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { placerSansChevauchement, type Rect } from '@/lib/carte-meteo/placement';
 import { ordreRepartition } from '@/lib/carte-meteo/echantillonnage';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
-import { cheminPictoImage } from '@/lib/carte-meteo/pictos';
+import { cheminPictoImage, type ThemeCarte } from '@/lib/carte-meteo/pictos';
+import type { Couche } from '@/lib/carte-meteo/tuiles';
 import { angleFleche } from '@/lib/carte-meteo/vent';
 import { PALIERS_NEIGE, palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
@@ -17,6 +18,22 @@ import { statsDe } from '@/lib/carte-meteo/texte-ia';
 import { useTexteIA } from './TexteIA';
 import { estStationGrandeVille } from '@/lib/carte-meteo/stations-bilan';
 import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
+
+/** Réglages d'affichage communs aux cartes d'une page (fond, relief, fleuves, contours, thème) ; absents = réglages habituels. */
+export interface AffichageCarte {
+  /** Thème visuel (Halloween, Noël, Pâques) ; null = aucun. */
+  theme: ThemeCarte | null;
+  /** Fond de carte ; null = selon le zoom. */
+  fond: Couche | null;
+  relief: boolean;
+  /** Part du relief qui transparaît (0 à 90). */
+  reliefPourcent: number;
+  /** Cours d'eau : aucun, ou densité ; null = selon la zone. */
+  fleuves: 'aucun' | 'faible' | 'moyen' | 'dense' | null;
+  opaciteFleuves: number;
+  contours: 'defaut' | 'aucun' | 'regions';
+}
+export const AffichageContexte = createContext<AffichageCarte | null>(null);
 
 /** Une valeur à placer sur la carte : point de prévision (département, ville) ou station d'observation. */
 export interface PointInfo {
@@ -94,7 +111,9 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
 export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1 }: Props) {
-  const fleuves = useFleuves(true);
+  const affichage = useContext(AffichageContexte);
+  const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
+  const contoursReg = useContours(affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
@@ -183,6 +202,12 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const codes = useMemo(() => codesDeLaZone(zone), [zone]);
   const selection = useMemo(() => new Set(codes), [codes]);
   const departements = useMemo(() => (enFrance ? contoursDep : contoursDep.filter((c) => selection.has(c.code))), [contoursDep, selection, enFrance]);
+  // Contours : « Aucun » = liste vide (seul le remplissage trace les départements) ; « Régions » = leurs contours ; sinon, réglage habituel.
+  const regionsAffichees = useMemo(() => {
+    if (affichage?.contours === 'aucun') return [];
+    if (affichage?.contours !== 'regions' || enDepartement) return null;
+    return zone.startsWith('reg:') ? contoursReg.filter((c) => normaliser(c.nom) === normaliser(zone.slice(4))) : contoursReg;
+  }, [affichage?.contours, enDepartement, zone, contoursReg]);
   const vue = useMemo(() => {
     const boite = unirBoites(contoursDep.filter((c) => selection.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
     // Régions et départements : la colonne de gauche reste libre pour le classement et la légende.
@@ -473,12 +498,15 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         largeur={largeur}
         fleuves={fleuves}
         // Comme la carte météo : les quatre grands fleuves en France et en région, fleuves et rivières principales en département.
-        densiteFleuves={zone.startsWith('dep:') ? 'moyen' : 'faible'}
-        afficherRelief
-        reliefVisible={0.22}
+        densiteFleuves={affichage?.fleuves && affichage.fleuves !== 'aucun' ? affichage.fleuves : zone.startsWith('dep:') ? 'moyen' : 'faible'}
+        opaciteFleuves={(affichage?.opaciteFleuves ?? 100) / 100}
+        afficherRelief={affichage?.relief ?? true}
+        reliefVisible={(affichage?.reliefPourcent ?? 22) / 100}
+        fond={affichage?.fond ?? undefined}
+        theme={affichage?.theme ?? null}
         vue={vue}
         departements={departements}
-        regions={null}
+        regions={regionsAffichees}
         selection={selection}
         marqueurs={[]}
         echelleMarqueurs={1}

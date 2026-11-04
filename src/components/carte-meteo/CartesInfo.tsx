@@ -25,7 +25,9 @@ import {
   type ThemeInfo,
   type ThemePrevision,
 } from '@/lib/carte-meteo/cartes-info';
-import CarteInfo, { type PointInfo } from './CarteInfo';
+import CarteInfo, { AffichageContexte, type AffichageCarte, type PointInfo } from './CarteInfo';
+import { THEMES_CARTE } from '@/lib/carte-meteo/pictos';
+import { LIBELLES_COUCHES, type Couche } from '@/lib/carte-meteo/tuiles';
 import { depStation, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import CarteSynthese, { type RubriqueSynthese } from './CarteSynthese';
 import { MASQUES_FRANCE, NOM_ECHEANCE, SECOURS, codesDeLaZone, libelleJour, normaliser } from './CarteMeteo';
@@ -148,6 +150,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [groupeChoisi, setGroupeChoisi] = useState(uneCarte ? 'Températures' : 'tous');
   const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
   const [recherche, setRecherche] = useState('');
+  // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
+  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut' });
+  const regler = (changement: Partial<AffichageCarte>) => setAffichage((a) => ({ ...a, ...changement }));
   const [filtreGroupe, setFiltreGroupe] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
   const [climatCommunes, setClimatCommunes] = useState<{ dep: string; communes: ClimatCommune[] } | null>(null);
@@ -535,6 +540,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
 
   const legende = uneCarte ? 'mb-1 block text-xs font-bold uppercase tracking-wide text-primary' : legendeBarre;
   return (
+    <AffichageContexte.Provider value={affichage}>
     <div>
       <div className={uneCarte ? 'flex flex-col gap-3 rounded-2xl border-2 border-primary/30 bg-primary/5 p-5 shadow-sm' : 'flex flex-col gap-3 rounded-xl border border-border bg-surface p-4'}>
         <div className={uneCarte ? 'grid grid-cols-1 items-start gap-x-6 gap-y-4 lg:grid-cols-12' : 'flex flex-wrap items-end gap-x-6 gap-y-3'}>
@@ -845,6 +851,68 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </select>
           </label>
         </div>
+        {uneCarte && (
+          <details open className="rounded-xl border border-primary/30 bg-surface p-4">
+            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-primary">Affichage de la carte</summary>
+            <div className="mt-3 grid grid-cols-1 items-end gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-sm font-medium">
+                <span className={legende}>Thème de la carte</span>
+                <select value={affichage.theme ?? ''} onChange={(e) => regler({ theme: (e.target.value || null) as AffichageCarte['theme'] })} className={`${selectBarre} w-full`}>
+                  <option value="">Aucun (carte habituelle)</option>
+                  {THEMES_CARTE.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.libelle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Fond de carte</span>
+                <select value={affichage.fond ?? ''} onChange={(e) => regler({ fond: (e.target.value || null) as Couche | null })} className={`${selectBarre} w-full`}>
+                  <option value="">Automatique (relief ou photos IGN)</option>
+                  {(Object.keys(LIBELLES_COUCHES) as Couche[]).map((c) => (
+                    <option key={c} value={c}>
+                      {LIBELLES_COUCHES[c]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Contours</span>
+                <select value={affichage.contours} onChange={(e) => regler({ contours: e.target.value as AffichageCarte['contours'] })} className={`${selectBarre} w-full`}>
+                  <option value="defaut">Habituels</option>
+                  <option value="aucun">Aucun</option>
+                  <option value="regions">Régions</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Fleuves</span>
+                <select value={affichage.fleuves ?? ''} onChange={(e) => regler({ fleuves: (e.target.value || null) as AffichageCarte['fleuves'] })} className={`${selectBarre} w-full`}>
+                  <option value="">Automatique selon la zone</option>
+                  <option value="aucun">Aucun</option>
+                  <option value="faible">Faible (4 grands fleuves)</option>
+                  <option value="moyen">Moyen (fleuves et rivières)</option>
+                  <option value="dense">Dense</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={affichage.relief} onChange={(e) => regler({ relief: e.target.checked })} />
+                Reliefs
+              </label>
+              <label className={`flex items-center gap-2 text-sm ${affichage.relief ? '' : 'opacity-50'}`}>
+                Opacité du relief
+                <input type="range" min={0} max={90} step={5} value={affichage.reliefPourcent} disabled={!affichage.relief} onChange={(e) => regler({ reliefPourcent: Number(e.target.value) })} aria-label="Opacité du relief" />
+                <span className="w-9 tabular-nums text-muted">{affichage.reliefPourcent} %</span>
+              </label>
+              <label className={`flex items-center gap-2 text-sm ${affichage.fleuves === 'aucun' ? 'opacity-50' : ''}`}>
+                Opacité des fleuves
+                <input type="range" min={10} max={100} step={5} value={affichage.opaciteFleuves} disabled={affichage.fleuves === 'aucun'} onChange={(e) => regler({ opaciteFleuves: Number(e.target.value) })} aria-label="Opacité des fleuves" />
+                <span className="w-10 tabular-nums text-muted">{affichage.opaciteFleuves} %</span>
+              </label>
+            </div>
+            <p className="mt-3 text-xs text-muted">Pictos, rafales, textes et icônes à poser : bouton « Carte avec pictos » en haut de la page.</p>
+          </details>
+        )}
         {!uneCarte && (
         <nav aria-label="Aller à une carte" className="flex flex-col gap-1.5 border-t border-border pt-3">
           {avecSynthese && (
@@ -1076,5 +1144,6 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
         </>
       )}
     </div>
+    </AffichageContexte.Provider>
   );
 }
