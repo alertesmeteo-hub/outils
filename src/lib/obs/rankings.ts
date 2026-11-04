@@ -173,7 +173,7 @@ export const WINDCHILL_SCALE = [
 export type RankingId =
   | 't' | 'dt24' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records' | 'tx12' | 'tx24'
   | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin' | 'tn12' | 'tn24'
-  | 'rr1' | 'rr3' | 'rr12' | 'rr24' | 'rr6' | 'rr24c' | 'rr48' | 'rr72'
+  | 'rr1' | 'rr3' | 'rr12' | 'rr24' | 'rr6' | 'rr0' | 'rr24c' | 'rr48' | 'rr72'
   | 'ff' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf24' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp6' | 'dp9' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
   | 'td' | 'windchill' | 'humidex' | 'sol10' | 'sol20' | 'sol50' | 'sol100'
@@ -316,6 +316,7 @@ export const RANKINGS: Ranking[] = [
   { id: 'rr1', short: 'Pluie 1 h', label: 'Classement de la pluie en 1 heure (dernière heure)', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(1) },
   { id: 'rr3', short: 'Pluie 3 h', label: 'Classement de la pluie sur 3 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(3) },
   { id: 'rr6', short: 'Pluie depuis 6 h UTC', label: 'Classement de la pluie depuis 6 h UTC, avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.since6, value: (o, w, n) => aggSum(o, w.since6, 'rr1', n) },
+  { id: 'rr0', short: 'Pluie depuis 00 h', label: 'Classement de la pluie de la journée, depuis minuit (heure de Paris)', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.sinceMidnight, value: (o, w, n) => aggSum(o, w.sinceMidnight, 'rr1', n) },
   { id: 'rr12', short: 'Pluie 12 h', label: 'Classement de la pluie sur 12 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(12) },
   { id: 'rr24', short: 'Pluie 24 h', label: 'Classement de la pluie sur 24 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', value: slide(24) },
   { id: 'rr24c', short: 'Pluie 24 h climato', label: 'Classement de la pluie de la journée climatologique (6 h UTC → 6 h UTC le lendemain), avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.clim, value: (o, w, n) => aggSum(o, w.clim, 'rr1', n) },
@@ -364,7 +365,7 @@ export const RANKINGS: Ranking[] = [
 ];
 export const isRecordRanking = (r: Ranking) => r.id === 'tx-records' || r.id === 'tn-records';
 /** Classements dont les colonnes de records sont toujours affichées. */
-export const alwaysRecords = (r: Ranking) => isRecordRanking(r) || r.id === 'rr6' || r.id === 'rr24c';
+export const alwaysRecords = (r: Ranking) => isRecordRanking(r) || r.id === 'rr6' || r.id === 'rr0' || r.id === 'rr24c';
 export const getRanking = (id: string | undefined) => RANKINGS.find((r) => r.id === id) ?? RANKINGS[0];
 
 /* ---------- Construction du tableau ---------- */

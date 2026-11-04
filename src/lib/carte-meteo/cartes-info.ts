@@ -24,6 +24,8 @@ export interface ThemeInfo {
   titre: string;
   /** Nom court (menus, titres de section). */
   court: string;
+  /** Explication d'une ligne (période couverte…), affichée sous le nom dans la recherche de « Une carte au choix ». */
+  aide?: string;
   unite: string;
   decimales: number;
   /** Paliers, du plus fort au plus faible ; le dernier commence à -Infinity. */
@@ -526,9 +528,10 @@ export const THEMES_BILAN: ThemeBilan[] = [
   { id: 'vent-mois', groupe: 'Bilan du mois', classement: '', mois: 'vent', titre: 'VENT MOYEN', court: 'Vent moyen', unite: 'km/h', decimales: 0, paliers: PALIERS_VENT_MOIS, ordre: 'desc', titreTop: 'Les plus ventés' },
   { id: 'n-tx', groupe: 'Écarts à la normale', classement: 'n-tx', titre: 'MAXIMALES : ÉCART À LA NORMALE', court: 'Écart des maximales', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
   { id: 'n-tn', groupe: 'Écarts à la normale', classement: 'n-tn', titre: 'MINIMALES : ÉCART À LA NORMALE', court: 'Écart des minimales', unite: '°', decimales: 1, paliers: PALIERS_ECART, ordre: 'desc', titreTop: 'Les plus au-dessus', signe: true },
-  { id: 'rr6', groupe: 'Pluie', classement: 'rr6', titre: 'PLUIE DEPUIS CE MATIN', court: 'Pluie depuis ce matin', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
-  { id: 'rr24c', groupe: 'Pluie', classement: 'rr24c', titre: 'PLUIE DE LA JOURNÉE', court: 'Pluie de la journée', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
-  { id: 'rr24', groupe: 'Pluie', classement: 'rr24', titre: 'PLUIE SUR 24 HEURES', court: 'Pluie 24 h', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'rr6', groupe: 'Pluie', classement: 'rr6', titre: 'PLUIE DEPUIS 6 H UTC', court: 'Pluie depuis ce matin', aide: 'Cumul depuis 6 h UTC (7 h en hiver, 8 h en été) jusqu’à maintenant.', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'rr0', groupe: 'Pluie', classement: 'rr0', titre: 'PLUIE DE LA JOURNÉE (DEPUIS 00 H)', court: 'Pluie de la journée', aide: 'Cumul depuis 00 h (minuit, heure de Paris) jusqu’à maintenant.', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'rr24c', groupe: 'Pluie', classement: 'rr24c', titre: 'PLUIE DE LA JOURNÉE CLIMATOLOGIQUE (6 H → 6 H UTC)', court: 'Pluie journée climatologique', aide: 'Dernière journée complète de 6 h UTC à 6 h UTC (7 h → 7 h en hiver) : la journée de référence des records.', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
+  { id: 'rr24', groupe: 'Pluie', classement: 'rr24', titre: 'PLUIE SUR LES 24 DERNIÈRES HEURES', court: 'Pluie 24 h', aide: 'Les 24 heures écoulées, glissantes : de maintenant à la même heure hier.', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
   { id: 'rr72', groupe: 'Pluie', classement: 'rr72', titre: 'PLUIE SUR 72 HEURES', court: 'Pluie 72 h', unite: 'mm', decimales: 1, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés' },
   { id: 'raf24', groupe: 'Vent', classement: 'raf24', titre: 'RAFALES MAXIMALES', court: 'Rafales 24 h', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes' },
   { id: 'insol24', groupe: 'Soleil et neige', classement: 'insol24', titre: 'ENSOLEILLEMENT', court: 'Soleil 24 h', unite: 'h', decimales: 1, paliers: PALIERS_SOLEIL, ordre: 'desc', titreTop: 'Les plus ensoleillés' },

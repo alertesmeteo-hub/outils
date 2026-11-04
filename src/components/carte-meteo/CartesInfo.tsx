@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR, REGION_PAR_DEPARTEMENT, departementsDeLaRegion } from '@/lib/carte-meteo/regions-fr';
+import { ZONES_QUARTS, grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import { CLIMAT_REGIONS, type Horizon } from '@/lib/carte-meteo/climat-tracc';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
@@ -169,11 +170,12 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   /** Mois des cartes « Bilan du mois » (AAAA-MM) ; null = mois en cours. Le reste des bilans ne dépend pas du mois. */
   const [moisBilan, setMoisBilan] = useState<string | null>(null);
 
-  const zone = niveau === 'france' ? 'france' : niveau === 'region' ? `reg:${region}` : `dep:${departement}`;
+  const zone = niveau === 'france' ? 'france' : niveau === 'region' ? (region.startsWith('gz:') ? region : `reg:${region}`) : `dep:${departement}`;
   const enDepartement = niveau === 'departement';
   const dateISO = ajouterJours(aujourdhui, jour);
   // Département : ses villes ; région : les villes de chacun de ses départements ; France : un point par département.
-  const requeteZone = niveau === 'departement' ? `&dep=${departement}` : niveau === 'region' ? `&deps=${codesDeLaZone(zone).join(',')}` : '';
+  const requeteZone = niveau === 'departement' ? `&dep=${departement}` : niveau === 'region' && !region.startsWith('gz:') ? `&deps=${codesDeLaZone(zone).join(',')}` : '';
+  // Grandes zones (Nord, Sud, NO, NE, SO, SE) : les données de la France entière (un point par département), cadrées sur la zone.
   const cle = `${modele}|${dateISO}|${requeteZone}`;
   const modeleCumul = modeleDuCumul(modele);
   const cleCumul = `${modeleCumul}|${aujourdhui}|${requeteZone}`;
@@ -319,7 +321,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           if (v != null) valeursDepartements[d] = v;
         }
         // Une étiquette par région ; en vue département, au centre du département (valeur de sa région).
-        const regions = niveau === 'france' ? REGIONS_FR : [niveau === 'region' ? region : REGION_PAR_DEPARTEMENT[departement]];
+        const regions = niveau === 'france' || region.startsWith('gz:') ? REGIONS_FR : [niveau === 'region' ? region : REGION_PAR_DEPARTEMENT[departement]];
         const points = regions
           .map((r): PointInfo | null => {
             const v = valeurDe(r);
@@ -447,7 +449,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
     setErreur(null);
   }
 
-  const nomZone = niveau === 'france' ? 'France' : niveau === 'region' ? region : DEPARTEMENTS_FR[departement];
+  const nomZone = niveau === 'france' ? 'France' : niveau === 'region' ? (region.startsWith('gz:') ? grandeZone(region.slice(3))?.nom ?? region : region) : DEPARTEMENTS_FR[departement];
   const modeleAffiche = previsions?.cle === cle ? infosModele(previsions.modele, previsions.modeles) : undefined;
   const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
   // « Températures en direct » et « Observations en direct » ont leur propre page (/outils/temperatures-en-direct/, /outils/observations-en-direct/) : pas ici.
@@ -577,7 +579,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               {(
                 [
                   ['france', 'France'],
-                  ['region', 'Région'],
+                  ['region', 'Région / zone'],
                   ['departement', 'Département'],
                 ] as const
               ).map(([valeur, libelle]) => (
@@ -598,11 +600,20 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               ))}
               {niveau === 'region' && (
                 <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectBarre} aria-label="Région">
-                  {REGIONS_FR.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
+                  <optgroup label="Grandes zones">
+                    {ZONES_QUARTS.map((z) => (
+                      <option key={z.id} value={`gz:${z.id}`}>
+                        {z.nom}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Régions">
+                    {REGIONS_FR.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               )}
               {niveau === 'departement' && (
@@ -714,7 +725,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </label>
           )}
           {mode === 'bilan' && bilans?.mois && bilans.mois.disponibles.length > 1 && (
-            <label className="text-sm font-medium">
+            <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-3 lg:col-start-6' : ''}`}>
               <span className={legende}>Mois</span>
               <select
                 value={moisBilan ?? bilans.mois.affiche}
@@ -724,7 +735,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                   setBilans(null);
                   setErreurBilans(null);
                 }}
-                className={selectBarre}
+                className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`}
                 title="Mois des cartes « Bilan du mois »"
               >
                 {[...bilans.mois.disponibles].reverse().map((m) => (
@@ -737,7 +748,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </label>
           )}
           {mode === 'climat' && (
-            <fieldset>
+            <fieldset className={uneCarte ? 'lg:col-span-7 lg:col-start-6' : undefined}>
               <legend className={legende}>Horizon</legend>
               <div className="flex gap-3">
                 {([2050, 2100] as const).map((h) => (
@@ -788,7 +799,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                               }}
                               className={`block w-full px-3 py-1.5 text-left ${t.id === carteEffective?.id ? 'bg-primary text-white' : 'hover:bg-bg'}`}
                             >
-                              {t.court}
+                              <span className="block">{t.court}</span>
+                              {t.aide && <span className={`mt-0.5 block text-xs font-normal ${t.id === carteEffective?.id ? 'text-white/85' : 'text-muted'}`}>{t.aide}</span>}
                             </button>
                           </li>
                         ))}

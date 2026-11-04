@@ -1,3 +1,4 @@
+import { COORDS_DEPARTEMENTS } from './departements-coords';
 import { departementsDeLaRegion } from './regions-fr';
 
 /** Grandes zones de la France (tableaux et cartes) : id utilisé dans les zones « gz:<id> ». */
@@ -19,4 +20,24 @@ export const GRANDES_ZONES: GrandeZone[] = [
   { id: 'corse', nom: 'Corse', departements: ['2A', '2B'] },
 ];
 
-export const grandeZone = (id: string) => GRANDES_ZONES.find((z) => z.id === id);
+/**
+ * Moitiés et quarts de la France (cartes « Une carte au choix ») : coupés par la latitude 46,5 °N (Nord / Sud) et la longitude 3 °E
+ * (Ouest / Est), d'après le centre de chaque département. Le Nord est donc exactement NO + NE, et le Sud SO + SE.
+ */
+const LAT_NORD_SUD = 46.5;
+const LON_OUEST_EST = 3;
+const dans = (nord: boolean | null, ouest: boolean | null) =>
+  Object.entries(COORDS_DEPARTEMENTS)
+    .filter(([, c]) => (nord == null || c.lat >= LAT_NORD_SUD === nord) && (ouest == null || c.lon < LON_OUEST_EST === ouest))
+    .map(([code]) => code);
+
+export const ZONES_QUARTS: GrandeZone[] = [
+  { id: 'moitie-nord', nom: 'Nord de la France', departements: dans(true, null) },
+  { id: 'moitie-sud', nom: 'Sud de la France', departements: dans(false, null) },
+  { id: 'quart-no', nom: 'Nord-Ouest (NO)', departements: dans(true, true) },
+  { id: 'quart-ne', nom: 'Nord-Est (NE)', departements: dans(true, false) },
+  { id: 'quart-so', nom: 'Sud-Ouest (SO)', departements: dans(false, true) },
+  { id: 'quart-se', nom: 'Sud-Est (SE)', departements: dans(false, false) },
+];
+
+export const grandeZone = (id: string) => [...GRANDES_ZONES, ...ZONES_QUARTS].find((z) => z.id === id);

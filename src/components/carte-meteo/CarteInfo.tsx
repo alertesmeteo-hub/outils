@@ -16,6 +16,7 @@ import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { statsDe } from '@/lib/carte-meteo/texte-ia';
 import { useTexteIA } from './TexteIA';
 import { estStationGrandeVille } from '@/lib/carte-meteo/stations-bilan';
+import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
 
 /** Une valeur à placer sur la carte : point de prévision (département, ville) ou station d'observation. */
 export interface PointInfo {
@@ -283,7 +284,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const rectLegende: Rect = { x: MARGE_COLONNE, y: HAUTEUR_CARTE - 44 - hauteurLegende, w: largeurLegende, h: hauteurLegende };
 
   // Texte IA (à la demande) : posé en bas, à droite de la légende.
-  const nomZone = enFrance ? 'France métropolitaine' : enDepartement ? `${DEPARTEMENTS_FR[zone.slice(4)]} (${zone.slice(4)})` : zone.slice(4);
+  const nomZone = enFrance ? 'France métropolitaine' : enDepartement ? `${DEPARTEMENTS_FR[zone.slice(4)]} (${zone.slice(4)})` : zone.startsWith('gz:') ? grandeZone(zone.slice(3))?.nom ?? zone.slice(3) : zone.slice(4);
   const xTexte = rectLegende.x + rectLegende.w + 16;
   const texteIA = useTexteIA(
     () =>
@@ -319,7 +320,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   // « Toutes les stations » : pastilles plus petites pour en placer le plus possible.
   const taille = Math.round((theme.toutes ? (enFrance ? 10 : 13) : enFrance ? 16 : enDepartement ? 19 : 17) * echelleValeurs * 10) / 10;
   // partValeurs = 0 : aucune valeur sur la carte.
-  const plafond = partValeurs === 0 ? 0 : Math.max(4, Math.round((theme.toutes ? 500 : PLAFOND[niveau] * zonesParDepartement) * partValeurs));
+  const plafond = partValeurs === 0 ? 0 : Math.max(4, Math.round((theme.toutes ? 500 : PLAFOND[zone.startsWith('gz:') ? 'france' : niveau] * zonesParDepartement) * partValeurs));
   const parDepartementMax = theme.toutes ? Infinity : PAR_DEPARTEMENT[niveau] * zonesParDepartement;
   const avecFleche = (p: PointInfo) => p.direction != null && Number.isFinite(p.direction);
 
