@@ -38,6 +38,8 @@ export default function ObservationsDirect() {
   const [echelleTop, setEchelleTop] = useState(2);
   // Cartes de pluie : valeurs affichées à partir de ce cumul (mm) ; 0 = toutes.
   const [seuilMm, setSeuilMm] = useState(0);
+  // Nom de la ville sous chaque valeur, et flèche vers la station.
+  const [reperes, setReperes] = useState(false);
   const zone = useZone('zone-observations-en-direct');
   const [themeId, setThemeId] = useState(THEMES_OBS[0]?.id ?? '');
   const [pluieId, setPluieId] = useState(THEMES_PLUIE[0]?.id ?? '');
@@ -104,6 +106,10 @@ export default function ObservationsDirect() {
             <option value="extra">Extra</option>
             <option value="extra-plus">Extra+</option>
           </select>
+        </label>
+        <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
+          <input type="checkbox" checked={reperes} onChange={(e) => setReperes(e.target.checked)} />
+          Flèches et noms des villes
         </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Pluie : afficher à partir de</span>
@@ -211,6 +217,7 @@ export default function ObservationsDirect() {
             key={theme.id}
             theme={theme}
             valeurMin={theme.unite === 'mm' ? seuilMm : undefined}
+            reperes={reperes}
             zone={zone.zone}
             points={points[theme.id] ?? []}
             sousTitre={sousTitre(theme.id)}
@@ -253,6 +260,7 @@ export default function ObservationsDirect() {
             key={pluie.id}
             theme={pluie}
             valeurMin={pluie.unite === 'mm' ? seuilMm : undefined}
+            reperes={reperes}
             zone={zone.zone}
             points={points[pluie.id] ?? []}
             sousTitre={sousTitre(pluie.id)}

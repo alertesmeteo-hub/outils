@@ -34,8 +34,13 @@ export interface AffichageCarte {
   contours: 'defaut' | 'aucun' | 'regions';
   /** Cartes en mm (pluie) : valeurs affichées à partir de ce cumul ; 0 = toutes. */
   seuilPluie?: number;
+  /** Nom de la ville sous chaque valeur, et flèche vers la station quand la valeur est décalée. */
+  reperes?: boolean;
 }
 export const AffichageContexte = createContext<AffichageCarte | null>(null);
+
+/** « GIUNCAGGIO_SAPC » → « Giuncaggio Sapc » : nom de station lisible sous la valeur. */
+const nomLisible = (nom: string) => nom.replace(/_/g, ' ').toLowerCase().replace(/(^|[\s'-])\S/g, (m) => m.toUpperCase());
 
 /** Une valeur à placer sur la carte : point de prévision (département, ville) ou station d'observation. */
 export interface PointInfo {
@@ -90,6 +95,8 @@ interface Props {
   decalagesValeurs?: Record<string, [number, number]>;
   /** Seules les valeurs d'au moins ce niveau sont affichées (ex. pluie à partir de 10 mm) ; absent = toutes. */
   valeurMin?: number;
+  /** Nom de la ville sous chaque valeur et flèche vers la station (sinon : réglage du bloc « Affichage de la carte »). */
+  reperes?: boolean;
   /** Masque le tableau du classement (« Les plus fortes… »), en plus des cartes qui n'en ont pas. */
   sansTableau?: boolean;
   /** Découpage automatique : nombre de zones par département (plusieurs points par département en vue France). */
@@ -116,7 +123,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, sansTableau = false }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, sansTableau = false }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -225,6 +232,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const hauteurLogo = logoUrl ? (zone === 'dep:66' && logoId.startsWith('pays-catalan') ? 150 : 83) : 0;
 
   // Seuil d'affichage : celui de la page (valeurMin) ou, pour les cartes en mm, celui du bloc « Affichage de la carte ».
+  const avecReperes = reperes ?? affichage?.reperes ?? false;
+  const avecNoms = enDepartement || avecReperes;
   const seuil = valeurMin ?? (theme.unite === 'mm' ? affichage?.seuilPluie ?? 0 : 0);
   const dansZone = useMemo(
     () => pointsCorriges.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur) && (!seuil || p.neige || p.valeur >= seuil)),
@@ -385,7 +394,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         const texte = texteInfo(theme, e.p.valeur);
         const largeurBulle = (texte.length * 0.56 + (uniteDe(e.p) ? uniteDe(e.p).length * 0.42 + 0.25 : 0) + 0.95 + (avecFleche(e.p) ? 1.05 : 0)) * taille;
         const hauteurBulle = 1.45 * taille;
-        const largeurNom = enDepartement ? e.p.nom.length * 0.33 * taille + 6 : 0;
+        const largeurNom = avecNoms ? e.p.nom.length * 0.33 * taille + 6 : 0;
         const avecPicto = !!pictos?.[e.p.code];
         const demi = Math.max(largeurBulle, largeurNom, avecPicto ? TAILLE_PICTO * taille : 0) / 2;
         return {
@@ -395,7 +404,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           gauche: demi,
           droite: demi,
           haut: hauteurBulle / 2 + (avecPicto ? TAILLE_PICTO * taille : 0),
-          bas: hauteurBulle / 2 + (enDepartement ? 0.85 * taille : 0),
+          bas: hauteurBulle / 2 + (avecNoms ? 0.85 * taille : 0),
           priorite: codesTop.has(e.p.code) || grandesVilles.has(e.p.code) ? 0 : 1,
         };
       });
@@ -411,13 +420,14 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     // Toutes les stations : une pastille peut s'écarter un peu plus de sa station pour trouver une place libre.
     const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * (theme.toutes ? 1.6 : 0.9));
     const parCode = new Map(ecran.map((e) => [e.p.code, e.p]));
+    const origine = new Map(ecran.map((e) => [e.p.code, { ox: e.x, oy: e.y }]));
     let restantes = plafond;
     return elements
       .filter((e) => positions.has(e.code))
       .filter((e) => e.priorite === 0 || restantes-- > 0)
-      .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)! }));
+      .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)!, ...origine.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos]);
+  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -534,6 +544,25 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         onModifier={NOP}
         remplissages={remplissages}
       >
+        {avecReperes && (
+          <svg className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 3 }} width={largeur} height={HAUTEUR_CARTE} aria-hidden>
+            <defs>
+              <marker id="cinfo-pointe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="#fff" stroke="#000" strokeWidth="0.8" />
+              </marker>
+            </defs>
+            {places.map(({ p, x, y, ox, oy }) => {
+              const decale = Math.hypot(ox - x, oy - y) > 0.9 * taille;
+              return (
+                <g key={p.code}>
+                  {decale && <line x1={x} y1={y} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(3, taille * 0.2)} strokeOpacity={0.55} strokeLinecap="round" />}
+                  {decale && <line x1={x} y1={y} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.6, taille * 0.1)} markerEnd="url(#cinfo-pointe)" />}
+                  <circle cx={ox} cy={oy} r={Math.max(2.5, taille * 0.16)} fill="#fff" stroke="#000" strokeWidth="1" />
+                </g>
+              );
+            })}
+          </svg>
+        )}
         {places.map(({ p, x, y }) => {
           const palier = palierDe(p.neige ? PALIERS_NEIGE : theme.paliers, p.valeur);
           const fichierPicto = pictos?.[p.code] ? cheminPictoImage(pictos[p.code]) : undefined;
@@ -576,7 +605,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
                 )}
                 {uniteDe(p) && <small>{uniteDe(p)}</small>}
               </div>
-              {enDepartement && <div className="cinfo-nom">{p.nom}</div>}
+              {avecNoms && <div className="cinfo-nom">{avecReperes ? nomLisible(p.nom) : p.nom}</div>}
               {edition && (
                 <button
                   type="button"

@@ -151,7 +151,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
-  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', seuilPluie: 0 });
+  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', seuilPluie: 0, reperes: false });
   const regler = (changement: Partial<AffichageCarte>) => setAffichage((a) => ({ ...a, ...changement }));
   const [filtreGroupe, setFiltreGroupe] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
@@ -905,6 +905,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!affichage.reperes} onChange={(e) => regler({ reperes: e.target.checked })} />
+                Flèches et noms des villes
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={affichage.relief} onChange={(e) => regler({ relief: e.target.checked })} />
