@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from 'react';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR } from '@/lib/carte-meteo/regions-fr';
+import { ZONES_QUARTS, grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import { CODES_DEPARTEMENTS } from '@/lib/carte-meteo/previsions-modeles';
 
 type Niveau = 'france' | 'region' | 'departement';
@@ -23,7 +24,7 @@ export function useZone(cle: string, departementImpose?: string) {
     try {
       const memo = JSON.parse(localStorage.getItem(cle) ?? 'null') as { niveau?: Niveau; region?: string; departement?: string } | null;
       if (memo?.niveau) setNiveau(memo.niveau);
-      if (memo?.region && REGIONS_FR.includes(memo.region)) setRegion(memo.region);
+      if (memo?.region && (REGIONS_FR.includes(memo.region) || (memo.region.startsWith('gz:') && grandeZone(memo.region.slice(3))))) setRegion(memo.region);
       if (memo?.departement && CODES_DEPARTEMENTS.includes(memo.departement)) setDepartement(memo.departement);
     } catch {
       // Stockage indisponible (navigation privée…) : France par défaut.
@@ -38,9 +39,10 @@ export function useZone(cle: string, departementImpose?: string) {
     }
   }, [cle, niveau, region, departement, departementImpose]);
 
-  const zone = niveau === 'france' ? 'france' : niveau === 'region' ? `reg:${region}` : `dep:${departement}`;
+  // Région, ou grande zone (« gz:moitie-nord », « gz:quart-se »… : Nord, Sud, NO, NE, SO, SE).
+  const zone = niveau === 'france' ? 'france' : niveau === 'region' ? (region.startsWith('gz:') ? region : `reg:${region}`) : `dep:${departement}`;
   /** Morceau du nom des fichiers exportés : « france », « pyrenees-orientales »… */
-  const nomFichier = (niveau === 'france' ? 'france' : niveau === 'region' ? region : DEPARTEMENTS_FR[departement] ?? departement)
+  const nomFichier = (niveau === 'france' ? 'france' : niveau === 'region' ? (region.startsWith('gz:') ? grandeZone(region.slice(3))?.nom ?? region : region) : DEPARTEMENTS_FR[departement] ?? departement)
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
@@ -60,7 +62,7 @@ export default function ChoixZone({ etat }: { etat: ReturnType<typeof useZone> }
         {(
           [
             ['france', 'France'],
-            ['region', 'Région'],
+            ['region', 'Région / zone'],
             ['departement', 'Département'],
           ] as const
         ).map(([valeur, libelle]) => (
@@ -71,11 +73,20 @@ export default function ChoixZone({ etat }: { etat: ReturnType<typeof useZone> }
         ))}
         {niveau === 'region' && (
           <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectBarre} aria-label="Région">
-            {REGIONS_FR.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
+            <optgroup label="Grandes zones">
+              {ZONES_QUARTS.map((z) => (
+                <option key={z.id} value={`gz:${z.id}`}>
+                  {z.nom}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Régions">
+              {REGIONS_FR.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </optgroup>
           </select>
         )}
         {niveau === 'departement' && (

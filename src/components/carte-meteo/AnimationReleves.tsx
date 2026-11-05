@@ -1,5 +1,6 @@
 'use client';
 
+import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointInfo } from './CarteInfo';
 import { basCarte, COTE_RELEVES, HAUTEUR_CARRE, HAUTEUR_FACEBOOK, HAUTEUR_TIKTOK, LARGEUR_YOUTUBE, dessinerReleves, ecranStation, type ParametreReleve, type PointReleve, type ReponseRelevesAnimation } from '@/lib/carte-meteo/animation-releves';
@@ -99,7 +100,7 @@ export default function AnimationReleves({ departementImpose }: { departementImp
     const boite = (codes && unirBoites(contoursBruts.filter((c) => codes.has(c.code)).map((c) => c.boite))) || BOITE_FRANCE;
     return ajusterVue(boite, { gauche: 0, haut: 0, droite: largeur, bas }, codes ? 0.04 : 0.01);
   }, [codes, contoursBruts, bas, largeur]);
-  const nomZone = zone.zone === 'france' ? 'FRANCE' : zone.zone.startsWith('reg:') ? zone.zone.slice(4).toUpperCase() : `${DEPARTEMENTS_FR[zone.zone.slice(4)] ?? ''} (${zone.zone.slice(4)})`.toUpperCase();
+  const nomZone = zone.zone === 'france' ? 'FRANCE' : zone.zone.startsWith('reg:') ? zone.zone.slice(4).toUpperCase() : zone.zone.startsWith('gz:') ? (grandeZone(zone.zone.slice(3))?.nom ?? '').toUpperCase() : `${DEPARTEMENTS_FR[zone.zone.slice(4)] ?? ''} (${zone.zone.slice(4)})`.toUpperCase();
   const rayon = useMemo(() => {
     const a = ecranStation(46, 2, vue);
     const b = ecranStation(46 + RAYON_KM / 111, 2, vue);

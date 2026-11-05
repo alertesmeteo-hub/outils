@@ -10,6 +10,7 @@ import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
 import { BOITE_FRANCE, FICHIERS_CONTOURS, codesDeLaZone, normaliser, useContours, useFleuves } from './CarteMeteo';
 import type { PointInfo } from './CarteInfo';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
+import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import { statsDe } from '@/lib/carte-meteo/texte-ia';
 import { useTexteIA } from './TexteIA';
 
@@ -97,7 +98,7 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
   });
 
   // Texte IA (à la demande) : posé en bas, entre les deux colonnes d'encadrés.
-  const nomZone = enFrance ? 'France métropolitaine' : enDepartement ? `${DEPARTEMENTS_FR[zone.slice(4)]} (${zone.slice(4)})` : zone.slice(4);
+  const nomZone = enFrance ? 'France métropolitaine' : enDepartement ? `${DEPARTEMENTS_FR[zone.slice(4)]} (${zone.slice(4)})` : zone.startsWith('gz:') ? grandeZone(zone.slice(3))?.nom ?? zone.slice(3) : zone.slice(4);
   const texteIA = useTexteIA(
     () =>
       classes.every((c) => c.length === 0)
