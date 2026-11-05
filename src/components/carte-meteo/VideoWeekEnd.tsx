@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
-import { ajouterJours, MODELES, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
+import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
+import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
+import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { cheminPictoImage, pictoDepuisPrevision } from '@/lib/carte-meteo/pictos';
 
 /** Vidéo verticale (TikTok, Reels, Shorts) « Quel temps ce week-end ? » : 3 ou 4 villes, samedi et dimanche, picto, maxi, mini, rafales, pluie. */
@@ -10,9 +11,29 @@ import { cheminPictoImage, pictoDepuisPrevision } from '@/lib/carte-meteo/pictos
 const L = 1080;
 const H = 1920;
 const FPS = 30;
-const DEPARTEMENT = '66';
-const NOM_DEPARTEMENT = 'Pyrénées-Orientales';
-const VILLES_DEFAUT = ['Perpignan', 'Canet-en-Roussillon', 'Prades', 'Bourg-Madame'];
+/** Villes choisies d'office pour un département (sinon : les plus peuplées, bien réparties). */
+const VILLES_PREFEREES: Record<string, string[]> = { '66': ['Perpignan', 'Canet-en-Roussillon', 'Prades', 'Bourg-Madame'] };
+const NB_VILLES = 4;
+
+interface VilleListe {
+  nom: string;
+  lat: number;
+  lon: number;
+}
+
+/** 4 villes : celles préférées du département si elles existent, sinon la plus peuplée puis, à chaque fois, la plus éloignée des déjà prises (parmi les 15 premières). */
+function villesAuto(dep: string, liste: VilleListe[]): string[] {
+  const preferees = (VILLES_PREFEREES[dep] ?? []).filter((n) => liste.some((v) => v.nom === n));
+  if (preferees.length >= 3) return preferees;
+  const candidates = liste.slice(0, 15);
+  const prises: VilleListe[] = candidates.slice(0, 1);
+  const d = (a: VilleListe, b: VilleListe) => Math.hypot((a.lon - b.lon) * Math.cos((a.lat * Math.PI) / 180), a.lat - b.lat);
+  while (prises.length < Math.min(NB_VILLES, candidates.length)) {
+    const suivante = candidates.filter((v) => !prises.includes(v)).reduce((m, v) => (Math.min(...prises.map((q) => d(q, v))) > Math.min(...prises.map((q) => d(q, m))) ? v : m));
+    prises.push(suivante);
+  }
+  return prises.map((v) => v.nom);
+}
 const DUREE_INTRO = 3;
 const DUREE_VILLE = 3.5;
 const DUREE_BILAN = 5;
@@ -155,6 +176,7 @@ interface Contexte {
   semaine: Semaine;
   villes: string[];
   logo: HTMLImageElement | null;
+  departement: string;
 }
 
 function dureeTotale(n: number) {
@@ -163,7 +185,7 @@ function dureeTotale(n: number) {
 
 /** Dessine l'image de la vidéo à l'instant `t` (secondes). */
 function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
-  const { semaine, villes, logo } = c;
+  const { semaine, villes, logo, departement } = c;
   const [sam, dim] = semaine.jours;
   fond(ctx);
   ctx.textBaseline = 'alphabetic';
@@ -175,7 +197,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     ctx.translate(0, (1 - a) * 80);
     ctx.fillStyle = '#ffe27a';
     ctx.font = `${70}px ${POLICE}`;
-    ctx.fillText(NOM_DEPARTEMENT.toUpperCase(), L / 2, 620);
+    texteAjuste(ctx, departement.toUpperCase(), L / 2, 620, 70, POLICE, 960, '#ffe27a');
     texteAjuste(ctx, 'QUEL TEMPS', L / 2, 820, 190, POLICE, 960);
     texteAjuste(ctx, 'CE WEEK-END ?', L / 2, 1030, 190, POLICE, 960);
     ctx.fillStyle = '#fff';
@@ -193,7 +215,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     const [js, jd] = semaine.villes[ville] ?? [versJour(undefined), versJour(undefined)];
     ctx.fillStyle = '#9ad8ff';
     ctx.font = `600 48px ${TEXTE}`;
-    ctx.fillText(`${NOM_DEPARTEMENT.toUpperCase()} · CE WEEK-END`, L / 2, 150);
+    texteAjuste(ctx, `${departement.toUpperCase()} · CE WEEK-END`, L / 2, 150, 48, TEXTE, 980, '#9ad8ff');
     const a = sortie(local / 0.5);
     ctx.save();
     ctx.globalAlpha = a;
@@ -257,7 +279,9 @@ const legende = 'mb-1 block text-xs font-bold uppercase tracking-wide text-prima
 
 export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const [modele, setModele] = useState<ModeleMeteo>('moyenne');
-  const [choix, setChoix] = useState<string[]>(VILLES_DEFAUT);
+  const [dep, setDep] = useState('66');
+  const [listeVilles, setListeVilles] = useState<{ dep: string; villes: VilleListe[] } | null>(null);
+  const [choix, setChoix] = useState<string[]>([]);
   const [logoId, setLogoId] = useState('pays-catalan-hd');
   const [donnees, setDonnees] = useState<{ cle: string; points: [PointCarte[], PointCarte[]] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -269,8 +293,33 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const [prets, setPrets] = useState(0);
 
   const jours = useMemo(() => weekEnd(aujourdhui), [aujourdhui]);
-  const cle = `${modele}|${jours[0]}`;
+  const nomDepartement = DEPARTEMENTS_FR[dep] ?? dep;
+  const cle = `${modele}|${jours[0]}|${dep}`;
   const villes = choix.filter(Boolean);
+  // Jours entre aujourd'hui et le dimanche : seuls les modèles qui vont jusque-là sont proposés (la moyenne va aussi loin que le CEP).
+  const echeanceDimanche = Math.round((Date.parse(`${jours[1]}T12:00:00Z`) - Date.parse(`${aujourdhui}T12:00:00Z`)) / 86_400_000);
+  const modelesProposes = MODELES.filter((m) => (m.id === 'moyenne' ? ECHEANCE_MAX.cep : ECHEANCE_MAX[m.id]) >= echeanceDimanche && (!m.departements || m.departements.includes(dep)));
+
+  // Villes du département : liste indépendante du week-end (le modèle choisi peut ne pas couvrir la date), puis choix automatique.
+  useEffect(() => {
+    const controleur = new AbortController();
+    setListeVilles(null);
+    fetch(`/api/carte-meteo/previsions/?modele=arome&date=${aujourdhui}&dep=${dep}`, { signal: controleur.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<{ points: PointCarte[] }>) : Promise.reject(new Error('Villes du département indisponibles'))))
+      .then((j) => {
+        const villes = j.points.filter((p) => p.lat != null && p.lon != null).map((p) => ({ nom: p.nom, lat: p.lat as number, lon: p.lon as number }));
+        setListeVilles({ dep, villes });
+        setChoix(villesAuto(dep, villes));
+        setLogoId(logoParDefaut([dep]).id === 'aucun' ? 'alertesmeteo' : logoParDefaut([dep]).id);
+      })
+      .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
+    return () => controleur.abort();
+  }, [dep, aujourdhui]);
+
+  // Le modèle choisi doit couvrir le week-end : sinon, retour à la moyenne.
+  useEffect(() => {
+    if (!modelesProposes.some((m) => m.id === modele)) setModele('moyenne');
+  }, [modelesProposes, modele]);
 
   useEffect(() => {
     if (donnees?.cle === cle) return;
@@ -278,7 +327,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     setErreur(null);
     Promise.all(
       jours.map((date) =>
-        fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${date}&dep=${DEPARTEMENT}`, { signal: controleur.signal }).then(async (r) => {
+        fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${date}&dep=${dep}`, { signal: controleur.signal }).then(async (r) => {
           if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
           return ((await r.json()) as { points: PointCarte[] }).points;
         })
@@ -287,9 +336,9 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
       .then(([a, b]) => setDonnees({ cle, points: [a, b] }))
       .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
     return () => controleur.abort();
-  }, [cle, donnees?.cle, jours, modele]);
+  }, [cle, donnees?.cle, jours, modele, dep]);
 
-  const toutesLesVilles = useMemo(() => (donnees ? [...donnees.points[0]].map((p) => p.nom).sort((a, b) => a.localeCompare(b, 'fr')) : []), [donnees]);
+  const toutesLesVilles = useMemo(() => (listeVilles?.dep === dep ? listeVilles.villes.map((v) => v.nom).sort((a, b) => a.localeCompare(b, 'fr')) : []), [listeVilles, dep]);
   const semaine: Semaine | null = useMemo(() => {
     if (!donnees || donnees.cle !== cle) return null;
     const parNom = (liste: PointCarte[]) => new Map(liste.map((p) => [p.nom, p]));
@@ -313,7 +362,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   }, [semaine, villes, logoId]);
 
   const total = dureeTotale(villes.length);
-  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo } : null;
+  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement } : null;
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -376,7 +425,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
       const url = URL.createObjectURL(new Blob(morceaux, { type: type.split(';')[0] }));
       const lien = document.createElement('a');
       lien.href = url;
-      lien.download = `meteo-weekend-66-${jours[0]}.${type.startsWith('video/mp4') ? 'mp4' : 'webm'}`;
+      lien.download = `meteo-weekend-${dep}-${jours[0]}.${type.startsWith('video/mp4') ? 'mp4' : 'webm'}`;
       lien.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (e) {
@@ -385,7 +434,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     } finally {
       setEtat(null);
     }
-  }, [contexte, total, jours]);
+  }, [contexte, total, jours, dep]);
 
   const changerVille = (k: number, nom: string) => setChoix((liste) => liste.map((v, i) => (i === k ? nom : v)));
 
@@ -393,12 +442,22 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4 rounded-2xl border-2 border-primary/30 bg-primary/5 p-5">
         <p className="text-sm">
-          Week-end du <strong>{libelleJour(jours[0]).toLowerCase()}</strong> et <strong>{libelleJour(jours[1]).toLowerCase()}</strong>, {NOM_DEPARTEMENT}.
+          Week-end du <strong>{libelleJour(jours[0]).toLowerCase()}</strong> et <strong>{libelleJour(jours[1]).toLowerCase()}</strong>.
         </p>
+        <label className="text-sm font-medium">
+          <span className={legende}>Département</span>
+          <select value={dep} onChange={(e) => { setDonnees(null); setChoix([]); setDep(e.target.value); }} className={selectBarre}>
+            {CODES_DEPARTEMENTS.map((c) => (
+              <option key={c} value={c}>
+                {c} — {DEPARTEMENTS_FR[c]}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="text-sm font-medium">
           <span className={legende}>Modèle</span>
           <select value={modele} onChange={(e) => setModele(e.target.value as ModeleMeteo)} className={selectBarre}>
-            {MODELES.filter((m) => !m.departements || m.departements.includes(DEPARTEMENT)).map((m) => (
+            {modelesProposes.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.libelle}
               </option>
@@ -412,7 +471,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
               {k >= 3 ? ' (facultative)' : ''}
             </span>
             <select value={choix[k] ?? ''} onChange={(e) => changerVille(k, e.target.value)} className={selectBarre}>
-              {k >= 3 && <option value="">Aucune</option>}
+              {(k >= 3 || !choix[k]) && <option value="">{k >= 3 ? 'Aucune' : '…'}</option>}
               {toutesLesVilles.map((v) => (
                 <option key={v} value={v}>
                   {v}
@@ -452,7 +511,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
           <input type="range" min={0} max={total} step={0.05} value={Math.min(t, total)} onChange={(e) => { setLecture(false); setT(Number(e.target.value)); }} className="flex-1" aria-label="Position dans la vidéo" />
           <span className="w-14 text-right text-xs tabular-nums text-muted">{Math.round(t * 10) / 10} s</span>
         </div>
-        {!contexte && !erreur && <p className="text-sm text-muted">Chargement des prévisions…</p>}
+        {!contexte && !erreur && <p className="text-sm text-muted">Chargement des villes et des prévisions…</p>}
       </div>
     </div>
   );
