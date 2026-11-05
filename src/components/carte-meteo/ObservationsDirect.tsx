@@ -35,13 +35,13 @@ export default function ObservationsDirect() {
   const { bilans, erreur, reessayer } = useBilans();
   const [taille, setTaille] = useState<keyof typeof TAILLES>('tres-grande');
   const [logoId, setLogoId] = useState('aucun');
-  const [echelleTop, setEchelleTop] = useState(2);
+  const [echelleTop, setEchelleTop] = useState(0);
   // Cartes de pluie : valeurs affichées à partir de ce cumul (mm) ; 0 = toutes.
-  const [seuilMm, setSeuilMm] = useState(0);
+  const [seuilMm, setSeuilMm] = useState(10);
   // Nom de la ville sous chaque valeur, et flèche vers la station.
-  const [reperes, setReperes] = useState(false);
+  const [reperes, setReperes] = useState(true);
   const zone = useZone('zone-observations-en-direct');
-  const [themeId, setThemeId] = useState(THEMES_OBS[0]?.id ?? '');
+  const [themeId, setThemeId] = useState(THEMES_OBS.find((t) => t.id === 'obs-rr48')?.id ?? THEMES_OBS[0]?.id ?? '');
   const [pluieId, setPluieId] = useState(THEMES_PLUIE[0]?.id ?? '');
   // Valeurs complémentaires importées sur demande (stations sans valeur dans les relevés Météo-France).
   const [complements, setComplements] = useState<ReponseComplements | null>(null);
@@ -228,7 +228,7 @@ export default function ObservationsDirect() {
             echelleTop={echelleTop || 1}
             sansTableau={echelleTop === 0}
             topRouge
-            titreDroite
+            titreDroite={echelleTop !== 0}
             echelleValeurs={TAILLES[taille]}
           />
         </div>
@@ -271,7 +271,7 @@ export default function ObservationsDirect() {
             echelleTop={echelleTop || 1}
             sansTableau={echelleTop === 0}
             topRouge
-            titreDroite
+            titreDroite={echelleTop !== 0}
           />
         </section>
       )}

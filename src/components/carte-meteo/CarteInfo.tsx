@@ -548,8 +548,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         {avecReperes && (
           <svg className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 3 }} width={largeur} height={HAUTEUR_CARTE} aria-hidden>
             <defs>
-              <marker id="cinfo-pointe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                <path d="M0 0 L10 5 L0 10 z" fill="#fff" stroke="#000" strokeWidth="0.8" />
+              <marker id="cinfo-pointe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M0 1 L10 5 L0 9 z" fill="#fff" stroke="#000" strokeWidth="1.2" />
               </marker>
             </defs>
             {places.map(({ p, x, y, ox, oy }) => {
@@ -558,9 +558,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
               const decale = Math.hypot(ox - x, oy - sy) > 0.5 * taille && (oy >= y ? oy > sy : oy < sy);
               return (
                 <g key={p.code}>
-                  {decale && <line x1={x} y1={sy} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(3, taille * 0.2)} strokeOpacity={0.55} strokeLinecap="round" />}
-                  {decale && <line x1={x} y1={sy} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.6, taille * 0.1)} markerEnd="url(#cinfo-pointe)" />}
-                  <circle cx={ox} cy={oy} r={Math.max(2.5, taille * 0.16)} fill="#fff" stroke="#000" strokeWidth="1" />
+                  {decale && <line x1={x} y1={sy} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(2.6, taille * 0.12)} strokeOpacity={0.6} strokeLinecap="round" />}
+                  {decale && <line x1={x} y1={sy} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.2, taille * 0.05)} markerEnd="url(#cinfo-pointe)" />}
+                  <circle cx={ox} cy={oy} r={Math.max(2, taille * 0.09)} fill="#fff" stroke="#000" strokeWidth="1" />
                 </g>
               );
             })}
