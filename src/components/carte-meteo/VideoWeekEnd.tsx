@@ -6,11 +6,18 @@ import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { cheminPictoImage, pictoDepuisPrevision } from '@/lib/carte-meteo/pictos';
 
-/** Vidéo verticale (TikTok, Reels, Shorts) « Quel temps ce week-end ? » : 3 ou 4 villes, samedi et dimanche, picto, maxi, mini, rafales, pluie. */
+/** Vidéo « Quel temps ce week-end ? » (TikTok, Reels, Shorts, Facebook, YouTube) : 3 ou 4 villes, samedi et dimanche, picto, maxi, mini, rafales, pluie. */
 
-const L = 1080;
-const H = 1920;
 const FPS = 30;
+
+/** Formats de vidéo : dimensions en pixels. */
+const FORMATS = [
+  { id: 'tiktok', libelle: 'TikTok, Reels, Shorts (9:16)', l: 1080, h: 1920 },
+  { id: 'facebook', libelle: 'Facebook, Instagram (4:5)', l: 1080, h: 1350 },
+  { id: 'carre', libelle: 'Carré (1:1)', l: 1080, h: 1080 },
+  { id: 'youtube', libelle: 'YouTube (16:9)', l: 1920, h: 1080 },
+] as const;
+type FormatId = (typeof FORMATS)[number]['id'];
 /** Villes choisies d'office pour un département (sinon : les plus peuplées, bien réparties). */
 const VILLES_PREFEREES: Record<string, string[]> = { '66': ['Perpignan', 'Canet-en-Roussillon', 'Prades', 'Bourg-Madame'] };
 const NB_VILLES = 4;
@@ -112,63 +119,76 @@ function texteAjuste(ctx: CanvasRenderingContext2D, texte: string, x: number, y:
   ctx.fillText(texte, x, y);
 }
 
+/** Unité de mise en page : 1 pour 1080 × 1400 et plus ; plus petite sur les formats plus bas (carré, 16:9). */
+const unite = (l: number, h: number) => Math.min(l / 1080, h / 1400);
+/** Format vertical (9:16, 4:5) : les deux jours s'empilent ; carré et 16:9 : côte à côte. */
+const empile = (l: number, h: number) => h >= l * 1.2;
+
 function fond(ctx: CanvasRenderingContext2D) {
+  const { width: W, height: H } = ctx.canvas;
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#0b2a5b');
   g.addColorStop(0.55, '#1556a8');
   g.addColorStop(1, '#2f8fe0');
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, L, H);
+  ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  for (const [x, y, r] of [[900, 300, 360], [120, 1100, 300], [880, 1650, 260]]) {
+  const u = unite(W, H);
+  for (const [x, y, r] of [[0.83, 0.16, 360], [0.11, 0.57, 300], [0.81, 0.86, 260]]) {
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(x * W, y * H, r * u, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
 function pied(ctx: CanvasRenderingContext2D, logo: HTMLImageElement | null) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#fff';
-  ctx.font = `700 40px ${TEXTE}`;
-  ctx.fillText('www.alertes-meteo.com', L / 2, H - 60);
+  ctx.font = `700 ${40 * u}px ${TEXTE}`;
+  ctx.fillText('www.alertes-meteo.com', W / 2, H - 45 * u);
   if (logo) {
-    const h = 130;
-    const w = Math.min(420, (logo.width / logo.height) * h);
-    ctx.drawImage(logo, L / 2 - w / 2, H - 230, w, (logo.height / logo.width) * w);
+    const h = 130 * u;
+    const w = Math.min(420 * u, (logo.width / logo.height) * h);
+    ctx.drawImage(logo, W / 2 - w / 2, H - 225 * u, w, (logo.height / logo.width) * w);
   }
 }
 
+/** Carte d'un jour : dessinée sur une base de 940 × 570, mise à l'échelle et centrée dans le rectangle donné. */
 function carteJour(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, titre: string, j: JourVille, apparition: number) {
-  const decal = (1 - sortie(apparition)) * 160;
+  const f = Math.min(w / 940, h / 570);
+  const decal = (1 - sortie(apparition)) * 160 * f;
   ctx.save();
   ctx.globalAlpha = sortie(apparition);
   ctx.translate(decal, 0);
   ctx.fillStyle = 'rgba(255,255,255,0.16)';
-  rectArrondi(ctx, x, y, w, h, 44);
+  rectArrondi(ctx, x, y, w, h, 44 * f);
   ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.35)';
   ctx.lineWidth = 3;
   ctx.stroke();
+  ctx.translate(x + (w - 940 * f) / 2, y + (h - 570 * f) / 2);
+  ctx.scale(f, f);
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffe27a';
   ctx.font = `${58}px ${POLICE}`;
-  ctx.fillText(titre, x + 44, y + 84);
+  ctx.fillText(titre, 44, 84);
   const img = j.picto ? imageDe.get(j.picto) : undefined;
-  if (img) ctx.drawImage(img, x + 36, y + 130, 330, 330);
+  if (img) ctx.drawImage(img, 36, 130, 330, 330);
   ctx.fillStyle = '#ff9d6b';
   ctx.font = `${210}px ${POLICE}`;
-  ctx.fillText(degre(j.maxi), x + 400, y + 330);
+  ctx.fillText(degre(j.maxi), 400, 330);
   ctx.fillStyle = '#9ad8ff';
   ctx.font = `${110}px ${POLICE}`;
-  ctx.fillText(degre(j.mini), x + 420, y + 450);
+  ctx.fillText(degre(j.mini), 420, 450);
   ctx.fillStyle = '#fff';
   ctx.font = `600 44px ${TEXTE}`;
   const infos: string[] = [];
   if (j.rafale != null && j.rafale >= 30) infos.push(`Rafales ${j.rafale} km/h`);
   if (j.pluie != null && j.pluie >= 0.5) infos.push(`Pluie ${Math.round(j.pluie * 10) / 10} mm`);
-  ctx.fillText(infos.length ? infos.join('   ·   ') : 'Pas de pluie, vent faible', x + 44, y + h - 40);
+  ctx.fillText(infos.length ? infos.join('   ·   ') : 'Pas de pluie, vent faible', 44, 530);
   ctx.restore();
 }
 
@@ -183,26 +203,26 @@ function dureeTotale(n: number) {
   return DUREE_INTRO + n * DUREE_VILLE + DUREE_BILAN;
 }
 
-/** Dessine l'image de la vidéo à l'instant `t` (secondes). */
+/** Dessine l'image de la vidéo à l'instant `t` (secondes), aux dimensions du canevas. */
 function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   const { semaine, villes, logo, departement } = c;
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const bas = H - 250 * u;
   const [sam, dim] = semaine.jours;
   fond(ctx);
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'center';
   if (t < DUREE_INTRO) {
     const a = sortie(t / 0.7);
+    const cy = bas / 2;
     ctx.save();
     ctx.globalAlpha = a;
-    ctx.translate(0, (1 - a) * 80);
-    ctx.fillStyle = '#ffe27a';
-    ctx.font = `${70}px ${POLICE}`;
-    texteAjuste(ctx, departement.toUpperCase(), L / 2, 620, 70, POLICE, 960, '#ffe27a');
-    texteAjuste(ctx, 'QUEL TEMPS', L / 2, 820, 190, POLICE, 960);
-    texteAjuste(ctx, 'CE WEEK-END ?', L / 2, 1030, 190, POLICE, 960);
-    ctx.fillStyle = '#fff';
-    ctx.font = `600 54px ${TEXTE}`;
-    ctx.fillText(`${libelleJour(sam)} · ${libelleJour(dim).split(' ')[0]} ${Number(dim.slice(8, 10))}`, L / 2, 1180);
+    ctx.translate(0, (1 - a) * 80 * u);
+    texteAjuste(ctx, departement.toUpperCase(), W / 2, cy - 210 * u, 70 * u, POLICE, W * 0.9, '#ffe27a');
+    texteAjuste(ctx, 'QUEL TEMPS', W / 2, cy - 20 * u, 190 * u, POLICE, W * 0.9);
+    texteAjuste(ctx, 'CE WEEK-END ?', W / 2, cy + 190 * u, 190 * u, POLICE, W * 0.9);
+    texteAjuste(ctx, `${libelleJour(sam)} · ${libelleJour(dim).split(' ')[0]} ${Number(dim.slice(8, 10))}`, W / 2, cy + 340 * u, 54 * u, TEXTE, W * 0.92);
     ctx.restore();
     pied(ctx, logo);
     return;
@@ -213,20 +233,30 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     const local = apresIntro - indice * DUREE_VILLE;
     const ville = villes[indice];
     const [js, jd] = semaine.villes[ville] ?? [versJour(undefined), versJour(undefined)];
-    ctx.fillStyle = '#9ad8ff';
-    ctx.font = `600 48px ${TEXTE}`;
-    texteAjuste(ctx, `${departement.toUpperCase()} · CE WEEK-END`, L / 2, 150, 48, TEXTE, 980, '#9ad8ff');
+    texteAjuste(ctx, `${departement.toUpperCase()} · CE WEEK-END`, W / 2, 110 * u, 48 * u, TEXTE, W * 0.92, '#9ad8ff');
     const a = sortie(local / 0.5);
     ctx.save();
     ctx.globalAlpha = a;
-    texteAjuste(ctx, ville.toUpperCase().replace('-LA-PRESTE', ''), L / 2, 330, 160, POLICE, 960);
+    texteAjuste(ctx, ville.toUpperCase().replace('-LA-PRESTE', ''), W / 2, 280 * u, 160 * u, POLICE, W * 0.9);
     ctx.restore();
-    carteJour(ctx, 70, 410, 940, 570, libelleJour(sam), js, (local - 0.2) / 0.6);
-    carteJour(ctx, 70, 1020, 940, 570, libelleJour(dim), jd, (local - 0.5) / 0.6);
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    const haut = 340 * u;
+    const bord = bas - 60 * u;
+    if (empile(W, H)) {
+      const ecart = 40 * u;
+      const ch = (bord - haut - ecart) / 2;
+      const cw = W - 140 * u;
+      carteJour(ctx, 70 * u, haut, cw, ch, libelleJour(sam), js, (local - 0.2) / 0.6);
+      carteJour(ctx, 70 * u, haut + ch + ecart, cw, ch, libelleJour(dim), jd, (local - 0.5) / 0.6);
+    } else {
+      const marge = 50 * u;
+      const cw = (W - 3 * marge) / 2;
+      const ch = bord - haut;
+      carteJour(ctx, marge, haut, cw, ch, libelleJour(sam), js, (local - 0.2) / 0.6);
+      carteJour(ctx, 2 * marge + cw, haut, cw, ch, libelleJour(dim), jd, (local - 0.5) / 0.6);
+    }
     for (let k = 0; k < villes.length; k++) {
       ctx.beginPath();
-      ctx.arc(L / 2 + (k - (villes.length - 1) / 2) * 44, 1650, k === indice ? 13 : 9, 0, Math.PI * 2);
+      ctx.arc(W / 2 + (k - (villes.length - 1) / 2) * 44 * u, bas - 20 * u, (k === indice ? 13 : 9) * u, 0, Math.PI * 2);
       ctx.fillStyle = k === indice ? '#fff' : 'rgba(255,255,255,0.4)';
       ctx.fill();
     }
@@ -235,38 +265,39 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   }
   // Bilan : toutes les villes, samedi et dimanche côte à côte.
   const local = apresIntro - villes.length * DUREE_VILLE;
-  ctx.fillStyle = '#ffe27a';
-  ctx.font = `${90}px ${POLICE}`;
-  ctx.fillText('RÉCAP DU WEEK-END', L / 2, 190);
+  texteAjuste(ctx, 'RÉCAP DU WEEK-END', W / 2, 150 * u, 90 * u, POLICE, W * 0.9, '#ffe27a');
+  const colSam = W * 0.5;
+  const colDim = W * 0.78;
   ctx.fillStyle = '#fff';
-  ctx.font = `${56}px ${POLICE}`;
-  ctx.fillText(courtJour(sam), 620, 300);
-  ctx.fillText(courtJour(dim), 870, 300);
-  const hauteurLigne = Math.min(300, 1220 / villes.length);
+  ctx.font = `${56 * u}px ${POLICE}`;
+  ctx.fillText(courtJour(sam), colSam + 90 * u, 250 * u);
+  ctx.fillText(courtJour(dim), colDim + 90 * u, 250 * u);
+  const haut = 280 * u;
+  const hauteurLigne = Math.min(300 * u, (bas - 20 * u - haut) / villes.length);
   villes.forEach((ville, k) => {
-    const y = 340 + k * hauteurLigne;
+    const y = haut + k * hauteurLigne;
     const a = sortie((local - k * 0.25) / 0.5);
     ctx.save();
     ctx.globalAlpha = a;
-    ctx.translate((1 - a) * 120, 0);
+    ctx.translate((1 - a) * 120 * u, 0);
     ctx.fillStyle = 'rgba(255,255,255,0.14)';
-    rectArrondi(ctx, 50, y, 980, hauteurLigne - 24, 36);
+    rectArrondi(ctx, 50 * u, y, W - 100 * u, hauteurLigne - 24 * u, 36 * u);
     ctx.fill();
     ctx.textAlign = 'left';
-    texteAjuste(ctx, ville.replace('-la-Preste', '').toUpperCase(), 80, y + hauteurLigne / 2 + 18, 64, POLICE, 400);
+    texteAjuste(ctx, ville.replace('-la-Preste', '').toUpperCase(), 80 * u, y + hauteurLigne / 2 + 18 * u, 64 * u, POLICE, colSam - 100 * u);
     ctx.textAlign = 'left';
     const jours = semaine.villes[ville] ?? [versJour(undefined), versJour(undefined)];
     jours.forEach((j, col) => {
-      const cx = col === 0 ? 500 : 760;
+      const cx = col === 0 ? colSam : colDim;
       const img = j.picto ? imageDe.get(j.picto) : undefined;
-      const s = Math.min(130, hauteurLigne - 60);
-      if (img) ctx.drawImage(img, cx, y + (hauteurLigne - 24 - s) / 2, s, s);
+      const s = Math.min(130 * u, hauteurLigne - 60 * u);
+      if (img) ctx.drawImage(img, cx, y + (hauteurLigne - 24 * u - s) / 2, s, s);
       ctx.fillStyle = '#ff9d6b';
-      ctx.font = `${64}px ${POLICE}`;
-      ctx.fillText(degre(j.maxi), cx + s + 8, y + hauteurLigne / 2 - 2);
+      ctx.font = `${64 * u}px ${POLICE}`;
+      ctx.fillText(degre(j.maxi), cx + s + 8 * u, y + hauteurLigne / 2 - 2 * u);
       ctx.fillStyle = '#9ad8ff';
-      ctx.font = `${46}px ${POLICE}`;
-      ctx.fillText(degre(j.mini), cx + s + 8, y + hauteurLigne / 2 + 44);
+      ctx.font = `${46 * u}px ${POLICE}`;
+      ctx.fillText(degre(j.mini), cx + s + 8 * u, y + hauteurLigne / 2 + 44 * u);
     });
     ctx.restore();
   });
@@ -283,6 +314,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const [listeVilles, setListeVilles] = useState<{ dep: string; villes: VilleListe[] } | null>(null);
   const [choix, setChoix] = useState<string[]>([]);
   const [logoId, setLogoId] = useState('pays-catalan-hd');
+  const [formatId, setFormatId] = useState<FormatId>('tiktok');
   const [donnees, setDonnees] = useState<{ cle: string; points: [PointCarte[], PointCarte[]] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [etat, setEtat] = useState<string | null>(null);
@@ -292,6 +324,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   const [prets, setPrets] = useState(0);
 
+  const format = FORMATS.find((f) => f.id === formatId)!;
   const jours = useMemo(() => weekEnd(aujourdhui), [aujourdhui]);
   const nomDepartement = DEPARTEMENTS_FR[dep] ?? dep;
   const cle = `${modele}|${jours[0]}|${dep}`;
@@ -373,7 +406,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     const ctx = c?.getContext('2d');
     if (ctx && contexte) dessiner(ctx, Math.min(t, total - 0.01), contexte);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, semaine, logo, prets, villes.join('|')]);
+  }, [t, semaine, logo, prets, villes.join('|'), format]);
 
   useEffect(() => {
     if (!lecture) return;
@@ -403,8 +436,8 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
       const type = types.find((x) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(x));
       if (!type) throw new Error("Ce navigateur n'enregistre pas de vidéo.");
       const c = document.createElement('canvas');
-      c.width = L;
-      c.height = H;
+      c.width = format.l;
+      c.height = format.h;
       const ctx = c.getContext('2d')!;
       dessiner(ctx, 0, contexte);
       const flux = c.captureStream(FPS);
@@ -429,7 +462,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
       const url = URL.createObjectURL(new Blob(morceaux, { type: type.split(';')[0] }));
       const lien = document.createElement('a');
       lien.href = url;
-      lien.download = `meteo-weekend-${dep}-${jours[0]}.${type.startsWith('video/mp4') ? 'mp4' : 'webm'}`;
+      lien.download = `meteo-weekend-${dep}-${format.id}-${jours[0]}.${type.startsWith('video/mp4') ? 'mp4' : 'webm'}`;
       lien.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (e) {
@@ -438,7 +471,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     } finally {
       setEtat(null);
     }
-  }, [contexte, total, jours, dep]);
+  }, [contexte, total, jours, dep, format]);
 
   const changerVille = (k: number, nom: string) => setChoix((liste) => liste.map((v, i) => (i === k ? nom : v)));
 
@@ -485,6 +518,16 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
           </label>
         ))}
         <label className="text-sm font-medium">
+          <span className={legende}>Format de la vidéo</span>
+          <select value={formatId} onChange={(e) => setFormatId(e.target.value as FormatId)} className={selectBarre}>
+            {FORMATS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.libelle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
           <span className={legende}>Logo</span>
           <select value={logoId} onChange={(e) => setLogoId(e.target.value)} className={selectBarre}>
             {LOGOS_PRESETS.map((l) => (
@@ -498,7 +541,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
           {etat ?? '🎬 Créer la vidéo (MP4)'}
         </button>
         <p className="text-xs text-muted">
-          Format 1080 × 1920 (TikTok, Reels, Shorts), {Math.round(total)} secondes : titre, une image par ville, récapitulatif. Le MP4 s&apos;enregistre dans le navigateur (Chrome, Edge) ; ailleurs, un WebM.
+          Format {format.l} × {format.h}, {Math.round(total)} secondes : titre, une image par ville, récapitulatif. Le MP4 s&apos;enregistre dans le navigateur (Chrome, Edge) ; ailleurs, un WebM.
         </p>
         {erreur && (
           <p role="alert" className="text-sm text-danger">
@@ -507,8 +550,8 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
         )}
       </div>
       <div className="flex flex-col items-center gap-3">
-        <canvas ref={canvasRef} width={L} height={H} className="max-h-[80vh] w-full max-w-[26rem] rounded-2xl border border-border bg-[#0b2a5b] shadow-lg" aria-label="Aperçu de la vidéo" />
-        <div className="flex w-full max-w-[26rem] items-center gap-3">
+        <canvas ref={canvasRef} width={format.l} height={format.h} style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }} className="h-auto w-full rounded-2xl border border-border bg-[#0b2a5b] shadow-lg" aria-label="Aperçu de la vidéo" />
+        <div className="flex w-full items-center gap-3" style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
           <button type="button" onClick={() => setLecture((v) => !v)} disabled={!contexte} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
             {lecture ? '⏸ Pause' : '▶ Lecture'}
           </button>
