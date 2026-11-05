@@ -142,8 +142,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [jour, setJour] = useState(0);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
   /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
-  const [tailleValeurs, setTailleValeurs] = useState<'petite' | 'normale' | 'grande' | 'tres-grande'>('normale');
-  const echelleValeurs = { petite: 0.8, normale: 1, grande: 1.25, 'tres-grande': 1.5 }[tailleValeurs];
+  const [tailleValeurs, setTailleValeurs] = useState(100);
+  const echelleValeurs = tailleValeurs / 100;
   const [horizon, setHorizon] = useState<Horizon>(2050);
   const [altitudeMax, setAltitudeMax] = useState(ALTITUDE_MAX_DEFAUT);
   /** Thème affiché (« tous » : toutes les cartes de la catégorie, rangées par thème). */
@@ -842,12 +842,13 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </select>
           </label>
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
-            <span className={legende}>Taille des valeurs</span>
-            <select value={tailleValeurs} onChange={(e) => setTailleValeurs(e.target.value as typeof tailleValeurs)} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Petites : plus de valeurs sur la carte ; grandes : plus lisibles">
-              <option value="petite">Petites (plus de valeurs)</option>
-              <option value="normale">Normales</option>
-              <option value="grande">Grandes</option>
-              <option value="tres-grande">Très grandes</option>
+            <span className={legende}>Grosseur de la police des valeurs</span>
+            <select value={tailleValeurs} onChange={(e) => setTailleValeurs(Number(e.target.value))} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Petite : plus de valeurs sur la carte ; grande : plus lisible">
+              {[60, 80, 100, 125, 150, 190, 240, 300].map((n) => (
+              <option key={n} value={n}>
+                {n === 100 ? '100 % (normale)' : `${n} %`}
+              </option>
+            ))}
             </select>
           </label>
         </div>

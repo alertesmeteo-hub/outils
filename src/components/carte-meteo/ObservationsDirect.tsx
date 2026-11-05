@@ -12,7 +12,6 @@ import ChoixZone, { useZone } from './ChoixZone';
 const THEMES_OBS = THEMES_BILAN.filter((t) => t.groupe === GROUPE_OBS);
 /** Pluie en direct : relevés, cumuls moyens du mois et de l'année, records de 24 h du mois et absolus, battus ? */
 const THEMES_PLUIE = THEMES_BILAN.filter((t) => t.groupe === GROUPE_PLUIE_DIRECT);
-const TAILLES = { petite: 0.8, normale: 1, grande: 1.25, 'tres-grande': 1.5, extra: 1.9, 'extra-plus': 2.4 } as const;
 /** Cartes dont les valeurs manquantes peuvent être complétées (rafales et pluie sur 24 h, température du moment). */
 const THEMES_COMPLETES = ['obs-raf24', 'obs-rr24', 'obs-t'];
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
@@ -33,7 +32,7 @@ const COULEURS: Record<(typeof RUBRIQUES_OBS)[number], string> = {
  */
 export default function ObservationsDirect() {
   const { bilans, erreur, reessayer } = useBilans();
-  const [taille, setTaille] = useState<keyof typeof TAILLES>('tres-grande');
+  const [taille, setTaille] = useState(150);
   const [logoId, setLogoId] = useState('aucun');
   const [echelleTop, setEchelleTop] = useState(0);
   // Cartes de pluie : valeurs affichées à partir de ce cumul (mm) ; 0 = toutes.
@@ -97,14 +96,13 @@ export default function ObservationsDirect() {
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
         <ChoixZone etat={zone} />
         <label className="text-sm font-medium">
-          <span className="mb-1 block">Taille des valeurs</span>
-          <select value={taille} onChange={(e) => setTaille(e.target.value as keyof typeof TAILLES)} className={selectBarre} title="Petites : plus de stations sur la carte ; grandes : plus lisibles">
-            <option value="petite">Petites (plus de stations)</option>
-            <option value="normale">Normales</option>
-            <option value="grande">Grandes</option>
-            <option value="tres-grande">Très grandes</option>
-            <option value="extra">Extra</option>
-            <option value="extra-plus">Extra+</option>
+          <span className="mb-1 block">Grosseur de la police des valeurs</span>
+          <select value={taille} onChange={(e) => setTaille(Number(e.target.value))} className={selectBarre} title="Petite : plus de stations sur la carte ; grande : plus lisible">
+            {[60, 80, 100, 125, 150, 190, 240, 300].map((n) => (
+              <option key={n} value={n}>
+                {n === 100 ? '100 % (normale)' : `${n} %`}
+              </option>
+            ))}
           </select>
         </label>
         <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
@@ -229,7 +227,7 @@ export default function ObservationsDirect() {
             sansTableau={echelleTop === 0}
             topRouge
             titreDroite={echelleTop !== 0}
-            echelleValeurs={TAILLES[taille]}
+            echelleValeurs={taille / 100}
           />
         </div>
       )}
@@ -267,7 +265,7 @@ export default function ObservationsDirect() {
             logoId={logoId}
             prefixeFichier={`pluie-en-direct-${zone.nomFichier}`}
             contexte="Pluie relevée par les stations Météo-France, normales 1991-2020 et records de chaque station (fiches climatologiques Météo-France)"
-            echelleValeurs={TAILLES[taille]}
+            echelleValeurs={taille / 100}
             echelleTop={echelleTop || 1}
             sansTableau={echelleTop === 0}
             topRouge
