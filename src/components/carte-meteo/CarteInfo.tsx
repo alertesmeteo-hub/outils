@@ -586,7 +586,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
               return (
                 <g key={p.code}>
                   {decale && <line x1={sx} y1={sy} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(3.6, taille * 0.17)} strokeOpacity={0.65} strokeLinecap="round" />}
-                  {decale && <line x1={sx} y1={sy} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.8, taille * 0.075)} markerEnd="url(#cinfo-pointe)" />}
+                  {decale && <line x1={sx} y1={sy} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.8, taille * 0.075)} strokeLinecap="round" />}
                   <circle cx={ox} cy={oy} r={Math.max(2.5, taille * 0.11)} fill="#fff" stroke="#000" strokeWidth="1" />
                 </g>
               );
