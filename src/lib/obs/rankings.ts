@@ -173,8 +173,8 @@ export const WINDCHILL_SCALE = [
 export type RankingId =
   | 't' | 'dt24' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records' | 'tx12' | 'tx24'
   | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin' | 'tn12' | 'tn24'
-  | 'rr1' | 'rr3' | 'rr12' | 'rr24' | 'rr6' | 'rr0' | 'rr24c' | 'rr48' | 'rr72'
-  | 'ff' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf24' | 'raf48' | 'raf72'
+  | 'rr1' | 'rr3' | 'rr12' | 'rr24' | 'rr6' | 'rr0' | 'rr24c' | 'rr36' | 'rr48' | 'rr72'
+  | 'ff' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf24' | 'raf36' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp6' | 'dp9' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
   | 'td' | 'windchill' | 'humidex' | 'sol10' | 'sol20' | 'sol50' | 'sol100'
   | 'n-tx' | 'n-tn' | 'n-tx24' | 'n-tn24' | 'e-recm-tx' | 'e-recm-tn' | 'e-reca-tx' | 'e-reca-tn';
@@ -320,6 +320,7 @@ export const RANKINGS: Ranking[] = [
   { id: 'rr12', short: 'Pluie 12 h', label: 'Classement de la pluie sur 12 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(12) },
   { id: 'rr24', short: 'Pluie 24 h', label: 'Classement de la pluie sur 24 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', value: slide(24) },
   { id: 'rr24c', short: 'Pluie 24 h climato', label: 'Classement de la pluie de la journée climatologique (6 h UTC → 6 h UTC le lendemain), avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.clim, value: (o, w, n) => aggSum(o, w.clim, 'rr1', n) },
+  { id: 'rr36', short: 'Pluie 36 h', label: 'Classement de la pluie sur 36 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(36) },
   { id: 'rr48', short: 'Pluie 48 h', label: 'Classement de la pluie sur 48 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(48) },
   { id: 'rr72', short: 'Pluie 72 h', label: 'Classement de la pluie sur 72 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(72) },
 
@@ -327,6 +328,7 @@ export const RANKINGS: Ranking[] = [
 
   { id: 'raf1', short: 'Rafales', label: 'Classement des rafales maximales sur la dernière heure (relevés 6 min)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: rafRecent(60) },
   { id: 'raf24', short: 'Rafales 24 h', label: 'Classement des rafales maximales sur 24 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(24) },
+  { id: 'raf36', short: 'Rafales 36 h', label: 'Classement des rafales maximales sur 36 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(36) },
   { id: 'raf48', short: 'Rafales 48 h', label: 'Classement des rafales maximales sur 48 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(48) },
   { id: 'raf72', short: 'Rafales 72 h', label: 'Classement des rafales maximales sur 72 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(72) },
   { id: 'ff', short: 'Vent moy', label: 'Classement du vent moyen (dernière observation)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: cur('ff') },
