@@ -43,7 +43,9 @@ export function placerSansChevauchement(
   limites: { largeur: number; hauteur: number },
   decalageMax: number,
   /** Position (centre) acceptable pour cet élément ? Ex. en vue département : rester sur la terre. */
-  valide?: (e: ElementAPlacer, x: number, y: number) => boolean
+  valide?: (e: ElementAPlacer, x: number, y: number) => boolean,
+  /** Écarte d'abord sur les côtés (étiquettes à flèche : les valeurs d'une même zone s'éclatent au lieu de s'empiler). */
+  surLesCotes = false
 ): Map<string, { x: number; y: number }> {
   const genererDecalages = (max: number, anneaux: number, versLeNord = false): [number, number][] => {
     const liste: [number, number][] = [[0, 0]];
@@ -57,12 +59,13 @@ export function placerSansChevauchement(
       }
       // Villes imposées : à distance égale, on essaie d'abord vers le nord (l'intérieur des terres pour les villes du littoral sud),
       // puis de biais, les côtés et le sud en dernier : un décalage vers le côté repousse souvent la ville voisine (Montpellier → Perpignan).
-      if (versLeNord) anneau.sort((a, b) => Math.abs(Math.atan2(a[0], -a[1])) - Math.abs(Math.atan2(b[0], -b[1])));
+      if (surLesCotes) anneau.sort((a, b) => Math.abs(a[1]) - Math.abs(b[1]));
+      else if (versLeNord) anneau.sort((a, b) => Math.abs(Math.atan2(a[0], -a[1])) - Math.abs(Math.atan2(b[0], -b[1])));
       liste.push(...anneau);
     }
     return liste;
   };
-  const decalages = genererDecalages(decalageMax, 6);
+  const decalages = genererDecalages(decalageMax, surLesCotes ? 10 : 6);
   // Marqueurs prioritaires (rafales signalées) : ils peuvent s'éloigner davantage plutôt que de disparaître.
   const decalagesPrioritaires = genererDecalages(decalageMax * 3, 15);
   // Priorité négative (villes imposées de la carte de France) : même portée, mais vers le nord d'abord.

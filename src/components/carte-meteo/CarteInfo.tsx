@@ -437,7 +437,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       ...(texteIA.rect ? [texteIA.rect] : []),
     ];
     // Toutes les stations : une pastille peut s'écarter un peu plus de sa station pour trouver une place libre.
-    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * (avecReperes ? 5 : theme.toutes ? 1.6 : 0.9));
+    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * (avecReperes ? 7 : theme.toutes ? 1.6 : 0.9), undefined, avecReperes);
     const parCode = new Map(ecran.map((e) => [e.p.code, e.p]));
     const origine = new Map(ecran.map((e) => [e.p.code, { ox: e.x, oy: e.y }]));
     let restantes = plafond;
