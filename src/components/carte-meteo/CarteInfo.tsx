@@ -412,7 +412,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         const hauteurBulle = 1.45 * taille;
         const largeurNom = avecNoms ? e.p.nom.length * 0.33 * echNoms * taille + 6 : 0;
         const avecPicto = !!pictos?.[e.p.code];
-        const demi = Math.max(largeurBulle, largeurNom, avecPicto ? TAILLE_PICTO * taille : 0) / 2;
+        // Flèches : de l'air autour de chaque étiquette pour que les valeurs d'une même zone (Corse…) s'éclatent.
+        const air = avecReperes ? 0.7 * taille : 0;
+        const demi = Math.max(largeurBulle, largeurNom, avecPicto ? TAILLE_PICTO * taille : 0) / 2 + air;
         return {
           code: e.p.code,
           x: e.x,
@@ -420,8 +422,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           y: e.y - (avecReperes ? 3.4 * taille : 0),
           gauche: demi,
           droite: demi,
-          haut: hauteurBulle / 2 + (avecPicto ? TAILLE_PICTO * taille : 0),
-          bas: hauteurBulle / 2 + (avecNoms ? 0.85 * echNoms * taille : 0),
+          haut: hauteurBulle / 2 + (avecPicto ? TAILLE_PICTO * taille : 0) + air * 0.6,
+          bas: hauteurBulle / 2 + (avecNoms ? 0.85 * echNoms * taille : 0) + air * 0.6,
           priorite: codesTop.has(e.p.code) || grandesVilles.has(e.p.code) ? 0 : 1,
         };
       });
@@ -435,7 +437,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       ...(texteIA.rect ? [texteIA.rect] : []),
     ];
     // Toutes les stations : une pastille peut s'écarter un peu plus de sa station pour trouver une place libre.
-    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * (theme.toutes ? 1.6 : 0.9));
+    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * (avecReperes ? 5 : theme.toutes ? 1.6 : 0.9));
     const parCode = new Map(ecran.map((e) => [e.p.code, e.p]));
     const origine = new Map(ecran.map((e) => [e.p.code, { ox: e.x, oy: e.y }]));
     let restantes = plafond;
