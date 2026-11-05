@@ -400,7 +400,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         return {
           code: e.p.code,
           x: e.x,
-          y: e.y,
+          // Flèches : la pastille est posée au-dessus de sa station, que la flèche désigne.
+          y: e.y - (avecReperes ? 3 * taille : 0),
           gauche: demi,
           droite: demi,
           haut: hauteurBulle / 2 + (avecPicto ? TAILLE_PICTO * taille : 0),
@@ -427,7 +428,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       .filter((e) => e.priorite === 0 || restantes-- > 0)
       .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)!, ...origine.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos]);
+  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, avecReperes, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -552,11 +553,13 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
               </marker>
             </defs>
             {places.map(({ p, x, y, ox, oy }) => {
-              const decale = Math.hypot(ox - x, oy - y) > 0.9 * taille;
+              // La flèche part du bas de l'étiquette (nom compris) ou de son haut si la station est plus haut.
+              const sy = oy >= y ? y + 1.6 * taille : y - 0.8 * taille;
+              const decale = Math.hypot(ox - x, oy - sy) > 0.5 * taille && (oy >= y ? oy > sy : oy < sy);
               return (
                 <g key={p.code}>
-                  {decale && <line x1={x} y1={y} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(3, taille * 0.2)} strokeOpacity={0.55} strokeLinecap="round" />}
-                  {decale && <line x1={x} y1={y} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.6, taille * 0.1)} markerEnd="url(#cinfo-pointe)" />}
+                  {decale && <line x1={x} y1={sy} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(3, taille * 0.2)} strokeOpacity={0.55} strokeLinecap="round" />}
+                  {decale && <line x1={x} y1={sy} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.6, taille * 0.1)} markerEnd="url(#cinfo-pointe)" />}
                   <circle cx={ox} cy={oy} r={Math.max(2.5, taille * 0.16)} fill="#fff" stroke="#000" strokeWidth="1" />
                 </g>
               );
