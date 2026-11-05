@@ -189,7 +189,8 @@ function carteJour(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.fillStyle = '#fff';
   ctx.font = `600 44px ${TEXTE}`;
   const infos: { icone: string; texte: string }[] = [];
-  if (j.pluie != null && j.pluie >= 0.5) infos.push({ icone: ICONE_PLUIE, texte: `${(Math.round(j.pluie * 10) / 10).toLocaleString('fr-FR')} mm` });
+  // Dès 0,1 mm : le picto passe en pluie dès 0,3 mm, la quantité doit alors toujours s'afficher.
+  if (j.pluie != null && j.pluie >= 0.1) infos.push({ icone: ICONE_PLUIE, texte: `${(Math.round(j.pluie * 10) / 10).toLocaleString('fr-FR')} mm` });
   if (j.rafale != null && j.rafale >= 30) infos.push({ icone: ICONE_VENT, texte: `${j.rafale} km/h` });
   if (infos.length === 0) ctx.fillText('Pas de pluie, vent faible', 44, 530);
   let xi = 44;
