@@ -401,7 +401,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           code: e.p.code,
           x: e.x,
           // Flèches : la pastille est posée au-dessus de sa station, que la flèche désigne.
-          y: e.y - (avecReperes ? 3 * taille : 0),
+          y: e.y - (avecReperes ? 3.4 * taille : 0),
           gauche: demi,
           droite: demi,
           haut: hauteurBulle / 2 + (avecPicto ? TAILLE_PICTO * taille : 0),
@@ -553,13 +553,22 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
               </marker>
             </defs>
             {places.map(({ p, x, y, ox, oy }) => {
-              // La flèche part du bas de l'étiquette (nom compris) ou de son haut si la station est plus haut.
-              const sy = oy >= y ? y + 1.6 * taille : y - 0.8 * taille;
-              const decale = Math.hypot(ox - x, oy - sy) > 0.5 * taille && (oy >= y ? oy > sy : oy < sy);
+              // Le trait part du bord de l'étiquette (pastille + nom) le plus proche de la station, et se voit toujours.
+              const cx = x;
+              const cy = y + 0.44 * taille;
+              const dx = ox - cx;
+              const dy = oy - cy;
+              const demiL = 2.2 * taille;
+              const demiH = 1.17 * taille;
+              const k = Math.min(demiL / (Math.abs(dx) || 1e-6), demiH / (Math.abs(dy) || 1e-6));
+              const dehors = k < 1;
+              const sx = cx + dx * k;
+              const sy = cy + dy * k;
+              const decale = dehors;
               return (
                 <g key={p.code}>
-                  {decale && <line x1={x} y1={sy} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(2.6, taille * 0.12)} strokeOpacity={0.6} strokeLinecap="round" />}
-                  {decale && <line x1={x} y1={sy} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.2, taille * 0.05)} markerEnd="url(#cinfo-pointe)" />}
+                  {decale && <line x1={sx} y1={sy} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(2.6, taille * 0.12)} strokeOpacity={0.6} strokeLinecap="round" />}
+                  {decale && <line x1={sx} y1={sy} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.2, taille * 0.05)} markerEnd="url(#cinfo-pointe)" />}
                   <circle cx={ox} cy={oy} r={Math.max(2, taille * 0.09)} fill="#fff" stroke="#000" strokeWidth="1" />
                 </g>
               );
