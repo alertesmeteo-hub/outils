@@ -295,10 +295,14 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const jours = useMemo(() => weekEnd(aujourdhui), [aujourdhui]);
   const nomDepartement = DEPARTEMENTS_FR[dep] ?? dep;
   const cle = `${modele}|${jours[0]}|${dep}`;
-  const villes = choix.filter(Boolean);
+  // Mémorisées : ces listes servent de dépendances aux effets (une nouvelle liste à chaque rendu les relancerait sans fin).
+  const villes = useMemo(() => choix.filter(Boolean), [choix]);
   // Jours entre aujourd'hui et le dimanche : seuls les modèles qui vont jusque-là sont proposés (la moyenne va aussi loin que le CEP).
   const echeanceDimanche = Math.round((Date.parse(`${jours[1]}T12:00:00Z`) - Date.parse(`${aujourdhui}T12:00:00Z`)) / 86_400_000);
-  const modelesProposes = MODELES.filter((m) => (m.id === 'moyenne' ? ECHEANCE_MAX.cep : ECHEANCE_MAX[m.id]) >= echeanceDimanche && (!m.departements || m.departements.includes(dep)));
+  const modelesProposes = useMemo(
+    () => MODELES.filter((m) => (m.id === 'moyenne' ? ECHEANCE_MAX.cep : ECHEANCE_MAX[m.id]) >= echeanceDimanche && (!m.departements || m.departements.includes(dep))),
+    [echeanceDimanche, dep]
+  );
 
   // Villes du département : liste indépendante du week-end (le modèle choisi peut ne pas couvrir la date), puis choix automatique.
   useEffect(() => {
