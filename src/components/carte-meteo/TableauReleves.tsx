@@ -14,7 +14,8 @@ const PAR_PAGE = 100;
 const COULEURS_BOUTONS: Record<Rubrique, string> = {
   Température: 'bg-[#e67e22] text-white',
   'T°C minis / maxis': 'bg-[#e74c3c] text-white',
-  'Pluvio & vent': 'bg-[#3b82f6] text-white',
+  Pluviométrie: 'bg-[#3b82f6] text-white',
+  Vent: 'bg-[#0ea5a4] text-white',
   Autres: 'bg-[#6ee0d0] text-[#0b3b36]',
   [RUBRIQUE_RECORDS]: 'bg-[#8e44ad] text-white',
 };
@@ -34,7 +35,7 @@ export default function TableauReleves() {
   const [recherche, setRecherche] = useState('');
   const [departement, setDepartement] = useState('');
   const [region, setRegion] = useState('');
-  const [rubriques, setRubriques] = useState<Set<Rubrique>>(() => new Set<Rubrique>(['Température', 'T°C minis / maxis', 'Pluvio & vent', 'Autres']));
+  const [rubriques, setRubriques] = useState<Set<Rubrique>>(() => new Set<Rubrique>(['Température', 'T°C minis / maxis', 'Pluviométrie', 'Vent', 'Autres']));
   const [tri, setTri] = useState<Tri>({ colonne: 'nom', sens: 1 });
   const [affichees, setAffichees] = useState(PAR_PAGE);
   const [couleurs, setCouleurs] = useState(true);

@@ -20,7 +20,8 @@ const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 const COULEURS: Record<(typeof RUBRIQUES_OBS)[number], string> = {
   Température: 'bg-[#e67e22] text-white',
   'T°C minis / maxis': 'bg-[#e74c3c] text-white',
-  'Pluvio & vent': 'bg-[#3b82f6] text-white',
+  Pluviométrie: 'bg-[#3b82f6] text-white',
+  Vent: 'bg-[#0ea5a4] text-white',
   Autres: 'bg-[#6ee0d0] text-[#0b3b36]',
 };
 
