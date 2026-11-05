@@ -151,7 +151,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
-  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut' });
+  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', seuilPluie: 0 });
   const regler = (changement: Partial<AffichageCarte>) => setAffichage((a) => ({ ...a, ...changement }));
   const [filtreGroupe, setFiltreGroupe] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
@@ -893,6 +893,17 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                   <option value="faible">Faible (4 grands fleuves)</option>
                   <option value="moyen">Moyen (fleuves et rivières)</option>
                   <option value="dense">Dense</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Pluie : valeurs à partir de</span>
+                <select value={affichage.seuilPluie ?? 0} onChange={(e) => regler({ seuilPluie: Number(e.target.value) })} className={`${selectBarre} w-full`}>
+                  <option value={0}>Toutes les valeurs</option>
+                  {[1, 2, 5, 10, 20, 30, 50, 100].map((mm) => (
+                    <option key={mm} value={mm}>
+                      {mm} mm et plus
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="flex items-center gap-2 text-sm">

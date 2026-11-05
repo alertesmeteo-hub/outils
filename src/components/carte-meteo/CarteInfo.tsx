@@ -32,6 +32,8 @@ export interface AffichageCarte {
   fleuves: 'aucun' | 'faible' | 'moyen' | 'dense' | null;
   opaciteFleuves: number;
   contours: 'defaut' | 'aucun' | 'regions';
+  /** Cartes en mm (pluie) : valeurs affichées à partir de ce cumul ; 0 = toutes. */
+  seuilPluie?: number;
 }
 export const AffichageContexte = createContext<AffichageCarte | null>(null);
 
@@ -86,6 +88,8 @@ interface Props {
   decalagesPictos?: Record<string, [number, number]>;
   /** Valeurs (bulles) déplaçables à la main : décalage en px par point, et rappel appelé pendant le glissement. */
   decalagesValeurs?: Record<string, [number, number]>;
+  /** Seules les valeurs d'au moins ce niveau sont affichées (ex. pluie à partir de 10 mm) ; absent = toutes. */
+  valeurMin?: number;
   /** Découpage automatique : nombre de zones par département (plusieurs points par département en vue France). */
   zonesParDepartement?: number;
   onValeurMove?: (code: string, dx: number, dy: number) => void;
@@ -110,7 +114,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1 }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -218,9 +222,11 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const logoUrl = logo?.fichier || null;
   const hauteurLogo = logoUrl ? (zone === 'dep:66' && logoId.startsWith('pays-catalan') ? 150 : 83) : 0;
 
+  // Seuil d'affichage : celui de la page (valeurMin) ou, pour les cartes en mm, celui du bloc « Affichage de la carte ».
+  const seuil = valeurMin ?? (theme.unite === 'mm' ? affichage?.seuilPluie ?? 0 : 0);
   const dansZone = useMemo(
-    () => pointsCorriges.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur)),
-    [pointsCorriges, selection, theme]
+    () => pointsCorriges.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur) && (!seuil || p.neige || p.valeur >= seuil)),
+    [pointsCorriges, selection, theme, seuil]
   );
   // Du « meilleur » (le plus chaud, le plus arrosé…) au moins remarquable.
   const tries = useMemo(

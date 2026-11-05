@@ -36,6 +36,8 @@ export default function ObservationsDirect() {
   const [taille, setTaille] = useState<keyof typeof TAILLES>('tres-grande');
   const [logoId, setLogoId] = useState('aucun');
   const [echelleTop, setEchelleTop] = useState(2);
+  // Cartes de pluie : valeurs affichées à partir de ce cumul (mm) ; 0 = toutes.
+  const [seuilMm, setSeuilMm] = useState(0);
   const zone = useZone('zone-observations-en-direct');
   const [themeId, setThemeId] = useState(THEMES_OBS[0]?.id ?? '');
   const [pluieId, setPluieId] = useState(THEMES_PLUIE[0]?.id ?? '');
@@ -101,6 +103,17 @@ export default function ObservationsDirect() {
             <option value="tres-grande">Très grandes</option>
             <option value="extra">Extra</option>
             <option value="extra-plus">Extra+</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Pluie : afficher à partir de</span>
+          <select value={seuilMm} onChange={(e) => setSeuilMm(Number(e.target.value))} className={selectBarre} title="Cartes de pluie : seules les stations ayant relevé au moins ce cumul sont affichées">
+            <option value={0}>Toutes les valeurs</option>
+            {[1, 2, 5, 10, 20, 30, 50, 100].map((mm) => (
+              <option key={mm} value={mm}>
+                {mm} mm et plus
+              </option>
+            ))}
           </select>
         </label>
         <label className="text-sm font-medium">
@@ -196,6 +209,7 @@ export default function ObservationsDirect() {
           <CarteInfo
             key={theme.id}
             theme={theme}
+            valeurMin={theme.unite === 'mm' ? seuilMm : undefined}
             zone={zone.zone}
             points={points[theme.id] ?? []}
             sousTitre={sousTitre(theme.id)}
@@ -236,6 +250,7 @@ export default function ObservationsDirect() {
           <CarteInfo
             key={pluie.id}
             theme={pluie}
+            valeurMin={pluie.unite === 'mm' ? seuilMm : undefined}
             zone={zone.zone}
             points={points[pluie.id] ?? []}
             sousTitre={sousTitre(pluie.id)}
