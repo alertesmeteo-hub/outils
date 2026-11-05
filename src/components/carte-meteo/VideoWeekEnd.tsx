@@ -327,7 +327,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     setErreur(null);
     Promise.all(
       jours.map((date) =>
-        fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${date}&dep=${dep}`, { signal: controleur.signal }).then(async (r) => {
+        fetch(`/api/carte-meteo/previsions/?modele=${modele === 'moyenne' ? 'moyenne&toutes=1' : modele}&date=${date}&dep=${dep}`, { signal: controleur.signal }).then(async (r) => {
           if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
           return ((await r.json()) as { points: PointCarte[] }).points;
         })
