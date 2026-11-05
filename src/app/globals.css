@@ -313,7 +313,7 @@ body {
 /* Cartes infos (/outils/carte-meteo-info/) : pastilles de valeurs colorées, légende et classement. */
 .cinfo-point { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; z-index: 4; line-height: 1; pointer-events: auto; }
 .cinfo-bulle { display: flex; align-items: center; gap: 0.12em; padding: 0.16em 0.42em 0.12em; border: 0.12em solid #fff; border-radius: 0.55em; box-shadow: 0 0.08em 0.35em rgba(0, 0, 0, 0.55); white-space: nowrap; }
-.cinfo-bulle strong { font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-weight: 400; font-size: 1.12em; letter-spacing: 0.01em; }
+.cinfo-bulle strong { font-family: var(--pv-fam, Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif); font-weight: var(--pv-poids, 400); font-size: 1.12em; letter-spacing: 0.01em; }
 /* Encadré des seuils (carte « Chaleur ») : deux phrases courtes. */
 .cinfo-seuils p { margin: 2px 0 6px; font-size: 13px; line-height: 1.25; white-space: normal; }
 .cinfo-seuils strong { font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-weight: 400; font-size: 17px; }
@@ -323,7 +323,7 @@ body {
 .cinfo-point .cmap-supprimer { top: -0.45em; left: -0.45em; z-index: 5; }
 .cinfo-bulle small { font-family: Arial, sans-serif; font-weight: 700; font-size: 0.6em; margin-left: 0.12em; }
 .cinfo-bulle svg { width: 1em; height: 1em; flex: none; }
-.cinfo-nom { margin-top: 0.12em; font-size: 0.6em; font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 3px #000, 0 0 3px #000; }
+.cinfo-nom { margin-top: 0.12em; font-size: calc(0.6em * var(--nom-t, 1)); font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 3px #000, 0 0 3px #000; }
 .cinfo-mention { position: absolute; left: 8px; bottom: 3px; z-index: 3; font-size: 10px; line-height: 1; color: rgba(255, 255, 255, 0.8); text-shadow: 0 0 3px #000, 0 0 3px #000; pointer-events: none; }
 .cinfo-bandeau { position: absolute; z-index: 6; text-align: left; white-space: nowrap; font-family: Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif; font-size: 44px; line-height: 1; letter-spacing: 0.03em; text-transform: uppercase; color: #e10600; -webkit-text-stroke: 1.5px #fff; paint-order: stroke fill; text-shadow: 0 0 6px #fff, 0 0 10px #fff, 0 3px 8px rgba(0, 0, 0, 0.6); pointer-events: none; }
 .cinfo-encadre { position: absolute; z-index: 3; background: rgba(13, 20, 40, 0.9); border: 2px solid #f5c400; border-radius: 8px; padding: 6px 9px 7px; color: #fff; font-size: 13px; line-height: 1.2; }

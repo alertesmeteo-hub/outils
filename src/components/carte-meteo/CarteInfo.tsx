@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
@@ -36,8 +37,19 @@ export interface AffichageCarte {
   seuilPluie?: number;
   /** Nom de la ville sous chaque valeur, et flèche vers la station quand la valeur est décalée. */
   reperes?: boolean;
+  /** Police des chiffres des pastilles : Impact (très gras), condensée grasse ou normale. */
+  policeValeurs?: PoliceValeurs;
+  /** Taille des noms de villes (1 = normale). */
+  tailleNoms?: number;
 }
 export const AffichageContexte = createContext<AffichageCarte | null>(null);
+
+export type PoliceValeurs = 'impact' | 'condensee' | 'normale';
+const FAMILLES_VALEURS: Record<PoliceValeurs, { fam: string; poids: number }> = {
+  impact: { fam: "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif", poids: 400 },
+  condensee: { fam: "'Arial Narrow', 'Roboto Condensed', 'Helvetica Neue', Arial, sans-serif", poids: 700 },
+  normale: { fam: 'Arial, sans-serif', poids: 600 },
+};
 
 /** « GIUNCAGGIO_SAPC » → « Giuncaggio Sapc » : nom de station lisible sous la valeur. */
 const nomLisible = (nom: string) => nom.replace(/_/g, ' ').toLowerCase().replace(/(^|[\s'-])\S/g, (m) => m.toUpperCase());
@@ -97,6 +109,8 @@ interface Props {
   valeurMin?: number;
   /** Nom de la ville sous chaque valeur et flèche vers la station (sinon : réglage du bloc « Affichage de la carte »). */
   reperes?: boolean;
+  policeValeurs?: PoliceValeurs;
+  tailleNoms?: number;
   /** Masque le tableau du classement (« Les plus fortes… »), en plus des cartes qui n'en ont pas. */
   sansTableau?: boolean;
   /** Découpage automatique : nombre de zones par département (plusieurs points par département en vue France). */
@@ -123,7 +137,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, sansTableau = false }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -234,6 +248,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   // Seuil d'affichage : celui de la page (valeurMin) ou, pour les cartes en mm, celui du bloc « Affichage de la carte ».
   const avecReperes = reperes ?? affichage?.reperes ?? false;
   const avecNoms = enDepartement || avecReperes;
+  const policeV = policeValeurs ?? affichage?.policeValeurs ?? 'condensee';
+  const echNoms = tailleNoms ?? affichage?.tailleNoms ?? 1.2;
   const seuil = valeurMin ?? (theme.unite === 'mm' ? affichage?.seuilPluie ?? 0 : 0);
   const dansZone = useMemo(
     () => pointsCorriges.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur) && (!seuil || p.neige || p.valeur >= seuil)),
@@ -394,7 +410,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         const texte = texteInfo(theme, e.p.valeur);
         const largeurBulle = (texte.length * 0.56 + (uniteDe(e.p) ? uniteDe(e.p).length * 0.42 + 0.25 : 0) + 0.95 + (avecFleche(e.p) ? 1.05 : 0)) * taille;
         const hauteurBulle = 1.45 * taille;
-        const largeurNom = avecNoms ? e.p.nom.length * 0.33 * taille + 6 : 0;
+        const largeurNom = avecNoms ? e.p.nom.length * 0.33 * echNoms * taille + 6 : 0;
         const avecPicto = !!pictos?.[e.p.code];
         const demi = Math.max(largeurBulle, largeurNom, avecPicto ? TAILLE_PICTO * taille : 0) / 2;
         return {
@@ -405,7 +421,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           gauche: demi,
           droite: demi,
           haut: hauteurBulle / 2 + (avecPicto ? TAILLE_PICTO * taille : 0),
-          bas: hauteurBulle / 2 + (avecNoms ? 0.85 * taille : 0),
+          bas: hauteurBulle / 2 + (avecNoms ? 0.85 * echNoms * taille : 0),
           priorite: codesTop.has(e.p.code) || grandesVilles.has(e.p.code) ? 0 : 1,
         };
       });
@@ -428,7 +444,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       .filter((e) => e.priorite === 0 || restantes-- > 0)
       .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)!, ...origine.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, avecReperes, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos]);
+  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, avecReperes, echNoms, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -548,18 +564,18 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         {avecReperes && (
           <svg className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 3 }} width={largeur} height={HAUTEUR_CARTE} aria-hidden>
             <defs>
-              <marker id="cinfo-pointe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <marker id="cinfo-pointe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
                 <path d="M0 1 L10 5 L0 9 z" fill="#fff" stroke="#000" strokeWidth="1.2" />
               </marker>
             </defs>
             {places.map(({ p, x, y, ox, oy }) => {
               // Le trait part du bord de l'étiquette (pastille + nom) le plus proche de la station, et se voit toujours.
               const cx = x;
-              const cy = y + 0.44 * taille;
+              const cy = y + 0.425 * echNoms * taille;
               const dx = ox - cx;
               const dy = oy - cy;
               const demiL = 2.2 * taille;
-              const demiH = 1.17 * taille;
+              const demiH = (0.725 + 0.425 * echNoms) * taille;
               const k = Math.min(demiL / (Math.abs(dx) || 1e-6), demiH / (Math.abs(dy) || 1e-6));
               const dehors = k < 1;
               const sx = cx + dx * k;
@@ -567,9 +583,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
               const decale = dehors;
               return (
                 <g key={p.code}>
-                  {decale && <line x1={sx} y1={sy} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(2.6, taille * 0.12)} strokeOpacity={0.6} strokeLinecap="round" />}
-                  {decale && <line x1={sx} y1={sy} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.2, taille * 0.05)} markerEnd="url(#cinfo-pointe)" />}
-                  <circle cx={ox} cy={oy} r={Math.max(2, taille * 0.09)} fill="#fff" stroke="#000" strokeWidth="1" />
+                  {decale && <line x1={sx} y1={sy} x2={ox} y2={oy} stroke="#000" strokeWidth={Math.max(3.6, taille * 0.17)} strokeOpacity={0.65} strokeLinecap="round" />}
+                  {decale && <line x1={sx} y1={sy} x2={ox} y2={oy} stroke="#fff" strokeWidth={Math.max(1.8, taille * 0.075)} markerEnd="url(#cinfo-pointe)" />}
+                  <circle cx={ox} cy={oy} r={Math.max(2.5, taille * 0.11)} fill="#fff" stroke="#000" strokeWidth="1" />
                 </g>
               );
             })}
@@ -579,7 +595,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           const palier = palierDe(p.neige ? PALIERS_NEIGE : theme.paliers, p.valeur);
           const fichierPicto = pictos?.[p.code] ? cheminPictoImage(pictos[p.code]) : undefined;
           return (
-            <div key={p.code} className="cinfo-point" style={{ left: x, top: y - 0.725 * taille - (fichierPicto ? TAILLE_PICTO * taille : 0), fontSize: taille }} title={`${p.nom} : ${texteInfo(theme, p.valeur)} ${uniteDe(p)}`}>
+            <div key={p.code} className="cinfo-point" style={{ left: x, top: y - 0.725 * taille - (fichierPicto ? TAILLE_PICTO * taille : 0), fontSize: taille, ['--pv-fam' as string]: FAMILLES_VALEURS[policeV].fam, ['--pv-poids' as string]: FAMILLES_VALEURS[policeV].poids, ['--nom-t' as string]: echNoms } as CSSProperties} title={`${p.nom} : ${texteInfo(theme, p.valeur)} ${uniteDe(p)}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {fichierPicto && <img src={fichierPicto} alt="" draggable={false} crossOrigin="anonymous" onPointerDown={onPictoClick || onPictoMove ? (e) => debutPicto(e, p.code) : undefined} title={onPictoClick ? 'Cliquer pour changer le picto, glisser pour le déplacer' : undefined} style={{ cursor: onPictoMove ? 'grab' : onPictoClick ? 'pointer' : undefined, touchAction: 'none', transform: decalagesPictos?.[p.code] ? `translate(${decalagesPictos[p.code][0]}px, ${decalagesPictos[p.code][1]}px)` : undefined, width: `${TAILLE_PICTO}em`, height: `${TAILLE_PICTO}em`, marginBottom: '-0.15em', filter: 'drop-shadow(0 0.04em 0.12em rgba(0,0,0,0.55))' }} />}
               <div

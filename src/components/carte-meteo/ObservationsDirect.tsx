@@ -5,7 +5,7 @@ import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { GROUPE_OBS, GROUPE_PLUIE_DIRECT, RUBRIQUES_OBS, THEMES_BILAN } from '@/lib/carte-meteo/cartes-info';
 import { depStation, normaliserNom, pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import type { ReponseComplements } from '@/app/api/carte-meteo/complements/route';
-import CarteInfo, { type PointInfo } from './CarteInfo';
+import CarteInfo, { type PoliceValeurs, type PointInfo } from './CarteInfo';
 import { useBilans } from './useBilans';
 import ChoixZone, { useZone } from './ChoixZone';
 
@@ -39,6 +39,8 @@ export default function ObservationsDirect() {
   const [seuilMm, setSeuilMm] = useState(10);
   // Nom de la ville sous chaque valeur, et flèche vers la station.
   const [reperes, setReperes] = useState(true);
+  const [policeV, setPoliceV] = useState<PoliceValeurs>('condensee');
+  const [tailleNoms, setTailleNoms] = useState(1.2);
   const zone = useZone('zone-observations-en-direct');
   const [themeId, setThemeId] = useState(THEMES_OBS.find((t) => t.id === 'obs-rr48')?.id ?? THEMES_OBS[0]?.id ?? '');
   const [pluieId, setPluieId] = useState(THEMES_PLUIE[0]?.id ?? '');
@@ -103,6 +105,25 @@ export default function ObservationsDirect() {
                 {n === 100 ? '100 % (normale)' : `${n} %`}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Police des valeurs</span>
+          <select value={policeV} onChange={(e) => setPoliceV(e.target.value as PoliceValeurs)} className={selectBarre}>
+            <option value="impact">Impact (très gras)</option>
+            <option value="condensee">Condensée grasse</option>
+            <option value="normale">Normale</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Taille des noms de villes</span>
+          <select value={tailleNoms} onChange={(e) => setTailleNoms(Number(e.target.value))} className={selectBarre}>
+            <option value={0.8}>Très petits</option>
+            <option value={1}>Petits</option>
+            <option value={1.2}>Moyens</option>
+            <option value={1.5}>Grands</option>
+            <option value={1.8}>Très grands</option>
+            <option value={2.2}>Énormes</option>
           </select>
         </label>
         <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
@@ -216,6 +237,8 @@ export default function ObservationsDirect() {
             theme={theme}
             valeurMin={theme.unite === 'mm' ? seuilMm : undefined}
             reperes={reperes}
+            policeValeurs={policeV}
+            tailleNoms={tailleNoms}
             zone={zone.zone}
             points={points[theme.id] ?? []}
             sousTitre={sousTitre(theme.id)}
@@ -259,6 +282,8 @@ export default function ObservationsDirect() {
             theme={pluie}
             valeurMin={pluie.unite === 'mm' ? seuilMm : undefined}
             reperes={reperes}
+            policeValeurs={policeV}
+            tailleNoms={tailleNoms}
             zone={zone.zone}
             points={points[pluie.id] ?? []}
             sousTitre={sousTitre(pluie.id)}

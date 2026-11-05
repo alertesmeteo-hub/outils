@@ -25,7 +25,7 @@ import {
   type ThemeInfo,
   type ThemePrevision,
 } from '@/lib/carte-meteo/cartes-info';
-import CarteInfo, { AffichageContexte, type AffichageCarte, type PointInfo } from './CarteInfo';
+import CarteInfo, { AffichageContexte, type AffichageCarte, type PoliceValeurs, type PointInfo } from './CarteInfo';
 import { THEMES_CARTE } from '@/lib/carte-meteo/pictos';
 import { LIBELLES_COUCHES, type Couche } from '@/lib/carte-meteo/tuiles';
 import { depStation, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
@@ -151,7 +151,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
-  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', seuilPluie: 0, reperes: false });
+  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', seuilPluie: 0, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
   const regler = (changement: Partial<AffichageCarte>) => setAffichage((a) => ({ ...a, ...changement }));
   const [filtreGroupe, setFiltreGroupe] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
@@ -910,6 +910,24 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={!!affichage.reperes} onChange={(e) => regler({ reperes: e.target.checked })} />
                 Flèches et noms des villes
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Police des valeurs</span>
+                <select value={affichage.policeValeurs ?? 'condensee'} onChange={(e) => regler({ policeValeurs: e.target.value as PoliceValeurs })} className={`${selectBarre} w-full`}>
+                  <option value="impact">Impact (très gras)</option>
+                  <option value="condensee">Condensée grasse (par défaut)</option>
+                  <option value="normale">Normale</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Taille des noms de villes</span>
+                <select value={affichage.tailleNoms ?? 1.2} onChange={(e) => regler({ tailleNoms: Number(e.target.value) })} className={`${selectBarre} w-full`}>
+                  {[0.8, 1, 1.2, 1.5, 1.8, 2.2].map((n) => (
+                    <option key={n} value={n}>
+                      {n === 1 ? 'Petits' : n === 1.2 ? 'Moyens (par défaut)' : n === 0.8 ? 'Très petits' : n === 1.5 ? 'Grands' : n === 1.8 ? 'Très grands' : 'Énormes'}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={affichage.relief} onChange={(e) => regler({ relief: e.target.checked })} />
