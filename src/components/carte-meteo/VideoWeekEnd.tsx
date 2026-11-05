@@ -94,6 +94,9 @@ function charger(src: string): Promise<HTMLImageElement> {
   return p;
 }
 const imageDe = new Map<string, HTMLImageElement>();
+/** Icônes de la ligne du bas des cartes : pluie et rafales. */
+const ICONE_PLUIE = cheminPictoImage('am:pluie') ?? '';
+const ICONE_VENT = cheminPictoImage('am:rafales') ?? '';
 
 const sortie = (t: number) => 1 - (1 - Math.min(1, Math.max(0, t))) ** 3;
 
@@ -185,10 +188,17 @@ function carteJour(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.fillText(degre(j.mini), 420, 450);
   ctx.fillStyle = '#fff';
   ctx.font = `600 44px ${TEXTE}`;
-  const infos: string[] = [];
-  if (j.rafale != null && j.rafale >= 30) infos.push(`Rafales ${j.rafale} km/h`);
-  if (j.pluie != null && j.pluie >= 0.5) infos.push(`Pluie ${Math.round(j.pluie * 10) / 10} mm`);
-  ctx.fillText(infos.length ? infos.join('   ·   ') : 'Pas de pluie, vent faible', 44, 530);
+  const infos: { icone: string; texte: string }[] = [];
+  if (j.pluie != null && j.pluie >= 0.5) infos.push({ icone: ICONE_PLUIE, texte: `${(Math.round(j.pluie * 10) / 10).toLocaleString('fr-FR')} mm` });
+  if (j.rafale != null && j.rafale >= 30) infos.push({ icone: ICONE_VENT, texte: `${j.rafale} km/h` });
+  if (infos.length === 0) ctx.fillText('Pas de pluie, vent faible', 44, 530);
+  let xi = 44;
+  for (const info of infos) {
+    const ic = imageDe.get(info.icone);
+    if (ic) ctx.drawImage(ic, xi, 466, 84, 84);
+    ctx.fillText(info.texte, xi + 96, 530);
+    xi += 96 + ctx.measureText(info.texte).width + 56;
+  }
   ctx.restore();
 }
 
@@ -388,6 +398,8 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     if (!semaine) return;
     const fichiers = new Set<string>();
     for (const v of villes) for (const j of semaine.villes[v] ?? []) if (j.picto) fichiers.add(j.picto);
+    if (ICONE_PLUIE) fichiers.add(ICONE_PLUIE);
+    if (ICONE_VENT) fichiers.add(ICONE_VENT);
     let vivant = true;
     Promise.all([...fichiers].map((f) => charger(f).then((img) => imageDe.set(f, img)))).then(() => vivant && setPrets((n) => n + 1)).catch(() => {});
     const fichierLogo = LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier;
