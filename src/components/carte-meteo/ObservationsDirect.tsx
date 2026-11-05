@@ -119,6 +119,7 @@ export default function ObservationsDirect() {
         <label className="text-sm font-medium">
           <span className="mb-1 block">Tableau « Les plus fortes »</span>
           <select value={echelleTop} onChange={(e) => setEchelleTop(Number(e.target.value))} className={selectBarre}>
+            <option value={0}>Aucun (masqué)</option>
             <option value={1}>Taille normale</option>
             <option value={2}>× 2</option>
             <option value={3}>× 3</option>
@@ -217,7 +218,8 @@ export default function ObservationsDirect() {
             prefixeFichier={`observations-en-direct-${zone.nomFichier}`}
             contexte="Observations des stations Météo-France"
             mention={pointsEtAjouts.nbAjoutes[theme.id] ? 'Stations complémentaires : Météo-Ciel' : ''}
-            echelleTop={echelleTop}
+            echelleTop={echelleTop || 1}
+            sansTableau={echelleTop === 0}
             topRouge
             titreDroite
             echelleValeurs={TAILLES[taille]}
@@ -258,7 +260,8 @@ export default function ObservationsDirect() {
             prefixeFichier={`pluie-en-direct-${zone.nomFichier}`}
             contexte="Pluie relevée par les stations Météo-France, normales 1991-2020 et records de chaque station (fiches climatologiques Météo-France)"
             echelleValeurs={TAILLES[taille]}
-            echelleTop={echelleTop}
+            echelleTop={echelleTop || 1}
+            sansTableau={echelleTop === 0}
             topRouge
             titreDroite
           />

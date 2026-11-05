@@ -90,6 +90,8 @@ interface Props {
   decalagesValeurs?: Record<string, [number, number]>;
   /** Seules les valeurs d'au moins ce niveau sont affichées (ex. pluie à partir de 10 mm) ; absent = toutes. */
   valeurMin?: number;
+  /** Masque le tableau du classement (« Les plus fortes… »), en plus des cartes qui n'en ont pas. */
+  sansTableau?: boolean;
   /** Découpage automatique : nombre de zones par département (plusieurs points par département en vue France). */
   zonesParDepartement?: number;
   onValeurMove?: (code: string, dx: number, dy: number) => void;
@@ -114,7 +116,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, sansTableau = false }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -285,7 +287,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     ...top.map((p) => Math.round(40 + Math.min(32, p.nom.length) * 9.5 + (enDepartement || theme.maille ? 0 : 30) + texteInfo(theme, p.valeur).length * 10 + (uniteVisible ? 48 : 0)))
   );
   // Titre de l'encadré sur deux lignes s'il dépasse la largeur (≈ 9 px par lettre en 16 px condensé).
-  const hauteurTop0 = top.length && !theme.sansTop ? 34 + top.length * 19 + (titreTop.length * 9 > largeurTop0 - 18 ? 18 : 0) : 0;
+  const hauteurTop0 = top.length && !(theme.sansTop || sansTableau) ? 34 + top.length * 19 + (titreTop.length * 9 > largeurTop0 - 18 ? 18 : 0) : 0;
   // Agrandi (échelle du tableau) : l'encadré garde sa mise en page et est mis à l'échelle depuis son coin haut-gauche.
   const largeurTop = Math.round(largeurTop0 * echelleTop);
   const hauteurTop = Math.round(hauteurTop0 * echelleTop);
@@ -481,7 +483,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
             Sous-titre
             <input value={sousTitreAffiche} onChange={(e) => setSousTitreSaisi(e.target.value.toUpperCase())} className="rounded-md border border-border bg-bg p-1.5 font-normal" />
           </label>
-          {!theme.sansTop && (
+          {!(theme.sansTop || sansTableau) && (
             <label className="flex flex-col gap-1 font-medium">
               Titre du classement
               <input value={titreTop} onChange={(e) => setTitreTopSaisi(e.target.value)} className="rounded-md border border-border bg-bg p-1.5 font-normal" />
