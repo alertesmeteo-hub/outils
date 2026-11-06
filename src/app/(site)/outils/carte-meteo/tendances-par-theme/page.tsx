@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import PlanchesTendances from '@/components/carte-meteo/PlanchesTendances';
-import { aujourdhuiParis, DUREES_TENDANCES, estModele, MODELES, type ModeleSource } from '@/lib/carte-meteo/previsions-modeles';
+import { aujourdhuiParis, CODES_DEPARTEMENTS, DUREES_TENDANCES, estModele, MODELES, type ModeleSource } from '@/lib/carte-meteo/previsions-modeles';
 import { chargerPrevisionsTendances, chargerZonesAutomatiques, chargerZonesTendances, type PointTendance } from '@/lib/carte-meteo/sources';
 
 // La date « du jour » doit être celle de la requête ; les fichiers de prévisions sont mis en cache côté serveur.
@@ -19,7 +19,7 @@ const MODELES_LONGUE_ECHEANCE: ModeleSource[] = ['arome', 'harmonie', 'arpege', 
 
 export default async function PageTendancesParTheme({ searchParams }: { searchParams: Promise<{ modele?: string; zones?: string }> }) {
   const { modele: demande, zones: zonesDemandees } = await searchParams;
-  const nbZones = [2, 3, 4, 5, 6].includes(Number(zonesDemandees)) ? Number(zonesDemandees) : 0;
+  const nbZones = [2, 3, 4, 5, 6, 7, 8].includes(Number(zonesDemandees)) ? Number(zonesDemandees) : 0;
   const modele: ModeleSource = estModele(demande ?? null) && MODELES_LONGUE_ECHEANCE.includes(demande as ModeleSource) ? (demande as ModeleSource) : 'cep';
   const infos = MODELES.find((m) => m.id === modele)!;
   const aujourdhui = aujourdhuiParis();
@@ -68,14 +68,14 @@ export default async function PageTendancesParTheme({ searchParams }: { searchPa
 
       <nav aria-label="Découpage en zones (carte de pluie)" className="mt-2 flex flex-wrap items-center gap-2 text-sm">
         <span className="font-medium">Carte de pluie, zones par département :</span>
-        {[0, 2, 3, 4, 5, 6].map((n) => (
+        {[0, 2, 3, 4, 5, 6, 7, 8].map((n) => (
           <Link
             key={n}
             href={`/outils/carte-meteo/tendances-par-theme/?modele=${modele}${n ? `&zones=${n}` : ''}`}
             aria-current={n === nbZones ? 'page' : undefined}
             className={`rounded-full border px-3 py-1 font-semibold ${n === nbZones ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
           >
-            {n ? `${n} zones` : 'Départements'}
+            {n ? `${n} zones (≈ ${Math.round((n * CODES_DEPARTEMENTS.length) / 10) * 10} sur la France)` : 'Départements'}
           </Link>
         ))}
       </nav>
