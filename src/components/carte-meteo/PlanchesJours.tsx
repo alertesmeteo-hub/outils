@@ -228,7 +228,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
   }, [zone, parQuarts, enDepartement, dates, jours, donneesDep, codes]);
 
-  const nomZone = parQuarts ? 'France en 4 zones (NO, NE, SO, SE)' : zone === 'france' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
+  const nomZone = parQuarts ? 'France' : zone === 'france' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const titre = weekEnd ? `MÉTÉO DU WEEK-END : ${nomZone.toUpperCase()}` : `TENDANCE SUR ${duree} JOURS : ${nomZone.toUpperCase()}`;
   const moment = periode === 'journee' ? '' : ` · ${(PERIODES_PLANCHE.find((x) => x.id === periode)?.libelle ?? '').replace(/ \(.*\)$/, '').toUpperCase()}`;
@@ -442,9 +442,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           onPointerDown={(e) => debutPicto(e, cle)}
                           style={{ width: taillePicto, height: taillePicto, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden', transform: dec ? `translate(${dec[0]}px, ${dec[1]}px)` : undefined }}
                         />
-                        <span style={{ fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.5), color: '#d4101a', textShadow: '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
-                          {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: '0.8em' }}> {Math.round(p.mini)}°</span> : null}
+                          {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: '0.72em' }}>{p.maxi != null ? ' / ' : ''}{Math.round(p.mini)}°</span> : null}
                         </span>
                         {p.rafale != null && p.rafale >= seuilRafale && (() => {
                           const kmh = Math.round(p.rafale / 5) * 5;

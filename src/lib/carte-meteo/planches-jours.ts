@@ -123,8 +123,9 @@ export function pointsParQuart(points: PointJour[]): PointJour[] {
       {
         code: q,
         nom: q,
-        lat: groupe.reduce((a, p) => a + p.lat, 0) / groupe.length,
-        lon: groupe.reduce((a, p) => a + p.lon, 0) / groupe.length,
+        // Picto au milieu géométrique du quart (limites : 46,6° N et 2,5° E ; France de 41,4 à 51,1° N et de −4,8 à 7,6° E).
+        lat: q[0] === 'N' ? (46.6 + 51.1) / 2 : (41.4 + 46.6) / 2,
+        lon: q[1] === 'E' ? (2.5 + 7.6) / 2 : (-4.8 + 2.5) / 2,
         maxi: moyenne(groupe.map((p) => p.maxi)),
         mini: moyenne(groupe.map((p) => p.mini)),
         codeJournee: null,
