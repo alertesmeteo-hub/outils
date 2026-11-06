@@ -432,15 +432,15 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                       const pictoId = surcharges[cle] ?? pictoDuJour(p);
                       const dec = decalages[cle];
                       return (
-                      <div key={p.code} style={{ position: 'absolute', left: x, top: y, transform: parQuarts ? 'translate(-50%, -50%)' : 'translate(-50%, -62%)', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                      <div key={p.code} style={{ position: 'absolute', left: x, top: y, transform: `${parQuarts ? 'translate(-50%, -50%)' : 'translate(-50%, -62%)'}${dec ? ` translate(${dec[0]}px, ${dec[1]}px)` : ''}`, display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={pictoId ? cheminPictoImage(pictoId) ?? '' : undefined}
                           alt=""
                           draggable={false}
-                          title="Cliquer pour changer le picto, glisser pour le déplacer"
+                          title="Cliquer pour changer le picto, glisser pour déplacer le picto et ses températures"
                           onPointerDown={(e) => debutPicto(e, cle)}
-                          style={{ width: taillePicto, height: taillePicto, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden', transform: dec ? `translate(${dec[0]}px, ${dec[1]}px)` : undefined }}
+                          style={{ width: taillePicto, height: taillePicto, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
                         />
                         <span style={{ fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
