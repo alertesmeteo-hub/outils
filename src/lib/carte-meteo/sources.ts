@@ -537,7 +537,8 @@ export async function chargerZonesAutomatiques(modele: ModeleSource, debutISO: s
       const ville = groupes[j].reduce((a, b) => (distance(c, b) < distance(c, a) ? b : a));
       for (const duree of durees) {
         const p = pointDepuisSerie(dep, nomDep, ville.serie, debutISO, ajouterJours(debutISO, duree - 1));
-        sortie[duree].push({ code: `${dep}-z${j + 1}`, nom: `${nomDep} (zone ${j + 1})`, ville: ville.nom, lat: c.lat, lon: c.lon, pluiePeriode: p.pluiePeriode, pictoPeriode: null } as unknown as PointTendance);
+        // Toutes les valeurs de la période (pluie, rafales, maxi, mini, neige) de la commune la plus proche du centre de la zone.
+        sortie[duree].push({ ...p, code: `${dep}-z${j + 1}`, nom: `${nomDep} (zone ${j + 1})`, ville: ville.nom, lat: c.lat, lon: c.lon, pictoPeriode: null } as PointTendance);
       }
     });
   });

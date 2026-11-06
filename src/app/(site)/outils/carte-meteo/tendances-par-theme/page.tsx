@@ -66,8 +66,8 @@ export default async function PageTendancesParTheme({ searchParams }: { searchPa
         })}
       </nav>
 
-      <nav aria-label="Découpage en zones (carte de pluie)" className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium">Carte de pluie, zones par département :</span>
+      <nav aria-label="Découpage en zones" className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium">Zones par département (pluie, rafales, maxi, mini, neige) :</span>
         {[0, 2, 3, 4, 5, 6, 7, 8].map((n) => (
           <Link
             key={n}

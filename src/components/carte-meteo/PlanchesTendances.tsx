@@ -40,7 +40,7 @@ interface Props {
   periodes: Record<number, PointTendance[] | null>;
   /** Pyrénées-Orientales en 10 zones, par durée (carte de pluie) ; null si indisponible. */
   zones66?: Record<number, PointTendance[] | null> | null;
-  /** Départements découpés automatiquement en `nbZones` zones (carte de pluie) ; null / 0 si non demandé. */
+  /** Départements découpés automatiquement en `nbZones` zones (tous les thèmes) ; null / 0 si non demandé. */
   zonesAuto?: Record<number, PointTendance[] | null> | null;
   nbZones?: number;
 }
@@ -65,7 +65,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
   const [moyenneRegions, setMoyenneRegions] = useState(false);
   // Carte de pluie : les Pyrénées-Orientales découpées en 10 zones (région '66' = ce découpage).
   const enZones66 = region === 'zones-66' && themeId === 'pluie' && !!zones66;
-  const enZonesAuto = !enZones66 && themeId === 'pluie' && !!zonesAuto && nbZones > 0;
+  const enZonesAuto = !enZones66 && !!zonesAuto && nbZones > 0;
   const regionCarte = region === 'zones-66' ? '' : region;
   const parRegion = moyenneRegions && !region;
   // Pictos changés à la main : « thème|durée|code » → picto ('' = retiré).
