@@ -103,6 +103,8 @@ export const QUARTS = ['NO', 'NE', 'SO', 'SE'] as const;
 const quartDe = (p: PointJour) => `${p.lat >= 46.6 ? 'N' : 'S'}${p.lon >= 2.5 ? 'E' : 'O'}`;
 
 /** Un point par quart : température moyenne (maxi et mini), un seul picto (le temps le plus fréquent), au centre des départements du quart. */
+const milieu = (v: number[]) => (Math.min(...v) + Math.max(...v)) / 2;
+
 export function pointsParQuart(points: PointJour[]): PointJour[] {
   return QUARTS.flatMap((q) => {
     const groupe = points.filter((p) => quartDe(p) === q);
@@ -123,9 +125,9 @@ export function pointsParQuart(points: PointJour[]): PointJour[] {
       {
         code: q,
         nom: q,
-        // Picto au milieu géométrique du quart (limites : 46,6° N et 2,5° E ; France de 41,4 à 51,1° N et de −4,8 à 7,6° E).
-        lat: q[0] === 'N' ? (46.6 + 51.1) / 2 : (41.4 + 46.6) / 2,
-        lon: q[1] === 'E' ? (2.5 + 7.6) / 2 : (-4.8 + 2.5) / 2,
+        // Picto au milieu du quart : centre de l'étendue des départements du quart (Corse exclue).
+        lat: milieu(groupe.map((p) => p.lat)),
+        lon: milieu(groupe.filter((p) => !(p.lon > 8.3 && p.lat < 43.3)).map((p) => p.lon)),
         maxi: moyenne(groupe.map((p) => p.maxi)),
         mini: moyenne(groupe.map((p) => p.mini)),
         codeJournee: null,

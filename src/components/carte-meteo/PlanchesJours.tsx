@@ -432,7 +432,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                       const pictoId = surcharges[cle] ?? pictoDuJour(p);
                       const dec = decalages[cle];
                       return (
-                      <div key={p.code} style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -62%)', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                      <div key={p.code} style={{ position: 'absolute', left: x, top: y, transform: parQuarts ? 'translate(-50%, -50%)' : 'translate(-50%, -62%)', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={pictoId ? cheminPictoImage(pictoId) ?? '' : undefined}
