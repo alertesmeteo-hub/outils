@@ -21,7 +21,7 @@ const REGLAGES_DEFAUT: Reglages = { couleur: '#ffffff', taille: 36, gras: true, 
 
 const champ = 'mt-0.5 block w-full rounded-md border border-border bg-surface p-1 text-sm';
 
-export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cible: RefObject<HTMLElement | null>; donnees?: () => CarteTexte | null; /** Boutons dans une barre d'outils (à côté de « Texte IA ») : le panneau s'ouvre en dessous, par-dessus la page. */ enLigne?: boolean }) {
+export default function TexteSurCarte({ cible, donnees, enLigne = false, emplacement }: { cible: RefObject<HTMLElement | null>; donnees?: () => CarteTexte | null; /** Boutons dans une barre d'outils (à côté de « Texte IA »). */ enLigne?: boolean; /** Élément (sous la barre d'outils) où s'affiche le panneau, dans le flux de la page : il ne recouvre pas la carte. */ emplacement?: RefObject<HTMLElement | null> }) {
   const [ouvert, setOuvert] = useState(false);
   const [noeud, setNoeud] = useState<HTMLElement | null>(null);
   const [textes, setTextes] = useState<Annotation[]>([]);
@@ -31,6 +31,7 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
   const [reglages, setReglages] = useState<Reglages>(REGLAGES_DEFAUT);
   const [redaction, setRedaction] = useState('');
   const [surCarte, setSurCarte] = useState(true);
+  const [lieu, setLieu] = useState<HTMLElement | null>(null);
   const panneauRef = useRef<HTMLDivElement>(null);
   const [copie, setCopie] = useState(false);
   const [format, setFormat] = useState<FormatTexte>('court');
@@ -41,6 +42,7 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
     const carte = donnees?.();
     if (!carte) {
       setErreur('Pas de donnée sur cette carte.');
+      setOuvert(true);
       return;
     }
     setErreur(null);
@@ -59,7 +61,7 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
     const largeur = noeud?.offsetWidth || 1280;
     const hauteur = noeud?.offsetHeight || 720;
     const taille = 18;
-    const parLigne = Math.max(20, Math.floor((largeur * 0.8) / (taille * 0.52)));
+    const parLigne = Math.max(20, Math.floor((largeur * 0.62) / (taille * 0.5)));
     const lignes: string[] = [];
     let courante = '';
     for (const mot of sansHashtags.split(' ')) {
@@ -84,6 +86,8 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
 
   // Le nœud exporté peut changer (autre vue, autre rendu) : on le relit à chaque rendu.
   useEffect(() => {
+    const place = emplacement?.current ?? null;
+    if (place !== lieu) setLieu(place);
     const courant = cible.current;
     if (courant !== noeud) setNoeud(courant);
     if (courant && getComputedStyle(courant).position === 'static') courant.style.position = 'relative';
@@ -195,32 +199,8 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
         )
       : null;
 
-  return (
-    <div className={enLigne ? 'relative flex gap-2' : 'mb-2 flex flex-wrap gap-2'}>
-      <button
-        type="button"
-        aria-expanded={ouvert}
-        onClick={() => setOuvert((o) => !o)}
-        className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${ouvert ? 'border-primary bg-primary text-white' : 'border-border'}`}
-      >
-        {textes.length > 0 ? `Texte sur la carte (${textes.length})` : 'Ajouter un texte sur la carte'}
-      </button>
-      {donnees && (
-        <button
-          type="button"
-          onClick={() => {
-            rediger();
-            setOuvert(true);
-          }}
-          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium"
-          title="Rédiger automatiquement un texte à partir des valeurs de la carte (sans IA)"
-        >
-          Régénérer le texte
-        </button>
-      )}
-      {calque}
-      {ouvert && (
-        <div ref={panneauRef} className={`rounded-lg border border-border bg-surface p-3 text-sm ${enLigne ? 'absolute right-0 top-full z-30 mt-2 w-[22rem] max-w-[90vw] shadow-lg' : 'mt-2 w-full max-w-md'}`}>
+  const panneau = (
+        <div ref={panneauRef} className={`rounded-lg border border-border bg-surface p-3 text-sm ${enLigne && !emplacement ? 'absolute right-0 top-full z-30 mt-2 w-[22rem] max-w-[90vw] shadow-lg' : 'mb-2 mt-2 w-full max-w-md'}`}>
           <label className="block text-xs font-medium">
             Texte
             <textarea
@@ -353,7 +333,30 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
             </button>
           )}
         </div>
+  );
+
+  return (
+    <div className={enLigne ? 'relative flex gap-2' : 'mb-2 flex flex-wrap gap-2'}>
+      <button
+        type="button"
+        aria-expanded={ouvert}
+        onClick={() => setOuvert((o) => !o)}
+        className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${ouvert ? 'border-primary bg-primary text-white' : 'border-border'}`}
+      >
+        {textes.length > 0 ? `Texte sur la carte (${textes.length})` : 'Ajouter un texte sur la carte'}
+      </button>
+      {donnees && (
+        <button
+          type="button"
+          onClick={() => rediger()}
+          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium"
+          title="Rédiger automatiquement un texte à partir des valeurs de la carte (sans IA)"
+        >
+          Régénérer le texte
+        </button>
       )}
+      {calque}
+      {ouvert && (lieu ? createPortal(panneau, lieu) : panneau)}
     </div>
   );
 }

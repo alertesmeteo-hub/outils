@@ -58,6 +58,7 @@ const trier = (r: RubriqueSynthese, zone: Set<string>) =>
 export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoId, nomFichier, contexte = '' }: Props) {
   const fleuves = useFleuves(true);
   const carteRef = useRef<HTMLDivElement>(null);
+  const emplacementTexte = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
   const [enExport, setEnExport] = useState(false);
@@ -169,12 +170,13 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
         <p className="text-base font-bold">{rubriques.map((r) => r.libelle).join(', ')}</p>
         <div className="flex gap-2">
           {texteIA.bouton}
-          <TexteSurCarte cible={carteRef} donnees={texteIA.construire} enLigne />
+          <TexteSurCarte cible={carteRef} donnees={texteIA.construire} enLigne emplacement={emplacementTexte} />
           <button type="button" onClick={exporter} disabled={enExport || contoursDep.length === 0} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
             {enExport ? 'Export…' : 'Exporter en JPG'}
           </button>
         </div>
       </div>
+      <div ref={emplacementTexte} />
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreurExport}

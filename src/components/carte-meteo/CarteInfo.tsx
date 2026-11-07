@@ -145,6 +145,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
   const carteRef = useRef<HTMLDivElement>(null);
+  const emplacementTexte = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
   const [enExport, setEnExport] = useState(false);
@@ -502,7 +503,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         <p className="text-base font-bold">{theme.court}</p>
         <div className="flex gap-2">
           {texteIA.bouton}
-          <TexteSurCarte cible={carteRef} donnees={texteIA.construire} enLigne />
+          <TexteSurCarte cible={carteRef} donnees={texteIA.construire} enLigne emplacement={emplacementTexte} />
           <button
             type="button"
             aria-pressed={edition}
@@ -516,6 +517,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           </button>
         </div>
       </div>
+      <div ref={emplacementTexte} />
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreurExport}
