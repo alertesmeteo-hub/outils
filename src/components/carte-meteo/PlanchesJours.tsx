@@ -16,6 +16,7 @@ import { PERIODES_PLANCHE, pictoDuJour, pointDeLaPeriode, pointsParQuart, versPo
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
 import TableauPrevisions, { type CelluleJour, type LigneTableau } from './TableauPrevisions';
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, FICHIERS_CONTOURS } from './CarteMeteo';
+import { statsDe, type CarteTexte, type RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from './TexteSurCarte';
 
 const LARGEUR = 1600;
@@ -230,6 +231,24 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   }, [zone, parQuarts, enDepartement, dates, jours, donneesDep, codes]);
 
   const nomZone = parQuarts ? 'France' : zone === 'france' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
+  /** Données du texte automatique : températures maximales des premiers jours de la planche. */
+  const donneesTexte = (): CarteTexte | null => {
+    const jourLong = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+    const rubriques = dates.slice(0, 4).flatMap((d, k): RubriqueTexte[] => {
+      const valeurs = lignesTableau.flatMap((l) => (l.cellules[k]?.maxi != null ? [{ lieu: l.nom, valeur: l.cellules[k]!.maxi as number }] : []));
+      if (valeurs.length === 0) return [];
+      valeurs.sort((a, b) => b.valeur - a.valeur);
+      return [{
+        nom: `Températures maximales du ${jourLong(d)}`,
+        unite: '°C',
+        sens: 'plus hautes',
+        preposition: enDepartement ? 'à' : 'pour',
+        classement: valeurs.slice(0, 5),
+        stats: statsDe(valeurs.map((v) => v.valeur)),
+      }];
+    });
+    return rubriques.length === 0 ? null : { type: 'Prévisions', titre: weekEnd ? 'Météo du week-end' : `Tendance sur ${duree} jours`, periode: dates.length > 1 ? `du ${jourLong(dates[0])} au ${jourLong(dates[dates.length - 1])}` : jourLong(dates[0]), zone: nomZone, source: `modèle ${modele.libelle ?? modele.id}`, rubriques };
+  };
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const titre = weekEnd ? `MÉTÉO DU WEEK-END : ${nomZone.toUpperCase()}` : `TENDANCE SUR ${duree} JOURS : ${nomZone.toUpperCase()}`;
   const moment = periode === 'journee' ? '' : ` · ${(PERIODES_PLANCHE.find((x) => x.id === periode)?.libelle ?? '').replace(/ \(.*\)$/, '').toUpperCase()}`;
@@ -370,7 +389,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
         </button>
       </div>
       <div className="mt-3">
-        <TexteSurCarte cible={planchRef} />
+        <TexteSurCarte cible={planchRef} donnees={donneesTexte} />
       </div>
       {erreur && (
         <p role="alert" className="mt-3 text-sm text-danger">

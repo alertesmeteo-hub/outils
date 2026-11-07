@@ -5,6 +5,7 @@ import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { couleur, fmtP, fmtT, type Variable } from '@/lib/saisonnier/couleurs';
 import { HAUTEUR_FR, LARGEUR_FR, projeterFrance, type EcheanceFrance, type SaisonnierFrance } from '@/lib/saisonnier/france';
+import { statsDe, type CarteTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from '../carte-meteo/TexteSurCarte';
 
 /** Pas de la grille (degrés), déduit des mailles. */
@@ -72,6 +73,16 @@ export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }
   const planche = useRef<HTMLDivElement>(null);
   const tableau = useRef<HTMLDivElement>(null);
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
+  /** Données du texte automatique : écart à la normale en France pour chaque échéance. */
+  const donneesTexte = (): CarteTexte | null => {
+    const valeurs = echeances.flatMap((e) => {
+      const v = variable === 't' ? e.t2m : e.pluiePct;
+      return v == null ? [] : [{ lieu: e.sousTitre ? `${e.titre} (${e.sousTitre})` : e.titre, valeur: v }];
+    });
+    if (valeurs.length === 0) return null;
+    valeurs.sort((a, b) => b.valeur - a.valeur);
+    return { type: 'Prévisions saisonnières, écart à la normale', titre: variable === 't' ? 'Écart de température à la normale' : 'Écart de pluie à la normale', periode: pas === 'hebdo' ? '8 prochaines semaines' : '9 prochains mois', zone: 'France', source: 'modèle saisonnier', rubriques: [{ nom: variable === 't' ? 'Écart de température' : 'Écart de pluie', unite: variable === 't' ? '°C' : '%', ecart: true, sens: 'plus hautes', preposition: 'pour', classement: valeurs, stats: statsDe(valeurs.map((v) => v.valeur)) }] };
+  };
   const run = new Date(`${donnees.init}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
   const exporter = async (noeud: HTMLDivElement | null, nom: string) => {
@@ -118,7 +129,7 @@ export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }
           {exportEnCours ? 'Export…' : 'Exporter la planche en JPG'}
         </button>
       </div>
-      <TexteSurCarte cible={planche} />
+      <TexteSurCarte cible={planche} donnees={donneesTexte} />
       <div ref={planche} className="rounded-xl bg-[#0b2a4a] p-3">
         <div className="mb-3 flex items-center justify-center gap-4">
           {logo?.fichier ? (

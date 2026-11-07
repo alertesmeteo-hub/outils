@@ -502,6 +502,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         <p className="text-base font-bold">{theme.court}</p>
         <div className="flex gap-2">
           {texteIA.bouton}
+          <TexteSurCarte cible={carteRef} donnees={texteIA.construire} enLigne />
           <button
             type="button"
             aria-pressed={edition}
@@ -515,7 +516,6 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           </button>
         </div>
       </div>
-      <TexteSurCarte cible={carteRef} donnees={texteIA.construire} />
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreurExport}

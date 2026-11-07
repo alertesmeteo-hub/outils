@@ -4,6 +4,7 @@ import { useId, useRef, useState } from 'react';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { couleur, fmtP, fmtT, type Variable } from '@/lib/saisonnier/couleurs';
 import { HAUTEUR_CARTE, LARGEUR_CARTE, projeter, type Echeance, type Saisonnier } from '@/lib/saisonnier/cfsv2';
+import { statsDe, type CarteTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from '../carte-meteo/TexteSurCarte';
 
 type Pas = 'hebdo' | 'mensuel';
@@ -67,6 +68,16 @@ export default function PrevisionsSaisonnieres({ donnees, traces }: { donnees: S
   const planche = useRef<HTMLDivElement>(null);
   const tableau = useRef<HTMLDivElement>(null);
   const echeances = pas === 'hebdo' ? donnees.hebdo : donnees.mensuel;
+  /** Données du texte automatique : écart à la normale en Occitanie pour chaque échéance. */
+  const donneesTexte = (): CarteTexte | null => {
+    const valeurs = echeances.flatMap((e) => {
+      const v = variable === 't' ? e.occitanie.t2m.anomalie : e.occitanie.pluie.anomalie_pct;
+      return v == null ? [] : [{ lieu: `${e.titre} (${e.sousTitre})`, valeur: v }];
+    });
+    if (valeurs.length === 0) return null;
+    valeurs.sort((a, b) => b.valeur - a.valeur);
+    return { type: 'Prévisions saisonnières (CFSv2), écart à la normale', titre: variable === 't' ? 'Écart de température à la normale' : 'Écart de pluie à la normale', periode: pas === 'hebdo' ? '8 prochaines semaines' : '9 prochains mois', zone: 'Occitanie', source: 'modèle CFSv2', rubriques: [{ nom: variable === 't' ? 'Écart de température' : 'Écart de pluie', unite: variable === 't' ? '°C' : '%', ecart: true, sens: 'plus hautes', preposition: 'pour', classement: valeurs, stats: statsDe(valeurs.map((v) => v.valeur)) }] };
+  };
   const run = new Date(`${donnees.init}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
   const exporter = async (noeud: HTMLDivElement | null, nom: string) => {
@@ -96,7 +107,7 @@ export default function PrevisionsSaisonnieres({ donnees, traces }: { donnees: S
             {exportEnCours ? 'Export…' : 'Exporter la planche en JPG'}
           </button>
         </div>
-        <TexteSurCarte cible={planche} />
+        <TexteSurCarte cible={planche} donnees={donneesTexte} />
         <div ref={planche} className="rounded-xl bg-[#0b2a4a] p-3">
           <p className="mb-3 text-center font-bold text-white">
             {variable === 't' ? 'ÉCART DE TEMPÉRATURE À LA NORMALE' : 'ÉCART DE PLUIE À LA NORMALE'} — {pas === 'hebdo' ? '8 PROCHAINES SEMAINES' : '9 PROCHAINS MOIS'}

@@ -26,6 +26,7 @@ import {
 } from '@/lib/carte-meteo/isobares';
 import { ajouterJours } from '@/lib/carte-meteo/previsions-modeles';
 import { NOM_ECHEANCE, libelleJour } from './CarteMeteo';
+import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from './TexteSurCarte';
 
 interface Echeance {
@@ -293,6 +294,31 @@ function CarteEurope({
   const isobares = useMemo(() => (grille ? tracerIsobares(grille, cadre, style === 'clair' ? 5 : 4) : []), [grille, cadre, style]);
   const centres = useMemo(() => (grille ? centresAction(grille, cadre) : []), [grille, cadre]);
 
+  /** Données du texte automatique : pressions au centre des anticyclones et des dépressions, avec la ville la plus proche. */
+  const donneesTexte = (): CarteTexte | null => {
+    if (!grille || centres.length === 0) return null;
+    const villes = (grille.villes ?? []).map((v) => ({ nom: v.nom, ...versEcranEurope(cadre, v.lon, v.lat) }));
+    const proche = (c: { x: number; y: number }) => villes.reduce<{ nom: string; d: number } | null>((m, v) => { const d = Math.hypot(v.x - c.x, v.y - c.y); return !m || d < m.d ? { nom: v.nom, d } : m; }, null)?.nom;
+    const rubrique = (type: 'A' | 'D'): RubriqueTexte[] => {
+      const liste = centres.filter((c) => c.type === type).sort((a, b) => (type === 'A' ? b.hpa - a.hpa : a.hpa - b.hpa)).slice(0, 4);
+      return liste.length === 0 ? [] : [{
+        nom: type === 'A' ? 'Pression au centre des anticyclones' : 'Pression au centre des dépressions',
+        unite: 'hPa',
+        sens: type === 'A' ? 'plus hautes' : 'plus basses',
+        preposition: 'pour',
+        classement: liste.map((c, k) => ({ lieu: `${type === 'A' ? "l'anticyclone" : 'la dépression'} ${proche(c) ? `près de ${proche(c)}` : `n° ${k + 1}`}`, valeur: c.hpa })),
+      }];
+    };
+    return {
+      type: 'Pression au niveau de la mer et isobares',
+      titre: titre || 'Pression et isobares',
+      periode: nomJour,
+      zone: 'Europe',
+      source: `modèle ${MODELES_EUROPE.find((m) => m.id === modele)?.libelle ?? modele}`,
+      rubriques: [...rubrique('A'), ...rubrique('D')],
+    };
+  };
+
   const sombre = style === 'sombre';
   const clair = style === 'clair';
   const idClip = `terres-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
@@ -512,7 +538,7 @@ function CarteEurope({
           {enExport ? 'Export…' : 'Exporter en JPG'}
         </button>
       </div>
-      <TexteSurCarte cible={carteRef} />
+      <TexteSurCarte cible={carteRef} donnees={donneesTexte} />
       {erreur && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreur}

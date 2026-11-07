@@ -12,6 +12,10 @@ export interface RubriqueTexte {
   /** Sens du classement : les valeurs les plus hautes ou les plus basses en tête. */
   sens: 'plus hautes' | 'plus basses';
   classement: { lieu: string; departement?: string; valeur: number }[];
+  /** Mot placé devant le lieu dans le texte automatique (« à » par défaut ; « pour » pour une période ou une zone). */
+  preposition?: string;
+  /** Écart à une référence : le signe + est écrit devant les valeurs positives. */
+  ecart?: boolean;
   stats?: { nombre: number; min: number; max: number; moyenne: number };
 }
 

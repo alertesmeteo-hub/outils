@@ -169,12 +169,12 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
         <p className="text-base font-bold">{rubriques.map((r) => r.libelle).join(', ')}</p>
         <div className="flex gap-2">
           {texteIA.bouton}
+          <TexteSurCarte cible={carteRef} donnees={texteIA.construire} enLigne />
           <button type="button" onClick={exporter} disabled={enExport || contoursDep.length === 0} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
             {enExport ? 'Export…' : 'Exporter en JPG'}
           </button>
         </div>
       </div>
-      <TexteSurCarte cible={carteRef} donnees={texteIA.construire} />
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreurExport}

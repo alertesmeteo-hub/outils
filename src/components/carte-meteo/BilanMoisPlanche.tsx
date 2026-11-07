@@ -7,6 +7,7 @@ import type { ReponseBilans } from '@/lib/carte-meteo/cartes-info';
 import type { ReponseHistorique } from '@/app/api/carte-meteo/bilan-historique/route';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { FICHIERS_CONTOURS, normaliser, useContours } from './CarteMeteo';
+import type { CarteTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from './TexteSurCarte';
 
 /** Formats de la planche (pixels de conception, l'export les agrandit) : paysage, 16:9 (YouTube), carré, 4:5 (Facebook), 9:16 (TikTok). */
@@ -210,6 +211,28 @@ export default function BilanMoisPlanche() {
     return lire.stations.flatMap((s) => (s.i < 0 ? [] : [ligneDe(s.nom, s.i, type as Type)])).filter((l): l is Ligne => l != null);
   }, [lire, type]);
 
+  /** Données du texte automatique : mesures du mois aux stations, et écarts à la normale. */
+  const donneesTexte = (): CarteTexte | null => {
+    if (lignes.length === 0) return null;
+    const unite = (t: Type) => (t === 'pluie' ? 'mm' : t === 'soleil' ? 'h' : '°C');
+    const uniteEcart = (t: Type) => (t === 'pluie' || t === 'soleil' ? '%' : '°C');
+    const t0 = lignes[0].type;
+    const m = [...lignes].sort((a, b) => b.mesure - a.mesure);
+    const e = [...lignes].sort((a, b) => b.ecart - a.ecart);
+    const nomMesure: Record<string, string> = { temp: 'Température moyenne du mois', chaud: 'Température maximale du mois', froid: 'Température minimale du mois', pluie: 'Cumul de pluie du mois', soleil: "Durée d'ensoleillement du mois" };
+    return {
+      type: 'Bilan du mois aux stations',
+      titre: `Bilan de ${moisAffiche}`,
+      periode: moisAffiche,
+      zone: 'Pyrénées-Orientales',
+      source: 'Relevés des stations Météo-France',
+      rubriques: [
+        { nom: type === 'tous' ? 'Valeurs du mois' : nomMesure[t0], unite: type === 'tous' ? '' : unite(t0), sens: 'plus hautes', classement: m.map((l) => ({ lieu: l.nom, valeur: l.mesure })) },
+        { nom: type === 'chaud' || type === 'froid' ? 'Écart au record du mois' : 'Écart à la normale', unite: type === 'tous' ? '' : uniteEcart(t0), ecart: true, sens: 'plus hautes', preposition: 'pour', classement: e.map((l) => ({ lieu: l.nom, valeur: l.ecart })) },
+      ],
+    };
+  };
+
   /** Records de chaque mois de l'année à la station de la planche (Perpignan), pour « Records des 12 mois ». */
   const annee = useMemo(() => {
     const s = lire?.stations.find((x) => x.i >= 0);
@@ -377,7 +400,7 @@ export default function BilanMoisPlanche() {
         </button>
       </div>
       <div className="mt-3">
-        <TexteSurCarte cible={planche} />
+        <TexteSurCarte cible={planche} donnees={donneesTexte} />
       </div>
       {erreur && (
         <p role="alert" className="mt-3 text-sm text-danger">
