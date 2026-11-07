@@ -689,3 +689,17 @@ export async function chargerPrevisionsMontagne(
   if (resultats.every((r) => r.status === 'rejected')) throw new Error(`${LIBELLES[source]} : aucun département disponible`);
   return points;
 }
+
+/** Neuf communes spatialement réparties par département pour la coloration fine. */
+export async function chargerPrevisionsZones(modele: ModeleSource, date: string, fin?: string) {
+  const resultats = await enParallele(CODES_DEPARTEMENTS, CONCURRENCE, async (dep) => {
+    const extrait = await extraitDepartement(modele, dep);
+    // Choisir avant le filtrage météo : les centres ne changent pas avec l'échéance.
+    return repartir(extrait.villes, 9).map((v) => ({
+      ...pointDepuisSerie(v.code, v.nom, v.serie, date, fin), dep, lat: v.lat, lon: v.lon,
+    }));
+  });
+  const points = resultats.flatMap((r) => r.status === 'fulfilled' ? r.value : []);
+  if (!points.some((p) => fin ? aValeursPeriode(p) : p.maxi != null)) throw new Error('Zonage : aucune donnée pour ce jour');
+  return points;
+}

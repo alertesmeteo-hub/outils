@@ -1,5 +1,5 @@
 import { aujourdhuiParis, ECHEANCE_MAX, MODELES_MOYENNE, modeleDisponible, type ModeleSource, type PointCarte } from './previsions-modeles';
-import { chargerPrevisionsCarte, chargerPrevisionsMontagne, chargerPrevisionsVilles } from './sources';
+import { chargerPrevisionsZones, chargerPrevisionsCarte, chargerPrevisionsMontagne, chargerPrevisionsVilles } from './sources';
 
 /**
  * « Moyenne des modèles » complète (cartes infos) : France, région ou département, n'importe quel jour jusqu'à J+15, et
@@ -91,3 +91,7 @@ export const moyenneVilles = (dateISO: string, deps: string[], fin?: string) =>
 /** Points de montagne (1 000 m et plus). */
 export const moyenneMontagne = (dateISO: string, deps: string[] | null, fin?: string) =>
   moyenneDe(modelesDeLaMoyenne(dateISO, deps?.length === 1 ? deps[0] : null, fin), (m) => chargerPrevisionsMontagne(m, dateISO, deps, fin));
+
+/** Moyenne par commune (code INSEE), jamais par numéro arbitraire de zone. */
+export const moyenneZones = (date: string, fin?: string) =>
+  moyenneDe(modelesDeLaMoyenne(date, null, fin), (m) => chargerPrevisionsZones(m, date, fin));

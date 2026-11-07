@@ -144,6 +144,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
   const [tailleValeurs, setTailleValeurs] = useState(100);
   const [sansTableau, setSansTableau] = useState(false);
+  const [zonageFin, setZonageFin] = useState(false);
   const echelleValeurs = tailleValeurs / 100;
   const [horizon, setHorizon] = useState<Horizon>(2050);
   const [altitudeMax, setAltitudeMax] = useState(ALTITUDE_MAX_DEFAUT);
@@ -180,7 +181,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const enDepartement = niveau === 'departement';
   const dateISO = ajouterJours(aujourdhui, jour);
   // Département : ses villes ; région : les villes de chacun de ses départements ; France : un point par département.
-  const requeteZone = niveau === 'departement' ? `&dep=${departement}` : niveau === 'region' && !region.startsWith('gz:') ? `&deps=${codesDeLaZone(zone).join(',')}` : '';
+  const requeteZone = zonageFin && mode === 'prevision' && niveau === 'france' ? '&zones=9' : niveau === 'departement' ? `&dep=${departement}` : niveau === 'region' && !region.startsWith('gz:') ? `&deps=${codesDeLaZone(zone).join(',')}` : '';
   // Grandes zones (Nord, Sud, NO, NE, SO, SE) : les données de la France entière (un point par département), cadrées sur la zone.
   const cle = `${modele}|${dateISO}|${requeteZone}`;
   const modeleCumul = modeleDuCumul(modele);
@@ -845,6 +846,16 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               ))}
             </select>
           </label>
+          {mode === 'prevision' && niveau === 'france' && (
+            <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
+              <span className={legende}>Zonage de la France</span>
+              <select value={zonageFin ? 'fin' : 'departements'} onChange={(e) => { setZonageFin(e.target.value === 'fin'); setErreur(null); setErreurCumuls(null); }} className={`${selectBarre} w-full`}>
+                <option value="departements">Par département</option>
+                <option value="fin">Fin : jusqu’à 864 zones · régions</option>
+              </select>
+              {zonageFin && <span className="mt-1 block text-xs font-normal text-muted">Jusqu’à 9 zones par département, colorées selon la commune de référence. Limites régionales visibles ; les données manquantes peuvent réduire le nombre de zones.</span>}
+            </label>
+          )}
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
             <span className={legende}>Tableau du classement</span>
             <select value={sansTableau ? 'sans' : 'avec'} onChange={(e) => setSansTableau(e.target.value === 'sans')} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`}>
@@ -1098,7 +1109,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                         </p>
                       ) : (
                         <CarteInfo
-                          sansTableau={sansTableau} echelleValeurs={echelleValeurs}
+                          zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs}
                           theme={theme}
                           zone={zone}
                           points={pointsPrevision[theme.id]}
@@ -1143,7 +1154,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                       )
                     ) : mode === 'prevision' ? (
                       <CarteInfo
-                          sansTableau={sansTableau} echelleValeurs={echelleValeurs}
+                          zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs}
                         theme={theme}
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
@@ -1163,10 +1174,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                         contexte={(theme as ThemePrevision).montagne ? `${contextePrevision}, communes de montagne (point du modèle à 1 000 m ou plus)` : contextePrevision}
                       />
                     ) : mode === 'bilan' ? (
-                      <CarteInfo sansTableau={sansTableau} echelleValeurs={echelleValeurs} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
+                      <CarteInfo  sansTableau={sansTableau} echelleValeurs={echelleValeurs} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
                     ) : (
                       <CarteInfo
-                          sansTableau={sansTableau} echelleValeurs={echelleValeurs}
+                           sansTableau={sansTableau} echelleValeurs={echelleValeurs}
                         theme={theme}
                         zone={zone}
                         points={climat[theme.id]?.points ?? []}

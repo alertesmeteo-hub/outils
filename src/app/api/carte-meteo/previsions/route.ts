@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, estModele, modeleDisponible, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
-import { chargerPrevisionsCarte, chargerPrevisionsMontagne, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
-import { moyenneCarte, moyenneMontagne, moyenneVilles } from '@/lib/carte-meteo/moyenne-modeles';
+import { chargerPrevisionsZones, chargerPrevisionsCarte, chargerPrevisionsMontagne, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
+import { moyenneZones, moyenneCarte, moyenneMontagne, moyenneVilles } from '@/lib/carte-meteo/moyenne-modeles';
 
 /**
  * GET /api/carte-meteo/previsions/?modele=arome|harmonie2km|harmonie|arpege|cep|gfs&date=YYYY-MM-DD[&dep=29 | &deps=29,22,35,56]
@@ -81,7 +81,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const points = dep ? await chargerPrevisionsVilles(modele, date, dep, fin) : await chargerPrevisionsCarte(modele, date, fin);
+    const points = !dep && !deps && modele !== 'moyenne' && url.searchParams.get('zones') === '9' ? await chargerPrevisionsZones(modele, date, fin) : dep ? await chargerPrevisionsVilles(modele, date, dep, fin) : await chargerPrevisionsCarte(modele, date, fin);
     return NextResponse.json({ modele, date, dep, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
   } catch (erreur) {
     const sansDonnee = erreur instanceof Error && erreur.message.includes('aucune donnée');
@@ -117,7 +117,7 @@ async function moyenneComplete(url: URL, date: string) {
         ? await moyenneMontagne(date, liste, fin)
         : liste
           ? await moyenneVilles(date, liste, fin)
-          : await moyenneCarte(date, fin);
+          : url.searchParams.get('zones') === '9' ? await moyenneZones(date, fin) : await moyenneCarte(date, fin);
     return NextResponse.json({ modele: 'moyenne', modeles, date, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
   } catch (erreur) {
     const sansDonnee = erreur instanceof Error && erreur.message.includes('aucune donnée');

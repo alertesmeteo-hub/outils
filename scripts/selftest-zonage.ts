@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { cellulesProximite } from '../src/lib/carte-meteo/zonage-fin';
+const boite = { minX: 0, minY: 0, maxX: 90, maxY: 90 };
+const centres = Array.from({ length: 9 }, (_, i) => ({ x: 15 + (i % 3) * 30, y: 15 + Math.floor(i / 3) * 30 }));
+const aire = (p: {x:number;y:number}[]) => Math.abs(p.reduce((s,a,i) => { const b=p[(i+1)%p.length]; return s+a.x*b.y-b.x*a.y; },0))/2;
+const cellules = cellulesProximite(centres, boite);
+assert.equal(cellules.length, 9);
+assert.equal(cellules.reduce((s,p)=>s+aire(p),0), 8100);
+for (const p of cellules) assert.equal(aire(p),900);
+assert.equal(cellulesProximite([],boite).length,0);
+const doublons=cellulesProximite([{x:45,y:45},{x:45,y:45}],boite);
+assert.equal(aire(doublons[0]),8100); assert.equal(doublons[1].length,0);
+console.log('OK : neuf cellules sans trou ni recouvrement, centres doublons et données absentes');

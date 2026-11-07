@@ -291,6 +291,7 @@ interface Props {
   onModifier: (code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale' | 'altitude', valeur: string, partout?: boolean) => void;
   /** Teinte de chaque département sélectionné (cartes infos : échelle de couleurs) ; sinon la teinte unie habituelle. */
   remplissages?: Record<string, string>;
+  cellules?: { code: string; dep: string; d: string; couleur: string }[];
   /** Éléments posés par-dessus la carte (cartes infos : pastilles de valeurs, légende), inclus dans l'export. */
   children?: ReactNode;
   /** Rafales ajoutées à la main, avec leur direction. */
@@ -482,6 +483,7 @@ export default function CarteRendu({
   onSupprimerRafale,
   rafalesAjoutees = [],
   remplissages,
+  cellules,
   children,
   onModifierRafaleAjoutee,
   onSupprimerRafaleAjoutee,
@@ -601,6 +603,18 @@ export default function CarteRendu({
                 )
               )}
             </g>
+            {cellules && (
+              <g opacity={afficherRelief ? 1 - reliefVisible : 1}>
+                <defs>
+                  {departements.filter((c) => selection.has(c.code)).map((c) => (
+                    <clipPath key={c.code} id={`${idClip}-zone-${c.code}`}><path d={c.d} /></clipPath>
+                  ))}
+                </defs>
+                {cellules.map((c) => (
+                  <path key={c.code} d={c.d} clipPath={`url(#${idClip}-zone-${c.dep})`} fill={c.couleur} stroke={c.couleur} strokeWidth={0.35} vectorEffect="non-scaling-stroke" />
+                ))}
+              </g>
+            )}
             {fleuves && (
               <>
                 <clipPath id={idClip}>

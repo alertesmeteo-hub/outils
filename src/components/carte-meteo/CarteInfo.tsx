@@ -1,6 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
+import { cellulesProximite } from '@/lib/carte-meteo/zonage-fin';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
@@ -72,6 +73,7 @@ export interface PointInfo {
 }
 
 interface Props {
+  zonageFin?: boolean;
   theme: ThemeInfo;
   zone: string;
   points: PointInfo[];
@@ -137,10 +139,10 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
-  const contoursReg = useContours(affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
+  const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
   const carteRef = useRef<HTMLDivElement>(null);
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
@@ -231,10 +233,11 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const departements = useMemo(() => (enFrance ? contoursDep : contoursDep.filter((c) => selection.has(c.code))), [contoursDep, selection, enFrance]);
   // Contours : « Aucun » = liste vide (seul le remplissage trace les départements) ; « Régions » = leurs contours ; sinon, réglage habituel.
   const regionsAffichees = useMemo(() => {
+    if (zonageFin) return contoursReg;
     if (affichage?.contours === 'aucun') return [];
     if (affichage?.contours !== 'regions' || enDepartement) return null;
     return zone.startsWith('reg:') ? contoursReg.filter((c) => normaliser(c.nom) === normaliser(zone.slice(4))) : contoursReg;
-  }, [affichage?.contours, enDepartement, zone, contoursReg]);
+  }, [affichage?.contours, enDepartement, zone, contoursReg, zonageFin]);
   const vue = useMemo(() => {
     const boite = unirBoites(contoursDep.filter((c) => selection.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
     // Régions et départements : la colonne de gauche reste libre pour le classement et la légende.
@@ -285,12 +288,26 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     return resultat;
   }, [dansZone, enDepartement, theme, valeursDepartements]);
 
+  const cellules = useMemo(() => {
+    if (!zonageFin || theme.sansTeinte || ('montagne' in theme && theme.montagne)) return undefined;
+    return departements.flatMap((dep) => {
+      const locaux = pointsCorriges.filter((p) => p.dep === dep.code && !p.neige && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur));
+      const centres = locaux.map((p) => versMonde(p.lat, p.lon));
+      return cellulesProximite(centres, dep.boite).flatMap((poly, i) => poly.length ? [{
+        code: locaux[i].code, dep: dep.code,
+        d: poly.map((p, j) => `${j ? 'L' : 'M'}${p.x},${p.y}`).join(' ') + 'Z',
+        couleur: palierDe(theme.paliers, locaux[i].valeur).fond,
+      }] : []);
+    });
+  }, [zonageFin, theme, departements, pointsCorriges]);
+
   // Paliers de la légende : seulement ceux qui couvrent les valeurs de la carte (une échelle de 12 couleurs pour 3 utilisées encombre).
   const legende = useMemo(() => {
-    if (dansZone.length === 0) return theme.paliers;
-    const indices = dansZone.map((p) => theme.paliers.indexOf(palierDe(theme.paliers, p.valeur)));
+    const valeurs = cellules ? pointsCorriges.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur)) : dansZone;
+    if (valeurs.length === 0) return theme.paliers;
+    const indices = valeurs.map((p) => theme.paliers.indexOf(palierDe(theme.paliers, p.valeur)));
     return theme.paliers.slice(Math.min(...indices), Math.max(...indices) + 1);
-  }, [dansZone, theme.paliers]);
+  }, [dansZone, theme, cellules, pointsCorriges, selection]);
 
   // Carte mixte pluie + neige : les points de neige ont leur légende (cm) sous celle de la pluie.
   const legendeNeige = useMemo(() => {
@@ -561,7 +578,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         pictosSelectionnes={AUCUN}
         onBasculerPalette={NOP}
         onModifier={NOP}
-        remplissages={remplissages}
+        remplissages={cellules ? undefined : remplissages}
+        cellules={cellules}
       >
         {avecReperes && (
           <svg className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 3 }} width={largeur} height={HAUTEUR_CARTE} aria-hidden>
