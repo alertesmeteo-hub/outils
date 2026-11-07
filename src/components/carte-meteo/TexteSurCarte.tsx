@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent as PointerEventReact, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { CarteTexte, FormatTexte } from '@/lib/carte-meteo/texte-ia';
+import { redigerTexte } from '@/lib/carte-meteo/texte-auto';
 import { COULEURS_TEXTE, POLICES, styleTexte, type Annotation, type FondTexte, type PoliceTexte } from './Annotations';
 
 /**
@@ -28,29 +29,19 @@ export default function TexteSurCarte({ cible, donnees }: { cible: RefObject<HTM
   const [redaction, setRedaction] = useState('');
   const [copie, setCopie] = useState(false);
   const [format, setFormat] = useState<FormatTexte>('court');
-  const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
-  /** Rédaction automatique (Claude) à partir des valeurs de la carte ; le résultat reste modifiable. */
-  async function rediger(f: FormatTexte = format) {
+  /** Rédaction automatique (modèles de phrases, sans IA) à partir des valeurs de la carte ; le résultat reste modifiable. */
+  function rediger(f: FormatTexte = format) {
     const carte = donnees?.();
     if (!carte) {
       setErreur('Pas de donnée sur cette carte.');
       return;
     }
-    setEnCours(true);
     setErreur(null);
-    try {
-      const r = await fetch('/api/carte-meteo/texte/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: f, carte }) });
-      const json = (await r.json().catch(() => null)) as { texte?: string; erreur?: string } | null;
-      if (!r.ok || !json?.texte) throw new Error(json?.erreur ?? 'Service IA momentanément indisponible.');
-      setRedaction(json.texte);
-    } catch (e) {
-      setErreur(e instanceof Error ? e.message : 'Service IA momentanément indisponible.');
-    } finally {
-      setEnCours(false);
-    }
+    setRedaction(redigerTexte(carte, f));
   }
+
   const glisser = useRef<{ id: number; sx: number; sy: number; x0: number; y0: number; echelle: number } | null>(null);
 
   // Le nœud exporté peut changer (autre vue, autre rendu) : on le relit à chaque rendu.
@@ -249,14 +240,14 @@ export default function TexteSurCarte({ cible, donnees }: { cible: RefObject<HTM
           </label>
           <label className="mt-3 block border-t border-border pt-2 text-xs font-medium">
             Texte de rédaction (hors image, à copier)
-            <textarea value={redaction} onChange={(e) => setRedaction(e.target.value)} rows={5} className={champ} placeholder={enCours ? 'Rédaction en cours…' : 'Ex. : On note 10 à 12 °C dans le nord, 16 à 18 °C dans le sud…'} />
+            <textarea value={redaction} onChange={(e) => setRedaction(e.target.value)} rows={5} className={champ} placeholder={'Ex. : On note 10 à 12 °C dans le nord, 16 à 18 °C dans le sud…'} />
           </label>
           {donnees && (
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => void rediger()} disabled={enCours} className="rounded-md border border-primary px-2 py-1 text-xs font-semibold text-primary disabled:opacity-60">
-                {enCours ? 'Rédaction…' : redaction ? '✨ Nouvelle version' : '✨ Rédiger le texte'}
+              <button type="button" onClick={() => rediger()} className="rounded-md border border-primary px-2 py-1 text-xs font-semibold text-primary">
+                {redaction ? 'Régénérer le texte' : 'Rédiger le texte'}
               </button>
-              <select value={format} onChange={(e) => setFormat(e.target.value as FormatTexte)} disabled={enCours} aria-label="Format du texte" className="rounded-md border border-border bg-surface p-1 text-xs">
+              <select value={format} onChange={(e) => { const f = e.target.value as FormatTexte; setFormat(f); if (redaction) rediger(f); }} aria-label="Format du texte" className="rounded-md border border-border bg-surface p-1 text-xs">
                 <option value="court">Court (réseaux sociaux)</option>
                 <option value="long">Long (article)</option>
               </select>
