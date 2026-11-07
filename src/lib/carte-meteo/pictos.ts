@@ -94,6 +94,7 @@ const METEOCONS: [string, string][] = [
   ['mostly-clear-day', 'Peu nuageux'],
   ['partly-cloudy-day', 'Éclaircies'],
   ['overcast-day', 'Nuageux'],
+  ['overcast-day-gris', 'Nuageux (nuage gris)'],
   ['cloudy', 'Nuages'],
   ['overcast', 'Couvert'],
   ['mist', 'Brume'],

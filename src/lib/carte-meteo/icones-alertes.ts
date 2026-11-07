@@ -8,7 +8,6 @@ export const ICONES_ALERTES: [string, string, string, string][] = [
   ["ciel-voile", "Ciel voilé", "Ciel", "nuages élevés cirrus voile"],
   ["peu-nuageux", "Peu nuageux", "Ciel", ""],
   ["eclaircies", "Éclaircies", "Ciel", "partiellement nuageux"],
-  ["eclaircies-gris", "Éclaircies (nuage gris)", "Ciel", "partiellement nuageux nuage gris"],
   ["nuageux", "Nuageux", "Ciel", ""],
   ["couvert", "Couvert", "Ciel", "gris"],
   ["brume", "Brume", "Ciel", ""],
