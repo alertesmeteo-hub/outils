@@ -78,10 +78,14 @@ function weekEnd(aujourdhui: string): [string, string] {
 const arrondi = (v: number | null | undefined) => (v == null ? null : Math.round(v));
 const degre = (v: number | null) => (v == null ? '–' : `${v}°`);
 
+/** Sous 0,5 mm, la pluie est ignorée (ni quantité, ni picto de pluie). */
+const SEUIL_PLUIE = 0.5;
+const pluieRetenue = (mm: number | null | undefined) => (mm != null && mm >= SEUIL_PLUIE ? mm : 0);
+
 function versJour(p: PointCarte | undefined): JourVille {
   if (!p) return { maxi: null, mini: null, rafale: null, pluie: null, picto: null };
-  const picto = pictoDepuisPrevision({ code: p.codeJournee ?? null, nuages: p.nuagesJournee ?? null, pluie: p.pluieJournee ?? null, temperature: p.maxi ?? null, voile: p.voileJournee }, 'alertes') as string;
-  return { maxi: arrondi(p.maxi), mini: arrondi(p.mini), rafale: arrondi(p.rafaleJournee), pluie: p.pluieJournee ?? null, picto: cheminPictoImage(picto) ?? null };
+  const picto = pictoDepuisPrevision({ code: p.codeJournee ?? null, nuages: p.nuagesJournee ?? null, pluie: p.pluieJournee == null ? null : pluieRetenue(p.pluieJournee), temperature: p.maxi ?? null, voile: p.voileJournee }, 'alertes') as string;
+  return { maxi: arrondi(p.maxi), mini: arrondi(p.mini), rafale: arrondi(p.rafaleJournee), pluie: pluieRetenue(p.pluieJournee), picto: cheminPictoImage(picto) ?? null };
 }
 
 const cacheImages = new Map<string, Promise<HTMLImageElement>>();
