@@ -312,7 +312,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     ...top.map((p) => Math.round(40 + Math.min(32, p.nom.length) * 9.5 + (enDepartement || theme.maille ? 0 : 30) + texteInfo(theme, p.valeur).length * 10 + (uniteVisible ? 48 : 0)))
   );
   // Titre de l'encadré sur deux lignes s'il dépasse la largeur (≈ 9 px par lettre en 16 px condensé).
-  const hauteurTop0 = top.length && !(theme.sansTop || sansTableau) ? 34 + top.length * 19 + (titreTop.length * 9 > largeurTop0 - 18 ? 18 : 0) : 0;
+  const hauteurTop0 = top.length && !(theme.sansTop || sansTableau) ? 38 + top.length * 24 + (titreTop.length * 9 > largeurTop0 - 18 ? 18 : 0) : 0;
   // Agrandi (échelle du tableau) : l'encadré garde sa mise en page et est mis à l'échelle depuis son coin haut-gauche.
   const largeurTop = Math.round(largeurTop0 * echelleTop);
   const hauteurTop = Math.round(hauteurTop0 * echelleTop);
@@ -328,7 +328,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
       ? { x: largeur - 28 - 430, y: 6, w: 430, h: 76 }
       : { x: largeur / 2 - 320, y: 6, w: 640, h: 76 };
   const rectTop: Rect = enFrance
-    ? { x: largeur - MARGE_COLONNE - largeurTop, y: titreAGauche ? 24 : 96, w: largeurTop, h: hauteurTop }
+    ? { x: largeur - MARGE_COLONNE - largeurTop, y: titreAGauche && rectTitre.x + rectTitre.w + 16 <= largeur - MARGE_COLONNE - largeurTop ? 24 : rectTitre.y + rectTitre.h + 14, w: largeurTop, h: hauteurTop }
     : { x: MARGE_COLONNE, y: logoUrl ? 21 + hauteurLogo + 14 : titreDroite ? 24 : rectTitre.y + rectTitre.h + 14, w: largeurTop, h: hauteurTop };
   // Seuils comptés (chaleur) : un encadré sous le classement, « N sur M ont atteint ou dépassé … ».
   const comptes = theme.seuils?.map((s) => ({ ...s, n: dansZone.filter((p) => p.valeur >= s.valeur).length })) ?? [];
@@ -654,7 +654,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         {texteIA.calque}
 
         {hauteurTop > 0 && (
-          <div className={`cinfo-encadre ${topRouge ? 'cinfo-top-rouge' : ''}`} style={{ left: rectTop.x, top: rectTop.y, width: largeurTop0, ...(echelleTop !== 1 ? { transform: `scale(${echelleTop})`, transformOrigin: '0 0' } : {}) }}>
+          <div className={`cinfo-encadre cinfo-classement ${topRouge ? 'cinfo-top-rouge' : ''}`} style={{ left: rectTop.x, top: rectTop.y, width: largeurTop0, ...(echelleTop !== 1 ? { transform: `scale(${echelleTop})`, transformOrigin: '0 0' } : {}) }}>
             <div className="cinfo-encadre-titre">{titreTop}</div>
             <ol>
               {top.map((p, i) => (

@@ -383,3 +383,9 @@ body {
 .cmap-fenetre-picto .cmap-choix-titre strong::before { content: '⠿'; margin-right: 6px; color: #94a3b8; font-weight: 400; }
 .cmap-choix .cmap-choix-retirer { display: block; width: 100%; margin: 6px 0 2px; padding: 5px 8px; border-radius: 6px; border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; font-size: 12px; font-weight: 600; cursor: pointer; text-align: left; }
 .cmap-choix .cmap-choix-retirer:hover { background: #fee2e2; border-color: #f87171; }
+
+/* Classement : lignes aérées et chiffres alignés, également dans l’export. */
+.cinfo-classement ol li { height: 24px; gap: 14px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.cinfo-classement ol li:last-child { border-bottom: 0; }
+.cinfo-classement ol li strong { min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.cinfo-classement .cinfo-encadre-titre { margin-bottom: 8px; }
