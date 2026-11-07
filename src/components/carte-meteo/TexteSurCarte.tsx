@@ -24,6 +24,8 @@ export default function TexteSurCarte({ cible }: { cible: RefObject<HTMLElement 
   const [pose, setPose] = useState(false);
   const [texteNouveau, setTexteNouveau] = useState('');
   const [reglages, setReglages] = useState<Reglages>(REGLAGES_DEFAUT);
+  const [redaction, setRedaction] = useState('');
+  const [copie, setCopie] = useState(false);
   const glisser = useRef<{ id: number; sx: number; sy: number; x0: number; y0: number; echelle: number } | null>(null);
 
   // Le nœud exporté peut changer (autre vue, autre rendu) : on le relit à chaque rendu.
@@ -96,7 +98,7 @@ export default function TexteSurCarte({ cible }: { cible: RefObject<HTMLElement 
             {textes.map((t) => (
               <div
                 key={t.id}
-                className="cmap-annotation"
+                className={`cmap-annotation ${selection === t.id ? 'cmap-annotation-sel' : ''}`}
                 style={{ left: t.x, top: t.y, pointerEvents: 'auto', zIndex: 21 }}
                 title="Glisser pour déplacer · clic pour modifier"
                 onPointerDown={(e) => debut(e, t)}
@@ -220,6 +222,26 @@ export default function TexteSurCarte({ cible }: { cible: RefObject<HTMLElement 
             <input type="checkbox" checked={reglages.gras} onChange={(e) => majReglages({ gras: e.target.checked })} />
             Gras
           </label>
+          <label className="mt-3 block border-t border-border pt-2 text-xs font-medium">
+            Texte de rédaction (hors image, à copier)
+            <textarea value={redaction} onChange={(e) => setRedaction(e.target.value)} rows={5} className={champ} placeholder="Ex. : On note 10 à 12 °C dans le nord, 16 à 18 °C dans le sud…" />
+          </label>
+          <button
+            type="button"
+            disabled={!redaction}
+            className="mt-1 rounded-md border border-border px-2 py-1 text-xs font-semibold disabled:opacity-50"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(redaction);
+                setCopie(true);
+                setTimeout(() => setCopie(false), 2000);
+              } catch {
+                /* copie refusée : le texte reste sélectionnable */
+              }
+            }}
+          >
+            {copie ? 'Copié ✓' : 'Copier le texte'}
+          </button>
           {textes.length > 0 && (
             <button
               type="button"

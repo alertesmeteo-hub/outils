@@ -41,6 +41,7 @@ async function integrerTuiles(noeud: HTMLElement): Promise<() => void> {
  * réduite par une transformation CSS selon la largeur d'écran : on la neutralise sur le clone exporté.
  */
 export async function exporterEnJpg(noeud: HTMLElement, nomFichier: string, largeur: number, hauteur: number): Promise<void> {
+  document.documentElement.classList.add('cmap-export-en-cours');
   const remettre = await integrerTuiles(noeud);
   let dataUrl: string;
   try {
@@ -58,6 +59,7 @@ export async function exporterEnJpg(noeud: HTMLElement, nomFichier: string, larg
       new Promise<never>((_, rejeter) => setTimeout(() => rejeter(new Error("Délai dépassé pendant l'export")), 60_000)),
     ]);
   } finally {
+    document.documentElement.classList.remove('cmap-export-en-cours');
     remettre();
   }
   const lien = document.createElement('a');
