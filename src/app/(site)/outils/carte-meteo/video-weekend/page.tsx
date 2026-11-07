@@ -6,16 +6,16 @@ import { aujourdhuiParis } from '@/lib/carte-meteo/previsions-modeles';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Vidéo TikTok : quel temps ce week-end dans les Pyrénées-Orientales',
-  description: 'Vidéo verticale (TikTok, Reels, Shorts) de la météo du week-end : 3 ou 4 villes, samedi et dimanche, picto, températures, rafales et pluie. Export MP4.',
+  title: "Vidéo météo : quel temps ce week-end, aujourd'hui ou demain",
+  description: "Vidéo météo (TikTok, Reels, Shorts, Facebook, YouTube) du week-end ou d'un jour (J, J+1, J+2…) : 3 ou 4 villes, pictos animés, températures, rafales et pluie. Export MP4.",
   alternates: { canonical: '/outils/carte-meteo/video-weekend/' },
 };
 
 export default function PageVideoWeekEnd() {
   return (
     <>
-      <h1 className="text-3xl font-extrabold">Vidéo TikTok : quel temps ce week-end ?</h1>
-      <p className="mt-2 max-w-3xl text-muted">Choisissez 3 ou 4 villes : la vidéo verticale montre samedi et dimanche (picto, maxi, mini, rafales, pluie), puis un récapitulatif.</p>
+      <h1 className="text-3xl font-extrabold">Vidéo météo : quel temps ce week-end, aujourd&apos;hui ou demain ?</h1>
+      <p className="mt-2 max-w-3xl text-muted">Choisissez le week-end ou un jour (J, J+1, J+2…), 3 ou 4 villes et le format (TikTok, Facebook, carré, YouTube) : pictos animés, maxi, mini, rafales, pluie, puis un récapitulatif.</p>
       <div className="mt-6">
         <VideoWeekEnd aujourdhui={aujourdhuiParis()} />
       </div>

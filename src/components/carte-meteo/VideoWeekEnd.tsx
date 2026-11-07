@@ -5,8 +5,9 @@ import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { cheminPictoImage, pictoDepuisPrevision } from '@/lib/carte-meteo/pictos';
+import { chargerPictoAnime, dessinerPictoAnime, type PictoAnime } from '@/lib/carte-meteo/pictos-animes';
 
-/** Vidéo « Quel temps ce week-end ? » (TikTok, Reels, Shorts, Facebook, YouTube) : 3 ou 4 villes, samedi et dimanche, picto, maxi, mini, rafales, pluie. */
+/** Vidéo « Quel temps ce week-end ? » ou « Quel temps aujourd'hui / demain / J+n ? » (TikTok, Reels, Shorts, Facebook, YouTube) : 3 ou 4 villes, picto animé, maxi, mini, rafales, pluie. */
 
 const FPS = 30;
 
@@ -54,7 +55,11 @@ interface JourVille {
   pluie: number | null;
   picto: string | null;
 }
-type Semaine = { jours: [string, string]; villes: Record<string, [JourVille, JourVille]> };
+/** Une ou deux dates : le jour choisi (J, J+1…) ou le week-end (samedi et dimanche). */
+type Semaine = { jours: string[]; villes: Record<string, JourVille[]> };
+type Mode = 'weekend' | 'jour';
+/** Écart maximal proposé pour la vidéo d'un jour (J+n). */
+const JOUR_MAX = 7;
 
 const NOMS_JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 const NOMS_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -94,6 +99,16 @@ function charger(src: string): Promise<HTMLImageElement> {
   return p;
 }
 const imageDe = new Map<string, HTMLImageElement>();
+/** Pictos découpés en calques animés (SVG) ; absents pour les images fixes. */
+const animes = new Map<string, PictoAnime>();
+
+/** Picto animé s'il existe, sinon l'image fixe. */
+function dessinerPicto(ctx: CanvasRenderingContext2D, chemin: string, x: number, y: number, taille: number, t: number, decalage: number) {
+  const anime = animes.get(chemin);
+  if (anime) return dessinerPictoAnime(ctx, anime, x, y, taille, t, decalage);
+  const img = imageDe.get(chemin);
+  if (img) ctx.drawImage(img, x, y, taille, taille);
+}
 /** Icônes de la ligne du bas des cartes : pluie et rafales. */
 const ICONE_PLUIE = cheminPictoImage('am:pluie') ?? '';
 const ICONE_VENT = cheminPictoImage('am:rafales') ?? '';
@@ -160,7 +175,7 @@ function pied(ctx: CanvasRenderingContext2D, logo: HTMLImageElement | null) {
 }
 
 /** Carte d'un jour : dessinée sur une base de 940 × 570, mise à l'échelle et centrée dans le rectangle donné. */
-function carteJour(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, titre: string, j: JourVille, apparition: number) {
+function carteJour(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, titre: string, j: JourVille, apparition: number, t: number, decalage: number) {
   const f = Math.min(w / 940, h / 570);
   const decal = (1 - sortie(apparition)) * 160 * f;
   ctx.save();
@@ -178,8 +193,7 @@ function carteJour(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.fillStyle = '#ffe27a';
   ctx.font = `${58}px ${POLICE}`;
   ctx.fillText(titre, 44, 84);
-  const img = j.picto ? imageDe.get(j.picto) : undefined;
-  if (img) ctx.drawImage(img, 36, 130, 330, 330);
+  if (j.picto) dessinerPicto(ctx, j.picto, 36, 130, 330, t, decalage);
   ctx.fillStyle = '#ff9d6b';
   ctx.font = `${210}px ${POLICE}`;
   ctx.fillText(degre(j.maxi), 400, 330);
@@ -208,19 +222,34 @@ interface Contexte {
   villes: string[];
   logo: HTMLImageElement | null;
   departement: string;
+  /** Textes selon le mode : titre de l'intro (2 lignes), sous-titre, bandeau des villes, titre du récapitulatif. */
+  textes: { intro: [string, string]; sous: string; bandeau: string; recap: string };
 }
 
 function dureeTotale(n: number) {
   return DUREE_INTRO + n * DUREE_VILLE + DUREE_BILAN;
 }
 
+/** Textes de la vidéo : week-end, ou un jour (aujourd'hui, demain, ou le jour de la semaine). */
+function textesVideo(mode: Mode, jours: string[], ecart: number): Contexte['textes'] {
+  if (mode === 'weekend') {
+    const [sam, dim] = jours;
+    return { intro: ['QUEL TEMPS', 'CE WEEK-END ?'], sous: `${libelleJour(sam)} · ${libelleJour(dim).split(' ')[0]} ${Number(dim.slice(8, 10))}`, bandeau: 'CE WEEK-END', recap: 'RÉCAP DU WEEK-END' };
+  }
+  const nom = NOMS_JOURS[jourDeSemaine(jours[0])].toUpperCase();
+  if (ecart === 0) return { intro: ['QUEL TEMPS', "AUJOURD'HUI ?"], sous: libelleJour(jours[0]), bandeau: "AUJOURD'HUI", recap: "RÉCAP D'AUJOURD'HUI" };
+  if (ecart === 1) return { intro: ['QUEL TEMPS', 'DEMAIN ?'], sous: libelleJour(jours[0]), bandeau: 'DEMAIN', recap: 'RÉCAP DE DEMAIN' };
+  return { intro: ['QUEL TEMPS', `CE ${nom} ?`], sous: libelleJour(jours[0]), bandeau: nom, recap: `RÉCAP DU ${nom}` };
+}
+
 /** Dessine l'image de la vidéo à l'instant `t` (secondes), aux dimensions du canevas. */
 function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
-  const { semaine, villes, logo, departement } = c;
+  const { semaine, villes, logo, departement, textes } = c;
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
   const bas = H - 250 * u;
   const [sam, dim] = semaine.jours;
+  const deuxJours = semaine.jours.length > 1;
   fond(ctx);
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'center';
@@ -231,9 +260,9 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     ctx.globalAlpha = a;
     ctx.translate(0, (1 - a) * 80 * u);
     texteAjuste(ctx, departement.toUpperCase(), W / 2, cy - 210 * u, 70 * u, POLICE, W * 0.9, '#ffe27a');
-    texteAjuste(ctx, 'QUEL TEMPS', W / 2, cy - 20 * u, 190 * u, POLICE, W * 0.9);
-    texteAjuste(ctx, 'CE WEEK-END ?', W / 2, cy + 190 * u, 190 * u, POLICE, W * 0.9);
-    texteAjuste(ctx, `${libelleJour(sam)} · ${libelleJour(dim).split(' ')[0]} ${Number(dim.slice(8, 10))}`, W / 2, cy + 340 * u, 54 * u, TEXTE, W * 0.92);
+    texteAjuste(ctx, textes.intro[0], W / 2, cy - 20 * u, 190 * u, POLICE, W * 0.9);
+    texteAjuste(ctx, textes.intro[1], W / 2, cy + 190 * u, 190 * u, POLICE, W * 0.9);
+    texteAjuste(ctx, textes.sous, W / 2, cy + 340 * u, 54 * u, TEXTE, W * 0.92);
     ctx.restore();
     pied(ctx, logo);
     return;
@@ -244,7 +273,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     const local = apresIntro - indice * DUREE_VILLE;
     const ville = villes[indice];
     const [js, jd] = semaine.villes[ville] ?? [versJour(undefined), versJour(undefined)];
-    texteAjuste(ctx, `${departement.toUpperCase()} · CE WEEK-END`, W / 2, 110 * u, 48 * u, TEXTE, W * 0.92, '#9ad8ff');
+    texteAjuste(ctx, `${departement.toUpperCase()} · ${textes.bandeau}`, W / 2, 110 * u, 48 * u, TEXTE, W * 0.92, '#9ad8ff');
     const a = sortie(local / 0.5);
     ctx.save();
     ctx.globalAlpha = a;
@@ -252,18 +281,23 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     ctx.restore();
     const haut = 340 * u;
     const bord = bas - 60 * u;
-    if (empile(W, H)) {
+    if (!deuxJours) {
+      // Un seul jour : une grande carte centrée.
+      const cw = Math.min(W - 140 * u, 1100 * u);
+      const ch = Math.min(bord - haut, cw * 0.72);
+      carteJour(ctx, (W - cw) / 2, haut + (bord - haut - ch) / 2, cw, ch, libelleJour(sam), js, (local - 0.2) / 0.6, t, 0);
+    } else if (empile(W, H)) {
       const ecart = 40 * u;
       const ch = (bord - haut - ecart) / 2;
       const cw = W - 140 * u;
-      carteJour(ctx, 70 * u, haut, cw, ch, libelleJour(sam), js, (local - 0.2) / 0.6);
-      carteJour(ctx, 70 * u, haut + ch + ecart, cw, ch, libelleJour(dim), jd, (local - 0.5) / 0.6);
+      carteJour(ctx, 70 * u, haut, cw, ch, libelleJour(sam), js, (local - 0.2) / 0.6, t, 0);
+      carteJour(ctx, 70 * u, haut + ch + ecart, cw, ch, libelleJour(dim), jd, (local - 0.5) / 0.6, t, 1.7);
     } else {
       const marge = 50 * u;
       const cw = (W - 3 * marge) / 2;
       const ch = bord - haut;
-      carteJour(ctx, marge, haut, cw, ch, libelleJour(sam), js, (local - 0.2) / 0.6);
-      carteJour(ctx, 2 * marge + cw, haut, cw, ch, libelleJour(dim), jd, (local - 0.5) / 0.6);
+      carteJour(ctx, marge, haut, cw, ch, libelleJour(sam), js, (local - 0.2) / 0.6, t, 0);
+      carteJour(ctx, 2 * marge + cw, haut, cw, ch, libelleJour(dim), jd, (local - 0.5) / 0.6, t, 1.7);
     }
     for (let k = 0; k < villes.length; k++) {
       ctx.beginPath();
@@ -276,13 +310,13 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   }
   // Bilan : toutes les villes, samedi et dimanche côte à côte.
   const local = apresIntro - villes.length * DUREE_VILLE;
-  texteAjuste(ctx, 'RÉCAP DU WEEK-END', W / 2, 150 * u, 90 * u, POLICE, W * 0.9, '#ffe27a');
-  const colSam = W * 0.5;
+  texteAjuste(ctx, textes.recap, W / 2, 150 * u, 90 * u, POLICE, W * 0.9, '#ffe27a');
+  const colSam = deuxJours ? W * 0.5 : W * 0.6;
   const colDim = W * 0.78;
   ctx.fillStyle = '#fff';
   ctx.font = `${56 * u}px ${POLICE}`;
   ctx.fillText(courtJour(sam), colSam + 90 * u, 250 * u);
-  ctx.fillText(courtJour(dim), colDim + 90 * u, 250 * u);
+  if (deuxJours) ctx.fillText(courtJour(dim), colDim + 90 * u, 250 * u);
   const haut = 280 * u;
   const hauteurLigne = Math.min(300 * u, (bas - 20 * u - haut) / villes.length);
   villes.forEach((ville, k) => {
@@ -298,11 +332,10 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     texteAjuste(ctx, ville.replace('-la-Preste', '').toUpperCase(), 80 * u, y + hauteurLigne / 2 + 18 * u, 64 * u, POLICE, colSam - 100 * u);
     ctx.textAlign = 'left';
     const jours = semaine.villes[ville] ?? [versJour(undefined), versJour(undefined)];
-    jours.forEach((j, col) => {
+    jours.slice(0, deuxJours ? 2 : 1).forEach((j, col) => {
       const cx = col === 0 ? colSam : colDim;
-      const img = j.picto ? imageDe.get(j.picto) : undefined;
       const s = Math.min(130 * u, hauteurLigne - 60 * u);
-      if (img) ctx.drawImage(img, cx, y + (hauteurLigne - 24 * u - s) / 2, s, s);
+      if (j.picto) dessinerPicto(ctx, j.picto, cx, y + (hauteurLigne - 24 * u - s) / 2, s, t, k * 0.9 + col * 1.7);
       ctx.fillStyle = '#ff9d6b';
       ctx.font = `${64 * u}px ${POLICE}`;
       ctx.fillText(degre(j.maxi), cx + s + 8 * u, y + hauteurLigne / 2 - 2 * u);
@@ -326,7 +359,9 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const [choix, setChoix] = useState<string[]>([]);
   const [logoId, setLogoId] = useState('pays-catalan-hd');
   const [formatId, setFormatId] = useState<FormatId>('tiktok');
-  const [donnees, setDonnees] = useState<{ cle: string; points: [PointCarte[], PointCarte[]] } | null>(null);
+  const [mode, setMode] = useState<Mode>('weekend');
+  const [ecart, setEcart] = useState(0);
+  const [donnees, setDonnees] = useState<{ cle: string; points: PointCarte[][] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [etat, setEtat] = useState<string | null>(null);
   const [t, setT] = useState(0);
@@ -336,13 +371,13 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const [prets, setPrets] = useState(0);
 
   const format = FORMATS.find((f) => f.id === formatId)!;
-  const jours = useMemo(() => weekEnd(aujourdhui), [aujourdhui]);
+  const jours = useMemo<string[]>(() => (mode === 'weekend' ? weekEnd(aujourdhui) : [ajouterJours(aujourdhui, ecart)]), [aujourdhui, mode, ecart]);
   const nomDepartement = DEPARTEMENTS_FR[dep] ?? dep;
-  const cle = `${modele}|${jours[0]}|${dep}`;
+  const cle = `${modele}|${jours.join(',')}|${dep}`;
   // Mémorisées : ces listes servent de dépendances aux effets (une nouvelle liste à chaque rendu les relancerait sans fin).
   const villes = useMemo(() => choix.filter(Boolean), [choix]);
-  // Jours entre aujourd'hui et le dimanche : seuls les modèles qui vont jusque-là sont proposés (la moyenne va aussi loin que le CEP).
-  const echeanceDimanche = Math.round((Date.parse(`${jours[1]}T12:00:00Z`) - Date.parse(`${aujourdhui}T12:00:00Z`)) / 86_400_000);
+  // Jours entre aujourd'hui et le dernier jour de la vidéo : seuls les modèles qui vont jusque-là sont proposés (la moyenne va aussi loin que le CEP).
+  const echeanceDimanche = Math.round((Date.parse(`${jours[jours.length - 1]}T12:00:00Z`) - Date.parse(`${aujourdhui}T12:00:00Z`)) / 86_400_000);
   const modelesProposes = useMemo(
     () => MODELES.filter((m) => (m.id === 'moyenne' ? ECHEANCE_MAX.cep : ECHEANCE_MAX[m.id]) >= echeanceDimanche && (!m.departements || m.departements.includes(dep))),
     [echeanceDimanche, dep]
@@ -381,7 +416,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
         })
       )
     )
-      .then(([a, b]) => setDonnees({ cle, points: [a, b] }))
+      .then((points) => setDonnees({ cle, points }))
       .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
     return () => controleur.abort();
   }, [cle, donnees?.cle, jours, modele, dep]);
@@ -389,9 +424,8 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const toutesLesVilles = useMemo(() => (listeVilles?.dep === dep ? listeVilles.villes.map((v) => v.nom).sort((a, b) => a.localeCompare(b, 'fr')) : []), [listeVilles, dep]);
   const semaine: Semaine | null = useMemo(() => {
     if (!donnees || donnees.cle !== cle) return null;
-    const parNom = (liste: PointCarte[]) => new Map(liste.map((p) => [p.nom, p]));
-    const [s, d] = [parNom(donnees.points[0]), parNom(donnees.points[1])];
-    return { jours, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, [versJour(s.get(n)), versJour(d.get(n))] as [JourVille, JourVille]])) };
+    const parJour = donnees.points.map((liste) => new Map(liste.map((p) => [p.nom, p])));
+    return { jours, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, parJour.map((m) => versJour(m.get(n)))])) };
   }, [donnees, cle, jours, toutesLesVilles]);
 
   // Images des pictos et logo, chargées avant de dessiner.
@@ -402,7 +436,11 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     if (ICONE_PLUIE) fichiers.add(ICONE_PLUIE);
     if (ICONE_VENT) fichiers.add(ICONE_VENT);
     let vivant = true;
-    Promise.all([...fichiers].map((f) => charger(f).then((img) => imageDe.set(f, img)))).then(() => vivant && setPrets((n) => n + 1)).catch(() => {});
+    Promise.all(
+      [...fichiers].map((f) =>
+        Promise.all([charger(f).then((img) => imageDe.set(f, img)), chargerPictoAnime(f).then((a) => (a ? animes.set(f, a) : animes.delete(f)))])
+      )
+    ).then(() => vivant && setPrets((n) => n + 1)).catch(() => {});
     const fichierLogo = LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier;
     if (fichierLogo) charger(fichierLogo).then((img) => vivant && setLogo(img)).catch(() => vivant && setLogo(null));
     else setLogo(null);
@@ -412,7 +450,8 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   }, [semaine, villes, logoId]);
 
   const total = dureeTotale(villes.length);
-  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement } : null;
+  const textes = useMemo(() => textesVideo(mode, jours, ecart), [mode, jours, ecart]);
+  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes } : null;
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -475,7 +514,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
       const url = URL.createObjectURL(new Blob(morceaux, { type: type.split(';')[0] }));
       const lien = document.createElement('a');
       lien.href = url;
-      lien.download = `meteo-weekend-${dep}-${format.id}-${jours[0]}.${type.startsWith('video/mp4') ? 'mp4' : 'webm'}`;
+      lien.download = `meteo-${mode === 'weekend' ? 'weekend' : 'jour'}-${dep}-${format.id}-${jours[0]}.${type.startsWith('video/mp4') ? 'mp4' : 'webm'}`;
       lien.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (e) {
@@ -491,8 +530,38 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4 rounded-2xl border-2 border-primary/30 bg-primary/5 p-5">
+        <div className="text-sm font-medium">
+          <span className={legende}>Prévision</span>
+          <div className="flex gap-2">
+            {([['weekend', 'Week-end'], ['jour', 'Un jour (J, J+1…)']] as const).map(([id, libelle]) => (
+              <button key={id} type="button" onClick={() => setMode(id)} aria-pressed={mode === id} className={`flex-1 rounded-lg border px-2 py-1.5 text-sm ${mode === id ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>
+                {libelle}
+              </button>
+            ))}
+          </div>
+        </div>
+        {mode === 'jour' && (
+          <label className="text-sm font-medium">
+            <span className={legende}>Jour</span>
+            <select value={ecart} onChange={(e) => setEcart(Number(e.target.value))} className={selectBarre}>
+              {Array.from({ length: JOUR_MAX + 1 }, (_, n) => (
+                <option key={n} value={n}>
+                  {n === 0 ? "Aujourd'hui (J)" : n === 1 ? 'Demain (J+1)' : `J+${n}`} — {libelleJour(ajouterJours(aujourdhui, n)).toLowerCase()}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <p className="text-sm">
-          Week-end du <strong>{libelleJour(jours[0]).toLowerCase()}</strong> et <strong>{libelleJour(jours[1]).toLowerCase()}</strong>.
+          {mode === 'weekend' ? (
+            <>
+              Week-end du <strong>{libelleJour(jours[0]).toLowerCase()}</strong> et <strong>{libelleJour(jours[1]).toLowerCase()}</strong>.
+            </>
+          ) : (
+            <>
+              Prévisions du <strong>{libelleJour(jours[0]).toLowerCase()}</strong>.
+            </>
+          )}
         </p>
         <label className="text-sm font-medium">
           <span className={legende}>Département</span>
