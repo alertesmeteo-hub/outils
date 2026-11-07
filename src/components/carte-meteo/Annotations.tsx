@@ -131,7 +131,7 @@ function estClaire(hex: string): boolean {
 }
 
 /** Style d'un texte posé : couleur, taille, police, et contour, encadré ou bandeau pour rester lisible sur le fond. */
-function styleTexte(a: Annotation): CSSProperties {
+export function styleTexte(a: Annotation): CSSProperties {
   const police = POLICES.find((p) => p.valeur === a.police)?.css ?? POLICES[0].css;
   const clair = estClaire(a.couleur);
   const base: CSSProperties = {

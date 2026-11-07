@@ -26,6 +26,7 @@ import {
 } from '@/lib/carte-meteo/isobares';
 import { ajouterJours } from '@/lib/carte-meteo/previsions-modeles';
 import { NOM_ECHEANCE, libelleJour } from './CarteMeteo';
+import TexteSurCarte from './TexteSurCarte';
 
 interface Echeance {
   h: number;
@@ -511,6 +512,7 @@ function CarteEurope({
           {enExport ? 'Export…' : 'Exporter en JPG'}
         </button>
       </div>
+      <TexteSurCarte cible={carteRef} />
       {erreur && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreur}

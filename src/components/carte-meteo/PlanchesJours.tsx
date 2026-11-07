@@ -16,6 +16,7 @@ import { PERIODES_PLANCHE, pictoDuJour, pointDeLaPeriode, pointsParQuart, versPo
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
 import TableauPrevisions, { type CelluleJour, type LigneTableau } from './TableauPrevisions';
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, FICHIERS_CONTOURS } from './CarteMeteo';
+import TexteSurCarte from './TexteSurCarte';
 
 const LARGEUR = 1600;
 const MARGE = 24;
@@ -367,6 +368,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
         <button type="button" onClick={exporter} disabled={enExport || contours.length === 0} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
           {enExport ? 'Export en cours…' : 'Exporter la planche en JPG'}
         </button>
+      </div>
+      <div className="mt-3">
+        <TexteSurCarte cible={planchRef} />
       </div>
       {erreur && (
         <p role="alert" className="mt-3 text-sm text-danger">

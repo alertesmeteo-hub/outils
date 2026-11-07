@@ -34,6 +34,7 @@ import {
 import type { Categorie, DisponibiliteJours, Evenement, Famille, JourRecords, MenacesRecords, Portee } from '@/lib/records-temperature/types';
 import { DEPARTEMENTS, departementsDeRegion, nomDepartement, REGIONS } from '@/lib/records-temperature/zones';
 import CarteRecords, { teinte } from './CarteRecords';
+import TexteSurCarte from '../carte-meteo/TexteSurCarte';
 
 interface Props {
   initial: JourRecords | null;
@@ -582,6 +583,9 @@ export default function RecordsTemperature({ initial, dispo }: Props) {
             {message}
           </span>
         )}
+      </div>
+      <div className="mt-3">
+        <TexteSurCarte cible={noeud} />
       </div>
 
       {jourAffiche && (

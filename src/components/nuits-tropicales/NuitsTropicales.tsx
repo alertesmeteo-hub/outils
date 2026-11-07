@@ -23,6 +23,7 @@ import type { DonneesNuits, StationNuits } from '@/lib/nuits-tropicales/types';
 import Barres, { type PointBarre } from './Barres';
 import Cadre from './Cadre';
 import CarteNuits from './CarteNuits';
+import TexteSurCarte from '../carte-meteo/TexteSurCarte';
 
 type Vue = 'annee' | 'evolution' | 'station';
 
@@ -207,6 +208,9 @@ export default function NuitsTropicales({ donnees }: Props) {
           {message}
         </span>
       )}
+      <div className="w-full">
+        <TexteSurCarte cible={noeud} />
+      </div>
     </div>
   );
 

@@ -20,6 +20,7 @@ import { statsDe } from '@/lib/carte-meteo/texte-ia';
 import { useTexteIA } from './TexteIA';
 import { estStationGrandeVille } from '@/lib/carte-meteo/stations-bilan';
 import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
+import TexteSurCarte from './TexteSurCarte';
 
 /** Réglages d'affichage communs aux cartes d'une page (fond, relief, fleuves, contours, thème) ; absents = réglages habituels. */
 export interface AffichageCarte {
@@ -514,6 +515,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           </button>
         </div>
       </div>
+      <TexteSurCarte cible={carteRef} />
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreurExport}

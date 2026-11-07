@@ -13,6 +13,7 @@ import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import { statsDe } from '@/lib/carte-meteo/texte-ia';
 import { useTexteIA } from './TexteIA';
+import TexteSurCarte from './TexteSurCarte';
 
 /** Un phénomène de la synthèse : son thème (couleurs, unité, sens du classement), son pictogramme et ses points. */
 export interface RubriqueSynthese {
@@ -173,6 +174,7 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
           </button>
         </div>
       </div>
+      <TexteSurCarte cible={carteRef} />
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreurExport}

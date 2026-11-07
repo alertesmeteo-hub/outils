@@ -4,6 +4,7 @@ import { useId, useRef, useState } from 'react';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { couleur, fmtP, fmtT, type Variable } from '@/lib/saisonnier/couleurs';
 import { HAUTEUR_CARTE, LARGEUR_CARTE, projeter, type Echeance, type Saisonnier } from '@/lib/saisonnier/cfsv2';
+import TexteSurCarte from '../carte-meteo/TexteSurCarte';
 
 type Pas = 'hebdo' | 'mensuel';
 
@@ -95,6 +96,7 @@ export default function PrevisionsSaisonnieres({ donnees, traces }: { donnees: S
             {exportEnCours ? 'Export…' : 'Exporter la planche en JPG'}
           </button>
         </div>
+        <TexteSurCarte cible={planche} />
         <div ref={planche} className="rounded-xl bg-[#0b2a4a] p-3">
           <p className="mb-3 text-center font-bold text-white">
             {variable === 't' ? 'ÉCART DE TEMPÉRATURE À LA NORMALE' : 'ÉCART DE PLUIE À LA NORMALE'} — {pas === 'hebdo' ? '8 PROCHAINES SEMAINES' : '9 PROCHAINS MOIS'}

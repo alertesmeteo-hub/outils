@@ -7,6 +7,7 @@ import type { ReponseBilans } from '@/lib/carte-meteo/cartes-info';
 import type { ReponseHistorique } from '@/app/api/carte-meteo/bilan-historique/route';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { FICHIERS_CONTOURS, normaliser, useContours } from './CarteMeteo';
+import TexteSurCarte from './TexteSurCarte';
 
 /** Formats de la planche (pixels de conception, l'export les agrandit) : paysage, 16:9 (YouTube), carré, 4:5 (Facebook), 9:16 (TikTok). */
 const FORMATS = {
@@ -374,6 +375,9 @@ export default function BilanMoisPlanche() {
         <button type="button" onClick={exporter} disabled={enExport || !bilans || !avecDonnees} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
           {enExport ? 'Export en cours…' : 'Exporter en JPG'}
         </button>
+      </div>
+      <div className="mt-3">
+        <TexteSurCarte cible={planche} />
       </div>
       {erreur && (
         <p role="alert" className="mt-3 text-sm text-danger">

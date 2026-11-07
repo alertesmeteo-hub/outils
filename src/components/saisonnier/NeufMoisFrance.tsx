@@ -5,6 +5,7 @@ import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { couleur, fmtP, fmtT, type Variable } from '@/lib/saisonnier/couleurs';
 import { HAUTEUR_FR, LARGEUR_FR, projeterFrance, type EcheanceFrance, type SaisonnierFrance } from '@/lib/saisonnier/france';
+import TexteSurCarte from '../carte-meteo/TexteSurCarte';
 
 /** Pas de la grille (degrés), déduit des mailles. */
 function pasGrille(e: EcheanceFrance) {
@@ -117,6 +118,7 @@ export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }
           {exportEnCours ? 'Export…' : 'Exporter la planche en JPG'}
         </button>
       </div>
+      <TexteSurCarte cible={planche} />
       <div ref={planche} className="rounded-xl bg-[#0b2a4a] p-3">
         <div className="mb-3 flex items-center justify-center gap-4">
           {logo?.fichier ? (
