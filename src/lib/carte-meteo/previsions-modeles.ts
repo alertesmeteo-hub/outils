@@ -360,6 +360,11 @@ function valeursSurPeriode(
   const indices = serie.t.map((t, i) => ({ t: Date.parse(t), i })).filter(({ t }) => t > debut && t <= fin);
   const derniere = indices.length ? indices[indices.length - 1].t : null;
   const couvert = derniere != null && (derniere - debut) / (fin - debut) >= COUVERTURE_MIN_CUMUL;
+  // À longue échéance, les pas de 6 h tombent à 1, 7, 13 et 19 h en hiver.
+  // Pour les extrêmes, tolérer le dernier intervalle d’échantillonnage avant minuit.
+  // Les cumuls conservent leur contrôle de couverture propre.
+  const pasFinal = indices.length >= 2 ? indices[indices.length - 1].t - indices[indices.length - 2].t : 0;
+  const couvertTemperature = couvert || (derniere != null && pasFinal > 0 && fin - derniere <= Math.min(pasFinal, 6 * 3600_000));
   const de = (champ: (number | null)[]) => indices.map(({ i }) => champ[i]);
   const rafale = indiceRafaleMax(serie, indices.map(({ i }) => i));
   return {
@@ -367,8 +372,8 @@ function valeursSurPeriode(
     neigePeriode: couvert ? arrondi(somme(de(serie.neige)), 1) : null,
     rafalePeriode: couvert && rafale >= 0 ? arrondi(serie.rafale[rafale]) : null,
     directionRafalePeriode: couvert ? directionRafaleMax(serie, indices.map(({ i }) => i)) : null,
-    maxiPeriode: couvert ? arrondi(maximum(de(serie.temp)), 1) : null,
-    miniPeriode: couvert ? arrondi(minimum(de(serie.temp)), 1) : null,
+    maxiPeriode: couvertTemperature ? arrondi(maximum(de(serie.temp)), 1) : null,
+    miniPeriode: couvertTemperature ? arrondi(minimum(de(serie.temp)), 1) : null,
     finPeriode: derniere != null ? new Date(derniere).toISOString() : null,
   };
 }

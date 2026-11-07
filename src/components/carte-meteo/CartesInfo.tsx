@@ -166,9 +166,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   /** Pluie sur une période : jours de début et de fin (0 = aujourd'hui), avec le modèle choisi. */
   const [periodePluie, setPeriodePluie] = useState({ debut: 0, fin: 2 });
   const [pluiePeriode, setPluiePeriode] = useState<{ cle: string; points: (PointCarte & { dep?: string })[] } | null>(null);
-  const [erreurPeriode, setErreurPeriode] = useState<string | null>(null);
+  const [echecPeriode, setErreurPeriode] = useState<{ cle: string; message: string } | null>(null);
   const [montagnePeriode, setMontagnePeriode] = useState<{ cle: string; points: (PointCarte & { dep?: string })[] } | null>(null);
-  const [erreurMontagnePeriode, setErreurMontagnePeriode] = useState<string | null>(null);
+  const [echecMontagnePeriode, setErreurMontagnePeriode] = useState<{ cle: string; message: string } | null>(null);
   const [erreurMontagne, setErreurMontagne] = useState<string | null>(null);
   const [bilans, setBilans] = useState<ReponseBilans | null>(null);
   const [erreurBilans, setErreurBilans] = useState<string | null>(null);
@@ -194,6 +194,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const finPeriodeISO = ajouterJours(aujourdhui, finPeriode);
   const clePeriode = `${modele}|${debutPeriodeISO}|${finPeriodeISO}|${requeteZone}|periode`;
   const cleMontagnePeriode = `${clePeriode}|montagne`;
+  // Une erreur ne bloque que la requête qui l’a produite.
+  const erreurPeriode = echecPeriode?.cle === clePeriode ? echecPeriode.message : null;
+  const erreurMontagnePeriode = echecMontagnePeriode?.cle === cleMontagnePeriode ? echecMontagnePeriode.message : null;
   // Cartes de France : pas de logo par défaut (www.alertes-meteo.com figure déjà en bas) ; régions et départements : AlertesMétéo ou Météo Pays Catalan (66).
   const logoId =
     logoChoisi ?? (niveau === 'france' ? 'aucun' : logoParDefaut(codesDeLaZone(zone)).id === 'aucun' ? 'alertesmeteo' : logoParDefaut(codesDeLaZone(zone)).id);
@@ -243,7 +246,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
         return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
       })
       .then((json) => setPluiePeriode({ cle: clePeriode, points: json.points }))
-      .catch((e: Error) => e.name !== 'AbortError' && setErreurPeriode(e.message.endsWith('.') ? e.message : `${e.message}.`));
+      .catch((e: Error) => !controleur.signal.aborted && setErreurPeriode({ cle: clePeriode, message: e.message.endsWith('.') ? e.message : `${e.message}.` }));
     return () => controleur.abort();
   }, [groupesAvecPeriode, clePeriode, pluiePeriode?.cle, erreurPeriode, modele, debutPeriodeISO, finPeriodeISO, requeteZone]);
 
@@ -259,7 +262,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
         return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
       })
       .then((json) => setMontagnePeriode({ cle: cleMontagnePeriode, points: json.points }))
-      .catch((e: Error) => e.name !== 'AbortError' && setErreurMontagnePeriode(e.message.endsWith('.') ? e.message : `${e.message}.`));
+      .catch((e: Error) => !controleur.signal.aborted && setErreurMontagnePeriode({ cle: cleMontagnePeriode, message: e.message.endsWith('.') ? e.message : `${e.message}.` }));
     return () => controleur.abort();
   }, [groupesAvecMontagnePeriode, cleMontagnePeriode, montagnePeriode?.cle, erreurMontagnePeriode, modele, debutPeriodeISO, finPeriodeISO, requeteZone]);
 

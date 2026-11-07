@@ -395,6 +395,11 @@ async function enParallele<T, R>(liste: T[], limite: number, tache: (x: T) => Pr
   return resultats;
 }
 
+/** Une période peut être renseignée même sans température l’après-midi du premier jour. */
+function aValeursPeriode(p: PointCarte): boolean {
+  return [p.miniPeriode, p.maxiPeriode, p.pluiePeriode, p.neigePeriode, p.rafalePeriode].some((v) => v != null);
+}
+
 /** Prévisions des 96 départements pour un modèle et plusieurs jours (une seule lecture des fichiers) : null pour un jour sans donnée. */
 export async function chargerPrevisionsCarteJours(
   modele: ModeleSource,
@@ -416,7 +421,7 @@ export async function chargerPrevisionsCarteJours(
     for (const date of datesISO) {
       const { nom: ville, lat, lon } = r.value.chefCommune;
       const point = { ...pointDepuisSerie(dep, DEPARTEMENTS_FR[dep] ?? dep, r.value.chef, date, finPeriode), ville, lat, lon };
-      if (point.tempApresMidi != null || (!apresMidiSeulement && point.maxi != null)) (sortie[date] as PointCarte[]).push(point);
+      if (finPeriode ? aValeursPeriode(point) : point.tempApresMidi != null || (!apresMidiSeulement && point.maxi != null)) (sortie[date] as PointCarte[]).push(point);
     }
   });
   for (const date of datesISO) if (!(sortie[date] as PointCarte[]).length) sortie[date] = null;
@@ -608,7 +613,7 @@ export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: stri
   if (modele === 'moyenne') return chargerPrevisionsVillesMoyenne(dateISO, dep);
   const extrait = await extraitDepartement(modele, dep);
   const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO, finPeriode), lat: v.lat, lon: v.lon, ...(v.prioritaire ? { prioritaire: true } : {}), ...(v.placeExacte ? { placeExacte: true } : {}) }));
-  const valides = points.filter((p) => p.tempApresMidi != null);
+  const valides = points.filter((p) => finPeriode ? aValeursPeriode(p) : p.tempApresMidi != null);
   if (!valides.length) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO} (département ${dep})`);
   return valides;
 }

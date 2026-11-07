@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { pointDepuisSerie, type Serie } from '../src/lib/carte-meteo/previsions-modeles';
+const t = ['00', '06', '12', '18'].map(h => `2026-11-15T${h}:00:00Z`);
+const serie: Serie = { t, temp: [6, 3, 12, 8], pluie: [0,0,0,0], neige: [0,0,0,0], nuages: [0,0,0,0], direction: [0,0,0,0], vent: [0,0,0,0], rafale: [0,0,0,0], orage: [0,0,0,0], visibilite: [10,10,10,10] };
+const point = pointDepuisSerie('75', 'Paris', serie, '2026-11-15', '2026-11-15');
+assert.equal(point.tempApresMidi, null);
+assert.equal(point.miniPeriode, 3);
+assert.equal(point.maxiPeriode, 12);
+const tronquee = Object.fromEntries(Object.entries(serie).map(([k,v]) => [k,v.slice(0,2)])) as unknown as Serie;
+assert.equal(pointDepuisSerie('75','Paris',tronquee,'2026-11-15','2026-11-15').miniPeriode, null);
+assert.equal(pointDepuisSerie('75','Paris',serie,'2026-11-16','2026-11-16').miniPeriode, null);
+console.log('OK : pas de 6 h, série tronquée et jour absent');
