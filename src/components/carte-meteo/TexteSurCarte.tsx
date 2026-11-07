@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type PointerEvent as PointerEventReact, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as PointerEventReact, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { CarteTexte, FormatTexte } from '@/lib/carte-meteo/texte-ia';
 import { redigerTexte } from '@/lib/carte-meteo/texte-auto';
@@ -13,6 +13,9 @@ import { COULEURS_TEXTE, POLICES, styleTexte, type Annotation, type FondTexte, t
  */
 
 type Reglages = Pick<Annotation, 'couleur' | 'taille' | 'gras' | 'fond' | 'police'>;
+
+/** Identifiant de l'encadré de rédaction posé sur la carte. */
+const ID_REDACTION = 1;
 
 const REGLAGES_DEFAUT: Reglages = { couleur: '#ffffff', taille: 36, gras: true, fond: 'contour', police: 'impact' };
 
@@ -27,6 +30,8 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
   const [texteNouveau, setTexteNouveau] = useState('');
   const [reglages, setReglages] = useState<Reglages>(REGLAGES_DEFAUT);
   const [redaction, setRedaction] = useState('');
+  const [surCarte, setSurCarte] = useState(true);
+  const panneauRef = useRef<HTMLDivElement>(null);
   const [copie, setCopie] = useState(false);
   const [format, setFormat] = useState<FormatTexte>('court');
   const [erreur, setErreur] = useState<string | null>(null);
@@ -39,7 +44,40 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
       return;
     }
     setErreur(null);
-    setRedaction(redigerTexte(carte, f));
+    const texte = redigerTexte(carte, f);
+    setRedaction(texte);
+    poserSurCarte(texte, surCarte);
+  }
+
+  /** Pose (ou met à jour) la rédaction dans un encadré de texte sur la carte, repris dans l'export ; `actif` faux : le retire. */
+  function poserSurCarte(texte: string, actif: boolean) {
+    const sansHashtags = texte.split('\n').filter((l) => !l.trim().startsWith('#')).join(' ').replace(/\s+/g, ' ').trim();
+    if (!actif || !sansHashtags) {
+      setTextes((liste) => liste.filter((t) => t.id !== ID_REDACTION));
+      return;
+    }
+    const largeur = noeud?.offsetWidth || 1280;
+    const hauteur = noeud?.offsetHeight || 720;
+    const taille = 18;
+    const parLigne = Math.max(20, Math.floor((largeur * 0.8) / (taille * 0.52)));
+    const lignes: string[] = [];
+    let courante = '';
+    for (const mot of sansHashtags.split(' ')) {
+      if (courante && (courante + ' ' + mot).length > parLigne) {
+        lignes.push(courante);
+        courante = mot;
+      } else courante = courante ? courante + ' ' + mot : mot;
+    }
+    if (courante) lignes.push(courante);
+    const contenu = lignes.join('\n');
+    setTextes((liste) => {
+      const existant = liste.find((t) => t.id === ID_REDACTION);
+      const autres = liste.filter((t) => t.id !== ID_REDACTION);
+      const bloc: Annotation = existant
+        ? { ...existant, contenu }
+        : { id: ID_REDACTION, zone: '', x: Math.round(largeur / 2), y: Math.round(hauteur - 50 - (lignes.length * taille * 1.1) / 2), type: 'texte', contenu, couleur: '#111111', taille, gras: false, fond: 'encadre', police: 'arial' };
+      return [...autres, bloc];
+    });
   }
 
   const glisser = useRef<{ id: number; sx: number; sy: number; x0: number; y0: number; echelle: number } | null>(null);
@@ -49,6 +87,17 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
     const courant = cible.current;
     if (courant !== noeud) setNoeud(courant);
     if (courant && getComputedStyle(courant).position === 'static') courant.style.position = 'relative';
+  });
+
+  // Panneau en barre d'outils : recalé dans la fenêtre (jamais coupé à gauche ni à droite).
+  useLayoutEffect(() => {
+    const el = panneauRef.current;
+    if (!el) return;
+    el.style.transform = '';
+    const r = el.getBoundingClientRect();
+    const marge = 8;
+    const dx = r.left < marge ? marge - r.left : r.right > window.innerWidth - marge ? window.innerWidth - marge - r.right : 0;
+    if (dx) el.style.transform = `translateX(${Math.round(dx)}px)`;
   });
 
   const choisi = textes.find((t) => t.id === selection) ?? null;
@@ -171,7 +220,7 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
       )}
       {calque}
       {ouvert && (
-        <div className={`rounded-lg border border-border bg-surface p-3 text-sm ${enLigne ? 'absolute right-0 top-full z-30 mt-2 w-[22rem] max-w-[90vw] shadow-lg' : 'mt-2 w-full max-w-md'}`}>
+        <div ref={panneauRef} className={`rounded-lg border border-border bg-surface p-3 text-sm ${enLigne ? 'absolute right-0 top-full z-30 mt-2 w-[22rem] max-w-[90vw] shadow-lg' : 'mt-2 w-full max-w-md'}`}>
           <label className="block text-xs font-medium">
             Texte
             <textarea
@@ -253,7 +302,11 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false }: { cib
           </label>
           <label className="mt-3 block border-t border-border pt-2 text-xs font-medium">
             Texte de rédaction (hors image, à copier)
-            <textarea value={redaction} onChange={(e) => setRedaction(e.target.value)} rows={5} className={champ} placeholder={'Ex. : On note 10 à 12 °C dans le nord, 16 à 18 °C dans le sud…'} />
+            <textarea value={redaction} onChange={(e) => { setRedaction(e.target.value); if (surCarte) poserSurCarte(e.target.value, true); }} rows={5} className={champ} placeholder={'Ex. : On note 10 à 12 °C dans le nord, 16 à 18 °C dans le sud…'} />
+          </label>
+          <label className="mt-1 flex items-center gap-2 text-xs font-medium">
+            <input type="checkbox" checked={surCarte} onChange={(e) => { setSurCarte(e.target.checked); poserSurCarte(redaction, e.target.checked); }} disabled={!redaction} />
+            Afficher ce texte sur la carte (déplaçable)
           </label>
           {donnees && (
             <div className="mt-1 flex flex-wrap items-center gap-2">
