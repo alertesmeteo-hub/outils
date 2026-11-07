@@ -26,6 +26,8 @@ import {
   type Boite,
   type Zone,
 } from '@/lib/carte-meteo/projection-france';
+import TexteSurCarte from './TexteSurCarte';
+import { statsDe, type CarteTexte, type RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, modeleDisponible, modeleParDefautJ0, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import CarteRendu, {
   ECHELLE_VENT_REDUIT,
@@ -1387,6 +1389,22 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const sousTitre = sousTitreManuel ?? SOUS_TITRES[periode];
   const nomZone = enFrance ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : DEPARTEMENTS_FR[zone.slice(4)];
 
+  /** Données du texte automatique : températures et rafales des villes affichées sur la carte. */
+  const donneesTexte = (): CarteTexte | null => {
+    const num = (v: string | null) => {
+      const n = parseFloat(String(v ?? '').replace(',', '.'));
+      return Number.isFinite(n) ? n : null;
+    };
+    const maxi = marqueurs.flatMap((m) => { const v = num(m.valeur); return v == null ? [] : [{ lieu: m.nom, valeur: v }]; }).sort((a, b) => b.valeur - a.valeur);
+    const mini = marqueurs.flatMap((m) => { const v = num(m.mini); return v == null ? [] : [{ lieu: m.nom, valeur: v }]; }).sort((a, b) => a.valeur - b.valeur);
+    const rafales = marqueurs.flatMap((m) => (m.rafale != null && m.rafale >= 50 ? [{ lieu: m.nom, valeur: m.rafale }] : [])).sort((a, b) => b.valeur - a.valeur);
+    const rubriques: RubriqueTexte[] = [];
+    if (maxi.length) rubriques.push({ nom: mini.length ? 'Températures maximales' : 'Températures', unite: '°C', sens: 'plus hautes', classement: maxi.slice(0, 6), stats: statsDe(maxi.map((x) => x.valeur)) });
+    if (mini.length) rubriques.push({ nom: 'Températures minimales', unite: '°C', sens: 'plus basses', classement: mini.slice(0, 5), stats: statsDe(mini.map((x) => x.valeur)) });
+    if (rafales.length) rubriques.push({ nom: 'Rafales de vent', unite: 'km/h', sens: 'plus hautes', classement: rafales.slice(0, 4) });
+    return rubriques.length === 0 ? null : { type: 'Prévisions météo', titre, periode: sousTitre, zone: nomZone, source: '', rubriques };
+  };
+
   function changerModele(m: ModeleMeteo) {
     setModele(m);
     setModeleTouche(true);
@@ -1622,6 +1640,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             {enExport ? 'Export…' : 'Exporter en JPG'}
           </button>
         </div>
+        <TexteSurCarte cible={carteRef} donnees={donneesTexte} />
         {erreurExport && (
           <p role="alert" className="mb-2 text-sm text-danger">
             {erreurExport}
@@ -1862,6 +1881,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         </div>
 
         <div className="flex flex-col gap-2 border-t border-border pt-4">
+          <TexteSurCarte cible={carteRef} donnees={donneesTexte} />
           <button
             type="button"
             onClick={exporter}

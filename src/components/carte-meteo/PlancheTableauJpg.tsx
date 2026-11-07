@@ -12,6 +12,8 @@ import { STYLES_TABLEAU, type StyleTableau } from '@/lib/carte-meteo/styles-tabl
 import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import { normaliser } from './CarteMeteo';
 import CarteInfo from './CarteInfo';
+import TexteSurCarte from './TexteSurCarte';
+import { statsDe, type CarteTexte } from '@/lib/carte-meteo/texte-ia';
 
 /** Largeur logique de l'image (exportée à 1,5 ×) ; la hauteur dépend du nombre de lignes. */
 const LARGEUR = 1280;
@@ -125,6 +127,20 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
     return r;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lignesTriees, mesures]);
+
+  /** Données du texte automatique : classement des stations sur la première mesure. */
+  const donneesTexte = (): CarteTexte | null => {
+    if (!classement || lignesTriees.length === 0) return null;
+    const valeurs = lignesTriees.map((l) => l.valeurs[classement.id] as number);
+    return {
+      type: 'Classement des stations',
+      titre: titre || classement.titre,
+      periode: sousTitre,
+      zone: nomZone,
+      source: 'Relevés des stations Météo-France',
+      rubriques: [{ nom: classement.court, unite: classement.unite === '°' ? '°C' : classement.unite, sens: sens === 'asc' ? 'plus basses' : 'plus hautes', classement: lignesTriees.slice(0, 8).map((l) => ({ lieu: l.nom, departement: l.dep, valeur: l.valeurs[classement.id] as number })), stats: statsDe(valeurs) }],
+    };
+  };
 
   /** Carte de la même zone et de la même mesure (France, région ou département). */
   const zoneCarte = departement ? `dep:${departement}` : zoneChoisie ? region : region ? `reg:${region}` : 'france';
@@ -323,6 +339,10 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
         <button type="button" onClick={exporter} disabled={enExport || lignesTriees.length === 0} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
           {enExport ? 'Export en cours…' : 'Exporter en JPG'}
         </button>
+      </div>
+
+      <div className="mt-3">
+        <TexteSurCarte cible={planchRef} donnees={donneesTexte} />
       </div>
 
       <fieldset className="mt-3">

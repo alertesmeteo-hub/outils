@@ -532,6 +532,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
           {enExport ? 'Export en cours…' : 'Exporter le tableau en JPG'}
         </button>
       </div>
+      <div className="mt-3">
+        <TexteSurCarte cible={tableauRef} donnees={donneesTexte} />
+      </div>
       <div className="mt-3 overflow-x-auto">
         <TableauPrevisions ref={tableauRef} dates={dates} lignes={lignesTableau} titre={titre} sousTitre={sousTitre} logoUrl={logo?.fichier || null} logoFondBlanc={logo?.fondBlanc !== false} />
       </div>

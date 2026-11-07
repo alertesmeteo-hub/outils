@@ -153,6 +153,7 @@ export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }
           {exportEnCours ? 'Export…' : 'Exporter le tableau en JPG'}
         </button>
       </div>
+      <TexteSurCarte cible={tableau} donnees={donneesTexte} />
       <div ref={tableau} className="overflow-x-auto rounded-xl bg-white p-3 text-zinc-900">
         <table className="w-full text-sm">
           <thead>
