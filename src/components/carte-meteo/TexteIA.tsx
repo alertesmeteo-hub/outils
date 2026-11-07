@@ -133,5 +133,5 @@ export function useTexteIA(construire: () => CarteTexte | null, zone: { x: numbe
     </div>
   );
 
-  return { bouton, panneau, calque, rect };
+  return { bouton, panneau, calque, rect, construire };
 }

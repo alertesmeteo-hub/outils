@@ -34,6 +34,7 @@ import {
 import type { Categorie, DisponibiliteJours, Evenement, Famille, JourRecords, MenacesRecords, Portee } from '@/lib/records-temperature/types';
 import { DEPARTEMENTS, departementsDeRegion, nomDepartement, REGIONS } from '@/lib/records-temperature/zones';
 import CarteRecords, { teinte } from './CarteRecords';
+import { statsDe, type CarteTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from '../carte-meteo/TexteSurCarte';
 
 interface Props {
@@ -262,6 +263,29 @@ export default function RecordsTemperature({ initial, dispo }: Props) {
     ].filter(Boolean);
     return morceaux.length ? morceaux.join(' · ') : 'France entière';
   }, [filtres.famille, filtres.dep, filtres.region, filtres.principal, enMenaces, serieLongue]);
+
+  /** Données transmises à l'IA pour rédiger le texte d'accompagnement de la carte. */
+  const donneesTexte = (): CarteTexte | null => {
+    if (!jourAffiche || visibles.length === 0) return null;
+    const froid = filtres.famille === 'cold';
+    const tries = [...visibles].sort((a, b) => (froid ? a.valeur - b.valeur : b.valeur - a.valeur));
+    return {
+      type: enMenaces ? 'Records de température menacés (prévision)' : 'Records de température battus ou égalés sur les stations',
+      titre: enMenaces ? 'Records menacés' : 'Records de température',
+      periode: jourAffiche.date,
+      zone: sousTitre,
+      source: 'Relevés et prévisions Météo-France, séries de référence des stations',
+      rubriques: [
+        {
+          nom: `Stations concernées (${visibles.length})`,
+          unite: '°C',
+          sens: froid ? 'plus basses' : 'plus hautes',
+          classement: tries.slice(0, 8).map((e) => ({ lieu: e.nom, departement: e.dep, valeur: e.valeur })),
+          stats: statsDe(visibles.map((e) => e.valeur)),
+        },
+      ],
+    };
+  };
 
   /** Périmètre des stations comptées dans la phrase de synthèse d'un jour prévu. */
   const perimetre = useMemo(
@@ -585,7 +609,7 @@ export default function RecordsTemperature({ initial, dispo }: Props) {
         )}
       </div>
       <div className="mt-3">
-        <TexteSurCarte cible={noeud} />
+        <TexteSurCarte cible={noeud} donnees={donneesTexte} />
       </div>
 
       {jourAffiche && (

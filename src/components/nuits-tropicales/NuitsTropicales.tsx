@@ -23,6 +23,7 @@ import type { DonneesNuits, StationNuits } from '@/lib/nuits-tropicales/types';
 import Barres, { type PointBarre } from './Barres';
 import Cadre from './Cadre';
 import CarteNuits from './CarteNuits';
+import { statsDe, type CarteTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from '../carte-meteo/TexteSurCarte';
 
 type Vue = 'annee' | 'evolution' | 'station';
@@ -141,6 +142,29 @@ export default function NuitsTropicales({ donnees }: Props) {
     return morceaux.join(' · ');
   }, [libellePeriode, dep, region, modeDernier]);
 
+  /** Données transmises à l'IA pour rédiger le texte d'accompagnement de la carte. */
+  const donneesTexte = (): CarteTexte | null => {
+    const avecNuits = lignes.filter((l) => l.nuits > 0);
+    if (avecNuits.length === 0) return null;
+    const tries = [...avecNuits].sort((a, b) => b.nuits - a.nuits);
+    return {
+      type: 'Nuits tropicales (minimum supérieur ou égal à 20 °C) comptées sur les stations',
+      titre: 'Nuits tropicales',
+      periode: sousTitreCarte,
+      zone: dep ? nomDepartement(dep) : region || 'France entière',
+      source: 'Relevés des stations Météo-France',
+      rubriques: [
+        {
+          nom: `Nuits tropicales par station (${avecNuits.length} stations sur ${lignes.length})`,
+          unite: 'nuits',
+          sens: 'plus hautes',
+          classement: tries.slice(0, 8).map((l) => ({ lieu: l.station.nom, departement: l.station.dep, valeur: l.nuits })),
+          stats: statsDe(lignes.map((l) => l.nuits)),
+        },
+      ],
+    };
+  };
+
   // ———— Évolution depuis 1950 ————
   const pointsNational = useMemo<PointBarre[]>(() => {
     const pts: PointBarre[] = indicateur.annees.map((a) => ({ annee: a.annee, valeur: a.moyenne }));
@@ -195,7 +219,7 @@ export default function NuitsTropicales({ donnees }: Props) {
     setTimeout(() => setMessage(null), 4000);
   };
 
-  const boutons = (nomFichier: string, desactive = false) => (
+  const boutons = (nomFichier: string, desactive = false, avecTexte = false) => (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       <button type="button" className="btn btn-primary !min-h-[40px]" disabled={desactive} onClick={() => exporter(nomFichier)}>
         Exporter l’image en JPG
@@ -209,7 +233,7 @@ export default function NuitsTropicales({ donnees }: Props) {
         </span>
       )}
       <div className="w-full">
-        <TexteSurCarte cible={noeud} />
+        <TexteSurCarte cible={noeud} donnees={avecTexte ? donneesTexte : undefined} />
       </div>
     </div>
   );
@@ -328,7 +352,7 @@ export default function NuitsTropicales({ donnees }: Props) {
               </Cadre>
             )}
           </div>
-          {boutons(`nuits-tropicales-${annee}${dep ? `-${dep}` : region ? '-region' : ''}`, contours.length === 0)}
+          {boutons(`nuits-tropicales-${annee}${dep ? `-${dep}` : region ? '-region' : ''}`, contours.length === 0, true)}
           <label className="mt-2 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={valeurs} onChange={(e) => setValeurs(e.target.checked)} />
             Nombre de nuits sur la carte

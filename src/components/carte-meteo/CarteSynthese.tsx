@@ -174,7 +174,7 @@ export default function CarteSynthese({ titre, sousTitre, zone, rubriques, logoI
           </button>
         </div>
       </div>
-      <TexteSurCarte cible={carteRef} />
+      <TexteSurCarte cible={carteRef} donnees={texteIA.construire} />
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreurExport}

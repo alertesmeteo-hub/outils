@@ -515,7 +515,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           </button>
         </div>
       </div>
-      <TexteSurCarte cible={carteRef} />
+      <TexteSurCarte cible={carteRef} donnees={texteIA.construire} />
       {erreurExport && (
         <p role="alert" className="mb-2 text-sm text-danger">
           {erreurExport}
