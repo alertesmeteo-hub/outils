@@ -291,6 +291,8 @@ interface Contexte {
   textes: { intro: [string, string]; sous: string; bandeau: string; recap: string };
   /** Format « TikTok Hook » : l'écran d'accroche précède l'intro. */
   hook?: boolean;
+  /** Code du département : le fond de carte du début zoome dessus. */
+  codeDep?: string;
   /** Tendance des jours suivant la vidéo (absente si les prévisions ne sont pas disponibles : l'écran est alors omis). */
   tendance?: { jours: string[]; villes: Record<string, JourVille[]> } | null;
 }
@@ -308,7 +310,7 @@ function dessinerTendance(ctx: CanvasRenderingContext2D, local: number, c: Conte
   const ville = villes[0];
   const jours = tendance.villes[ville] ?? [];
   texteAjuste(ctx, 'TENDANCE DES PROCHAINS JOURS', W / 2, 150 * u, 80 * u, POLICE, W * 0.92, '#ffe27a');
-  texteAjuste(ctx, ville.replace('-la-Preste', '').toUpperCase(), W / 2, 235 * u, 52 * u, TEXTE, W * 0.9, '#9ad8ff');
+  texteHook(ctx, ville.replace('-la-Preste', '').toUpperCase(), W / 2, 240 * u, 60 * u, W * 0.9, ROUGE_CATALAN);
   const haut = 290 * u;
   const n = tendance.jours.length;
   const vertical = empile(W, H);
@@ -450,6 +452,133 @@ function textesVideo(mode: Mode, jours: string[], ecart: number): Contexte['text
   return { intro: ['QUEL TEMPS', `CE ${nom} ?`], sous: libelleJour(jours[0]), bandeau: nom, recap: `RÉCAP DU ${nom}` };
 }
 
+/** Fond cartographique du début de la vidéo : terres d'Europe et départements, chargés une fois. */
+type Anneau = [number, number][];
+let geoFond: { terres: Anneau[]; depts: Record<string, Anneau[]> } | null = null;
+let geoFondPromesse: Promise<void> | null = null;
+function chargerGeoFond(): Promise<void> {
+  geoFondPromesse ??= Promise.all([fetch('/geo/europe.json').then((r) => r.json()), fetch('/geo/departements-simplifies.json').then((r) => r.json())])
+    .then(([europe, depts]: [{ terres: number[][] }, Record<string, Anneau[]>]) => {
+      const paires = (plat: number[]): Anneau => {
+        const o: Anneau = [];
+        for (let i = 0; i + 1 < plat.length; i += 2) o.push([plat[i], plat[i + 1]]);
+        return o;
+      };
+      geoFond = { terres: europe.terres.map(paires), depts };
+    })
+    .catch(() => {
+      geoFondPromesse = null;
+    });
+  return geoFondPromesse;
+}
+
+/** Trace des anneaux (lon/lat) dans un chemin, avec la projection donnée. */
+function cheminAnneaux(ctx: CanvasRenderingContext2D, anneaux: Anneau[], X: (lon: number) => number, Y: (lat: number) => number) {
+  ctx.beginPath();
+  for (const a of anneaux) {
+    a.forEach(([lon, lat], i) => (i === 0 ? ctx.moveTo(X(lon), Y(lat)) : ctx.lineTo(X(lon), Y(lat))));
+    ctx.closePath();
+  }
+}
+
+/** Isobares : courbes blanches fermées autour d'un centre de basse pression, qui se dessinent puis ondulent lentement. */
+function isobares(ctx: CanvasRenderingContext2D, t: number) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const cx = W * 0.5 + Math.sin(t * 0.4) * 30 * u;
+  const cy = H * 0.42 + Math.cos(t * 0.35) * 25 * u;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+  ctx.lineWidth = 5 * u;
+  for (let i = 0; i < 7; i++) {
+    const R = (95 + i * 115) * u * (1 + 0.025 * Math.sin(t * 0.9 + i));
+    const N = 140;
+    const pts: [number, number][] = [];
+    let longueur = 0;
+    for (let k = 0; k <= N; k++) {
+      const th = (k / N) * Math.PI * 2;
+      const r = R * (1 + 0.16 * Math.sin(2 * th + i * 1.3 + t * 0.35) + 0.09 * Math.sin(3 * th + i * 0.7 - t * 0.28) + 0.05 * Math.sin(5 * th + i));
+      const pt: [number, number] = [cx + r * Math.cos(th), cy + r * Math.sin(th) * 1.25];
+      if (k > 0) longueur += Math.hypot(pt[0] - pts[k - 1][0], pt[1] - pts[k - 1][1]);
+      pts.push(pt);
+    }
+    const avancement = sortie((t - 0.15 * i) / 1.3);
+    if (avancement <= 0) continue;
+    ctx.setLineDash([longueur * avancement, longueur]);
+    ctx.beginPath();
+    pts.forEach(([x, y], k) => (k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Fond du début (accroche et intro) : carte météo bleue (mer claire, terres bleues cernées d'un trait sombre, départements),
+ * zoom de la France entière vers le département choisi, isobares blanches par-dessus. `t` : secondes depuis le début ; `duree` : durée du zoom.
+ */
+function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, codeDep: string) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const mer = ctx.createLinearGradient(0, 0, 0, H);
+  mer.addColorStop(0, '#5aa0ea');
+  mer.addColorStop(1, '#93c9f8');
+  ctx.fillStyle = mer;
+  ctx.fillRect(0, 0, W, H);
+  if (geoFond) {
+    const p = Math.min(1, t / duree);
+    const e = p * p * (3 - 2 * p);
+    const anneauxDep = geoFond.depts[codeDep] ?? [];
+    let lon0 = 999, lon1 = -999, lat0 = 999, lat1 = -999;
+    for (const a of anneauxDep) for (const [lon, lat] of a) { lon0 = Math.min(lon0, lon); lon1 = Math.max(lon1, lon); lat0 = Math.min(lat0, lat); lat1 = Math.max(lat1, lat); }
+    const trouve = anneauxDep.length > 0;
+    const k = Math.cos((46.6 * Math.PI) / 180);
+    const s0 = H / 11;
+    const dLat = trouve ? Math.max(lat1 - lat0, 0.3) : 11;
+    const dLon = trouve ? Math.max(lon1 - lon0, 0.3) : 14;
+    const s1 = trouve ? Math.min(H / (dLat * 2.6), W / (dLon * k * 1.8)) : s0;
+    const s = s0 * Math.pow(s1 / s0, e);
+    const lonC = 2.5 + ((trouve ? lon0 + dLon / 2 : 2.5) - 2.5) * e;
+    const latC = 46.6 + ((trouve ? lat0 + dLat / 2 : 46.6) - 46.6) * e;
+    const X = (lon: number) => W / 2 + (lon - lonC) * k * s;
+    const Y = (lat: number) => H / 2 - (lat - latC) * s;
+    cheminAnneaux(ctx, geoFond.terres, X, Y);
+    ctx.fillStyle = '#2c61bb';
+    ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#0b2a5b';
+    ctx.lineWidth = 3.5 * u;
+    ctx.stroke();
+    // Départements : traits fins, puis le département choisi en relief clair.
+    ctx.strokeStyle = `rgba(255,255,255,${0.12 + 0.2 * e})`;
+    ctx.lineWidth = 1.5 * u;
+    for (const [code, anneaux] of Object.entries(geoFond.depts)) {
+      if (code === codeDep) continue;
+      cheminAnneaux(ctx, anneaux, X, Y);
+      ctx.stroke();
+    }
+    if (trouve) {
+      const a = sortie((p - 0.3) / 0.5);
+      cheminAnneaux(ctx, anneauxDep, X, Y);
+      ctx.fillStyle = `rgba(255,255,255,${0.2 * a})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255,255,255,${0.95 * a})`;
+      ctx.lineWidth = 5 * u;
+      ctx.stroke();
+    }
+  }
+  isobares(ctx, t);
+  // Léger assombrissement en haut et en bas : le texte et le pied de page restent lisibles.
+  const voile = ctx.createLinearGradient(0, 0, 0, H);
+  voile.addColorStop(0, 'rgba(6,24,60,0.3)');
+  voile.addColorStop(0.3, 'rgba(6,24,60,0)');
+  voile.addColorStop(0.7, 'rgba(6,24,60,0)');
+  voile.addColorStop(1, 'rgba(6,24,60,0.38)');
+  ctx.fillStyle = voile;
+  ctx.fillRect(0, 0, W, H);
+}
+
 /** Dessine l'image de la vidéo à l'instant `t` (secondes), aux dimensions du canevas. */
 function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   const { semaine, villes, logo, departement, textes } = c;
@@ -458,7 +587,9 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   const bas = H - 250 * u;
   const [sam, dim] = semaine.jours;
   const deuxJours = semaine.jours.length > 1;
-  fond(ctx);
+  const dureeDebut = (c.hook ? DUREE_HOOK : 0) + DUREE_INTRO;
+  if (t < dureeDebut) fondCarte(ctx, t, dureeDebut, c.codeDep ?? '');
+  else fond(ctx);
   if (c.hook) {
     if (t < DUREE_HOOK) {
       dessinerHook(ctx, t, logo);
@@ -498,7 +629,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     const a = sortie(local / 0.5);
     ctx.save();
     ctx.globalAlpha = a;
-    texteAjuste(ctx, ville.toUpperCase().replace('-LA-PRESTE', ''), W / 2, 280 * u, 160 * u, POLICE, W * 0.9);
+    texteHook(ctx, ville.toUpperCase().replace('-LA-PRESTE', ''), W / 2, 280 * u, 160 * u, W * 0.9, ROUGE_CATALAN);
     ctx.restore();
     const haut = 340 * u;
     const bord = bas - 60 * u;
@@ -554,7 +685,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     rectArrondi(ctx, 50 * u, y, W - 100 * u, hauteurLigne - 24 * u, 36 * u);
     ctx.fill();
     ctx.textAlign = 'left';
-    texteAjuste(ctx, ville.replace('-la-Preste', '').toUpperCase(), 80 * u, y + hauteurLigne / 2 + 18 * u, 64 * u, POLICE, colSam - 100 * u);
+    texteHook(ctx, ville.replace('-la-Preste', '').toUpperCase(), 80 * u, y + hauteurLigne / 2 + 18 * u, 64 * u, colSam - 100 * u, ROUGE_CATALAN);
     ctx.textAlign = 'left';
     const jours = semaine.villes[ville] ?? [versJour(undefined), versJour(undefined)];
     jours.slice(0, deuxJours ? 2 : 1).forEach((j, col) => {
@@ -730,6 +861,8 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
         Promise.all([charger(f).then((img) => imageDe.set(f, img)), chargerPictoAnime(f).then((a) => (a ? animes.set(f, a) : animes.delete(f)))])
       )
     ).then(() => vivant && setPrets((n) => n + 1)).catch(() => {});
+    // Fond de carte du début : chargé ici pour que l'aperçu le montre dès qu'il est prêt.
+    chargerGeoFond().then(() => vivant && setPrets((n) => n + 1));
     const fichierLogo = LOGOS_PRESETS.find((l) => l.id === logoId)?.fichier;
     if (fichierLogo) charger(fichierLogo).then((img) => vivant && setLogo(img)).catch(() => vivant && setLogo(null));
     else setLogo(null);
@@ -742,7 +875,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const avecHook = format.id === 'hook';
   const total = dureeTotale(villes.length, avecHook, !!tendance);
   const textes = useMemo(() => textesVideo(mode, jours, ecart), [mode, jours, ecart]);
-  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, tendance } : null;
+  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, tendance, codeDep: dep } : null;
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -774,6 +907,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     if (!contexte) return;
     setErreur(null);
     setLecture(false);
+    await chargerGeoFond();
     try {
       const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
       const type = types.find((x) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(x));
