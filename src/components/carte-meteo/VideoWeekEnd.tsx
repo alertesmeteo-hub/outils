@@ -175,8 +175,6 @@ function dessinerPicto(ctx: CanvasRenderingContext2D, chemin: string, x: number,
 /** Icônes de la ligne du bas des cartes : pluie et rafales. */
 const ICONE_PLUIE = cheminPictoImage('am:pluie') ?? '';
 const ICONE_VENT = cheminPictoImage('am:rafales') ?? '';
-/** Icônes de l'écran d'accroche (format « TikTok Hook ») : images du site, soleil, éclaircies, couvert et pluie, orage. */
-const ICONES_HOOK = ['img:100', 'img:104', 'img:110', 'img:12'].map((id) => cheminPictoImage(id) ?? '');
 
 const sortie = (t: number) => 1 - (1 - Math.min(1, Math.max(0, t))) ** 3;
 
@@ -391,6 +389,109 @@ function texteHook(ctx: CanvasRenderingContext2D, texte: string, x: number, y: n
   ctx.fillText(texte, x, y);
 }
 
+/**
+ * Icônes d'accroche dessinées aux couleurs catalanes (jaune et rouge), animées : soleil aux rayons qui tournent, nuage qui dérive,
+ * pluie qui tombe, vent qui souffle. Repère de 100 × 100 centré en (0, 0) ; contour blanc pour ressortir sur la carte.
+ */
+type Prim = { c: [number, number, number] } | { r: [number, number, number, number, number] };
+
+function tracerPrim(ctx: CanvasRenderingContext2D, p: Prim) {
+  if ('c' in p) {
+    ctx.beginPath();
+    ctx.arc(p.c[0], p.c[1], p.c[2], 0, Math.PI * 2);
+  } else {
+    rectArrondi(ctx, p.r[0], p.r[1], p.r[2], p.r[3], p.r[4]);
+  }
+}
+
+/** Forme pleine cernée : liseré blanc, contour de couleur, remplissage (le dernier passage efface les traits intérieurs). */
+function forme(ctx: CanvasRenderingContext2D, prims: Prim[], remplissage: string, contour: string, epaisseur: number) {
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = epaisseur * 2 + 9;
+  for (const p of prims) { tracerPrim(ctx, p); ctx.stroke(); }
+  ctx.strokeStyle = contour;
+  ctx.lineWidth = epaisseur * 2;
+  ctx.fillStyle = remplissage;
+  for (const p of prims) { tracerPrim(ctx, p); ctx.fill(); ctx.stroke(); }
+  for (const p of prims) { tracerPrim(ctx, p); ctx.fill(); }
+}
+
+/** Trait épais à trois couches (blanc, contour, couleur), pour les rayons et le vent. */
+function traitCerne(ctx: CanvasRenderingContext2D, tracer: () => void, couleur: string, contour: string, largeur: number) {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const [c, l] of [['#fff', largeur + 11], [contour, largeur + 5], [couleur, largeur]] as const) {
+    ctx.strokeStyle = c;
+    ctx.lineWidth = l;
+    tracer();
+    ctx.stroke();
+  }
+}
+
+function soleilCatalan(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, t: number) {
+  for (let i = 0; i < 10; i++) {
+    const a = (i * Math.PI * 2) / 10 + t * 0.9;
+    const debut = r + 9 * (r / 24);
+    const longueur = r * 0.5 * (1 + 0.25 * Math.sin(t * 3.2 + i));
+    traitCerne(ctx, () => {
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(a) * debut, y + Math.sin(a) * debut);
+      ctx.lineTo(x + Math.cos(a) * (debut + longueur), y + Math.sin(a) * (debut + longueur));
+    }, ROUGE_CATALAN, ROUGE_CATALAN, 6 * (r / 24));
+  }
+  forme(ctx, [{ c: [x, y, r] }], JAUNE_CATALAN, ROUGE_CATALAN, 4 * (r / 24));
+}
+
+/** Nuage rouge à liseré jaune (largeur d'environ 80 × k). */
+function nuageCatalan(ctx: CanvasRenderingContext2D, x: number, y: number, k: number) {
+  forme(ctx, [
+    { c: [x - 22 * k, y + 6 * k, 17 * k] },
+    { c: [x - 2 * k, y - 8 * k, 24 * k] },
+    { c: [x + 22 * k, y + 4 * k, 19 * k] },
+    { r: [x - 30 * k, y + 4 * k, 62 * k, 22 * k, 11 * k] },
+  ], ROUGE_CATALAN, JAUNE_CATALAN, 4 * k);
+}
+
+/** Icône n° `i` (0 soleil, 1 éclaircies, 2 pluie, 3 rafales) à l'instant `t`, dans un repère de 100 × 100 centré en (0, 0). */
+function iconeCatalane(ctx: CanvasRenderingContext2D, i: number, t: number) {
+  ctx.save();
+  if (i === 0) {
+    soleilCatalan(ctx, 0, 0, 24, t);
+  } else if (i === 1) {
+    soleilCatalan(ctx, -15, -15, 17, t);
+    nuageCatalan(ctx, 6 + Math.sin(t * 1.3) * 4, 12, 0.92);
+  } else if (i === 2) {
+    nuageCatalan(ctx, Math.sin(t * 1.1) * 2, -12, 1);
+    for (let g = 0; g < 4; g++) {
+      const cycle = (t * 0.9 + g * 0.27) % 1;
+      const gx = -27 + g * 18 + cycle * 6;
+      const gy = 18 + cycle * 30;
+      ctx.globalAlpha = Math.min(1, (1 - cycle) * 2.2);
+      forme(ctx, [{ r: [gx - 4, gy - 8, 8, 16, 4] }], JAUNE_CATALAN, ROUGE_CATALAN, 2.4);
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    // Trois filets de vent, de longueurs différentes, terminés par une volute et qui ondulent d'un côté à l'autre.
+    const filets: { y: number; fin: number; haut: boolean }[] = [
+      { y: -22, fin: 14, haut: true },
+      { y: 2, fin: 28, haut: false },
+      { y: 24, fin: 4, haut: true },
+    ];
+    filets.forEach((f, j) => {
+      const dx = Math.sin(t * 2.4 + j * 1.3) * 6;
+      traitCerne(ctx, () => {
+        ctx.beginPath();
+        ctx.moveTo(-42 + dx, f.y);
+        ctx.lineTo(f.fin + dx, f.y);
+        if (f.haut) ctx.arc(f.fin + dx, f.y - 9, 9, Math.PI / 2, -Math.PI * 0.85, true);
+        else ctx.arc(f.fin + dx, f.y + 9, 9, -Math.PI / 2, Math.PI * 0.85, false);
+      }, JAUNE_CATALAN, ROUGE_CATALAN, 5);
+    });
+  }
+  ctx.restore();
+}
+
 /** Écran d'accroche : « QUEL TEMPS » en jaune, « CHEZ NOUS ? » en rouge, qui claque (zoom arrière) à l'ouverture. */
 function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null) {
   const { width: W, height: H } = ctx.canvas;
@@ -413,12 +514,11 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
   texteHook(ctx, 'CHEZ NOUS ?', W / 2, cy + 260 * u, 250 * u, W * 0.9, ROUGE_CATALAN);
   ctx.restore();
 
-  // Quatre grosses icônes de temps (images du site), deux au-dessus et deux sous le texte, directement sur la carte, avec une ombre.
+  // Quatre grosses icônes de temps animées aux couleurs catalanes, deux au-dessus et deux sous le texte.
   const rangees: [number, number][] = [[90 * u, cy - 230 * u], [cy + 290 * u, bas - 130 * u]];
-  ICONES_HOOK.forEach((chemin, i) => {
-    if (!chemin) return;
+  for (let i = 0; i < 4; i++) {
     const [y0, y1] = rangees[Math.floor(i / 2)];
-    const taille = Math.min(W * 0.52, (y1 - y0) * 1.08);
+    const taille = Math.min(W * 0.44, (y1 - y0) * 0.95);
     const cx = W * (i % 2 === 0 ? 0.27 : 0.73);
     const py = (y0 + y1) / 2 + Math.sin(t * 2.2 + i * 1.4) * 9 * u;
     const pop = sortie((t - 0.12 * i) / 0.4);
@@ -426,13 +526,13 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
     ctx.save();
     ctx.globalAlpha = Math.max(0, sortant);
     ctx.translate(cx, py);
-    ctx.scale(echelle, echelle);
-    ctx.shadowColor = 'rgba(0,20,60,0.55)';
-    ctx.shadowBlur = 34 * u;
-    ctx.shadowOffsetY = 14 * u;
-    dessinerPicto(ctx, chemin, -taille / 2, -taille / 2, taille, t, i * 0.9);
+    ctx.scale((echelle * taille) / 100, (echelle * taille) / 100);
+    ctx.shadowColor = 'rgba(0,20,60,0.45)';
+    ctx.shadowBlur = 24 * u;
+    ctx.shadowOffsetY = 8 * u;
+    iconeCatalane(ctx, i, t + i * 0.7);
     ctx.restore();
-  });
+  }
   pied(ctx, logo);
 }
 
@@ -815,7 +915,6 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     if (tendance && villes[0]) for (const j of tendance.villes[villes[0]] ?? []) if (j.picto) fichiers.add(j.picto);
     if (ICONE_PLUIE) fichiers.add(ICONE_PLUIE);
     if (ICONE_VENT) fichiers.add(ICONE_VENT);
-    if (format.id === 'hook') for (const f of ICONES_HOOK) if (f) fichiers.add(f);
     let vivant = true;
     Promise.all(
       [...fichiers].map((f) =>
