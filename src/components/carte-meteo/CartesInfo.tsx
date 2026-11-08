@@ -881,6 +881,21 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               {zonageFin && <span className="mt-1 block text-xs font-normal text-muted">Jusqu’à 9 zones par département, colorées selon la commune de référence. Limites régionales visibles ; les données manquantes peuvent réduire le nombre de zones.</span>}
             </label>
           )}
+          {uneCarte && mode === 'prevision' && carteEffective?.groupe === GROUPE_RISQUES && (() => {
+            const base = carteEffective.id === 'orages' ? 'risque-orage' : carteEffective.id.replace(/-(periode|24h)$/, '');
+            const idDe = (d: 'jour' | 'periode' | '24h') => (d === 'jour' ? (base === 'risque-orage' ? 'orages' : base) : `${base}${d === 'periode' ? '-periode' : '-24h'}`);
+            const duree = carteEffective.id.endsWith('-periode') ? 'periode' : carteEffective.id.endsWith('-24h') ? '24h' : 'jour';
+            return (
+              <label className="text-sm font-medium lg:col-span-2">
+                <span className={`${legende} !text-red-600`}>Durée du risque</span>
+                <select value={duree} onChange={(e) => setCarteChoisie(idDe(e.target.value as 'jour' | 'periode' | '24h'))} className={`${selectBarre} w-full !border-red-600 font-semibold`}>
+                  <option value="jour">Un jour</option>
+                  <option value="periode" disabled={!tousThemes.some((x) => x.id === idDe('periode'))}>Une période (du … au …)</option>
+                  <option value="24h" disabled={!tousThemes.some((x) => x.id === idDe('24h'))}>24 h glissantes (à partir de maintenant)</option>
+                </select>
+              </label>
+            );
+          })()}
           {mode === 'prevision' && groupeChoisi === GROUPE_RISQUES && (
             <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
               <span className={`${legende} !text-red-600`}>Affichage des risques</span>
