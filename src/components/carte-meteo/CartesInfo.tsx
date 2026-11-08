@@ -147,6 +147,12 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
   const [tailleValeurs, setTailleValeurs] = useState(100);
   const [sansTableau, setSansTableau] = useState(false);
+  /** Cartes de risque : afficher les chiffres (km/h, mm, °C) à la place des niveaux (faible, modéré…). */
+  const [chiffres, setChiffres] = useState(false);
+  const themesPrevision = useMemo<ThemePrevision[]>(
+    () => (chiffres ? THEMES_PREVISION.map((t) => (t.brut ? { ...t, ...t.brut, texteValeur: undefined } : t)) : THEMES_PREVISION),
+    [chiffres]
+  );
   const [zonageFin, setZonageFin] = useState(false);
   const echelleValeurs = tailleValeurs / 100;
   const [horizon, setHorizon] = useState<Horizon>(2050);
@@ -377,7 +383,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             : null;
         })
         .filter((p): p is NonNullable<typeof p> => p != null);
-    for (const theme of THEMES_PREVISION) {
+    for (const theme of themesPrevision) {
       const source = theme.cumulJours
         ? cumuls?.cle === cleCumul
           ? cumuls.points
@@ -411,7 +417,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
       if (source) resultat[theme.id] = versPoints(theme, source);
     }
     return resultat;
-  }, [previsions, cle, cumuls, cleCumul, montagne, cleMontagne, montagnePeriode, cleMontagnePeriode, pluiePeriode, clePeriode, enDepartement, departement, niveau]);
+  }, [previsions, cle, cumuls, cleCumul, montagne, cleMontagne, montagnePeriode, cleMontagnePeriode, pluiePeriode, clePeriode, enDepartement, departement, niveau, themesPrevision]);
 
   /** Pluie sur une période : sous-titre avec la période réellement couverte par le modèle. */
   const sousTitrePeriode = useMemo(() => {
@@ -464,7 +470,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
 
   const nomZone = niveau === 'france' ? 'France' : niveau === 'region' ? (region.startsWith('gz:') ? grandeZone(region.slice(3))?.nom ?? region : region) : DEPARTEMENTS_FR[departement];
   const modeleAffiche = previsions?.cle === cle ? infosModele(previsions.modele, previsions.modeles) : undefined;
-  const themes: ThemeInfo[] = mode === 'prevision' ? THEMES_PREVISION : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
+  const themes: ThemeInfo[] = mode === 'prevision' ? themesPrevision : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
   // « Températures en direct » et « Observations en direct » ont leur propre page (/outils/temperatures-en-direct/, /outils/observations-en-direct/) : pas ici.
   const groupes = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT && g.groupe !== GROUPE_JOURNEE && g.groupe !== GROUPE_OBS && g.groupe !== GROUPE_PLUIE_DIRECT);
   const tousThemes = groupes.flatMap((g) => g.themes);
@@ -873,6 +879,15 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 <option value="fin">Fin : jusqu’à 864 zones · régions</option>
               </select>
               {zonageFin && <span className="mt-1 block text-xs font-normal text-muted">Jusqu’à 9 zones par département, colorées selon la commune de référence. Limites régionales visibles ; les données manquantes peuvent réduire le nombre de zones.</span>}
+            </label>
+          )}
+          {mode === 'prevision' && groupeChoisi === GROUPE_RISQUES && (
+            <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
+              <span className={`${legende} !text-red-600`}>Affichage des risques</span>
+              <select value={chiffres ? 'chiffres' : 'niveaux'} onChange={(e) => setChiffres(e.target.value === 'chiffres')} className={`${selectBarre} !border-red-600 font-semibold ${uneCarte ? 'w-full' : ''}`}>
+                <option value="niveaux">Niveaux (faible, modéré, fort, sévère)</option>
+                <option value="chiffres">Chiffres (km/h, mm, °C) colorés selon le niveau</option>
+              </select>
             </label>
           )}
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>

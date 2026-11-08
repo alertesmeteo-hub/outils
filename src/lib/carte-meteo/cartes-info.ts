@@ -68,6 +68,8 @@ export interface ThemePrevision extends ThemeInfo {
   fenetreHeures?: number;
   /** Carte mixte : pluie (mm) en plaine et neige fraîche (cm) sur les communes de montagne (lues à part, ?montagne=1). */
   pluieEtNeige?: boolean;
+  /** Cartes de risque, option « chiffres » : valeur brute (km/h, mm, °C…) à la place du niveau, colorée selon les mêmes seuils. */
+  brut?: { valeur: (x: PointCarte) => number | null | undefined; unite: string; decimales: number; paliers: Palier[] };
 }
 
 /** Cartes du réchauffement climatique : fiches régionales Météo-France (TRACC) ou pluies DRIAS par commune. */
@@ -448,7 +450,7 @@ const niveauVerglas = (x: PointCarte): number | null => {
 };
 
 /** Cartes de prévision (paquets des modèles AROME, Harmonie, CEP, GFS). */
-export const THEMES_PREVISION: ThemePrevision[] = [
+const THEMES_PREVISION_BASE: ThemePrevision[] = [
   { id: 'tmax', groupe: 'Températures', titre: 'TEMPÉRATURES MAXIMALES', court: 'Températures maximales', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes', valeur: (x) => x.maxi },
   { id: 'tmax-periode', groupe: 'Températures', periode: true, titre: 'MAXIMALES SUR LA PÉRIODE', court: 'Maxi sur une période', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes', valeur: (x) => x.maxiPeriode },
   { id: 'tmin-periode', groupe: 'Températures', periode: true, titre: 'MINIMALES SUR LA PÉRIODE', court: 'Mini sur une période', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides', valeur: (x) => x.miniPeriode },
@@ -502,6 +504,41 @@ export const THEMES_PREVISION: ThemePrevision[] = [
   { id: 'nuages', groupe: 'Ciel et brouillard', titre: 'COUVERTURE NUAGEUSE', court: 'Nuages et soleil', unite: '%', decimales: 0, paliers: PALIERS_NUAGES, ordre: 'asc', titreTop: 'Les plus ensoleillés', valeur: (x) => x.nuagesJournee },
   { id: 'brouillard', groupe: 'Ciel et brouillard', titre: 'BROUILLARD ET VISIBILITÉ', court: 'Brouillard', unite: 'km', decimales: 1, paliers: PALIERS_VISIBILITE, ordre: 'asc', titreTop: 'Visibilité la plus faible', valeur: (x) => x.visibiliteMin },
 ];
+
+/** Paliers « chiffres » d'une carte de risque : mêmes couleurs que les niveaux, mais coupés aux seuils de la grandeur. `bas` : seuils décroissants (froid). */
+function paliersRisque(seuils: [number, number, number, number], unite: string): Palier[] {
+  const nom = ['Faible', 'Modéré', 'Fort', 'Sévère'];
+  const couleurs: [string, string][] = [['#f5c400', NOIR], ['#ff8c1a', NOIR], ['#e5191e', BLANC], ['#7b2cbf', BLANC]];
+  return [3, 2, 1, 0].map((k) => p(seuils[k], couleurs[k][0], couleurs[k][1], `${nom[k]} (≥ ${seuils[k]} ${unite})`)).concat([p(-Infinity, '#e5e7eb', NOIR, 'Pas de risque', true)]);
+}
+/** Froid : le niveau monte quand la valeur baisse (≤ 0, ≤ -5…). Paliers du plus haut au plus bas. */
+function paliersFroid(seuils: [number, number, number, number], unite: string): Palier[] {
+  const nom = ['Faible', 'Modéré', 'Fort', 'Sévère'];
+  const couleurs: [string, string][] = [['#f5c400', NOIR], ['#ff8c1a', NOIR], ['#e5191e', BLANC], ['#7b2cbf', BLANC]];
+  // Un palier couvre de son seuil (exclu) jusqu'au seuil précédent : son « min » est juste au-dessus du seuil suivant.
+  return seuils.map((seuil, k) => p(k === 3 ? -Infinity : seuils[k + 1] + 0.01, couleurs[k][0], couleurs[k][1], `${nom[k]} (≤ ${seuil} ${unite})`));
+}
+const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => {
+  const vent = (champ: (x: PointCarte) => number | null | undefined, seuils: [number, number, number, number]) => ({ valeur: champ, unite: 'km/h', decimales: 0, paliers: paliersRisque(seuils, 'km/h') });
+  const chaud = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: paliersRisque([30, 34, 38, 42], '°C') });
+  const froid = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: [p(0.01, '#e5e7eb', NOIR, 'Pas de risque', true), ...paliersFroid([0, -5, -10, -15], '°C')] });
+  const pluie = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: 'mm', decimales: 0, paliers: paliersRisque([10, 30, 60, 100], 'mm') });
+  const neige = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: 'cm', decimales: 0, paliers: paliersRisque([1, 5, 15, 30], 'cm') });
+  const verglas = (niveau: (x: PointCarte) => number | null, pluieDe: (x: PointCarte) => number | null | undefined) => ({
+    valeur: (x: PointCarte) => { const n = niveau(x); return n == null ? null : n > 0 ? pluieDe(x) ?? 0 : 0; },
+    unite: 'mm', decimales: 0, paliers: paliersRisque([1, 3, 8, 15], 'mm'),
+  });
+  return {
+    'risque-froid': froid((x) => x.mini), 'risque-froid-periode': froid((x) => x.miniPeriode), 'risque-froid-24h': froid((x) => x.mini24h),
+    'risque-pluie': pluie((x) => x.pluieJournee), 'risque-pluie-periode': pluie((x) => x.pluiePeriode), 'risque-pluie-24h': pluie((x) => x.pluie24h),
+    'risque-vent': vent((x) => x.rafaleJournee, [60, 80, 100, 120]), 'risque-vent-periode': vent((x) => x.rafalePeriode, [60, 80, 100, 120]), 'risque-vent-24h': vent((x) => x.rafale24h, [60, 80, 100, 120]),
+    'risque-tempete': vent((x) => x.rafaleJournee, [100, 120, 140, 160]), 'risque-tempete-periode': vent((x) => x.rafalePeriode, [100, 120, 140, 160]), 'risque-tempete-24h': vent((x) => x.rafale24h, [100, 120, 140, 160]),
+    'risque-chaleur': chaud((x) => x.maxi), 'risque-chaleur-periode': chaud((x) => x.maxiPeriode), 'risque-chaleur-24h': chaud((x) => x.maxi24h),
+    'risque-neige': neige((x) => x.neigeJournee), 'risque-neige-periode': neige((x) => x.neigePeriode), 'risque-neige-24h': neige((x) => x.neige24h),
+    'risque-verglas': verglas(niveauVerglas, (x) => x.pluieJournee), 'risque-verglas-24h': verglas(niveauVerglas24h, (x) => x.pluie24h),
+  };
+})();
+export const THEMES_PREVISION: ThemePrevision[] = THEMES_PREVISION_BASE.map((t) => (BRUT_RISQUE[t.id] ? { ...t, brut: BRUT_RISQUE[t.id] } : t));
 
 /** Cartes de bilan (observations des stations Météo-France, mêmes fenêtres que les classements). */
 export const THEMES_BILAN: ThemeBilan[] = [
