@@ -954,7 +954,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               </label>
               <label className="text-sm font-medium">
                 <span className={legende}>Pluie : valeurs à partir de</span>
-                <select value={affichage.seuilPluie ?? 0} onChange={(e) => regler({ seuilPluie: Number(e.target.value) })} className={`${selectBarre} w-full`}>
+                <select value={affichage.seuils?.mm ?? affichage.seuilPluie ?? 0} onChange={(e) => regler({ seuilPluie: Number(e.target.value), seuils: { ...affichage.seuils, mm: Number(e.target.value) } })} className={`${selectBarre} w-full`}>
                   <option value={0}>Toutes les valeurs</option>
                   {[1, 2, 5, 10, 20, 30, 50, 100].map((mm) => (
                     <option key={mm} value={mm}>
@@ -963,6 +963,25 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                   ))}
                 </select>
               </label>
+              {(
+                [
+                  ['km/h', 'Vent et rafales : valeurs à partir de', [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140], ' km/h et plus'],
+                  ['cm', 'Neige : valeurs à partir de', [1, 2, 5, 10, 20, 30, 50], ' cm et plus'],
+                  ['niveau', 'Risques (niveaux) : à partir de', [1, 2, 3, 4], ''],
+                ] as const
+              ).map(([cle, titre, valeurs, suffixe]) => (
+                <label key={cle} className="text-sm font-medium">
+                  <span className={legende}>{titre}</span>
+                  <select value={affichage.seuils?.[cle] ?? 0} onChange={(e) => regler({ seuils: { ...affichage.seuils, [cle]: Number(e.target.value) } })} className={`${selectBarre} w-full`}>
+                    <option value={0}>Toutes les valeurs</option>
+                    {valeurs.map((v) => (
+                      <option key={v} value={v}>
+                        {cle === 'niveau' ? ['', 'Faible et plus', 'Modéré et plus', 'Fort et plus', 'Sévère'][v] : `${v}${suffixe}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={!!affichage.reperes} onChange={(e) => regler({ reperes: e.target.checked })} />
                 Flèches et noms des villes
@@ -1193,7 +1212,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
                         sousTitre={
-                          (theme as ThemePrevision).fenetreHeures
+                          ((theme as ThemePrevision).fenetreHeures
                             ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!)
                             : (theme as ThemePrevision).periode
                             ? (theme as ThemePrevision).montagne
@@ -1201,7 +1220,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                               : sousTitrePeriode
                             : (theme as ThemePrevision).montagne
                               ? `${libelleJour(dateISO)} · 1 000 M ET PLUS`
-                              : libelleJour(dateISO)
+                              : libelleJour(dateISO)) +
+                          // Carte de risque sans aucune zone concernée : on l'écrit, plutôt que de laisser une carte qui paraît vide.
+                          (theme.groupe === GROUPE_RISQUES && (pointsPrevision[theme.id] ?? []).length > 0 && (pointsPrevision[theme.id] ?? []).every((q) => q.valeur === 0) ? ' · AUCUN RISQUE PRÉVU' : '')
                         }
                         logoId={logoId}
                         prefixeFichier={prefixe}

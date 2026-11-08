@@ -37,6 +37,8 @@ export interface AffichageCarte {
   contours: 'defaut' | 'aucun' | 'regions';
   /** Cartes en mm (pluie) : valeurs affichées à partir de ce cumul ; 0 = toutes. */
   seuilPluie?: number;
+  /** Seuil d'affichage par grandeur (« mm », « km/h », « cm », « niveau » pour les cartes de risque en niveaux) : les valeurs plus basses sont masquées. */
+  seuils?: Record<string, number>;
   /** Nom de la ville sous chaque valeur, et flèche vers la station quand la valeur est décalée. */
   reperes?: boolean;
   /** Police des chiffres des pastilles : Impact (très gras), condensée grasse ou normale. */
@@ -255,7 +257,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const avecNoms = enDepartement || avecReperes;
   const policeV = policeValeurs ?? affichage?.policeValeurs ?? 'condensee';
   const echNoms = tailleNoms ?? affichage?.tailleNoms ?? 1.2;
-  const seuil = valeurMin ?? (theme.unite === 'mm' ? affichage?.seuilPluie ?? 0 : 0);
+  const seuil = valeurMin ?? affichage?.seuils?.[theme.texteValeur ? 'niveau' : theme.unite] ?? (theme.unite === 'mm' ? affichage?.seuilPluie ?? 0 : 0);
   const dansZone = useMemo(
     () => pointsCorriges.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur) && (!seuil || p.neige || p.valeur >= seuil)),
     [pointsCorriges, selection, theme, seuil]
