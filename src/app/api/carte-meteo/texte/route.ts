@@ -17,10 +17,15 @@ Règles :
 - N'écris jamais « demain » ni « après-demain » : désigne toujours le jour par son nom (« lundi », « mardi »…) ou par sa date.
 - Mentionne la zone, la date ou la période, les valeurs extrêmes et leurs lieux, et ce qu'il faut en retenir.
 - Pour une projection climatique, rappelle qu'il s'agit d'une moyenne projetée (trajectoire de référence TRACC de Météo-France), pas d'une prévision.
-- Texte brut : pas de titre, pas de liste à puces, pas de markdown. Emojis seulement si le format le demande.`;
+- Texte brut : pas de titre, pas de liste à puces, pas de markdown. Emojis seulement si le format le demande.
+
+Style attendu (exemple de ton et de construction, à ne jamais recopier : les lieux, valeurs et dates viennent uniquement des données fournies) :
+« ☁️ Ciel couvert et vent au rendez-vous ce lundi 9 novembre : rafales jusqu'à 65 km/h et des températures douces, de 17 à 22°C dans les terres, environ 21°C sur la côte et 11 à 16°C sur les reliefs.
+Mardi et mercredi restent gris mais doux, avant le retour de la pluie jeudi. 🌧️ »
+Ce qui fait ce style : une première phrase qui donne le temps du jour (ciel, vent, rafales) puis les températures par secteur (terres, côte, reliefs) quand les données le permettent ; une seconde phrase courte sur la tendance des jours suivants, avec un emoji d'ouverture et un de clôture qui illustrent le temps. Quand les données contiennent plusieurs jours, termine par cette tendance ; sinon n'en invente pas.`;
 
 const FORMATS = {
-  court: "Format réseaux sociaux : 2 à 4 phrases, 60 à 90 mots, 1 à 3 emojis pertinents, puis 2 ou 3 hashtags en fin de texte (#météo et la zone).",
+  court: "Format réseaux sociaux : 2 phrases (3 au plus), 40 à 70 mots, dans le style de l'exemple : un emoji de temps en tête de la première phrase et un autre à la fin. Pas de hashtag.",
   long: 'Format article : 2 paragraphes, 150 à 220 mots, sans emoji ni hashtag.',
 } as const;
 
