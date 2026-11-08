@@ -32,18 +32,48 @@ interface VilleListe {
  * 4 villes tirées au hasard parmi les plus peuplées du département (20 premières), mais réparties : la première est au hasard,
  * puis, à chaque fois, on tire 5 candidates au hasard et on garde la plus éloignée des villes déjà prises.
  */
-function villesAuto(_dep: string, liste: VilleListe[]): string[] {
+function villesAuto(liste: VilleListe[], alea: () => number = Math.random): string[] {
   const candidates = liste.slice(0, 20);
   if (candidates.length === 0) return [];
-  const hasard = <T,>(tab: T[]) => tab[Math.floor(Math.random() * tab.length)];
   const d = (a: VilleListe, b: VilleListe) => Math.hypot((a.lon - b.lon) * Math.cos((a.lat * Math.PI) / 180), a.lat - b.lat);
-  const prises: VilleListe[] = [hasard(candidates)];
+  const prises: VilleListe[] = [candidates[Math.floor(alea() * candidates.length)]];
   while (prises.length < Math.min(NB_VILLES, candidates.length)) {
     const restantes = candidates.filter((v) => !prises.includes(v));
-    const echantillon = [...restantes].sort(() => Math.random() - 0.5).slice(0, 5);
+    const echantillon = restantes.map((v) => ({ v, k: alea() })).sort((a, b) => a.k - b.k).slice(0, 5).map((x) => x.v);
     prises.push(echantillon.reduce((m, v) => (Math.min(...prises.map((q) => d(q, v))) > Math.min(...prises.map((q) => d(q, m))) ? v : m)));
   }
   return prises.map((v) => v.nom);
+}
+
+/** Générateur pseudo-aléatoire reproductible (mulberry32) à partir d'un texte : même texte, même suite. */
+function alea(graine: string): () => number {
+  let h = 1779033703 ^ graine.length;
+  for (let i = 0; i < graine.length; i++) {
+    h = Math.imul(h ^ graine.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Villes du jour : une sélection différente chaque jour, identique toute la journée. Les 20 villes les plus peuplées sont
+ * coupées en deux moitiés fixes (mélange propre au département) : jours pairs d'un côté, jours impairs de l'autre, donc
+ * deux jours de suite ne partagent jamais une ville ; dans la moitié du jour, 4 villes réparties sont tirées avec la date.
+ */
+function villesDuJour(dep: string, liste: VilleListe[], aujourdhui: string): string[] {
+  const pool = liste.slice(0, 20);
+  if (pool.length < NB_VILLES * 2) return villesAuto(pool, alea(`${dep}|${aujourdhui}`));
+  const hasard = alea(`moitiés|${dep}`);
+  const melange = pool.map((v) => ({ v, k: hasard() })).sort((a, b) => a.k - b.k).map((x) => x.v);
+  const parite = Math.floor(Date.parse(`${aujourdhui}T12:00:00Z`) / 86_400_000) % 2;
+  return villesAuto(melange.filter((_, i) => i % 2 === parite), alea(`${dep}|${aujourdhui}`));
 }
 /** Accroche du format « TikTok Hook » : « Quel temps chez nous ? » aux couleurs catalanes, avant l'intro. */
 const DUREE_HOOK = 2.5;
@@ -570,7 +600,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
       .then((j) => {
         const villes = j.points.filter((p) => p.lat != null && p.lon != null).map((p) => ({ nom: p.nom, lat: p.lat as number, lon: p.lon as number }));
         setListeVilles({ dep, villes });
-        setChoix(villesAuto(dep, villes));
+        setChoix(villesDuJour(dep, villes, aujourdhui));
         setLogoId(logoParDefaut([dep]).id === 'aucun' ? 'alertesmeteo' : logoParDefaut([dep]).id);
       })
       .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
@@ -792,11 +822,11 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
         </label>
         <button
           type="button"
-          onClick={() => listeVilles?.dep === dep && setChoix(villesAuto(dep, listeVilles.villes))}
+          onClick={() => listeVilles?.dep === dep && setChoix(villesAuto(listeVilles.villes))}
           disabled={listeVilles?.dep !== dep}
           className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium disabled:opacity-60"
         >
-          🎲 Tirer 4 autres villes au hasard
+          🎲 Tirer d’autres villes au hasard
         </button>
         {[0, 1, 2, 3].map((k) => (
           <label key={k} className="text-sm font-medium">
