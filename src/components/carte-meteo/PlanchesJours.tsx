@@ -11,7 +11,7 @@ import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
 import { cheminPictoImage, estPictoImage } from '@/lib/carte-meteo/pictos';
 import { angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
-import { MATRICE_RELIEF, CREDITS_COUCHES, coucheParDefaut, tuilesVisibles, type Couche } from '@/lib/carte-meteo/tuiles';
+import { MATRICE_RELIEF, CREDITS_COUCHES, LIBELLES_COUCHES, coucheParDefaut, tuilesVisibles, type Couche } from '@/lib/carte-meteo/tuiles';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { cellulesProximite } from '@/lib/carte-meteo/zonage-fin';
 import { PERIODES_PLANCHE, pictoDuJour, pointDeLaPeriode, pointsParQuart, versPointJour, type PeriodePlanche, type PointJour } from '@/lib/carte-meteo/planches-jours';
@@ -448,8 +448,11 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
           <select value={fondChoisi} onChange={(e) => setFondChoisi(e.target.value as 'auto' | 'uni' | Couche)} className={selectBarre}>
             <option value="auto">Automatique (relief ou photos pour une région ou un département)</option>
             <option value="uni">Uni (bleu)</option>
-            <option value="relief">Relief et fonds marins (NASA)</option>
-            <option value="ortho">Photos aériennes (IGN)</option>
+            {(Object.keys(LIBELLES_COUCHES) as Couche[]).map((c) => (
+              <option key={c} value={c}>
+                {LIBELLES_COUCHES[c]}
+              </option>
+            ))}
           </select>
         </label>
         <label className="text-sm font-medium">

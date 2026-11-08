@@ -7,21 +7,39 @@ import { MONDE_PX, type Vue } from './projection-france';
  * - `relief` : NASA Blue Marble avec relief et bathymétrie (GIBS, domaine public). Mers turquoise avec les fonds marins,
  *   relief et neige sur les Alpes ; 500 m par pixel au mieux (zoom 8), donc pour la France et les régions.
  */
-export type Couche = 'ortho' | 'relief';
+export type Couche = 'ortho' | 'relief' | 'osm' | 'plan-ign' | 'topo' | 'satellite-esri' | 'esri-relief' | 'esri-physical';
 
 const COUCHES: Record<Couche, { zoomMin: number; zoomMax: number }> = {
   ortho: { zoomMin: 5, zoomMax: 15 },
   relief: { zoomMin: 0, zoomMax: 8 },
+  osm: { zoomMin: 0, zoomMax: 18 },
+  'plan-ign': { zoomMin: 0, zoomMax: 18 },
+  topo: { zoomMin: 0, zoomMax: 17 },
+  'satellite-esri': { zoomMin: 0, zoomMax: 18 },
+  'esri-relief': { zoomMin: 0, zoomMax: 13 },
+  'esri-physical': { zoomMin: 0, zoomMax: 8 },
 };
 
 export const LIBELLES_COUCHES: Record<Couche, string> = {
   relief: 'Relief et fonds marins (NASA)',
   ortho: 'Photos aériennes (IGN)',
+  osm: 'Plan OpenStreetMap (routes)',
+  'plan-ign': 'Plan IGN (routes, relief)',
+  topo: 'Relief (OpenTopoMap)',
+  'satellite-esri': 'Satellite Esri',
+  'esri-relief': 'Esri World Shaded Relief',
+  'esri-physical': 'Esri World Physical',
 };
 
 export const CREDITS_COUCHES: Record<Couche, string> = {
   relief: 'NASA Blue Marble (GIBS, domaine public)',
   ortho: '© IGN (Géoplateforme, Licence ouverte)',
+  osm: '© OpenStreetMap',
+  'plan-ign': '© IGN (Géoplateforme, Licence ouverte)',
+  topo: '© OpenTopoMap, © OpenStreetMap',
+  'satellite-esri': '© Esri',
+  'esri-relief': '© Esri',
+  'esri-physical': '© Esri',
 };
 
 /**
@@ -53,7 +71,22 @@ export function urlTuile(couche: Couche, z: number, col: number, ligne: number):
   if (couche === 'relief') {
     return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/${z}/${ligne}/${col}.jpeg`;
   }
-  return `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${ligne}&TILECOL=${col}`;
+  switch (couche) {
+    case 'osm':
+      return `https://tile.openstreetmap.org/${z}/${col}/${ligne}.png`;
+    case 'topo':
+      return `https://tile.opentopomap.org/${z}/${col}/${ligne}.png`;
+    case 'satellite-esri':
+      return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ligne}/${col}`;
+    case 'esri-relief':
+      return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/${z}/${ligne}/${col}`;
+    case 'esri-physical':
+      return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/${z}/${ligne}/${col}`;
+    case 'plan-ign':
+      return `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${ligne}&TILECOL=${col}`;
+    default:
+      return `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${ligne}&TILECOL=${col}`;
+  }
 }
 
 /** Tuiles nécessaires pour couvrir une image de `largeur` x `hauteur` pixels vue à travers `vue`, au zoom adapté à l'échelle. */
