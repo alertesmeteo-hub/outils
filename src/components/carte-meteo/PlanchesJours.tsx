@@ -12,6 +12,7 @@ import { cheminPictoImage, estPictoImage } from '@/lib/carte-meteo/pictos';
 import { angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
+import { cellulesProximite } from '@/lib/carte-meteo/zonage-fin';
 import { PERIODES_PLANCHE, pictoDuJour, pointDeLaPeriode, pointsParQuart, versPointJour, type PeriodePlanche, type PointJour } from '@/lib/carte-meteo/planches-jours';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
 import TableauPrevisions, { type CelluleJour, type LigneTableau } from './TableauPrevisions';
@@ -173,6 +174,50 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
 
   const contours = useContours(FICHIERS_CONTOURS.departements);
   const codes = useMemo(() => new Set(codesDeLaZone(zoneCarte)), [zoneCarte]);
+  // Zonage fin (jusqu'à 864 zones) : une teinte par zone au lieu d'une par département, pour la France entière.
+  const [zonageFin, setZonageFin] = useState(false);
+  const fin = zonageFin && zone === 'france' && !parQuarts;
+  type PointZone = { dep: string; lat: number; lon: number; maxi: number | null };
+  const [zonesBrutes, setZonesBrutes] = useState<Record<string, PointZone[] | null>>({});
+  useEffect(() => {
+    if (!fin) return;
+    const controleur = new AbortController();
+    (async () => {
+      for (const date of dates) {
+        const cle = `${modele.id}|${date}`;
+        if (zonesBrutes[cle] !== undefined) continue;
+        try {
+          const r = await fetch(`/api/carte-meteo/previsions/?modele=${modele.id}&date=${date}&zones=9`, { signal: controleur.signal });
+          const points = r.ok ? ((await r.json()) as { points: PointZone[] }).points : null;
+          setZonesBrutes((z) => ({ ...z, [cle]: points }));
+        } catch (e) {
+          if ((e as Error).name === 'AbortError') return;
+          setZonesBrutes((z) => ({ ...z, [cle]: null }));
+        }
+      }
+    })();
+    return () => controleur.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fin, dates, modele.id]);
+  /** Cellules colorées de chaque jour (zonage fin), dans le repère du monde comme les contours. */
+  const cellulesJours = useMemo(() => {
+    const r: Record<string, { code: string; dep: string; d: string; couleur: string }[]> = {};
+    if (!fin) return r;
+    for (const date of dates) {
+      const points = zonesBrutes[`${modele.id}|${date}`];
+      if (!points) continue;
+      r[date] = contours.flatMap((c) => {
+        const locaux = points.filter((p) => p.dep === c.code && p.maxi != null && Number.isFinite(p.maxi));
+        const centres = locaux.map((p) => versMonde(p.lat, p.lon));
+        return cellulesProximite(centres, c.boite).flatMap((poly, i) => poly.length ? [{
+          code: `${c.code}-${i}`, dep: c.code,
+          d: poly.map((q, j) => `${j ? 'L' : 'M'}${q.x},${q.y}`).join(' ') + 'Z',
+          couleur: palierDe(PALIERS_TEMPERATURE, locaux[i].maxi as number).fond,
+        }] : []);
+      });
+    }
+    return r;
+  }, [fin, dates, zonesBrutes, contours, modele.id]);
   const colonnes = COLONNES[duree];
   const largeurCarte = (LARGEUR - 2 * MARGE - (colonnes - 1) * ECART) / colonnes;
   const hauteurCarte = Math.round(largeurCarte * (zoneCarte === 'france' ? 1 : 0.92));
@@ -375,6 +420,15 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
             </optgroup>
           </select>
         </label>
+        {zone === 'france' && niveauDetail !== NIVEAU_QUATRE_PICTOS && (
+          <label className="text-sm font-medium">
+            <span className="mb-1 block text-orange-500">Zonage (carte fine, 864 zones)</span>
+            <select value={zonageFin ? 'fin' : 'departements'} onChange={(e) => setZonageFin(e.target.value === 'fin')} className={`${selectBarre} !border-orange-500 !bg-orange-500/15 font-semibold ring-2 ring-orange-500`}>
+              <option value="departements">Par département</option>
+              <option value="fin">Fin : jusqu’à 864 zones</option>
+            </select>
+          </label>
+        )}
         <label className="text-sm font-medium">
           <span className="mb-1 block">Logo</span>
           <select value={logoId} onChange={(e) => setLogoId(e.target.value)} className={selectBarre}>
@@ -446,6 +500,21 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           const fond = dedans && point?.maxi != null ? palierDe(PALIERS_TEMPERATURE, point.maxi).fond : dedans ? '#6f86d6' : '#061428';
                           return <path key={c.code} d={c.d} fill={fond} fillOpacity={dedans ? 0.88 : 0.4} stroke="#fff" strokeOpacity={dedans ? 0.55 : 0.2} strokeWidth={0.7 / vue.echelle} />;
                         })}
+                        {fin && cellulesJours[date] && (
+                          <g>
+                            <defs>
+                              {contours.filter((c) => codes.has(c.code)).map((c) => (
+                                <clipPath key={c.code} id={`zf-${date}-${c.code}`}><path d={c.d} /></clipPath>
+                              ))}
+                            </defs>
+                            {cellulesJours[date].map((c) => (
+                              <path key={c.code} d={c.d} clipPath={`url(#zf-${date}-${c.dep})`} fill={c.couleur} stroke={c.couleur} strokeWidth={0.35} vectorEffect="non-scaling-stroke" />
+                            ))}
+                            {contours.filter((c) => codes.has(c.code)).map((c) => (
+                              <path key={`l${c.code}`} d={c.d} fill="none" stroke="#fff" strokeOpacity={0.55} strokeWidth={0.7 / vue.echelle} />
+                            ))}
+                          </g>
+                        )}
                       </g>
                     </svg>
                     <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: 'rgba(255,255,255,0.94)', color: '#0b2a4a', fontFamily: POLICE, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
