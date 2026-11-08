@@ -39,12 +39,12 @@ interface VilleListe {
  * 4 villes tirées au hasard parmi les plus peuplées du département (les 12 premières de la liste, triée par population), mais réparties : la première est au hasard,
  * puis, à chaque fois, on tire 5 candidates au hasard et on garde la plus éloignée des villes déjà prises.
  */
-function villesAuto(liste: VilleListe[], alea: () => number = Math.random): string[] {
+function villesAuto(liste: VilleListe[], alea: () => number = Math.random, n = NB_VILLES): string[] {
   const candidates = liste.slice(0, NB_GRANDES_VILLES);
   if (candidates.length === 0) return [];
   const d = (a: VilleListe, b: VilleListe) => Math.hypot((a.lon - b.lon) * Math.cos((a.lat * Math.PI) / 180), a.lat - b.lat);
   const prises: VilleListe[] = [candidates[Math.floor(alea() * candidates.length)]];
-  while (prises.length < Math.min(NB_VILLES, candidates.length)) {
+  while (prises.length < Math.min(n, candidates.length)) {
     const restantes = candidates.filter((v) => !prises.includes(v));
     const echantillon = restantes.map((v) => ({ v, k: alea() })).sort((a, b) => a.k - b.k).slice(0, 5).map((x) => x.v);
     prises.push(echantillon.reduce((m, v) => (Math.min(...prises.map((q) => d(q, v))) > Math.min(...prises.map((q) => d(q, m))) ? v : m)));
@@ -72,15 +72,27 @@ function alea(graine: string): () => number {
 /**
  * Villes du jour : une sélection différente chaque jour, identique toute la journée. Les 12 villes les plus peuplées sont
  * coupées en deux moitiés fixes (mélange propre au département) : jours pairs d'un côté, jours impairs de l'autre, donc
- * deux jours de suite ne partagent jamais une ville ; dans la moitié du jour, 4 villes réparties sont tirées avec la date.
+ * deux jours de suite ne partagent jamais une ville ; dans la moitié du jour, 3 villes réparties sont tirées avec la date,
+ * plus une ville de relief (communes de montagne du département, à tour de rôle selon le jour) quand il y en a.
  */
-function villesDuJour(dep: string, liste: VilleListe[], aujourdhui: string): string[] {
+function villesDuJour(dep: string, liste: VilleListe[], reliefs: VilleListe[], aujourdhui: string): string[] {
+  const n = reliefs.length > 0 ? NB_VILLES - 1 : NB_VILLES;
   const pool = liste.slice(0, NB_GRANDES_VILLES);
-  if (pool.length < NB_VILLES * 2) return villesAuto(pool, alea(`${dep}|${aujourdhui}`));
-  const hasard = alea(`moitiés|${dep}`);
-  const melange = pool.map((v) => ({ v, k: hasard() })).sort((a, b) => a.k - b.k).map((x) => x.v);
-  const parite = Math.floor(Date.parse(`${aujourdhui}T12:00:00Z`) / 86_400_000) % 2;
-  return villesAuto(melange.filter((_, i) => i % 2 === parite), alea(`${dep}|${aujourdhui}`));
+  const numeroJour = Math.floor(Date.parse(`${aujourdhui}T12:00:00Z`) / 86_400_000);
+  let grandes: string[];
+  if (pool.length < NB_VILLES * 2) grandes = villesAuto(pool, alea(`${dep}|${aujourdhui}`), n);
+  else {
+    const hasard = alea(`moitiés|${dep}`);
+    const melange = pool.map((v) => ({ v, k: hasard() })).sort((a, b) => a.k - b.k).map((x) => x.v);
+    grandes = villesAuto(melange.filter((_, i) => i % 2 === numeroJour % 2), alea(`${dep}|${aujourdhui}`), n);
+  }
+  return reliefs.length > 0 ? [...grandes, reliefs[numeroJour % reliefs.length].nom] : grandes;
+}
+
+/** Tirage libre (bouton) : 3 grandes villes au hasard et une ville de relief au hasard, s'il y en a. */
+function villesAuHasard(liste: VilleListe[], reliefs: VilleListe[]): string[] {
+  const grandes = villesAuto(liste, Math.random, reliefs.length > 0 ? NB_VILLES - 1 : NB_VILLES);
+  return reliefs.length > 0 ? [...grandes, reliefs[Math.floor(Math.random() * reliefs.length)].nom] : grandes;
 }
 /** Accroche du format « TikTok Hook » : « Quel temps chez nous ? » aux couleurs catalanes, avant l'intro. */
 const DUREE_HOOK = 2.5;
@@ -568,7 +580,7 @@ const legende = 'mb-1 block text-xs font-bold uppercase tracking-wide text-prima
 export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const [modele, setModele] = useState<ModeleMeteo>('moyenne');
   const [dep, setDep] = useState('66');
-  const [listeVilles, setListeVilles] = useState<{ dep: string; villes: VilleListe[] } | null>(null);
+  const [listeVilles, setListeVilles] = useState<{ dep: string; villes: VilleListe[]; reliefs: VilleListe[]; altRelief: number } | null>(null);
   const [choix, setChoix] = useState<string[]>([]);
   const [logoId, setLogoId] = useState('pays-catalan-hd');
   // Par défaut : format « TikTok Hook » et vidéo du lendemain (J+1).
@@ -602,12 +614,23 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   useEffect(() => {
     const controleur = new AbortController();
     setListeVilles(null);
-    fetch(`/api/carte-meteo/previsions/?modele=arome&date=${aujourdhui}&dep=${dep}`, { signal: controleur.signal })
-      .then((r) => (r.ok ? (r.json() as Promise<{ points: PointCarte[] }>) : Promise.reject(new Error('Villes du département indisponibles'))))
-      .then((j) => {
-        const villes = j.points.filter((p) => p.lat != null && p.lon != null).map((p) => ({ nom: p.nom, lat: p.lat as number, lon: p.lon as number, altitude: p.altitude }));
-        setListeVilles({ dep, villes });
-        setChoix(villesDuJour(dep, villes, aujourdhui));
+    const lire = (url: string) =>
+      fetch(url, { signal: controleur.signal }).then((r) => (r.ok ? (r.json() as Promise<{ points: PointCarte[] }>) : Promise.reject(new Error('Villes du département indisponibles'))));
+    const enListe = (points: PointCarte[]): VilleListe[] => points.filter((p) => p.lat != null && p.lon != null).map((p) => ({ nom: p.nom, lat: p.lat as number, lon: p.lon as number, altitude: p.altitude }));
+    // Villes de relief (communes de montagne, 1 000 m ou plus ; à défaut 500 m) : facultatives, une erreur ne bloque pas le reste.
+    const reliefsDe = async (): Promise<{ reliefs: VilleListe[]; altRelief: number }> => {
+      for (const alt of [1000, 500]) {
+        const r = await lire(`/api/carte-meteo/previsions/?modele=arome&montagne=1&deps=${dep}&alt=${alt}&date=${aujourdhui}`).then((j) => enListe(j.points)).catch(() => [] as VilleListe[]);
+        if (r.length > 0) return { reliefs: r, altRelief: alt };
+      }
+      return { reliefs: [], altRelief: 1000 };
+    };
+    Promise.all([lire(`/api/carte-meteo/previsions/?modele=arome&date=${aujourdhui}&dep=${dep}`).then((j) => enListe(j.points)), reliefsDe()])
+      .then(([villes, { reliefs, altRelief }]) => {
+        const nomsGrandes = new Set(villes.map((v) => v.nom));
+        const reliefsSeuls = reliefs.filter((v) => !nomsGrandes.has(v.nom));
+        setListeVilles({ dep, villes, reliefs: reliefsSeuls, altRelief });
+        setChoix(villesDuJour(dep, villes, reliefsSeuls, aujourdhui));
         setLogoId(logoParDefaut([dep]).id === 'aucun' ? 'alertesmeteo' : logoParDefaut([dep]).id);
       })
       .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
@@ -655,18 +678,42 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     return () => controleur.abort();
   }, [cleTendance, donneesTendance?.cle, joursTendance, dep]);
 
-  const toutesLesVilles = useMemo(() => (listeVilles?.dep === dep ? listeVilles.villes.map((v) => v.nom).sort((a, b) => a.localeCompare(b, 'fr')) : []), [listeVilles, dep]);
+  // Prévisions des villes de relief pour les jours de la vidéo et de la tendance (AROME ; la moyenne des modèles n'existe pas en montagne).
+  const [reliefsParDate, setReliefsParDate] = useState<{ cle: string; parDate: Record<string, PointCarte[]> } | null>(null);
+  const cleReliefs = `${[...jours, ...joursTendance].join(',')}|${dep}`;
+  useEffect(() => {
+    if (!listeVilles || listeVilles.dep !== dep || listeVilles.reliefs.length === 0) return;
+    const controleur = new AbortController();
+    const dates = [...jours, ...joursTendance];
+    Promise.all(
+      dates.map((date) =>
+        fetch(`/api/carte-meteo/previsions/?modele=arome&montagne=1&deps=${dep}&alt=${listeVilles.altRelief}&date=${date}`, { signal: controleur.signal })
+          .then((r) => (r.ok ? (r.json() as Promise<{ points: PointCarte[] }>) : { points: [] as PointCarte[] }))
+          .then((j) => j.points)
+          .catch(() => [] as PointCarte[])
+      )
+    ).then((listes) => !controleur.signal.aborted && setReliefsParDate({ cle: cleReliefs, parDate: Object.fromEntries(dates.map((d, i) => [d, listes[i]])) }));
+    return () => controleur.abort();
+  }, [listeVilles, dep, jours, joursTendance, cleReliefs]);
+  const pointsReliefs = (date: string): PointCarte[] => (reliefsParDate?.cle === cleReliefs ? reliefsParDate.parDate[date] ?? [] : []);
+
+  const toutesLesVilles = useMemo(
+    () => (listeVilles?.dep === dep ? [...listeVilles.villes, ...listeVilles.reliefs].map((v) => v.nom).sort((a, b) => a.localeCompare(b, 'fr')) : []),
+    [listeVilles, dep]
+  );
   const semaine: Semaine | null = useMemo(() => {
     if (!donnees || donnees.cle !== cle) return null;
-    const parJour = donnees.points.map((liste) => new Map(liste.map((p) => [p.nom, p])));
+    const parJour = donnees.points.map((liste, i) => new Map([...liste, ...pointsReliefs(jours[i])].map((p) => [p.nom, p])));
     return { jours, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, parJour.map((m) => versJour(m.get(n)))])) };
-  }, [donnees, cle, jours, toutesLesVilles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [donnees, cle, jours, toutesLesVilles, reliefsParDate]);
 
   const tendance = useMemo(() => {
     if (!donneesTendance || donneesTendance.cle !== cleTendance || toutesLesVilles.length === 0) return null;
-    const parJour = donneesTendance.points.map((liste) => new Map(liste.map((p) => [p.nom, p])));
+    const parJour = donneesTendance.points.map((liste, i) => new Map([...liste, ...pointsReliefs(joursTendance[i])].map((p) => [p.nom, p])));
     return { jours: joursTendance, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, parJour.map((m) => versJour(m.get(n)))])) };
-  }, [donneesTendance, cleTendance, joursTendance, toutesLesVilles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [donneesTendance, cleTendance, joursTendance, toutesLesVilles, reliefsParDate]);
 
   // Images des pictos et logo, chargées avant de dessiner.
   useEffect(() => {
@@ -780,7 +827,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     // Secteur de chaque ville (côte, terres, reliefs) ; sans le tracé de la côte, on ne distingue plus que les reliefs.
     const cote = await chargerCote().catch(() => null);
     const secteur = (v: string) => {
-      const x = listeVilles?.dep === dep ? listeVilles.villes.find((w) => w.nom === v) : undefined;
+      const x = listeVilles?.dep === dep ? [...listeVilles.villes, ...listeVilles.reliefs].find((w) => w.nom === v) : undefined;
       return x ? secteurDe(x.lat, x.lon, x.altitude, cote) : null;
     };
     const nomJour = (iso: string) => libelleJour(iso).toLowerCase();
@@ -921,7 +968,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
         </label>
         <button
           type="button"
-          onClick={() => listeVilles?.dep === dep && setChoix(villesAuto(listeVilles.villes))}
+          onClick={() => listeVilles?.dep === dep && setChoix(villesAuHasard(listeVilles.villes, listeVilles.reliefs))}
           disabled={listeVilles?.dep !== dep}
           className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium disabled:opacity-60"
         >
