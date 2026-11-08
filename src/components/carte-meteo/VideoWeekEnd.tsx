@@ -8,6 +8,7 @@ import { cheminPictoImage, pictoDepuisPrevision } from '@/lib/carte-meteo/pictos
 import { chargerPictoAnime, dessinerPictoAnime, type PictoAnime } from '@/lib/carte-meteo/pictos-animes';
 import { ICONES_ALERTES } from '@/lib/carte-meteo/icones-alertes';
 import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
+import { chargerCote, secteurDe } from '@/lib/carte-meteo/secteurs';
 
 /** Vidéo « Quel temps ce week-end ? » ou « Quel temps aujourd'hui / demain / J+n ? » (TikTok, Reels, Shorts, Facebook, YouTube) : 3 ou 4 villes, picto animé, maxi, mini, rafales, pluie. */
 
@@ -30,6 +31,8 @@ interface VilleListe {
   nom: string;
   lat: number;
   lon: number;
+  /** Altitude (m) de la ville, si l'API la donne : sert à repérer les reliefs dans le texte du post. */
+  altitude?: number;
 }
 
 /**
@@ -602,7 +605,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     fetch(`/api/carte-meteo/previsions/?modele=arome&date=${aujourdhui}&dep=${dep}`, { signal: controleur.signal })
       .then((r) => (r.ok ? (r.json() as Promise<{ points: PointCarte[] }>) : Promise.reject(new Error('Villes du département indisponibles'))))
       .then((j) => {
-        const villes = j.points.filter((p) => p.lat != null && p.lon != null).map((p) => ({ nom: p.nom, lat: p.lat as number, lon: p.lon as number }));
+        const villes = j.points.filter((p) => p.lat != null && p.lon != null).map((p) => ({ nom: p.nom, lat: p.lat as number, lon: p.lon as number, altitude: p.altitude }));
         setListeVilles({ dep, villes });
         setChoix(villesDuJour(dep, villes, aujourdhui));
         setLogoId(logoParDefaut([dep]).id === 'aucun' ? 'alertesmeteo' : logoParDefaut([dep]).id);
@@ -772,8 +775,14 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const [texteErreur, setTexteErreur] = useState<string | null>(null);
   const [texteCopie, setTexteCopie] = useState(false);
 
-  function donneesTexte(): CarteTexte | null {
+  async function donneesTexte(): Promise<CarteTexte | null> {
     if (!semaine || villes.length === 0) return null;
+    // Secteur de chaque ville (côte, terres, reliefs) ; sans le tracé de la côte, on ne distingue plus que les reliefs.
+    const cote = await chargerCote().catch(() => null);
+    const secteur = (v: string) => {
+      const x = listeVilles?.dep === dep ? listeVilles.villes.find((w) => w.nom === v) : undefined;
+      return x ? secteurDe(x.lat, x.lon, x.altitude, cote) : null;
+    };
     const nomJour = (iso: string) => libelleJour(iso).toLowerCase();
     const ciel = (picto: string | null) => {
       const nom = picto?.match(/pictos-alertes\/([^./?]+)\.svg/)?.[1];
@@ -784,7 +793,8 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
         const j = semaine.villes[v]?.[d];
         const val = j ? valeur(j) : null;
         const c = avecCiel && j ? ciel(j.picto) : null;
-        return val == null ? [] : [{ lieu: c ? `${v} (${c.toLowerCase()})` : v, departement: dep, valeur: val }];
+        const precisions = [c?.toLowerCase(), secteur(v)].filter(Boolean).join(', ');
+        return val == null ? [] : [{ lieu: precisions ? `${v} (${precisions})` : v, departement: dep, valeur: val }];
       });
     const rubriques: RubriqueTexte[] = [];
     const ajouter = (nom: string, unite: string, sens: RubriqueTexte['sens'], classement: RubriqueTexte['classement']) => {
@@ -795,15 +805,15 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     ajouter(`Températures minimales, ${nomJour(jours[0])}`, '°C', 'plus basses', lignes(0, (j) => j.mini));
     ajouter('Rafales maximales', 'km/h', 'plus hautes', villes.flatMap((v) => {
       const val = Math.max(...jours.map((_, d) => semaine.villes[v]?.[d]?.rafale ?? -1));
-      return val < 0 ? [] : [{ lieu: v, departement: dep, valeur: val }];
+      return val < 0 ? [] : [{ lieu: secteur(v) ? `${v} (${secteur(v)})` : v, departement: dep, valeur: val }];
     }));
     ajouter('Cumul de pluie (mm)', 'mm', 'plus hautes', villes.flatMap((v) => {
       const val = Math.max(...jours.map((_, d) => semaine.villes[v]?.[d]?.pluie ?? -1));
-      return val < 0 ? [] : [{ lieu: v, departement: dep, valeur: val }];
+      return val < 0 ? [] : [{ lieu: secteur(v) ? `${v} (${secteur(v)})` : v, departement: dep, valeur: val }];
     }));
     if (tendance && villes[0]) {
       const ville = villes[0];
-      ajouter(`Tendance des jours suivants, maximales à ${ville}`, '°C', 'plus hautes',
+      ajouter(`Tendance, maximales à ${ville}`, '°C', 'plus hautes',
         tendance.jours.flatMap((iso, k) => {
           const j = tendance.villes[ville]?.[k];
           if (!j || j.maxi == null) return [];
@@ -822,9 +832,12 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   }
 
   async function genererTexte() {
-    const carte = donneesTexte();
-    if (!carte) return;
     setTexteEnCours(true);
+    const carte = await donneesTexte();
+    if (!carte) {
+      setTexteEnCours(false);
+      return;
+    }
     setTexteErreur(null);
     try {
       const r = await fetch('/api/carte-meteo/texte/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: 'court', carte }) });

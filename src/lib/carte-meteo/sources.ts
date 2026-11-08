@@ -103,7 +103,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v18'; // v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v19'; // v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -288,6 +288,8 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     serie: serieALAltitude(serieDuPoint(fichier, c, v.pointId), altitude(v.pointId), retouche?.altitudes?.[v.nom]),
     ...(gardees.includes(v) ? { prioritaire: true } : {}),
     ...(gardees.includes(v) || retouche?.exactes?.includes(v.nom) ? { placeExacte: true } : {}),
+    // Altitude de la ville (retouche manuelle, sinon point du modèle) : sert à classer côte / terres / reliefs dans le texte des vidéos.
+    altitude: retouche?.altitudes?.[v.nom] ?? Math.round(altitude(v.pointId) / 10) * 10,
   }));
   // Montagne : les communes les plus peuplées au-dessus de 1 000 m (stations, villages), bien réparties sur les massifs.
   const hautes = communes.filter((x) => altitude(x.pointId) >= ALTITUDE_MONTAGNE).slice(0, CANDIDATES_VILLES);
@@ -628,7 +630,7 @@ export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: strin
 export async function chargerPrevisionsVilles(modele: ModeleMeteo, dateISO: string, dep: string, finPeriode?: string): Promise<PointCarte[]> {
   if (modele === 'moyenne') return chargerPrevisionsVillesMoyenne(dateISO, dep);
   const extrait = await extraitDepartement(modele, dep);
-  const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO, finPeriode), lat: v.lat, lon: v.lon, ...(v.prioritaire ? { prioritaire: true } : {}), ...(v.placeExacte ? { placeExacte: true } : {}) }));
+  const points = extrait.villes.map((v) => ({ ...pointDepuisSerie(v.code, v.nom, v.serie, dateISO, finPeriode), lat: v.lat, lon: v.lon, ...(v.prioritaire ? { prioritaire: true } : {}), ...(v.placeExacte ? { placeExacte: true } : {}), ...(v.altitude != null ? { altitude: v.altitude } : {}) }));
   const valides = points.filter((p) => finPeriode ? aValeursPeriode(p) : p.tempApresMidi != null);
   if (!valides.length) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO} (département ${dep})`);
   return valides;
