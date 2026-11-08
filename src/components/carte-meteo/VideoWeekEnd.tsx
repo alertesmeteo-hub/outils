@@ -121,6 +121,8 @@ function dessinerPicto(ctx: CanvasRenderingContext2D, chemin: string, x: number,
 /** Icônes de la ligne du bas des cartes : pluie et rafales. */
 const ICONE_PLUIE = cheminPictoImage('am:pluie') ?? '';
 const ICONE_VENT = cheminPictoImage('am:rafales') ?? '';
+/** Icônes de l'écran d'accroche (format « TikTok Hook ») : soleil, éclaircies, pluie, rafales. */
+const ICONES_HOOK = ['am:soleil', 'am:eclaircies', 'am:pluie', 'am:rafales'].map((id) => cheminPictoImage(id) ?? '');
 
 const sortie = (t: number) => 1 - (1 - Math.min(1, Math.max(0, t))) ** 3;
 
@@ -287,6 +289,32 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
   texteHook(ctx, 'QUEL TEMPS', W / 2, cy - 20 * u, 250 * u, W * 0.9, JAUNE_CATALAN);
   texteHook(ctx, 'CHEZ NOUS ?', W / 2, cy + 260 * u, 250 * u, W * 0.9, ROUGE_CATALAN);
   ctx.restore();
+
+  // Quatre grosses icônes de temps, deux au-dessus et deux sous le texte, sur disque blanc pour ressortir du fond bleu.
+  const rangees: [number, number][] = [[90 * u, cy - 230 * u], [cy + 290 * u, bas - 130 * u]];
+  ICONES_HOOK.forEach((chemin, i) => {
+    if (!chemin) return;
+    const [y0, y1] = rangees[Math.floor(i / 2)];
+    const taille = Math.min(W * 0.4, y1 - y0);
+    const cx = W * (i % 2 === 0 ? 0.28 : 0.72);
+    const py = (y0 + y1) / 2;
+    const pop = sortie((t - 0.12 * i) / 0.4);
+    const echelle = pop * (1 + 0.08 * Math.sin(Math.min(1, pop) * Math.PI)) * (1 + 0.03 * Math.sin(t * 4 + i));
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, sortant);
+    ctx.translate(cx, py);
+    ctx.scale(echelle, echelle);
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 28 * u;
+    ctx.shadowOffsetY = 10 * u;
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.beginPath();
+    ctx.arc(0, 0, taille * 0.56, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    dessinerPicto(ctx, chemin, -taille * 0.56, -taille * 0.56, taille * 1.12, t, i * 0.9);
+    ctx.restore();
+  });
   pied(ctx, logo);
 }
 
@@ -507,6 +535,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     for (const v of villes) for (const j of semaine.villes[v] ?? []) if (j.picto) fichiers.add(j.picto);
     if (ICONE_PLUIE) fichiers.add(ICONE_PLUIE);
     if (ICONE_VENT) fichiers.add(ICONE_VENT);
+    if (format.id === 'hook') for (const f of ICONES_HOOK) if (f) fichiers.add(f);
     let vivant = true;
     Promise.all(
       [...fichiers].map((f) =>
@@ -519,7 +548,8 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     return () => {
       vivant = false;
     };
-  }, [semaine, villes, logoId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [semaine, villes, logoId, format.id]);
 
   const avecHook = format.id === 'hook';
   const total = dureeTotale(villes.length, avecHook);
