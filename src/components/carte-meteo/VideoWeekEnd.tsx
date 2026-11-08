@@ -6,6 +6,8 @@ import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { cheminPictoImage, pictoDepuisPrevision } from '@/lib/carte-meteo/pictos';
 import { chargerPictoAnime, dessinerPictoAnime, type PictoAnime } from '@/lib/carte-meteo/pictos-animes';
+import { ICONES_ALERTES } from '@/lib/carte-meteo/icones-alertes';
+import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 
 /** Vidéo « Quel temps ce week-end ? » ou « Quel temps aujourd'hui / demain / J+n ? » (TikTok, Reels, Shorts, Facebook, YouTube) : 3 ou 4 villes, picto animé, maxi, mini, rafales, pluie. */
 
@@ -764,6 +766,88 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     }
   }, [contexte, total, jours, dep, format]);
 
+  // Texte d'accompagnement (légende du post) rédigé par l'IA à partir des mêmes données que la vidéo.
+  const [texteIA, setTexteIA] = useState('');
+  const [texteEnCours, setTexteEnCours] = useState(false);
+  const [texteErreur, setTexteErreur] = useState<string | null>(null);
+  const [texteCopie, setTexteCopie] = useState(false);
+
+  function donneesTexte(): CarteTexte | null {
+    if (!semaine || villes.length === 0) return null;
+    const nomJour = (iso: string) => libelleJour(iso).toLowerCase();
+    const ciel = (picto: string | null) => {
+      const nom = picto?.match(/pictos-alertes\/([^./?]+)\.svg/)?.[1];
+      return ICONES_ALERTES.find(([n]) => n === nom)?.[1] ?? null;
+    };
+    const lignes = (d: number, valeur: (j: JourVille) => number | null, avecCiel = false) =>
+      villes.flatMap((v) => {
+        const j = semaine.villes[v]?.[d];
+        const val = j ? valeur(j) : null;
+        const c = avecCiel && j ? ciel(j.picto) : null;
+        return val == null ? [] : [{ lieu: c ? `${v} (${c.toLowerCase()})` : v, departement: dep, valeur: val }];
+      });
+    const rubriques: RubriqueTexte[] = [];
+    const ajouter = (nom: string, unite: string, sens: RubriqueTexte['sens'], classement: RubriqueTexte['classement']) => {
+      if (classement.length) rubriques.push({ nom: nom.slice(0, 60), unite, sens, classement });
+    };
+    // Priorité : maxi de chaque jour, mini du premier jour, rafales, pluie, puis la tendance (6 rubriques au plus).
+    jours.forEach((iso, d) => ajouter(`Températures maximales, ${nomJour(iso)}`, '°C', 'plus hautes', lignes(d, (j) => j.maxi, true)));
+    ajouter(`Températures minimales, ${nomJour(jours[0])}`, '°C', 'plus basses', lignes(0, (j) => j.mini));
+    ajouter('Rafales maximales', 'km/h', 'plus hautes', villes.flatMap((v) => {
+      const val = Math.max(...jours.map((_, d) => semaine.villes[v]?.[d]?.rafale ?? -1));
+      return val < 0 ? [] : [{ lieu: v, departement: dep, valeur: val }];
+    }));
+    ajouter('Cumul de pluie (mm)', 'mm', 'plus hautes', villes.flatMap((v) => {
+      const val = Math.max(...jours.map((_, d) => semaine.villes[v]?.[d]?.pluie ?? -1));
+      return val < 0 ? [] : [{ lieu: v, departement: dep, valeur: val }];
+    }));
+    if (tendance && villes[0]) {
+      const ville = villes[0];
+      ajouter(`Tendance des jours suivants, maximales à ${ville}`, '°C', 'plus hautes',
+        tendance.jours.flatMap((iso, k) => {
+          const j = tendance.villes[ville]?.[k];
+          if (!j || j.maxi == null) return [];
+          const c = ciel(j.picto);
+          return [{ lieu: c ? `${nomJour(iso)} : ${c.toLowerCase()}` : nomJour(iso), valeur: j.maxi }];
+        }));
+    }
+    return {
+      type: "Prévision (légende d'une vidéo météo)",
+      titre: `Vidéo météo ${nomDepartement}`,
+      periode: jours.map(nomJour).join(' et '),
+      zone: `${nomDepartement} (${dep})`,
+      source: MODELES.find((m) => m.id === modele)?.libelle ?? String(modele),
+      rubriques: rubriques.slice(0, 6),
+    };
+  }
+
+  async function genererTexte() {
+    const carte = donneesTexte();
+    if (!carte) return;
+    setTexteEnCours(true);
+    setTexteErreur(null);
+    try {
+      const r = await fetch('/api/carte-meteo/texte/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: 'court', carte }) });
+      const json = (await r.json().catch(() => null)) as { texte?: string; erreur?: string } | null;
+      if (!r.ok || !json?.texte) throw new Error(json?.erreur ?? 'Service IA momentanément indisponible.');
+      setTexteIA(json.texte);
+    } catch (e) {
+      setTexteErreur(e instanceof Error ? e.message : 'Service IA momentanément indisponible.');
+    } finally {
+      setTexteEnCours(false);
+    }
+  }
+
+  async function copierTexte() {
+    try {
+      await navigator.clipboard.writeText(texteIA);
+      setTexteCopie(true);
+      setTimeout(() => setTexteCopie(false), 2000);
+    } catch {
+      setTexteErreur('Copie impossible : sélectionnez le texte et copiez-le à la main.');
+    }
+  }
+
   const changerVille = (k: number, nom: string) => setChoix((liste) => liste.map((v, i) => (i === k ? nom : v)));
 
   return (
@@ -886,6 +970,24 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
           </button>
           <input type="range" min={0} max={total} step={0.05} value={Math.min(t, total)} onChange={(e) => { setLecture(false); setT(Number(e.target.value)); }} className="flex-1" aria-label="Position dans la vidéo" />
           <span className="w-14 text-right text-xs tabular-nums text-muted">{Math.round(t * 10) / 10} s</span>
+        </div>
+        <div className="flex w-full flex-col gap-2" style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
+          <button type="button" onClick={genererTexte} disabled={!contexte || texteEnCours} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium disabled:opacity-60">
+            {texteEnCours ? '✍️ Rédaction du texte…' : texteIA ? '✍️ Régénérer le texte du post' : '✍️ Générer le texte du post'}
+          </button>
+          {texteIA && (
+            <>
+              <textarea value={texteIA} onChange={(e) => setTexteIA(e.target.value)} rows={7} className="w-full rounded-lg border border-border bg-surface p-2 text-sm" aria-label="Texte d'accompagnement de la vidéo" />
+              <button type="button" onClick={copierTexte} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium">
+                {texteCopie ? '✓ Copié' : '📋 Copier le texte'}
+              </button>
+            </>
+          )}
+          {texteErreur && (
+            <p role="alert" className="text-sm text-danger">
+              {texteErreur}
+            </p>
+          )}
         </div>
         {!contexte && !erreur && <p className="text-sm text-muted">Chargement des villes et des prévisions…</p>}
       </div>
