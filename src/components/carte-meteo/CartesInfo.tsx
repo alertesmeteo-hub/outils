@@ -848,8 +848,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           </label>
           {mode === 'prevision' && niveau === 'france' && (
             <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
-              <span className={legende}>Zonage de la France</span>
-              <select value={zonageFin ? 'fin' : 'departements'} onChange={(e) => { setZonageFin(e.target.value === 'fin'); setErreur(null); setErreurCumuls(null); }} className={`${selectBarre} w-full`}>
+              <span className={`${legende} !text-orange-500`}>Zonage de la France (carte fine, 864 zones)</span>
+              <select value={zonageFin ? 'fin' : 'departements'} onChange={(e) => { setZonageFin(e.target.value === 'fin'); setErreur(null); setErreurCumuls(null); }} className={`${selectBarre} w-full !border-orange-500 !bg-orange-500/15 font-semibold ring-2 ring-orange-500`}>
                 <option value="departements">Par département</option>
                 <option value="fin">Fin : jusqu’à 864 zones · régions</option>
               </select>
