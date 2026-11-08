@@ -1662,6 +1662,23 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[230px_minmax(0,1fr)_230px]">
       <aside className="order-2 flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:order-1">
+        {/* Export tout en haut de la colonne, près de la carte. */}
+        <div className="flex flex-col gap-2 border-b border-border pb-4">
+          <TexteSurCarte cible={carteRef} donnees={donneesTexte} />
+          <button
+            type="button"
+            onClick={exporter}
+            disabled={enExport || !(enDepartement ? donneesVilles : donnees)}
+            className="rounded-lg bg-primary px-5 py-2.5 font-medium text-white disabled:opacity-60"
+          >
+            {enExport ? 'Export en cours…' : 'Exporter en JPG'}
+          </button>
+          {erreurExport && (
+            <p role="alert" className="text-sm text-danger">
+              {erreurExport}
+            </p>
+          )}
+        </div>
         <div>
           <p className={titreGroupe}>Thème</p>
           <fieldset className="mt-2">
@@ -1881,15 +1898,6 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         </div>
 
         <div className="flex flex-col gap-2 border-t border-border pt-4">
-          <TexteSurCarte cible={carteRef} donnees={donneesTexte} />
-          <button
-            type="button"
-            onClick={exporter}
-            disabled={enExport || !(enDepartement ? donneesVilles : donnees)}
-            className="rounded-lg bg-primary px-5 py-2.5 font-medium text-white disabled:opacity-60"
-          >
-            {enExport ? 'Export en cours…' : 'Exporter en JPG'}
-          </button>
           <button
             type="button"
             onClick={basculerFiger}
@@ -1913,11 +1921,6 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           {erreurMemo && (
             <p role="alert" className="text-sm text-danger">
               {erreurMemo}
-            </p>
-          )}
-          {erreurExport && (
-            <p role="alert" className="text-sm text-danger">
-              {erreurExport}
             </p>
           )}
           <button

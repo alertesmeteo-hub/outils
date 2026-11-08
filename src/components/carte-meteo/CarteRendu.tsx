@@ -12,7 +12,7 @@ import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/v
  * Tuile du fond. L'IGN renvoie un aplat bleu marine quand il n'a pas d'image (hors couverture, par exemple en Espagne) :
  * on le détecte à sa taille minuscule et on le remplace par la tuile du zoom inférieur qui contient la zone (moins nette, mais réelle).
  */
-function TuileFond({ t, couche }: { t: Tuile; couche: Couche }) {
+export function TuileFond({ t, couche }: { t: Tuile; couche: Couche }) {
   const [source, setSource] = useState<Tuile>(t);
   const idDecoupe = `tuile${useId().replace(/:/g, '')}`;
   useEffect(() => {

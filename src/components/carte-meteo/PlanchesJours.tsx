@@ -11,10 +11,12 @@ import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
 import { cheminPictoImage, estPictoImage } from '@/lib/carte-meteo/pictos';
 import { angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
+import { MATRICE_RELIEF, CREDITS_COUCHES, coucheParDefaut, tuilesVisibles, type Couche } from '@/lib/carte-meteo/tuiles';
 import { ajusterVue, unirBoites, versEcran, versMonde } from '@/lib/carte-meteo/projection-france';
 import { cellulesProximite } from '@/lib/carte-meteo/zonage-fin';
 import { PERIODES_PLANCHE, pictoDuJour, pointDeLaPeriode, pointsParQuart, versPointJour, type PeriodePlanche, type PointJour } from '@/lib/carte-meteo/planches-jours';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
+import { TuileFond } from './CarteRendu';
 import TableauPrevisions, { type CelluleJour, type LigneTableau } from './TableauPrevisions';
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, FICHIERS_CONTOURS } from './CarteMeteo';
 import { statsDe, type CarteTexte, type RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
@@ -176,6 +178,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const codes = useMemo(() => new Set(codesDeLaZone(zoneCarte)), [zoneCarte]);
   // Zonage fin (jusqu'à 864 zones) : une teinte par zone au lieu d'une par département, pour la France entière.
   const [zonageFin, setZonageFin] = useState(false);
+  /** Fond de carte : automatique (relief ou photos pour un département ou une région, uni pour la France), uni, relief NASA ou photos IGN. */
+  const [fondChoisi, setFondChoisi] = useState<'auto' | 'uni' | Couche>('auto');
   const fin = zonageFin && zone === 'france' && !parQuarts;
   type PointZone = { dep: string; lat: number; lon: number; maxi: number | null };
   const [zonesBrutes, setZonesBrutes] = useState<Record<string, PointZone[] | null>>({});
@@ -228,6 +232,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
     const boite = unirBoites(contours.filter((c) => codes.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
     return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : 0.05);
   }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte]);
+  /** Fond de la carte : tuiles de relief ou de photos aériennes (null = fond uni bleu). Automatique : pour un département ou une région seulement. */
+  const couche: Couche | null = fondChoisi === 'uni' ? null : fondChoisi === 'auto' ? (zoneCarte === 'france' ? null : coucheParDefaut(vue)) : fondChoisi;
 
   const partDetail = niveauDetail === NIVEAU_QUATRE_PICTOS ? 0.22 : (NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1);
   const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 2.6 : 1);
@@ -430,6 +436,15 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
           </label>
         )}
         <label className="text-sm font-medium">
+          <span className="mb-1 block">Fond de carte</span>
+          <select value={fondChoisi} onChange={(e) => setFondChoisi(e.target.value as 'auto' | 'uni' | Couche)} className={selectBarre}>
+            <option value="auto">Automatique (relief ou photos pour une région ou un département)</option>
+            <option value="uni">Uni (bleu)</option>
+            <option value="relief">Relief et fonds marins (NASA)</option>
+            <option value="ortho">Photos aériennes (IGN)</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium">
           <span className="mb-1 block">Logo</span>
           <select value={logoId} onChange={(e) => setLogoId(e.target.value)} className={selectBarre}>
             {LOGOS_PRESETS.map((l) => (
@@ -494,10 +509,26 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                   <div key={date} style={{ position: 'relative', width: largeurCarte, height: hauteurCarte, borderRadius: 10, overflow: 'hidden', background: '#0a2342', border: '2px solid rgba(255,255,255,0.7)' }}>
                     <svg width={largeurCarte} height={hauteurCarte} style={{ position: 'absolute', left: 0, top: 0 }}>
                       <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
+                        {couche && (
+                          <>
+                            {couche === 'relief' && (
+                              <filter id={`fond-relief-${date}`} colorInterpolationFilters="sRGB">
+                                <feColorMatrix type="matrix" values={MATRICE_RELIEF} />
+                              </filter>
+                            )}
+                            <g filter={couche === 'relief' ? `url(#fond-relief-${date})` : undefined}>
+                              {tuilesVisibles(couche, vue, largeurCarte, hauteurCarte).map((t) => (
+                                <TuileFond key={t.cle} t={t} couche={couche} />
+                              ))}
+                            </g>
+                          </>
+                        )}
                         {contours.map((c) => {
                           const dedans = codes.has(c.code);
                           const point = (enDepartement ? [] : jours[date] ?? []).find((p) => p.code === c.code);
                           const fond = dedans && point?.maxi != null ? palierDe(PALIERS_TEMPERATURE, point.maxi).fond : dedans ? '#6f86d6' : '#061428';
+                          // Avec un fond de carte : le territoire est teinté en transparence (le relief reste visible), le reste assombri.
+                          if (couche) return <path key={c.code} d={c.d} fill={dedans ? fond : '#061428'} fillOpacity={dedans ? 0.5 : 0.55} stroke="#fff" strokeOpacity={dedans ? 0.9 : 0.25} strokeWidth={(dedans ? 1.4 : 0.7) / vue.echelle} />;
                           return <path key={c.code} d={c.d} fill={fond} fillOpacity={dedans ? 0.88 : 0.4} stroke="#fff" strokeOpacity={dedans ? 0.55 : 0.2} strokeWidth={0.7 / vue.echelle} />;
                         })}
                         {fin && cellulesJours[date] && (
@@ -589,7 +620,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
 
             <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: HAUTEUR_PIED, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${MARGE}px`, fontSize: 16, color: '#cfe3fa' }}>
               <span>
-                Prévisions {modele.libelle} ({modele.fournisseur}) · {parQuarts ? 'moyenne par zone' : `un point par ${enDepartement ? 'ville' : 'département'}`} · <span style={{ color: '#ff8a8a' }}>maximale</span> puis <span style={{ color: '#7db4ff' }}>minimale</span>
+                Prévisions {modele.libelle} ({modele.fournisseur}) · {parQuarts ? 'moyenne par zone' : `un point par ${enDepartement ? 'ville' : 'département'}`} · <span style={{ color: '#ff8a8a' }}>maximale</span> puis <span style={{ color: '#7db4ff' }}>minimale</span>{couche ? ` · Fond : ${CREDITS_COUCHES[couche]}` : ''}
               </span>
               <span style={{ fontFamily: POLICE, fontSize: 24, color: '#fff' }}>www.alertes-meteo.com</span>
             </div>
