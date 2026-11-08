@@ -38,6 +38,9 @@ type Mode = 'prevision' | 'bilan' | 'climat' | 'europe';
 /** Groupe des cartes du mois (voir THEMES_BILAN) : bouton « Bilan du mois ». */
 const GROUPE_MOIS = 'Bilan du mois';
 
+/** Groupe des cartes de risque (voir THEMES_PREVISION) : bouton rouge « Risques » du menu Cartes. */
+const GROUPE_RISQUES = 'Risques';
+
 const MODES: [Mode, string][] = [
   ['prevision', 'Prévisions'],
   ['bilan', 'Bilans des stations'],
@@ -556,12 +559,12 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 <button
                   key={valeur}
                   type="button"
-                  aria-pressed={mode === valeur && !(valeur === 'bilan' && groupeChoisi === GROUPE_MOIS)}
+                  aria-pressed={mode === valeur && !(valeur === 'bilan' && groupeChoisi === GROUPE_MOIS) && !(valeur === 'prevision' && groupeChoisi === GROUPE_RISQUES)}
                   onClick={() => {
                     setMode(valeur);
                     setGroupeChoisi('tous');
                   }}
-                  className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === valeur && !(valeur === 'bilan' && groupeChoisi === GROUPE_MOIS) ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+                  className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === valeur && !(valeur === 'bilan' && groupeChoisi === GROUPE_MOIS) && !(valeur === 'prevision' && groupeChoisi === GROUPE_RISQUES) ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
                 >
                   {libelle}
                 </button>
@@ -577,6 +580,22 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === 'bilan' && groupeChoisi === GROUPE_MOIS ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
               >
                 Bilan du mois
+              </button>
+              {/* Raccourci : les cartes de risque (orage, froid/gel, pluie, vent, chaleur, neige, verglas), en rouge. */}
+              <button
+                type="button"
+                aria-pressed={mode === 'prevision' && groupeChoisi === GROUPE_RISQUES}
+                onClick={() => {
+                  setMode('prevision');
+                  setGroupeChoisi(GROUPE_RISQUES);
+                  if (uneCarte) {
+                    setCarteChoisie('risque-vent');
+                    setFiltreGroupe(GROUPE_RISQUES);
+                  }
+                }}
+                className={`rounded-full border-2 px-4 py-1.5 text-sm font-bold ${mode === 'prevision' && groupeChoisi === GROUPE_RISQUES ? 'border-red-600 bg-red-600 text-white' : 'border-red-600 bg-surface text-red-600'}`}
+              >
+                ⚠️ Risques
               </button>
               {/* Carte à part : relevés du moment et records de toutes les stations. */}
               <a href="/outils/temperatures-en-direct/" className="rounded-full border border-border bg-surface px-4 py-1.5 text-sm font-semibold hover:bg-bg">
