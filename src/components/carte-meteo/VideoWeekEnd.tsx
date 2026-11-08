@@ -14,6 +14,7 @@ const FPS = 30;
 /** Formats de vidéo : dimensions en pixels. */
 const FORMATS = [
   { id: 'tiktok', libelle: 'TikTok, Reels, Shorts (9:16)', l: 1080, h: 1920 },
+  { id: 'hook', libelle: 'TikTok Hook (9:16) : « Quel temps chez nous ? » en ouverture', l: 1080, h: 1920 },
   { id: 'facebook', libelle: 'Facebook, Instagram (4:5)', l: 1080, h: 1350 },
   { id: 'carre', libelle: 'Carré (1:1)', l: 1080, h: 1080 },
   { id: 'youtube', libelle: 'YouTube (16:9)', l: 1920, h: 1080 },
@@ -42,6 +43,10 @@ function villesAuto(dep: string, liste: VilleListe[]): string[] {
   }
   return prises.map((v) => v.nom);
 }
+/** Accroche du format « TikTok Hook » : « Quel temps chez nous ? » aux couleurs catalanes, avant l'intro. */
+const DUREE_HOOK = 2.5;
+const JAUNE_CATALAN = '#fcdd09';
+const ROUGE_CATALAN = '#da121a';
 const DUREE_INTRO = 3;
 const DUREE_VILLE = 3.5;
 const DUREE_BILAN = 5;
@@ -228,10 +233,61 @@ interface Contexte {
   departement: string;
   /** Textes selon le mode : titre de l'intro (2 lignes), sous-titre, bandeau des villes, titre du récapitulatif. */
   textes: { intro: [string, string]; sous: string; bandeau: string; recap: string };
+  /** Format « TikTok Hook » : l'écran d'accroche précède l'intro. */
+  hook?: boolean;
 }
 
-function dureeTotale(n: number) {
-  return DUREE_INTRO + n * DUREE_VILLE + DUREE_BILAN;
+function dureeTotale(n: number, avecHook = false) {
+  return (avecHook ? DUREE_HOOK : 0) + DUREE_INTRO + n * DUREE_VILLE + DUREE_BILAN;
+}
+
+/** Bandeau « senyera » (jaune à quatre barres rouges) : le drapeau catalan, en haut et en bas de l'écran d'accroche. */
+function senyera(ctx: CanvasRenderingContext2D, y: number, h: number) {
+  const { width: W } = ctx.canvas;
+  ctx.fillStyle = JAUNE_CATALAN;
+  ctx.fillRect(0, y, W, h);
+  ctx.fillStyle = ROUGE_CATALAN;
+  for (let i = 0; i < 4; i++) ctx.fillRect(0, y + h * (0.1 + i * 0.2), W, h * 0.1);
+}
+
+/** Texte de l'accroche : contour blanc épais pour que le rouge et le jaune restent lisibles sur le fond bleu. */
+function texteHook(ctx: CanvasRenderingContext2D, texte: string, x: number, y: number, taille: number, largeurMax: number, couleur: string) {
+  let t = taille;
+  ctx.font = `${t}px ${POLICE}`;
+  while (ctx.measureText(texte).width > largeurMax && t > 20) {
+    t -= 2;
+    ctx.font = `${t}px ${POLICE}`;
+  }
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = t * 0.09;
+  ctx.strokeStyle = '#fff';
+  ctx.strokeText(texte, x, y);
+  ctx.fillStyle = couleur;
+  ctx.fillText(texte, x, y);
+}
+
+/** Écran d'accroche : « QUEL TEMPS » en jaune, « CHEZ NOUS ? » en rouge, qui claque (zoom arrière) à l'ouverture. */
+function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const bas = H - 250 * u;
+  const cy = bas / 2;
+  const a = sortie(t / 0.35);
+  const sortant = t > DUREE_HOOK - 0.25 ? 1 - (t - (DUREE_HOOK - 0.25)) / 0.25 : 1;
+  senyera(ctx, 0, 70 * u);
+  senyera(ctx, bas - 110 * u, 70 * u);
+  ctx.save();
+  // Visible dès la première image (miniature, aperçu) : seul le zoom d'ouverture est animé, pas la transparence.
+  ctx.globalAlpha = Math.max(0, sortant);
+  ctx.translate(W / 2, cy);
+  ctx.scale(1 + (1 - a) * 0.35, 1 + (1 - a) * 0.35);
+  ctx.translate(-W / 2, -cy);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  texteHook(ctx, 'QUEL TEMPS', W / 2, cy - 20 * u, 250 * u, W * 0.9, JAUNE_CATALAN);
+  texteHook(ctx, 'CHEZ NOUS ?', W / 2, cy + 260 * u, 250 * u, W * 0.9, ROUGE_CATALAN);
+  ctx.restore();
+  pied(ctx, logo);
 }
 
 /** Textes de la vidéo : week-end, ou un jour (aujourd'hui, ou le jour de la semaine : jamais « demain »). */
@@ -254,6 +310,13 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   const [sam, dim] = semaine.jours;
   const deuxJours = semaine.jours.length > 1;
   fond(ctx);
+  if (c.hook) {
+    if (t < DUREE_HOOK) {
+      dessinerHook(ctx, t, logo);
+      return;
+    }
+    t -= DUREE_HOOK;
+  }
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'center';
   if (t < DUREE_INTRO) {
@@ -452,9 +515,10 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     };
   }, [semaine, villes, logoId]);
 
-  const total = dureeTotale(villes.length);
+  const avecHook = format.id === 'hook';
+  const total = dureeTotale(villes.length, avecHook);
   const textes = useMemo(() => textesVideo(mode, jours, ecart), [mode, jours, ecart]);
-  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes } : null;
+  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook } : null;
 
   useEffect(() => {
     const c = canvasRef.current;
