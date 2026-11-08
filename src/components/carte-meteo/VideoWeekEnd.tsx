@@ -50,6 +50,9 @@ const ROUGE_CATALAN = '#da121a';
 const DUREE_INTRO = 3;
 const DUREE_VILLE = 3.5;
 const DUREE_BILAN = 5;
+/** Tendance des prochains jours, après le récapitulatif : nombre de jours montrés et durée de l'écran. */
+const NB_JOURS_TENDANCE = 3;
+const DUREE_TENDANCE = 5;
 const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 const TEXTE = "'Segoe UI', Arial, sans-serif";
 
@@ -237,10 +240,77 @@ interface Contexte {
   textes: { intro: [string, string]; sous: string; bandeau: string; recap: string };
   /** Format « TikTok Hook » : l'écran d'accroche précède l'intro. */
   hook?: boolean;
+  /** Tendance des jours suivant la vidéo (absente si les prévisions ne sont pas disponibles : l'écran est alors omis). */
+  tendance?: { jours: string[]; villes: Record<string, JourVille[]> } | null;
 }
 
-function dureeTotale(n: number, avecHook = false) {
-  return (avecHook ? DUREE_HOOK : 0) + DUREE_INTRO + n * DUREE_VILLE + DUREE_BILAN;
+function dureeTotale(n: number, avecHook = false, avecTendance = false) {
+  return (avecHook ? DUREE_HOOK : 0) + DUREE_INTRO + n * DUREE_VILLE + DUREE_BILAN + (avecTendance ? DUREE_TENDANCE : 0);
+}
+
+/** Tendance des jours qui suivent la vidéo : une ville (la première), un jour par carte (picto, maxi, mini). */
+function dessinerTendance(ctx: CanvasRenderingContext2D, local: number, c: Contexte & { tendance: NonNullable<Contexte['tendance']> }, t: number) {
+  const { villes, logo, tendance } = c;
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const bas = H - 250 * u;
+  const ville = villes[0];
+  const jours = tendance.villes[ville] ?? [];
+  texteAjuste(ctx, 'TENDANCE DES PROCHAINS JOURS', W / 2, 150 * u, 80 * u, POLICE, W * 0.92, '#ffe27a');
+  texteAjuste(ctx, ville.replace('-la-Preste', '').toUpperCase(), W / 2, 235 * u, 52 * u, TEXTE, W * 0.9, '#9ad8ff');
+  const haut = 290 * u;
+  const n = tendance.jours.length;
+  const vertical = empile(W, H);
+  const gap = 28 * u;
+  tendance.jours.forEach((iso, k) => {
+    const j = jours[k] ?? versJour(undefined);
+    const a = sortie((local - k * 0.3) / 0.5);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 3;
+    const nom = `${NOMS_JOURS[jourDeSemaine(iso)].toUpperCase()} ${Number(iso.slice(8, 10))}`;
+    if (vertical) {
+      const hl = (bas - 20 * u - haut - (n - 1) * gap) / n;
+      const y = haut + k * (hl + gap);
+      ctx.translate((1 - a) * 120 * u, 0);
+      rectArrondi(ctx, 50 * u, y, W - 100 * u, hl, 36 * u);
+      ctx.fill();
+      ctx.stroke();
+      ctx.textAlign = 'left';
+      texteAjuste(ctx, nom, 90 * u, y + hl / 2 + 24 * u, 76 * u, POLICE, W * 0.4);
+      const s = Math.min(190 * u, hl - 40 * u);
+      if (j.picto) dessinerPicto(ctx, j.picto, W * 0.5, y + (hl - s) / 2, s, t, k * 0.9);
+      ctx.fillStyle = '#ff9d6b';
+      ctx.font = `${96 * u}px ${POLICE}`;
+      ctx.fillText(degre(j.maxi), W * 0.5 + s + 20 * u, y + hl / 2 + 4 * u);
+      ctx.fillStyle = '#9ad8ff';
+      ctx.font = `${62 * u}px ${POLICE}`;
+      ctx.fillText(degre(j.mini), W * 0.5 + s + 20 * u, y + hl / 2 + 66 * u);
+    } else {
+      const cw = (W - 100 * u - (n - 1) * gap) / n;
+      const x = 50 * u + k * (cw + gap);
+      const ch = bas - 20 * u - haut;
+      ctx.translate(0, (1 - a) * 80 * u);
+      rectArrondi(ctx, x, haut, cw, ch, 36 * u);
+      ctx.fill();
+      ctx.stroke();
+      ctx.textAlign = 'center';
+      texteAjuste(ctx, nom, x + cw / 2, haut + 70 * u, 56 * u, POLICE, cw - 40 * u);
+      const s = Math.min(cw * 0.6, ch * 0.42);
+      if (j.picto) dessinerPicto(ctx, j.picto, x + (cw - s) / 2, haut + 90 * u, s, t, k * 0.9);
+      ctx.fillStyle = '#ff9d6b';
+      ctx.font = `${80 * u}px ${POLICE}`;
+      ctx.fillText(degre(j.maxi), x + cw / 2, haut + ch - 80 * u);
+      ctx.fillStyle = '#9ad8ff';
+      ctx.font = `${50 * u}px ${POLICE}`;
+      ctx.fillText(degre(j.mini), x + cw / 2, haut + ch - 20 * u);
+    }
+    ctx.restore();
+  });
+  ctx.textAlign = 'center';
+  pied(ctx, logo);
 }
 
 /** Bandeau « senyera » (jaune à quatre barres rouges) : le drapeau catalan, en haut et en bas de l'écran d'accroche. */
@@ -410,6 +480,10 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   }
   // Bilan : toutes les villes, samedi et dimanche côte à côte.
   const local = apresIntro - villes.length * DUREE_VILLE;
+  if (c.tendance && local >= DUREE_BILAN) {
+    dessinerTendance(ctx, local - DUREE_BILAN, { ...c, tendance: c.tendance }, t);
+    return;
+  }
   texteAjuste(ctx, textes.recap, W / 2, 150 * u, 90 * u, POLICE, W * 0.9, '#ffe27a');
   const colSam = deuxJours ? W * 0.5 : W * 0.6;
   const colDim = W * 0.78;
@@ -458,10 +532,12 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
   const [listeVilles, setListeVilles] = useState<{ dep: string; villes: VilleListe[] } | null>(null);
   const [choix, setChoix] = useState<string[]>([]);
   const [logoId, setLogoId] = useState('pays-catalan-hd');
-  const [formatId, setFormatId] = useState<FormatId>('tiktok');
-  const [mode, setMode] = useState<Mode>('weekend');
-  const [ecart, setEcart] = useState(0);
+  // Par défaut : format « TikTok Hook » et vidéo du lendemain (J+1).
+  const [formatId, setFormatId] = useState<FormatId>('hook');
+  const [mode, setMode] = useState<Mode>('jour');
+  const [ecart, setEcart] = useState(1);
   const [donnees, setDonnees] = useState<{ cle: string; points: PointCarte[][] } | null>(null);
+  const [donneesTendance, setDonneesTendance] = useState<{ cle: string; points: PointCarte[][] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [etat, setEtat] = useState<string | null>(null);
   const [t, setT] = useState(0);
@@ -521,6 +597,25 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     return () => controleur.abort();
   }, [cle, donnees?.cle, jours, modele, dep]);
 
+  // Tendance : les jours qui suivent la vidéo, toujours en moyenne des modèles (qui va jusqu'à J+10). Si elle échoue, la vidéo se fait sans cet écran.
+  const joursTendance = useMemo(() => Array.from({ length: NB_JOURS_TENDANCE }, (_, i) => ajouterJours(jours[jours.length - 1], i + 1)), [jours]);
+  const cleTendance = `${joursTendance.join(',')}|${dep}`;
+  useEffect(() => {
+    if (donneesTendance?.cle === cleTendance) return;
+    const controleur = new AbortController();
+    Promise.all(
+      joursTendance.map((date) =>
+        fetch(`/api/carte-meteo/previsions/?modele=moyenne&toutes=1&date=${date}&dep=${dep}`, { signal: controleur.signal }).then(async (r) => {
+          if (!r.ok) throw new Error('Tendance indisponible');
+          return ((await r.json()) as { points: PointCarte[] }).points;
+        })
+      )
+    )
+      .then((points) => setDonneesTendance({ cle: cleTendance, points }))
+      .catch(() => {});
+    return () => controleur.abort();
+  }, [cleTendance, donneesTendance?.cle, joursTendance, dep]);
+
   const toutesLesVilles = useMemo(() => (listeVilles?.dep === dep ? listeVilles.villes.map((v) => v.nom).sort((a, b) => a.localeCompare(b, 'fr')) : []), [listeVilles, dep]);
   const semaine: Semaine | null = useMemo(() => {
     if (!donnees || donnees.cle !== cle) return null;
@@ -528,11 +623,18 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     return { jours, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, parJour.map((m) => versJour(m.get(n)))])) };
   }, [donnees, cle, jours, toutesLesVilles]);
 
+  const tendance = useMemo(() => {
+    if (!donneesTendance || donneesTendance.cle !== cleTendance || toutesLesVilles.length === 0) return null;
+    const parJour = donneesTendance.points.map((liste) => new Map(liste.map((p) => [p.nom, p])));
+    return { jours: joursTendance, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, parJour.map((m) => versJour(m.get(n)))])) };
+  }, [donneesTendance, cleTendance, joursTendance, toutesLesVilles]);
+
   // Images des pictos et logo, chargées avant de dessiner.
   useEffect(() => {
     if (!semaine) return;
     const fichiers = new Set<string>();
     for (const v of villes) for (const j of semaine.villes[v] ?? []) if (j.picto) fichiers.add(j.picto);
+    if (tendance && villes[0]) for (const j of tendance.villes[villes[0]] ?? []) if (j.picto) fichiers.add(j.picto);
     if (ICONE_PLUIE) fichiers.add(ICONE_PLUIE);
     if (ICONE_VENT) fichiers.add(ICONE_VENT);
     if (format.id === 'hook') for (const f of ICONES_HOOK) if (f) fichiers.add(f);
@@ -549,12 +651,12 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
       vivant = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [semaine, villes, logoId, format.id]);
+  }, [semaine, villes, logoId, format.id, tendance]);
 
   const avecHook = format.id === 'hook';
-  const total = dureeTotale(villes.length, avecHook);
+  const total = dureeTotale(villes.length, avecHook, !!tendance);
   const textes = useMemo(() => textesVideo(mode, jours, ecart), [mode, jours, ecart]);
-  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook } : null;
+  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, tendance } : null;
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -726,7 +828,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
           {etat ?? '🎬 Créer la vidéo (MP4)'}
         </button>
         <p className="text-xs text-muted">
-          Format {format.l} × {format.h}, {Math.round(total)} secondes : titre, une image par ville, récapitulatif. Le MP4 s&apos;enregistre dans le navigateur (Chrome, Edge) ; ailleurs, un WebM.
+          Format {format.l} × {format.h}, {Math.round(total)} secondes : titre, une image par ville, récapitulatif{tendance ? ', tendance des prochains jours' : ''}. Le MP4 s&apos;enregistre dans le navigateur (Chrome, Edge) ; ailleurs, un WebM.
         </p>
         {erreur && (
           <p role="alert" className="text-sm text-danger">
