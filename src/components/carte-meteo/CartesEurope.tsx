@@ -25,7 +25,7 @@ import {
   type ModeleEurope,
 } from '@/lib/carte-meteo/isobares';
 import { ajouterJours } from '@/lib/carte-meteo/previsions-modeles';
-import { NOM_ECHEANCE, libelleJour } from './CarteMeteo';
+import { NOM_ECHEANCE, libelleJour, nomEcheanceCarte } from './CarteMeteo';
 import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from './TexteSurCarte';
 
@@ -200,7 +200,7 @@ export default function CartesEurope({ aujourdhui, logoId }: { aujourdhui: strin
                   cadre={cadre}
                   echeance={echeance}
                   titre={libelleJour(date)}
-                  libelleJour={NOM_ECHEANCE(n)}
+                  libelleJour={nomEcheanceCarte(n, date)}
                   fond={fond?.cadre === cadre ? fond.traces : null}
                   logoId={logoId}
                   immediat={n < 2}
@@ -211,7 +211,7 @@ export default function CartesEurope({ aujourdhui, logoId }: { aujourdhui: strin
               ) : (
                 <div className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">
                   <p className="font-bold text-text">
-                    {NOM_ECHEANCE(n)} ({date.split('-').reverse().join('/')})
+                    {nomEcheanceCarte(n, date)} ({date.split('-').reverse().join('/')})
                   </p>
                   <p className="mt-1">
                     Pas d&apos;échéance {NOM_MODELE[modele]} à cette heure dans le dernier passage{modele === 'cep' && n > 10 ? ' (le CEP va jusqu’à J+10 : choisissez GFS)' : ''}.

@@ -234,7 +234,7 @@ function dureeTotale(n: number) {
   return DUREE_INTRO + n * DUREE_VILLE + DUREE_BILAN;
 }
 
-/** Textes de la vidéo : week-end, ou un jour (aujourd'hui, demain, ou le jour de la semaine). */
+/** Textes de la vidéo : week-end, ou un jour (aujourd'hui, ou le jour de la semaine : jamais « demain »). */
 function textesVideo(mode: Mode, jours: string[], ecart: number): Contexte['textes'] {
   if (mode === 'weekend') {
     const [sam, dim] = jours;
@@ -242,7 +242,6 @@ function textesVideo(mode: Mode, jours: string[], ecart: number): Contexte['text
   }
   const nom = NOMS_JOURS[jourDeSemaine(jours[0])].toUpperCase();
   if (ecart === 0) return { intro: ['QUEL TEMPS', "AUJOURD'HUI ?"], sous: libelleJour(jours[0]), bandeau: "AUJOURD'HUI", recap: "RÉCAP D'AUJOURD'HUI" };
-  if (ecart === 1) return { intro: ['QUEL TEMPS', 'DEMAIN ?'], sous: libelleJour(jours[0]), bandeau: 'DEMAIN', recap: 'RÉCAP DE DEMAIN' };
   return { intro: ['QUEL TEMPS', `CE ${nom} ?`], sous: libelleJour(jours[0]), bandeau: nom, recap: `RÉCAP DU ${nom}` };
 }
 

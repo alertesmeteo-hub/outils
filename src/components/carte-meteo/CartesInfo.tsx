@@ -30,7 +30,7 @@ import { THEMES_CARTE } from '@/lib/carte-meteo/pictos';
 import { LIBELLES_COUCHES, type Couche } from '@/lib/carte-meteo/tuiles';
 import { depStation, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import CarteSynthese, { type RubriqueSynthese } from './CarteSynthese';
-import { MASQUES_FRANCE, NOM_ECHEANCE, SECOURS, codesDeLaZone, libelleJour, normaliser } from './CarteMeteo';
+import { MASQUES_FRANCE, NOM_ECHEANCE, nomEcheanceCarte, SECOURS, codesDeLaZone, libelleJour, normaliser } from './CarteMeteo';
 import CartesEurope from './CartesEurope';
 
 type Mode = 'prevision' | 'bilan' | 'climat' | 'europe';
@@ -1110,7 +1110,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
         <>
           <p className="mt-4 text-sm text-muted">
             {mode === 'prevision'
-              ? `Prévisions — ${nomZone}, ${NOM_ECHEANCE(jour).toLowerCase()} (${dateISO.split('-').reverse().join('/')}), modèle ${modeleAffiche?.libelle} (${modeleAffiche?.fournisseur}).`
+              ? `Prévisions — ${nomZone}, ${nomEcheanceCarte(jour, dateISO).toLowerCase()} (${dateISO.split('-').reverse().join('/')}), modèle ${modeleAffiche?.libelle} (${modeleAffiche?.fournisseur}).`
               : mode === 'bilan'
                 ? `Bilans — ${nomZone}, stations Météo-France${altitudeMax ? ` jusqu'à ${altitudeMax.toLocaleString('fr-FR')} m d'altitude (neige au sol : toutes)` : ''}${bilans?.majA ? `, mise à jour ${new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}` : ''}.`
                 : `Réchauffement climatique — ${nomZone}, horizon ${horizon}, trajectoire de référence TRACC (Météo-France), par rapport à 1976-2005.`}

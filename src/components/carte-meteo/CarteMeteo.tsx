@@ -385,6 +385,15 @@ export function libelleJour(dateISO: string): string {
 export const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { harmonie2km: 'arome', arome: 'harmonie', harmonie: 'cep', arpege: 'cep' };
 export const NOM_ECHEANCE = (n: number) => (n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : `J+${n}`);
 
+/** Libellé d'échéance à écrire SUR une carte : jamais « demain », on met le jour de la semaine (« Lundi »). */
+export function nomEcheanceCarte(n: number, dateISO: string): string {
+  if (n === 1) {
+    const jour = new Date(`${dateISO}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'UTC' });
+    return jour.charAt(0).toUpperCase() + jour.slice(1);
+  }
+  return NOM_ECHEANCE(n);
+}
+
 const champLabel = 'block text-sm font-medium';
 const champSelect = 'mt-1 w-full rounded-lg border border-border bg-surface p-2 text-sm';
 const champInput = 'mt-1 w-full rounded-lg border border-border bg-surface p-2 text-sm';
@@ -1629,7 +1638,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       <div className="min-w-0" ref={colonneRef}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-base font-bold">
-            {NOM_ECHEANCE(jour)} <span className="font-normal text-muted">({dateISO.split('-').reverse().join('/')})</span>
+            {nomEcheanceCarte(jour, dateISO)} <span className="font-normal text-muted">({dateISO.split('-').reverse().join('/')})</span>
           </p>
           <button
             type="button"
