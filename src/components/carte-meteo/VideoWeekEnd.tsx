@@ -175,8 +175,8 @@ function dessinerPicto(ctx: CanvasRenderingContext2D, chemin: string, x: number,
 /** Icônes de la ligne du bas des cartes : pluie et rafales. */
 const ICONE_PLUIE = cheminPictoImage('am:pluie') ?? '';
 const ICONE_VENT = cheminPictoImage('am:rafales') ?? '';
-/** Icônes de l'écran d'accroche (format « TikTok Hook ») : soleil, éclaircies, pluie, rafales. */
-const ICONES_HOOK = ['am:soleil', 'am:eclaircies', 'am:pluie', 'am:rafales'].map((id) => cheminPictoImage(id) ?? '');
+/** Icônes de l'écran d'accroche (format « TikTok Hook ») : images du site, soleil, éclaircies, couvert et pluie, orage. */
+const ICONES_HOOK = ['img:100', 'img:104', 'img:110', 'img:12'].map((id) => cheminPictoImage(id) ?? '');
 
 const sortie = (t: number) => 1 - (1 - Math.min(1, Math.max(0, t))) ** 3;
 
@@ -413,29 +413,24 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
   texteHook(ctx, 'CHEZ NOUS ?', W / 2, cy + 260 * u, 250 * u, W * 0.9, ROUGE_CATALAN);
   ctx.restore();
 
-  // Quatre grosses icônes de temps, deux au-dessus et deux sous le texte, sur disque blanc pour ressortir du fond bleu.
+  // Quatre grosses icônes de temps (images du site), deux au-dessus et deux sous le texte, directement sur la carte, avec une ombre.
   const rangees: [number, number][] = [[90 * u, cy - 230 * u], [cy + 290 * u, bas - 130 * u]];
   ICONES_HOOK.forEach((chemin, i) => {
     if (!chemin) return;
     const [y0, y1] = rangees[Math.floor(i / 2)];
-    const taille = Math.min(W * 0.4, y1 - y0);
-    const cx = W * (i % 2 === 0 ? 0.28 : 0.72);
-    const py = (y0 + y1) / 2;
+    const taille = Math.min(W * 0.52, (y1 - y0) * 1.08);
+    const cx = W * (i % 2 === 0 ? 0.27 : 0.73);
+    const py = (y0 + y1) / 2 + Math.sin(t * 2.2 + i * 1.4) * 9 * u;
     const pop = sortie((t - 0.12 * i) / 0.4);
-    const echelle = pop * (1 + 0.08 * Math.sin(Math.min(1, pop) * Math.PI)) * (1 + 0.03 * Math.sin(t * 4 + i));
+    const echelle = pop * (1 + 0.1 * Math.sin(Math.min(1, pop) * Math.PI));
     ctx.save();
     ctx.globalAlpha = Math.max(0, sortant);
     ctx.translate(cx, py);
     ctx.scale(echelle, echelle);
-    ctx.shadowColor = 'rgba(0,0,0,0.35)';
-    ctx.shadowBlur = 28 * u;
-    ctx.shadowOffsetY = 10 * u;
-    ctx.fillStyle = 'rgba(255,255,255,0.96)';
-    ctx.beginPath();
-    ctx.arc(0, 0, taille * 0.56, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-    dessinerPicto(ctx, chemin, -taille * 0.56, -taille * 0.56, taille * 1.12, t, i * 0.9);
+    ctx.shadowColor = 'rgba(0,20,60,0.55)';
+    ctx.shadowBlur = 34 * u;
+    ctx.shadowOffsetY = 14 * u;
+    dessinerPicto(ctx, chemin, -taille / 2, -taille / 2, taille, t, i * 0.9);
     ctx.restore();
   });
   pied(ctx, logo);
