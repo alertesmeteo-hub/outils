@@ -54,7 +54,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ erreur: 'Départements invalides.' }, { status: 400 });
     }
     try {
-      const points = await chargerPrevisionsMontagne(modele, date, liste, fin);
+      const altParam = Number(url.searchParams.get('alt') ?? 1000);
+      const altitudeMin = [300, 500, 1000, 2000].includes(altParam) ? altParam : 1000;
+      const points = await chargerPrevisionsMontagne(modele, date, liste, fin, altitudeMin);
       return NextResponse.json({ modele, date, montagne: true, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
     } catch (erreur) {
       console.error('Erreur carte météo (montagne)', erreur);

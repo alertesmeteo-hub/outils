@@ -69,6 +69,8 @@ interface Extrait {
   villes: Ville[];
   /** Communes de montagne (point du modèle à 1 000 m ou plus), la plus peuplée d'abord ; vide hors montagne. */
   montagne: Ville[];
+  /** Communes de relief selon l'altitude minimale du point du modèle (300, 500 et 2 000 m ; 1 000 m : `montagne`). */
+  montagneAlt?: Record<number, Ville[]>;
 }
 
 interface Colonnes {
@@ -101,7 +103,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v17'; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v18'; // v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -297,6 +299,19 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     serie: serieDuPoint(fichier, c, v.pointId),
     altitude: Math.round(altitude(v.pointId) / 10) * 10,
   }));
+  // Relief à d'autres altitudes (cartes de risque) : mêmes règles que la montagne, avec un autre seuil d'altitude minimale.
+  const montagneAlt: Record<number, typeof montagne> = {};
+  for (const seuil of [300, 500, 2000]) {
+    const plus = communes.filter((x) => altitude(x.pointId) >= seuil).slice(0, CANDIDATES_VILLES);
+    montagneAlt[seuil] = repartir(plus, VILLES_MONTAGNE_PAR_DEPARTEMENT).map((v) => ({
+      code: v.code,
+      nom: v.nom,
+      lat: v.lat,
+      lon: v.lon,
+      serie: serieDuPoint(fichier, c, v.pointId),
+      altitude: Math.round(altitude(v.pointId) / 10) * 10,
+    }));
+  }
   // Carte de France : la rafale du département est la plus forte de ses communes de plaine (point du modèle à 500 m au plus),
   // à chaque échéance, avec le vent et la direction de cette commune. Un seul point (Perpignan) est souvent plus abrité que la
   // plaine et la côte : la tramontane (65 km/h à Banyuls, 36 au point de Perpignan) n'apparaissait pas. Températures, ciel et
@@ -322,6 +337,7 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     chefCommune: { nom: chefCommune.nom, lat: chefCommune.lat, lon: chefCommune.lon },
     villes,
     montagne,
+    montagneAlt,
   };
 }
 
@@ -671,7 +687,9 @@ export async function chargerPrevisionsMontagne(
   dateISO: string,
   deps: string[] | null,
   /** Valeurs sur une période (du jour demandé à ce jour inclus), voir pointDepuisSerie. */
-  finPeriode?: string
+  finPeriode?: string,
+  /** Altitude minimale du point du modèle (300, 500, 1 000 ou 2 000 m) ; 1 000 par défaut. */
+  altitudeMin = 1000
 ): Promise<(PointCarte & { dep: string })[]> {
   const liste = deps ?? CODES_DEPARTEMENTS;
   // La moyenne des modèles n'existe qu'en vue département (villes) : la montagne prend alors AROME.
@@ -680,7 +698,8 @@ export async function chargerPrevisionsMontagne(
   const points: (PointCarte & { dep: string })[] = [];
   resultats.forEach((r, i) => {
     if (r.status === 'rejected') return;
-    const villes = deps ? r.value.montagne : r.value.montagne.slice(0, 1);
+    const hautes = altitudeMin === 1000 ? r.value.montagne : r.value.montagneAlt?.[altitudeMin] ?? [];
+    const villes = deps ? hautes : hautes.slice(0, 1);
     for (const v of villes) {
       const p = pointDepuisSerie(v.code, v.nom, v.serie, dateISO, finPeriode);
       if (p.maxi != null) points.push({ ...p, lat: v.lat, lon: v.lon, altitude: v.altitude, dep: liste[i] });
