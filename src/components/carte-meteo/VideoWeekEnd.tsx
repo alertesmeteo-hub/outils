@@ -21,6 +21,8 @@ const FORMATS = [
 ] as const;
 type FormatId = (typeof FORMATS)[number]['id'];
 const NB_VILLES = 4;
+/** Grandes villes seulement : la liste du département est triée par population, on ne tire que parmi les plus peuplées. */
+const NB_GRANDES_VILLES = 12;
 
 interface VilleListe {
   nom: string;
@@ -29,11 +31,11 @@ interface VilleListe {
 }
 
 /**
- * 4 villes tirées au hasard parmi les plus peuplées du département (20 premières), mais réparties : la première est au hasard,
+ * 4 villes tirées au hasard parmi les plus peuplées du département (les 12 premières de la liste, triée par population), mais réparties : la première est au hasard,
  * puis, à chaque fois, on tire 5 candidates au hasard et on garde la plus éloignée des villes déjà prises.
  */
 function villesAuto(liste: VilleListe[], alea: () => number = Math.random): string[] {
-  const candidates = liste.slice(0, 20);
+  const candidates = liste.slice(0, NB_GRANDES_VILLES);
   if (candidates.length === 0) return [];
   const d = (a: VilleListe, b: VilleListe) => Math.hypot((a.lon - b.lon) * Math.cos((a.lat * Math.PI) / 180), a.lat - b.lat);
   const prises: VilleListe[] = [candidates[Math.floor(alea() * candidates.length)]];
@@ -63,12 +65,12 @@ function alea(graine: string): () => number {
 }
 
 /**
- * Villes du jour : une sélection différente chaque jour, identique toute la journée. Les 20 villes les plus peuplées sont
+ * Villes du jour : une sélection différente chaque jour, identique toute la journée. Les 12 villes les plus peuplées sont
  * coupées en deux moitiés fixes (mélange propre au département) : jours pairs d'un côté, jours impairs de l'autre, donc
  * deux jours de suite ne partagent jamais une ville ; dans la moitié du jour, 4 villes réparties sont tirées avec la date.
  */
 function villesDuJour(dep: string, liste: VilleListe[], aujourdhui: string): string[] {
-  const pool = liste.slice(0, 20);
+  const pool = liste.slice(0, NB_GRANDES_VILLES);
   if (pool.length < NB_VILLES * 2) return villesAuto(pool, alea(`${dep}|${aujourdhui}`));
   const hasard = alea(`moitiés|${dep}`);
   const melange = pool.map((v) => ({ v, k: hasard() })).sort((a, b) => a.k - b.k).map((x) => x.v);
