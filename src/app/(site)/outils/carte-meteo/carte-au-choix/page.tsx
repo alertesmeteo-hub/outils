@@ -17,7 +17,7 @@ export default function PageCarteAuChoix() {
   return (
     <>
       <h1 className="text-3xl font-extrabold">Une carte au choix</h1>
-      <p className="mt-2 max-w-3xl text-muted">
+      <p className="mt-1 truncate text-xs text-muted">
         Choisissez la zone, le modèle et le jour, puis le thème. Export en JPG. Toutes les cartes à la suite :{' '}
         <Link href="/outils/carte-meteo-info/" className="underline">
           cartes infos
