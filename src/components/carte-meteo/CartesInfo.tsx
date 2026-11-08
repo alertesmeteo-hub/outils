@@ -149,8 +149,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [sansTableau, setSansTableau] = useState(false);
   /** Cartes de risque : afficher les chiffres (km/h, mm, °C) à la place des niveaux (faible, modéré…). */
   const [chiffres, setChiffres] = useState(false);
+  /** Cartes de risque : durée choisie (par défaut une période) ; la liste ne garde qu'une entrée par risque, la durée se change dans le menu « Durée du risque ». */
+  const [dureeRisque, setDureeRisque] = useState<'jour' | 'periode' | '24h'>('periode');
   const themesPrevision = useMemo<ThemePrevision[]>(
-    () => (chiffres ? THEMES_PREVISION.map((t) => (t.brut ? { ...t, ...t.brut, texteValeur: undefined } : t)) : THEMES_PREVISION),
+    () => (chiffres ? THEMES_PREVISION.map((t) => (t.brut ? { ...t, ...t.brut, texteValeur: undefined, neutresVisibles: true } : t)) : THEMES_PREVISION),
     [chiffres]
   );
   const [zonageFin, setZonageFin] = useState(false);
@@ -482,7 +484,13 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   useEffect(() => {
     if (carteEffective && carteEffective.groupe !== groupeChoisi) setGroupeChoisi(carteEffective.groupe);
   }, [carteEffective, groupeChoisi]);
-  const resultatsRecherche = uneCarte ? tousThemes.filter((t) => (!filtreGroupe || t.groupe === filtreGroupe) && normaliser(`${t.titre} ${t.court} ${t.groupe}`).includes(normaliser(recherche))) : [];
+  const baseRisque = (id: string) => (id === 'orages' ? 'risque-orage' : id.replace(/-(periode|24h)$/, ''));
+  const idRisque = (id: string, d: 'jour' | 'periode' | '24h') => {
+    const base = baseRisque(id);
+    const cible = d === 'jour' ? (base === 'risque-orage' ? 'orages' : base) : `${base}${d === 'periode' ? '-periode' : '-24h'}`;
+    return tousThemes.some((x) => x.id === cible) ? cible : id;
+  };
+  const resultatsRecherche = uneCarte ? tousThemes.filter((t) => !(t.groupe === GROUPE_RISQUES && /-(periode|24h)$/.test(t.id)) && (!filtreGroupe || t.groupe === filtreGroupe) && normaliser(`${t.titre} ${t.court} ${t.groupe}`).includes(normaliser(recherche))) : [];
   /** Nom affiché d'un groupe : le bilan du mois porte le nom du mois choisi (« Octobre 2026 »). */
   const nomGroupe = (groupe: string) => (groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe);
   const avecSynthese = !uneCarte && mode !== 'climat' && (groupeChoisi === 'tous' || groupeChoisi === ESSENTIEL);
@@ -594,8 +602,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 onClick={() => {
                   setMode('prevision');
                   setGroupeChoisi(GROUPE_RISQUES);
+                  setChiffres(true);
                   if (uneCarte) {
-                    setCarteChoisie('risque-vent');
+                    setCarteChoisie(`risque-vent${dureeRisque === 'periode' ? '-periode' : dureeRisque === '24h' ? '-24h' : ''}`);
                     setFiltreGroupe(GROUPE_RISQUES);
                   }
                 }}
@@ -828,12 +837,12 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                           <li key={t.id}>
                             <button
                               type="button"
-                              aria-pressed={t.id === carteEffective?.id}
+                              aria-pressed={t.groupe === GROUPE_RISQUES ? baseRisque(t.id) === baseRisque(carteEffective?.id ?? '') : t.id === carteEffective?.id}
                               onClick={() => {
-                                setCarteChoisie(t.id);
+                                setCarteChoisie(t.groupe === GROUPE_RISQUES ? idRisque(t.id, dureeRisque) : t.id);
                                 setGroupeChoisi(t.groupe);
                               }}
-                              className={`block w-full px-3 py-1.5 text-left ${t.id === carteEffective?.id ? 'bg-primary text-white' : 'hover:bg-bg'}`}
+                              className={`block w-full px-3 py-1.5 text-left ${(t.groupe === GROUPE_RISQUES ? baseRisque(t.id) === baseRisque(carteEffective?.id ?? '') : t.id === carteEffective?.id) ? 'bg-primary text-white' : 'hover:bg-bg'}`}
                             >
                               <span className="block">{t.court}</span>
                               {t.aide && <span className={`mt-0.5 block text-xs font-normal ${t.id === carteEffective?.id ? 'text-white/85' : 'text-muted'}`}>{t.aide}</span>}
@@ -888,7 +897,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             return (
               <label className="text-sm font-medium lg:col-span-2">
                 <span className={`${legende} !text-red-600`}>Durée du risque</span>
-                <select value={duree} onChange={(e) => setCarteChoisie(idDe(e.target.value as 'jour' | 'periode' | '24h'))} className={`${selectBarre} w-full !border-red-600 font-semibold`}>
+                <select value={duree} onChange={(e) => { const d = e.target.value as 'jour' | 'periode' | '24h'; setDureeRisque(d); setCarteChoisie(idDe(d)); }} className={`${selectBarre} w-full !border-red-600 font-semibold`}>
                   <option value="jour">Un jour</option>
                   <option value="periode" disabled={!tousThemes.some((x) => x.id === idDe('periode'))}>Une période (du … au …)</option>
                   <option value="24h" disabled={!tousThemes.some((x) => x.id === idDe('24h'))}>24 h glissantes (à partir de maintenant)</option>
