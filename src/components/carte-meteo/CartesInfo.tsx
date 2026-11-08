@@ -765,7 +765,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               </fieldset>
             </>
           )}
-          {(uneCarte || mode === 'bilan' || (mode === 'prevision' && jour === 0)) && (
+          {(uneCarte || mode === 'bilan' || (mode === 'prevision' && jour === 0)) && !(mode === 'prevision' && groupeChoisi === GROUPE_RISQUES) && (
             <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-3 lg:col-start-6' : ''} ${uneCarte && !(mode === 'bilan' || (mode === 'prevision' && jour === 0)) ? 'invisible' : ''}`}>
               <span className={legende}>Stations jusqu&apos;à</span>
               <select value={altitudeMax} onChange={(e) => setAltitudeMax(Number(e.target.value))} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Écarte les stations de haute montagne des bilans (sauf la neige au sol)">
