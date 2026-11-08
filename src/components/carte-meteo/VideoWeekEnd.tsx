@@ -326,9 +326,15 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     ctx.globalAlpha = a;
     ctx.translate(0, (1 - a) * 80 * u);
     texteAjuste(ctx, departement.toUpperCase(), W / 2, cy - 210 * u, 70 * u, POLICE, W * 0.9, '#ffe27a');
-    texteAjuste(ctx, textes.intro[0], W / 2, cy - 20 * u, 190 * u, POLICE, W * 0.9);
-    texteAjuste(ctx, textes.intro[1], W / 2, cy + 190 * u, 190 * u, POLICE, W * 0.9);
-    texteAjuste(ctx, textes.sous, W / 2, cy + 340 * u, 54 * u, TEXTE, W * 0.92);
+    if (c.hook) {
+      // « Quel temps chez nous ? » vient d'être dit par l'accroche : l'intro ne donne plus que la période (« CE WEEK-END »).
+      texteAjuste(ctx, textes.intro[1].replace(/\s*\?$/, ''), W / 2, cy + 30 * u, 200 * u, POLICE, W * 0.9);
+      texteAjuste(ctx, textes.sous, W / 2, cy + 190 * u, 54 * u, TEXTE, W * 0.92);
+    } else {
+      texteAjuste(ctx, textes.intro[0], W / 2, cy - 20 * u, 190 * u, POLICE, W * 0.9);
+      texteAjuste(ctx, textes.intro[1], W / 2, cy + 190 * u, 190 * u, POLICE, W * 0.9);
+      texteAjuste(ctx, textes.sous, W / 2, cy + 340 * u, 54 * u, TEXTE, W * 0.92);
+    }
     ctx.restore();
     pied(ctx, logo);
     return;
