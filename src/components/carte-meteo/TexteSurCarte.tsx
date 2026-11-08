@@ -30,7 +30,8 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false, emplace
   const [texteNouveau, setTexteNouveau] = useState('');
   const [reglages, setReglages] = useState<Reglages>(REGLAGES_DEFAUT);
   const [redaction, setRedaction] = useState('');
-  const [surCarte, setSurCarte] = useState(true);
+  const [surCarte, setSurCarte] = useState(false);
+  const [redactionOuverte, setRedactionOuverte] = useState(false);
   const [lieu, setLieu] = useState<HTMLElement | null>(null);
   const panneauRef = useRef<HTMLDivElement>(null);
   const [copie, setCopie] = useState(false);
@@ -42,10 +43,11 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false, emplace
     const carte = donnees?.();
     if (!carte) {
       setErreur('Pas de donnée sur cette carte.');
-      setOuvert(true);
+      setRedactionOuverte(true);
       return;
     }
     setErreur(null);
+    setRedactionOuverte(true);
     const texte = redigerTexte(carte, f);
     setRedaction(texte);
     poserSurCarte(texte, surCarte);
@@ -280,13 +282,36 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false, emplace
             <input type="checkbox" checked={reglages.gras} onChange={(e) => majReglages({ gras: e.target.checked })} />
             Gras
           </label>
-          <label className="mt-3 block border-t border-border pt-2 text-xs font-medium">
-            Texte de rédaction (hors image, à copier)
-            <textarea value={redaction} onChange={(e) => { setRedaction(e.target.value); if (surCarte) poserSurCarte(e.target.value, true); }} rows={5} className={champ} placeholder={'Ex. : On note 10 à 12 °C dans le nord, 16 à 18 °C dans le sud…'} />
+          {textes.length > 0 && (
+            <button
+              type="button"
+              className="btn-ghost mt-2 rounded-md px-2 py-1 text-xs"
+              onClick={() => {
+                setTextes([]);
+                setSelection(null);
+              }}
+            >
+              Retirer tous les textes ({textes.length})
+            </button>
+          )}
+        </div>
+  );
+
+  const zoneRedaction = (
+    <div className="mb-2 w-full rounded-lg border border-border bg-surface p-3 text-sm">
+      <div className="mb-1 flex items-center justify-between">
+        <p className="text-sm font-semibold">Texte de rédaction</p>
+        <button type="button" onClick={() => setRedactionOuverte(false)} className="text-xs text-muted" aria-label="Fermer le texte de rédaction">
+          Fermer
+        </button>
+      </div>
+          <label className="block text-xs font-medium">
+            Texte de rédaction (hors image, modifiable)
+            <textarea value={redaction} onChange={(e) => { setRedaction(e.target.value); if (surCarte) poserSurCarte(e.target.value, true); }} rows={6} className={champ} placeholder={'Ex. : On note 10 à 12 °C dans le nord, 16 à 18 °C dans le sud…'} />
           </label>
           <label className="mt-1 flex items-center gap-2 text-xs font-medium">
             <input type="checkbox" checked={surCarte} onChange={(e) => { setSurCarte(e.target.checked); poserSurCarte(redaction, e.target.checked); }} disabled={!redaction} />
-            Afficher ce texte sur la carte (déplaçable)
+            Afficher aussi ce texte sur la carte (encadré déplaçable)
           </label>
           {donnees && (
             <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -320,19 +345,7 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false, emplace
           >
             {copie ? 'Copié ✓' : 'Copier le texte'}
           </button>
-          {textes.length > 0 && (
-            <button
-              type="button"
-              className="btn-ghost mt-2 rounded-md px-2 py-1 text-xs"
-              onClick={() => {
-                setTextes([]);
-                setSelection(null);
-              }}
-            >
-              Retirer tous les textes ({textes.length})
-            </button>
-          )}
-        </div>
+    </div>
   );
 
   return (
@@ -357,6 +370,7 @@ export default function TexteSurCarte({ cible, donnees, enLigne = false, emplace
       )}
       {calque}
       {ouvert && (lieu ? createPortal(panneau, lieu) : panneau)}
+      {redactionOuverte && (lieu ? createPortal(zoneRedaction, lieu) : zoneRedaction)}
     </div>
   );
 }
