@@ -243,19 +243,27 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const nombreMax = Math.max(3, Math.floor((largeurCarte / (tailleBase * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
 
   /** Points de chaque jour, dans la zone, répartis sur la carte (les premiers sont toujours bien espacés). */
-  const cartes = useMemo(
-    () =>
-      dates.map((date) => {
-        const brut = enDepartement ? donneesDep[`${zone.slice(4)}|${date}`] : jours[date];
-        const dansZone = parQuarts ? pointsParQuart(brut ?? []) : (brut ?? []).filter((p) => enDepartement || codes.has(p.code));
-        // 4 zones : les quatre pictos sont toujours gardés (le Sud-Est, près du bord, était écarté quand les pictos sont gros).
-        const ecran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => parQuarts || (e.x > taillePicto * 0.95 && e.x < largeurCarte - taillePicto * 0.95 && e.y > HAUTEUR_JOUR + taillePicto * 0.7 && e.y < hauteurCarte - taillePicto * 1.3));
-        const rang = new Map(ordreRepartition(ecran.map((e) => ({ code: e.p.code, x: e.x, y: e.y }))).map((c, i) => [c, i]));
-        const retenus = ecran.sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, parQuarts ? 4 : Math.max(3, Math.round(Math.min(nombreMax, ecran.length) * partDetail)));
-        return { date, charge: brut !== undefined, vide: brut === null, points: retenus };
-      }),
-    [dates, jours, donneesDep, enDepartement, parQuarts, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax, partDetail, taillePicto]
-  );
+  const cartes = useMemo(() => {
+    const jourCarte = dates.map((date) => {
+      const brut = enDepartement ? donneesDep[`${zone.slice(4)}|${date}`] : jours[date];
+      const dansZone = parQuarts ? pointsParQuart(brut ?? []) : (brut ?? []).filter((p) => enDepartement || codes.has(p.code));
+      // 4 zones : les quatre pictos sont toujours gardés (le Sud-Est, près du bord, était écarté quand les pictos sont gros).
+      const ecran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => parQuarts || (e.x > taillePicto * 0.95 && e.x < largeurCarte - taillePicto * 0.95 && e.y > HAUTEUR_JOUR + taillePicto * 0.7 && e.y < hauteurCarte - taillePicto * 1.3));
+      return { date, brut, ecran };
+    });
+    // Répartition calculée une seule fois sur l'ensemble des jours : les pictos sont aux mêmes endroits d'une carte à l'autre
+    // (bien répartis, par exemple ouest, centre et est du département), même si un jour a moins de villes disponibles.
+    const union = new Map<string, { code: string; x: number; y: number }>();
+    for (const j of jourCarte) for (const e of j.ecran) if (!union.has(e.p.code)) union.set(e.p.code, { code: e.p.code, x: e.x, y: e.y });
+    const rang = new Map(ordreRepartition([...union.values()]).map((c, i) => [c, i]));
+    const nombre = parQuarts ? 4 : Math.max(3, Math.round(Math.min(nombreMax, union.size) * partDetail));
+    return jourCarte.map(({ date, brut, ecran }) => ({
+      date,
+      charge: brut !== undefined,
+      vide: brut === null,
+      points: [...ecran].sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, nombre),
+    }));
+  }, [dates, jours, donneesDep, enDepartement, parQuarts, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax, partDetail, taillePicto]);
 
   /** Lignes du tableau : régions pour la France (moyenne de leurs départements), départements pour une région, villes pour un département. */
   const lignesTableau: LigneTableau[] = useMemo(() => {
