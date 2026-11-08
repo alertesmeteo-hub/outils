@@ -481,42 +481,9 @@ function cheminAnneaux(ctx: CanvasRenderingContext2D, anneaux: Anneau[], X: (lon
   }
 }
 
-/** Isobares : courbes blanches fermées autour d'un centre de basse pression, qui se dessinent puis ondulent lentement. */
-function isobares(ctx: CanvasRenderingContext2D, t: number) {
-  const { width: W, height: H } = ctx.canvas;
-  const u = unite(W, H);
-  const cx = W * 0.5 + Math.sin(t * 0.4) * 30 * u;
-  const cy = H * 0.42 + Math.cos(t * 0.35) * 25 * u;
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-  ctx.lineWidth = 5 * u;
-  for (let i = 0; i < 7; i++) {
-    const R = (95 + i * 115) * u * (1 + 0.025 * Math.sin(t * 0.9 + i));
-    const N = 140;
-    const pts: [number, number][] = [];
-    let longueur = 0;
-    for (let k = 0; k <= N; k++) {
-      const th = (k / N) * Math.PI * 2;
-      const r = R * (1 + 0.16 * Math.sin(2 * th + i * 1.3 + t * 0.35) + 0.09 * Math.sin(3 * th + i * 0.7 - t * 0.28) + 0.05 * Math.sin(5 * th + i));
-      const pt: [number, number] = [cx + r * Math.cos(th), cy + r * Math.sin(th) * 1.25];
-      if (k > 0) longueur += Math.hypot(pt[0] - pts[k - 1][0], pt[1] - pts[k - 1][1]);
-      pts.push(pt);
-    }
-    const avancement = sortie((t - 0.15 * i) / 1.3);
-    if (avancement <= 0) continue;
-    ctx.setLineDash([longueur * avancement, longueur]);
-    ctx.beginPath();
-    pts.forEach(([x, y], k) => (k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
 /**
  * Fond du début (accroche et intro) : carte météo bleue (mer claire, terres bleues cernées d'un trait sombre, départements),
- * zoom de la France entière vers le département choisi, isobares blanches par-dessus. `t` : secondes depuis le début ; `duree` : durée du zoom.
+ * zoom de la France entière vers le département choisi. `t` : secondes depuis le début ; `duree` : durée du zoom.
  */
 function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, codeDep: string) {
   const { width: W, height: H } = ctx.canvas;
@@ -568,7 +535,6 @@ function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, code
       ctx.stroke();
     }
   }
-  isobares(ctx, t);
   // Léger assombrissement en haut et en bas : le texte et le pied de page restent lisibles.
   const voile = ctx.createLinearGradient(0, 0, 0, H);
   voile.addColorStop(0, 'rgba(6,24,60,0.3)');
