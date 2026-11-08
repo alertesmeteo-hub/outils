@@ -20,8 +20,6 @@ const FORMATS = [
   { id: 'youtube', libelle: 'YouTube (16:9)', l: 1920, h: 1080 },
 ] as const;
 type FormatId = (typeof FORMATS)[number]['id'];
-/** Villes choisies d'office pour un département (sinon : les plus peuplées, bien réparties). */
-const VILLES_PREFEREES: Record<string, string[]> = { '66': ['Perpignan', 'Canet-en-Roussillon', 'Prades', 'Bourg-Madame'] };
 const NB_VILLES = 4;
 
 interface VilleListe {
@@ -30,16 +28,20 @@ interface VilleListe {
   lon: number;
 }
 
-/** 4 villes : celles préférées du département si elles existent, sinon la plus peuplée puis, à chaque fois, la plus éloignée des déjà prises (parmi les 15 premières). */
-function villesAuto(dep: string, liste: VilleListe[]): string[] {
-  const preferees = (VILLES_PREFEREES[dep] ?? []).filter((n) => liste.some((v) => v.nom === n));
-  if (preferees.length >= 3) return preferees;
-  const candidates = liste.slice(0, 15);
-  const prises: VilleListe[] = candidates.slice(0, 1);
+/**
+ * 4 villes tirées au hasard parmi les plus peuplées du département (20 premières), mais réparties : la première est au hasard,
+ * puis, à chaque fois, on tire 5 candidates au hasard et on garde la plus éloignée des villes déjà prises.
+ */
+function villesAuto(_dep: string, liste: VilleListe[]): string[] {
+  const candidates = liste.slice(0, 20);
+  if (candidates.length === 0) return [];
+  const hasard = <T,>(tab: T[]) => tab[Math.floor(Math.random() * tab.length)];
   const d = (a: VilleListe, b: VilleListe) => Math.hypot((a.lon - b.lon) * Math.cos((a.lat * Math.PI) / 180), a.lat - b.lat);
+  const prises: VilleListe[] = [hasard(candidates)];
   while (prises.length < Math.min(NB_VILLES, candidates.length)) {
-    const suivante = candidates.filter((v) => !prises.includes(v)).reduce((m, v) => (Math.min(...prises.map((q) => d(q, v))) > Math.min(...prises.map((q) => d(q, m))) ? v : m));
-    prises.push(suivante);
+    const restantes = candidates.filter((v) => !prises.includes(v));
+    const echantillon = [...restantes].sort(() => Math.random() - 0.5).slice(0, 5);
+    prises.push(echantillon.reduce((m, v) => (Math.min(...prises.map((q) => d(q, v))) > Math.min(...prises.map((q) => d(q, m))) ? v : m)));
   }
   return prises.map((v) => v.nom);
 }
@@ -788,6 +790,14 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          onClick={() => listeVilles?.dep === dep && setChoix(villesAuto(dep, listeVilles.villes))}
+          disabled={listeVilles?.dep !== dep}
+          className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+        >
+          🎲 Tirer 4 autres villes au hasard
+        </button>
         {[0, 1, 2, 3].map((k) => (
           <label key={k} className="text-sm font-medium">
             <span className={legende}>
