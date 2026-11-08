@@ -105,6 +105,12 @@ export interface PointCarte {
   pluie36h?: number | null;
   /** Neige fraîche (cm, estimée) dans les 36 prochaines heures. */
   neige36h?: number | null;
+  /** Cartes de risque sur 24 h glissantes : rafale max, maxi, mini, orage (code max 0 à 4) et neige (mm) dans les 24 prochaines heures. */
+  rafale24h?: number | null;
+  maxi24h?: number | null;
+  mini24h?: number | null;
+  orage24h?: number | null;
+  neige24h?: number | null;
   pluie3j?: number | null;
   pluie5j?: number | null;
   pluie10j?: number | null;
@@ -308,13 +314,22 @@ function rafaleEntre(serie: Serie, debut: number, fin: number): { valeur: number
   return { valeur: i >= 0 ? arrondi(serie.rafale[i]) : null, direction: directionRafaleMax(serie, indices.map((x) => x.i)) };
 }
 
+/** Valeur extrême (maximum ou minimum) d'un champ de la série entre deux instants (ms), si la série couvre assez de la période. */
+function extremeEntre(serie: Serie, debut: number, fin: number, champ: 'temp' | 'rafale' | 'orage', sens: 'max' | 'min'): number | null {
+  const indices = serie.t.map((t, i) => ({ t: Date.parse(t), i })).filter(({ t, i }) => t > debut && t <= fin && serie[champ][i] != null);
+  if (!indices.length) return null;
+  if ((indices[indices.length - 1].t - debut) / (fin - debut) < COUVERTURE_MIN_CUMUL) return null;
+  const valeurs = indices.map(({ i }) => serie[champ][i] as number);
+  return arrondi(sens === 'max' ? Math.max(...valeurs) : Math.min(...valeurs), 1);
+}
+
 /** Cumuls de pluie et rafales les plus fortes sur 3, 5, 10 et 16 jours à partir de minuit (Paris) de `dateISO`. */
 function cumulsPluie(
   serie: Serie,
   dateISO: string
 ): Pick<
   PointCarte,
-  | 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'pluie24h' | 'pluie36h' | 'neige36h' | 'finPrevision'
+  | 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'pluie24h' | 'pluie36h' | 'neige36h' | 'rafale24h' | 'maxi24h' | 'mini24h' | 'orage24h' | 'neige24h' | 'finPrevision'
   | 'rafale3j' | 'rafale5j' | 'rafale10j' | 'rafale16j' | 'directionRafale3j' | 'directionRafale5j' | 'directionRafale10j' | 'directionRafale16j'
 > {
   const debut = minuitParis(dateISO);
@@ -329,6 +344,11 @@ function cumulsPluie(
     pluie24h: c24.valeur,
     pluie36h: c36.valeur,
     neige36h: n36.valeur,
+    rafale24h: extremeEntre(serie, maintenant, maintenant + 24 * 3_600_000, 'rafale', 'max'),
+    maxi24h: extremeEntre(serie, maintenant, maintenant + 24 * 3_600_000, 'temp', 'max'),
+    mini24h: extremeEntre(serie, maintenant, maintenant + 24 * 3_600_000, 'temp', 'min'),
+    orage24h: extremeEntre(serie, maintenant, maintenant + 24 * 3_600_000, 'orage', 'max'),
+    neige24h: cumulEntre(serie, maintenant, maintenant + 24 * 3_600_000, 'neige').valeur,
     pluie3j: c3.valeur,
     pluie5j: c5.valeur,
     pluie10j: c10.valeur,
