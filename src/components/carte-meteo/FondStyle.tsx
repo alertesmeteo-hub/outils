@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useState } from 'react';
-import { versMonde, type Vue } from '@/lib/carte-meteo/projection-france';
+import { MONDE_PX, versMonde, type Vue } from '@/lib/carte-meteo/projection-france';
 import { STYLES_FOND, type Peinture, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 
 interface Anneau {
@@ -10,39 +10,54 @@ interface Anneau {
   minY: number;
   maxX: number;
   maxY: number;
+  /** Points en pixels monde, aplatis [x, y, x, y…] (test « un point est-il sur cette terre ? »). */
+  pts: number[];
 }
 
-/** Terres d'Europe (public/geo/europe.json, Natural Earth 1:50 m) en tracés « pixels monde », chargées une seule fois. */
-let promesseTerres: Promise<Anneau[]> | null = null;
-function chargerTerres(): Promise<Anneau[]> {
+export interface Terres {
+  /** Terres (anneaux fermés). */
+  anneaux: Anneau[];
+  /** Frontières terrestres (lignes ouvertes). */
+  frontieres: Anneau[];
+}
+
+const VIDE: Terres = { anneaux: [], frontieres: [] };
+
+function tracer(lignes: number[][], fermer: boolean): Anneau[] {
+  return lignes.map((ligne) => {
+    let d = '';
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const pts: number[] = [];
+    for (let k = 0; k < ligne.length; k += 2) {
+      const { x, y } = versMonde(ligne[k + 1], ligne[k]);
+      d += `${k ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+      pts.push(x, y);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    return { d: fermer ? `${d}Z` : d, minX, minY, maxX, maxY, pts };
+  });
+}
+
+/** Terres et frontières d'Europe (public/geo/europe.json, Natural Earth 1:50 m), chargées une seule fois. */
+let promesseTerres: Promise<Terres> | null = null;
+function chargerTerres(): Promise<Terres> {
   promesseTerres ??= fetch('/geo/europe.json')
-    .then((r) => (r.ok ? (r.json() as Promise<{ terres: number[][] }>) : Promise.reject(new Error('europe.json'))))
-    .then((j) =>
-      j.terres.map((anneau) => {
-        let d = '';
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        for (let k = 0; k < anneau.length; k += 2) {
-          const { x, y } = versMonde(anneau[k + 1], anneau[k]);
-          d += `${k ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-        return { d: `${d}Z`, minX, minY, maxX, maxY };
-      })
-    );
+    .then((r) => (r.ok ? (r.json() as Promise<{ terres: number[][]; frontieres: number[][] }>) : Promise.reject(new Error('europe.json'))))
+    .then((j) => ({ anneaux: tracer(j.terres, true), frontieres: tracer(j.frontieres, false) }));
   promesseTerres.catch(() => {
     promesseTerres = null;
   });
   return promesseTerres;
 }
 
-export function useTerres(actif: boolean): Anneau[] {
-  const [terres, setTerres] = useState<Anneau[]>([]);
+export function useTerres(actif: boolean): Terres {
+  const [terres, setTerres] = useState<Terres>(VIDE);
   useEffect(() => {
     if (!actif) return;
     let vivant = true;
@@ -54,16 +69,25 @@ export function useTerres(actif: boolean): Anneau[] {
   return terres;
 }
 
-/** Fond de la carte : mer (toujours), terres autour du territoire. À placer dans le groupe transformé par `vue`. */
-export function FondStyleSvg({ style, vue, largeur, hauteur, terres }: { style: StyleFond; vue: Vue; largeur: number; hauteur: number; terres: Anneau[] }) {
+/** Largeur (pixels monde, ≈ 0,9 km) du liseré retiré : ~5 km de part et d'autre du contour des départements, quel que soit le zoom. */
+const LISERE = 11;
+
+const visible = (a: Anneau, x0: number, y0: number, w: number, h: number) => a.maxX >= x0 && a.minX <= x0 + w && a.maxY >= y0 && a.minY <= y0 + h;
+
+/**
+ * Fond de la carte : mer (toujours), terres autour du territoire, frontières. À placer dans le groupe transformé par `vue`.
+ * Le long de la côte française, la terre du Natural Earth dépasse un peu des contours des départements : ce liseré est masqué
+ * (sauf près des frontières terrestres, où l'on retrouve bien la terre voisine).
+ */
+export function FondStyleSvg({ style, vue, largeur, hauteur, terres, departements }: { style: StyleFond; vue: Vue; largeur: number; hauteur: number; terres: Terres; departements: { code: string; d: string }[] }) {
   const def = STYLES_FOND[style];
   const id = `fs${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
-  // Cadre visible en pixels monde.
   const x0 = -vue.tx / vue.echelle;
   const y0 = -vue.ty / vue.echelle;
   const w = largeur / vue.echelle;
   const h = hauteur / vue.echelle;
-  const visibles = useMemo(() => terres.filter((a) => a.maxX >= x0 && a.minX <= x0 + w && a.maxY >= y0 && a.minY <= y0 + h), [terres, x0, y0, w, h]);
+  const anneaux = useMemo(() => terres.anneaux.filter((a) => visible(a, x0, y0, w, h)), [terres, x0, y0, w, h]);
+  const frontieres = useMemo(() => terres.frontieres.filter((a) => visible(a, x0, y0, w, h)), [terres, x0, y0, w, h]);
   const degrade = (nom: string, p: Peinture) =>
     typeof p === 'string' ? null : (
       <linearGradient id={`${id}-${nom}`} gradientUnits="userSpaceOnUse" x1={x0} y1={y0} x2={x0 + w} y2={y0 + h}>
@@ -72,31 +96,117 @@ export function FondStyleSvg({ style, vue, largeur, hauteur, terres }: { style: 
       </linearGradient>
     );
   const remplir = (nom: string, p: Peinture) => (typeof p === 'string' ? p : `url(#${id}-${nom})`);
+  const dFrontieres = frontieres.map((a) => a.d).join('');
   return (
     <g>
       <defs>
         {degrade('mer', def.mer)}
         {degrade('terre', def.terre)}
+        <mask id={`${id}-masque`} maskUnits="userSpaceOnUse" x={x0 - 1} y={y0 - 1} width={w + 2} height={h + 2}>
+          <rect x={x0 - 1} y={y0 - 1} width={w + 2} height={h + 2} fill="#fff" />
+          {/* Liseré hors des départements : retiré ; l'intérieur des départements et les abords des frontières restent. */}
+          <g fill="none" stroke="#000" strokeWidth={LISERE} strokeLinejoin="round">
+            {departements.map((c) => (
+              <path key={c.code} d={c.d} />
+            ))}
+          </g>
+          <g fill="#fff" stroke="none">
+            {departements.map((c) => (
+              <path key={c.code} d={c.d} />
+            ))}
+          </g>
+          <path d={dFrontieres} fill="none" stroke="#fff" strokeWidth={LISERE * 1.7} strokeLinecap="round" strokeLinejoin="round" />
+        </mask>
       </defs>
       <rect x={x0 - 1} y={y0 - 1} width={w + 2} height={h + 2} fill={remplir('mer', def.mer)} />
-      <path d={visibles.map((a) => a.d).join('')} fill={remplir('terre', def.terre)} stroke={def.cote} strokeWidth={1} strokeOpacity={0.8} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+      <g mask={`url(#${id}-masque)`}>
+        <path d={anneaux.map((a) => a.d).join('')} fill={remplir('terre', def.terre)} />
+      </g>
+      <path d={dFrontieres} fill="none" stroke={def.voisins} strokeWidth={1.4} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </g>
   );
+}
+
+const enLonLat = (x: number, y: number) => ({ lon: (x / MONDE_PX) * 360 - 180, lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / MONDE_PX))) * 180) / Math.PI });
+
+function surTerre(anneaux: Anneau[], x: number, y: number): boolean {
+  for (const a of anneaux) {
+    if (x < a.minX || x > a.maxX || y < a.minY || y > a.maxY) continue;
+    const p = a.pts;
+    let dedans = false;
+    for (let i = 0, k = p.length - 2; i < p.length; k = i, i += 2) {
+      if (p[i + 1] > y !== p[k + 1] > y && x < ((p[k] - p[i]) * (y - p[i + 1])) / (p[k + 1] - p[i + 1]) + p[i]) dedans = !dedans;
+    }
+    if (dedans) return true;
+  }
+  return false;
+}
+
+/** Point de la mer Méditerranée (pixels écran) le mieux centré dans la partie visible de la mer ; nul s'il n'y en a pas assez. */
+export function positionMer(terres: Terres, vue: Vue, largeur: number, hauteur: number): { x: number; y: number } | null {
+  if (!terres.anneaux.length) return null;
+  const pas = 20;
+  const colonnes = Math.floor(largeur / pas);
+  const lignes = Math.floor(hauteur / pas);
+  const mer: boolean[] = new Array(colonnes * lignes).fill(false);
+  const x0 = -vue.tx / vue.echelle;
+  const y0 = -vue.ty / vue.echelle;
+  const w = largeur / vue.echelle;
+  const h = hauteur / vue.echelle;
+  const proches = terres.anneaux.filter((a) => visible(a, x0, y0, w, h));
+  for (let j = 0; j < lignes; j++) {
+    for (let i = 0; i < colonnes; i++) {
+      const mx = (i * pas + pas / 2 - vue.tx) / vue.echelle;
+      const my = (j * pas + pas / 2 - vue.ty) / vue.echelle;
+      const { lon, lat } = enLonLat(mx, my);
+      // Méditerranée : ni golfe de Gascogne ni mer Noire.
+      if (lon < -5.3 || lon > 36 || lat < 30 || lat > 46 || (lat > 43.3 && lon < 3) || (lon > 27.5 && lat > 40.5)) continue;
+      mer[j * colonnes + i] = !surTerre(proches, mx, my);
+    }
+  }
+  // Marges : le libellé tient dans le cadre (hors titre en haut).
+  const iMin = Math.ceil(75 / pas);
+  const iMax = colonnes - Math.ceil(75 / pas);
+  const jMin = Math.ceil(80 / pas);
+  const jMax = lignes - Math.ceil(50 / pas);
+  let total = 0;
+  let sx = 0;
+  let sy = 0;
+  for (let j = jMin; j < jMax; j++) {
+    for (let i = iMin; i < iMax; i++) {
+      if (mer[j * colonnes + i]) {
+        total++;
+        sx += i;
+        sy += j;
+      }
+    }
+  }
+  if (total < 12) return null;
+  const cx = sx / total;
+  const cy = sy / total;
+  let meilleur: { i: number; j: number; score: number; d: number } | null = null;
+  for (let j = jMin; j < jMax; j++) {
+    for (let i = iMin; i < iMax; i++) {
+      if (!mer[j * colonnes + i]) continue;
+      let score = 0;
+      for (let dj = -2; dj <= 2; dj++) for (let di = -4; di <= 4; di++) if (mer[(j + dj) * colonnes + (i + di)]) score++;
+      const d = Math.hypot(i - cx, j - cy);
+      // Cases de mer tout autour d'abord, puis la plus proche du centre de la mer visible.
+      if (!meilleur || score > meilleur.score + 2 || (score >= meilleur.score - 2 && d < meilleur.d)) meilleur = { i, j, score, d };
+    }
+  }
+  if (!meilleur || meilleur.score < 30) return null;
+  return { x: meilleur.i * pas + pas / 2, y: meilleur.j * pas + pas / 2 };
 }
 
 const JAUNE = '#fcdd09';
 const ROUGE = '#da121a';
 
-/** Décor posé sur la carte (coordonnées écran) : bandes de la senyera en coin et nom de la mer. */
-export function DecorStyle({ style, vue, largeur, hauteur }: { style: StyleFond; vue: Vue; largeur: number; hauteur: number }) {
+/** Décor posé sur la carte (coordonnées écran) : bandes de la senyera en coin et nom de la mer, centré dans la mer visible. */
+export function DecorStyle({ style, largeur, hauteur, mer }: { style: StyleFond; largeur: number; hauteur: number; mer: { x: number; y: number } | null }) {
   const def = STYLES_FOND[style];
   const l = largeur;
   const h = hauteur;
-  // « Mer Méditerranée » : posé au large de la côte catalane, seulement si ce point est bien dans le cadre.
-  const mer = versMonde(42.62, 3.33);
-  const mx = vue.tx + vue.echelle * mer.x;
-  const my = vue.ty + vue.echelle * mer.y;
-  const libelleMer = mx > l * 0.6 && mx < l - 60 && my > 90 && my < h - 80;
   const bandes = Array.from({ length: 5 }, (_, k) => (
     <path
       key={k}
@@ -117,14 +227,13 @@ export function DecorStyle({ style, vue, largeur, hauteur }: { style: StyleFond;
           </g>
         </>
       )}
-      {libelleMer && (
-        <g fill={def.texteMer} fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight={700} fontSize={24} textAnchor="middle" style={{ paintOrder: 'stroke' }}>
-          <text x={mx} y={my - 4}>Mer</text>
-          <text x={mx} y={my + 24}>Méditerranée</text>
-          <path d={`M ${mx - 34} ${my + 46} q 11 -9 22 0 t 22 0 t 22 0 M ${mx - 34} ${my + 56} q 11 -9 22 0 t 22 0 t 22 0`} fill="none" stroke={def.texteMer} strokeWidth={2.4} strokeLinecap="round" />
+      {mer && (
+        <g fill={def.texteMer} fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight={700} fontSize={22} textAnchor="middle">
+          <text x={mer.x} y={mer.y - 12}>Mer</text>
+          <text x={mer.x} y={mer.y + 12}>Méditerranée</text>
+          <path d={`M ${mer.x - 34} ${mer.y + 30} q 11 -9 22 0 t 22 0 t 22 0 M ${mer.x - 34} ${mer.y + 40} q 11 -9 22 0 t 22 0 t 22 0`} fill="none" stroke={def.texteMer} strokeWidth={2.4} strokeLinecap="round" />
         </g>
       )}
     </svg>
   );
 }
-

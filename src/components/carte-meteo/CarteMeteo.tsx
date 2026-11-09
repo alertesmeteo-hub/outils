@@ -1540,6 +1540,25 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const legendeBarre = 'mb-1 block text-sm font-medium';
   const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
+  /** Taille des pictos, bien visible au-dessus de la carte (même réglage que « Taille des icônes » du menu). */
+  const barreTaillePictos = (
+    <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold">
+      <span>Taille des pictos : {tailleIcones} %</span>
+      <button type="button" onClick={() => setTailleIcones((t) => Math.max(40, t - 10))} className="rounded-md border border-border px-3 py-1 text-base leading-none" aria-label="Réduire les pictos">
+        −
+      </button>
+      <input type="range" min={40} max={200} step={5} value={tailleIcones} onChange={(e) => setTailleIcones(Number(e.target.value))} className="w-40 sm:w-56" aria-label="Taille des pictos en pourcentage" />
+      <button type="button" onClick={() => setTailleIcones((t) => Math.min(200, t + 10))} className="rounded-md border border-border px-3 py-1 text-base leading-none" aria-label="Agrandir les pictos">
+        +
+      </button>
+      {tailleIcones !== (reglages?.tailleIcones ?? 100) && (
+        <button type="button" onClick={() => setTailleIcones(reglages?.tailleIcones ?? 100)} className="btn-ghost rounded-md px-2 py-1 text-xs">
+          Taille d&apos;origine
+        </button>
+      )}
+    </div>
+  );
+
   const rendu = (
     <CarteRendu
       carteRef={carteRef}
@@ -1668,6 +1687,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             {erreur}
           </p>
         )}
+        {barreTaillePictos}
         <div className="relative">
           <div className={chargement ? 'opacity-60 transition-opacity' : 'transition-opacity'}>{rendu}</div>
           {chargement && <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-surface px-3 py-1.5 text-sm shadow">Chargement…</p>}
@@ -1740,7 +1760,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           </fieldset>
           <label className="mt-3 block text-sm font-medium">
             Taille des icônes : {tailleIcones} %
-            <input type="range" min={50} max={150} step={5} value={tailleIcones} onChange={(e) => setTailleIcones(Number(e.target.value))} className="block w-full" aria-label="Taille des icônes en pourcentage" />
+            <input type="range" min={40} max={200} step={5} value={tailleIcones} onChange={(e) => setTailleIcones(Number(e.target.value))} className="block w-full" aria-label="Taille des icônes en pourcentage" />
           </label>
           {tailleIcones !== 100 && (
             <button type="button" className="btn-ghost rounded-md px-2 py-1 text-xs" onClick={() => setTailleIcones(100)}>
@@ -2133,6 +2153,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </button>
             </p>
           )}
+          {barreTaillePictos}
           <div className={chargement ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
             {rendu}
           </div>

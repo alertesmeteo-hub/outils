@@ -1,12 +1,12 @@
 'use client';
 
 import type { ThemeCarte } from '@/lib/carte-meteo/pictos';
-import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as PointerEventReact, type ReactNode, type RefObject } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type PointerEvent as PointerEventReact, type ReactNode, type RefObject } from 'react';
 import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { MATRICE_RELIEF, TAILLE_TUILE_VIDE, coucheParDefaut, tuileParente, tuilesVisibles, type Couche, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_DEFAUT_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
-import { DecorStyle, FondStyleSvg, useTerres } from './FondStyle';
+import { DecorStyle, FondStyleSvg, positionMer, useTerres } from './FondStyle';
 import { STYLES_FOND, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 
@@ -497,6 +497,7 @@ export default function CarteRendu({
 }: Props) {
   const [partout, setPartout] = useState(false);
   const terresEurope = useTerres(styleFond != null);
+  const merVisible = useMemo(() => (styleFond ? positionMer(terresEurope, vue, largeur, HAUTEUR_CARTE) : null), [styleFond, terresEurope, vue, largeur]);
   const defStyle = styleFond ? STYLES_FOND[styleFond] : null;
   // Style de fond : territoire plein (contour du style), voisins en simple trait ; sinon les traits habituels.
   const traitSelectionStyle = defStyle ? { ...TRAIT_SELECTION, fill: defStyle.territoire, fillOpacity: 1, stroke: defStyle.contour, strokeOpacity: 1, strokeWidth: 1.6 } : null;
@@ -600,7 +601,7 @@ export default function CarteRendu({
                 <TuileFond key={t.cle} t={t} couche={couche} />
               ))}
             </g>
-            {styleFond && <FondStyleSvg style={styleFond} vue={vue} largeur={largeur} hauteur={HAUTEUR_CARTE} terres={terresEurope} />}
+            {styleFond && <FondStyleSvg style={styleFond} vue={vue} largeur={largeur} hauteur={HAUTEUR_CARTE} terres={terresEurope} departements={departements} />}
             {departements.filter((c) => !selection.has(c.code)).map((c) => (
               <path key={c.code} d={c.d} {...(traitVoisinsStyle ?? (theme ? traitsTheme(theme).hors : TRAIT_HORS_SELECTION))} {...(regions ? { stroke: 'none' } : {})} />
             ))}
@@ -657,7 +658,7 @@ export default function CarteRendu({
           </g>
         </svg>
         {theme && <DecorTheme theme={theme} largeur={largeur} hauteur={HAUTEUR_CARTE} />}
-        {styleFond && !theme && <DecorStyle style={styleFond} vue={vue} largeur={largeur} hauteur={HAUTEUR_CARTE} />}
+        {styleFond && !theme && <DecorStyle style={styleFond} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} />}
 
         {logoUrl && (
           <img
