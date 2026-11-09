@@ -28,6 +28,7 @@ import {
 import CarteInfo, { AffichageContexte, type AffichageCarte, type PoliceValeurs, type PointInfo } from './CarteInfo';
 import { THEMES_CARTE } from '@/lib/carte-meteo/pictos';
 import { LIBELLES_COUCHES, type Couche } from '@/lib/carte-meteo/tuiles';
+import { ORDRE_STYLES_FOND, STYLES_FOND, estStyleFond } from '@/lib/carte-meteo/styles-fond';
 import { depStation, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import CarteSynthese, { type RubriqueSynthese } from './CarteSynthese';
 import { MASQUES_FRANCE, NOM_ECHEANCE, nomEcheanceCarte, SECOURS, codesDeLaZone, libelleJour, normaliser } from './CarteMeteo';
@@ -963,6 +964,17 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                   {THEMES_CARTE.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.libelle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Style de fond</span>
+                <select value={affichage.styleFond ?? ''} onChange={(e) => regler({ styleFond: estStyleFond(e.target.value) ? e.target.value : null })} className={`${selectBarre} w-full`}>
+                  <option value="">Aucun (fond de carte ci-dessous)</option>
+                  {ORDRE_STYLES_FOND.map((s) => (
+                    <option key={s} value={s}>
+                      {STYLES_FOND[s].libelle}
                     </option>
                   ))}
                 </select>

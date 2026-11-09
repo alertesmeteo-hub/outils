@@ -12,6 +12,7 @@ import CarteInfo, { type PointInfo } from './CarteInfo';
 import { MASQUES_FRANCE } from './CarteMeteo';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
 import { estPictoImage } from '@/lib/carte-meteo/pictos';
+import { ORDRE_STYLES_FOND, STYLES_FOND, estStyleFond, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 
 /** Les cartes de chaque planche : le thème (carte « sur la période » des cartes infos) et son titre pour N jours. */
 const THEMES_TENDANCES = [
@@ -53,6 +54,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
   const setAvecPictos = (v: boolean) => setSansPictos((s) => ({ ...s, [themeId]: !v }));
   // Texte d'alerte en rouge sur la carte (« ÉPISODE MÉDITERRANÉEN »…) ; '' = aucun.
   const [bandeau, setBandeau] = useState('');
+  const [styleFond, setStyleFond] = useState<StyleFond | null>(null);
   /** Carte Rafales : valeurs affichées à partir de ce seuil (km/h), 0 = toutes. */
   const [seuilRafales, setSeuilRafales] = useState(0);
   /** Carte Pluie : valeurs affichées à partir de ce seuil (mm), 0 = toutes ; 10 mm par défaut. */
@@ -175,6 +177,17 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
           </label>
         )}
         <label className="text-sm font-medium">
+          <span className="mb-1 block">Style de fond</span>
+          <select value={styleFond ?? ''} onChange={(e) => setStyleFond(estStyleFond(e.target.value) ? e.target.value : null)} className={selectBarre}>
+            <option value="">Aucun (fond habituel)</option>
+            {ORDRE_STYLES_FOND.map((s) => (
+              <option key={s} value={s}>
+                {STYLES_FOND[s].libelle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
           <span className="mb-1 block">Texte d&apos;alerte en rouge</span>
           <select value={bandeau} onChange={(e) => setBandeau(e.target.value)} className={selectBarre}>
             <option value="">Aucun</option>
@@ -261,6 +274,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
                 </div>
               ) : (
                 <CarteInfo
+                  styleFond={styleFond}
                   theme={theme}
                   zone={enZones66 ? 'dep:66' : regionCarte ? `reg:${regionCarte}` : 'france'}
                   points={points}

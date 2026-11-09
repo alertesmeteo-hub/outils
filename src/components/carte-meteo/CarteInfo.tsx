@@ -11,6 +11,7 @@ import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { cheminPictoImage, type ThemeCarte } from '@/lib/carte-meteo/pictos';
 import type { Couche } from '@/lib/carte-meteo/tuiles';
+import type { StyleFond } from '@/lib/carte-meteo/styles-fond';
 import { angleFleche } from '@/lib/carte-meteo/vent';
 import { PALIERS_NEIGE, palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
@@ -28,6 +29,8 @@ export interface AffichageCarte {
   theme: ThemeCarte | null;
   /** Fond de carte ; null = selon le zoom. */
   fond: Couche | null;
+  /** Style de fond (couleurs, mer dessinée) à la place des tuiles ; null = aucun. */
+  styleFond?: StyleFond | null;
   relief: boolean;
   /** Part du relief qui transparaît (0 à 90). */
   reliefPourcent: number;
@@ -112,6 +115,8 @@ interface Props {
   decalagesValeurs?: Record<string, [number, number]>;
   /** Seules les valeurs d'au moins ce niveau sont affichées (ex. pluie à partir de 10 mm) ; absent = toutes. */
   valeurMin?: number;
+  /** Style de fond de cette carte (sinon celui de la page). */
+  styleFond?: StyleFond | null;
   /** Nom de la ville sous chaque valeur et flèche vers la station (sinon : réglage du bloc « Affichage de la carte »). */
   reperes?: boolean;
   policeValeurs?: PoliceValeurs;
@@ -142,7 +147,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -234,7 +239,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const contoursDep = useContours(FICHIERS_CONTOURS.departements);
   const codes = useMemo(() => codesDeLaZone(zone), [zone]);
   const selection = useMemo(() => new Set(codes), [codes]);
-  const departements = useMemo(() => (enFrance ? contoursDep : contoursDep.filter((c) => selection.has(c.code))), [contoursDep, selection, enFrance]);
+  const styleFond = styleFondCarte ?? affichage?.styleFond ?? null;
+  // Avec un style de fond : tous les départements (voisins en contours, côte et frontières).
+  const departements = useMemo(() => (enFrance || styleFond ? contoursDep : contoursDep.filter((c) => selection.has(c.code))), [contoursDep, selection, enFrance, styleFond]);
   // Contours : « Aucun » = liste vide (seul le remplissage trace les départements) ; « Régions » = leurs contours ; sinon, réglage habituel.
   const regionsAffichees = useMemo(() => {
     if (zonageFin) return contoursReg;
@@ -563,6 +570,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         afficherRelief={affichage?.relief ?? true}
         reliefVisible={(affichage?.reliefPourcent ?? 22) / 100}
         fond={affichage?.fond ?? undefined}
+        styleFond={styleFond}
         theme={affichage?.theme ?? null}
         vue={vue}
         departements={departements}

@@ -19,6 +19,8 @@ import { cellulesProximite } from '@/lib/carte-meteo/zonage-fin';
 import { PERIODES_PLANCHE, pictoDuJour, pointDeLaPeriode, pointsParQuart, versPointJour, type PeriodePlanche, type PointJour } from '@/lib/carte-meteo/planches-jours';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
 import { TuileFond } from './CarteRendu';
+import { DecorStyle, FondStyleSvg, positionMer, useTerres } from './FondStyle';
+import { ORDRE_STYLES_FOND, STYLES_FOND, estStyleFond, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 import TableauPrevisions, { type CelluleJour, type LigneTableau } from './TableauPrevisions';
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, FICHIERS_CONTOURS } from './CarteMeteo';
 import { statsDe, type CarteTexte, type RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
@@ -183,6 +185,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [zonageFin, setZonageFin] = useState(false);
   /** Fond de carte : automatique (relief ou photos pour un département ou une région, uni pour la France), uni, relief NASA ou photos IGN. */
   const [fondChoisi, setFondChoisi] = useState<'auto' | 'uni' | Couche>('auto');
+  const [styleFond, setStyleFond] = useState<StyleFond | null>(null);
+  const terresEurope = useTerres(styleFond != null);
   const fin = zonageFin && zone === 'france' && !parQuarts;
   type PointZone = { dep: string; lat: number; lon: number; maxi: number | null };
   const [zonesBrutes, setZonesBrutes] = useState<Record<string, PointZone[] | null>>({});
@@ -236,7 +240,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
     return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : 0.05);
   }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte]);
   /** Fond de la carte : tuiles de relief ou de photos aériennes (null = fond uni bleu). Automatique : pour un département ou une région seulement. */
-  const couche: Couche | null = fondChoisi === 'uni' ? null : fondChoisi === 'auto' ? (zoneCarte === 'france' ? null : coucheParDefaut(vue)) : fondChoisi;
+  const couche: Couche | null = styleFond ? null : fondChoisi === 'uni' ? null : fondChoisi === 'auto' ? (zoneCarte === 'france' ? null : coucheParDefaut(vue)) : fondChoisi;
+  const merVisible = useMemo(() => (styleFond ? positionMer(terresEurope, vue, largeurCarte, hauteurCarte) : null), [styleFond, terresEurope, vue, largeurCarte, hauteurCarte]);
 
   const partDetail = niveauDetail === NIVEAU_QUATRE_PICTOS ? 0.22 : (NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1);
   const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 2.6 : 1);
@@ -449,6 +454,17 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
           </label>
         )}
         <label className="text-sm font-medium">
+          <span className="mb-1 block">Style de fond</span>
+          <select value={styleFond ?? ''} onChange={(e) => setStyleFond(estStyleFond(e.target.value) ? e.target.value : null)} className={selectBarre}>
+            <option value="">Aucun (fond de carte ci-dessous)</option>
+            {ORDRE_STYLES_FOND.map((s) => (
+              <option key={s} value={s}>
+                {STYLES_FOND[s].libelle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
           <span className="mb-1 block">Fond de carte</span>
           <select value={fondChoisi} onChange={(e) => setFondChoisi(e.target.value as 'auto' | 'uni' | Couche)} className={selectBarre}>
             <option value="auto">Automatique (relief ou photos pour une région ou un département)</option>
@@ -525,6 +541,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                   <div key={date} style={{ position: 'relative', width: largeurCarte, height: hauteurCarte, borderRadius: 10, overflow: 'hidden', background: '#0a2342', border: '2px solid rgba(255,255,255,0.7)' }}>
                     <svg width={largeurCarte} height={hauteurCarte} style={{ position: 'absolute', left: 0, top: 0 }}>
                       <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
+                        {styleFond && <FondStyleSvg style={styleFond} vue={vue} largeur={largeurCarte} hauteur={hauteurCarte} terres={terresEurope} departements={contours} />}
                         {couche && (
                           <>
                             {couche === 'relief' && (
@@ -544,6 +561,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           const point = (enDepartement ? [] : jours[date] ?? []).find((p) => p.code === c.code);
                           const fond = dedans && point?.maxi != null ? palierDe(PALIERS_TEMPERATURE, point.maxi).fond : dedans ? '#6f86d6' : '#061428';
                           // Avec un fond de carte : le territoire est teinté en transparence (le relief reste visible), le reste assombri.
+                          if (styleFond) return <path key={c.code} d={c.d} fill={dedans ? fond : 'none'} fillOpacity={dedans ? 0.92 : 1} stroke={dedans ? STYLES_FOND[styleFond].contour : STYLES_FOND[styleFond].voisins} strokeOpacity={1} strokeWidth={(dedans ? 1.6 : 1) / vue.echelle} />;
                           if (couche) return <path key={c.code} d={c.d} fill={dedans ? fond : '#061428'} fillOpacity={dedans ? 0.5 : 0.55} stroke="#fff" strokeOpacity={dedans ? 0.9 : 0.25} strokeWidth={(dedans ? 1.4 : 0.7) / vue.echelle} />;
                           return <path key={c.code} d={c.d} fill={fond} fillOpacity={dedans ? 0.88 : 0.4} stroke="#fff" strokeOpacity={dedans ? 0.55 : 0.2} strokeWidth={0.7 / vue.echelle} />;
                         })}
@@ -564,6 +582,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                         )}
                       </g>
                     </svg>
+                    {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={merVisible} />}
                     <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: 'rgba(255,255,255,0.94)', color: '#0b2a4a', fontFamily: POLICE, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
                       {jourLibelle(date)}
                     </div>

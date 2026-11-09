@@ -72,6 +72,44 @@ export function useTerres(actif: boolean): Terres {
 /** Largeur (pixels monde, ≈ 0,9 km) du liseré retiré : ~5 km de part et d'autre du contour des départements, quel que soit le zoom. */
 const LISERE = 11;
 
+/** Centre approximatif de la France : les frontières s'en éloignent, le côté « étranger » est celui opposé à ce point. */
+const CENTRE_FRANCE = versMonde(46.6, 2.4);
+
+/**
+ * Bande de terre étrangère à conserver le long des frontières : la ligne est décalée du côté étranger (à l'opposé du centre de
+ * la France), de sorte que le liseré de côte français, qui touche la frontière au bord de la mer, reste masqué.
+ */
+function cheminEtranger(lignes: Anneau[], decalage: number, dansFrance: (x: number, y: number) => boolean): string {
+  let d = '';
+  for (const l of lignes) {
+    const p = l.pts;
+    const n = p.length / 2;
+    if (n < 2) continue;
+    for (let i = 0; i < n; i++) {
+      const a = Math.max(0, i - 1);
+      const b = Math.min(n - 1, i + 1);
+      let tx = p[2 * b] - p[2 * a];
+      let ty = p[2 * b + 1] - p[2 * a + 1];
+      const long = Math.hypot(tx, ty) || 1;
+      tx /= long;
+      ty /= long;
+      let nx = -ty;
+      let ny = tx;
+      // Côté étranger : celui qui n'est pas dans un département ; à défaut (frontière hors de France), à l'opposé du centre de la France.
+      const x = p[2 * i];
+      const y = p[2 * i + 1];
+      const devant = dansFrance(x + nx * 2.2, y + ny * 2.2);
+      const derriere = dansFrance(x - nx * 2.2, y - ny * 2.2);
+      if (devant !== derriere ? devant : (x - CENTRE_FRANCE.x) * nx + (y - CENTRE_FRANCE.y) * ny < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      d += `${i ? 'L' : 'M'}${(p[2 * i] + nx * decalage).toFixed(1)} ${(p[2 * i + 1] + ny * decalage).toFixed(1)}`;
+    }
+  }
+  return d;
+}
+
 const visible = (a: Anneau, x0: number, y0: number, w: number, h: number) => a.maxX >= x0 && a.minX <= x0 + w && a.maxY >= y0 && a.minY <= y0 + h;
 
 /**
@@ -97,6 +135,14 @@ export function FondStyleSvg({ style, vue, largeur, hauteur, terres, departement
     );
   const remplir = (nom: string, p: Peinture) => (typeof p === 'string' ? p : `url(#${id}-${nom})`);
   const dFrontieres = frontieres.map((a) => a.d).join('');
+  const dansFrance = useMemo(() => {
+    if (typeof document === 'undefined' || departements.length === 0) return () => false;
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return () => false;
+    const france = new Path2D(departements.map((c) => c.d).join(''));
+    return (x: number, y: number) => ctx.isPointInPath(france, x, y);
+  }, [departements]);
+  const dEtranger = useMemo(() => cheminEtranger(frontieres, LISERE * 0.38, dansFrance), [frontieres, dansFrance]);
   return (
     <g>
       <defs>
@@ -115,7 +161,7 @@ export function FondStyleSvg({ style, vue, largeur, hauteur, terres, departement
               <path key={c.code} d={c.d} />
             ))}
           </g>
-          <path d={dFrontieres} fill="none" stroke="#fff" strokeWidth={LISERE * 1.7} strokeLinecap="round" strokeLinejoin="round" />
+          <path d={dEtranger} fill="none" stroke="#fff" strokeWidth={LISERE * 1.15} strokeLinecap="butt" strokeLinejoin="round" />
         </mask>
       </defs>
       <rect x={x0 - 1} y={y0 - 1} width={w + 2} height={h + 2} fill={remplir('mer', def.mer)} />
