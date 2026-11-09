@@ -408,7 +408,7 @@ interface Props {
   /** Réglages de départ : la carte peut être préréglée (ex. un département, demain). */
   /** `modele` : modèle par défaut au-delà d'aujourd'hui (ex. « Moyenne des modèles » pour la carte des Pyrénées-Orientales). */
   /** `densite`, `periode` et `tailleIcones` : réglages de départ (ex. carte des Pyrénées-Orientales : peu de pictos, grands, mini et maxi de la journée). */
-  reglages?: { niveau?: Niveau; departement?: string; jour?: number; miniMaxi?: boolean; modele?: ModeleMeteo; densite?: Densite; periode?: Periode; tailleIcones?: number };
+  reglages?: { niveau?: Niveau; departement?: string; jour?: number; miniMaxi?: boolean; modele?: ModeleMeteo; densite?: Densite; periode?: Periode; tailleIcones?: number; jeuPictos?: JeuPictos };
   /** Vignette : seulement la carte et son bouton d'export (page des 16 jours), sans les menus de réglage. */
   compact?: boolean;
   /** Habillage léger aux couleurs catalanes (page Pyrénées-Orientales). */
@@ -433,7 +433,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [densite, setDensite] = useState<Densite>(reglages?.densite ?? 'moyen');
   const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(initialVilles);
   // Emojis par défaut, quelle que soit la zone (France, région, département) et sur la page des 16 jours.
-  const jeuInitial: JeuPictos = 'alertes';
+  const jeuInitial: JeuPictos = reglages?.jeuPictos ?? 'alertes';
   const [jeuPictos, setJeuPictos] = useState<JeuPictos>(jeuInitial);
   /** Taille des icônes (%), températures inchangées. */
   const [tailleIcones, setTailleIcones] = useState(reglages?.tailleIcones ?? 100);
@@ -1710,7 +1710,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
                     setTheme(valeur);
                     // Un thème apporte ses pictos (citrouille, bonhomme de neige, poussin…) ; en le quittant, retour aux icônes Alertes Météo.
                     if (valeur) changerJeuPictos(valeur);
-                    else if (THEMES_CARTE.some((t) => t.id === jeuPictos)) changerJeuPictos('alertes');
+                    else if (THEMES_CARTE.some((t) => t.id === jeuPictos)) changerJeuPictos(reglages?.jeuPictos ?? 'alertes');
                   }}
                   className="mr-2"
                 />
