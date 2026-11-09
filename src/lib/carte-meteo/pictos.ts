@@ -290,7 +290,7 @@ function meteoconsDepuisCode(code: number | null | undefined): PictoMeteo {
 /** Code météo WMO → icône Alertes Météo. */
 function alertesDepuisCode(code: number | null | undefined): PictoMeteo {
   if (code == null || code <= 1) return 'am:soleil';
-  if (code === 2) return 'am:eclaircies-gris';
+  if (code === 2) return 'am:eclaircies';
   if (code === 3) return 'am:couvert';
   if (code === 45 || code === 48) return 'am:brouillard';
   if (code >= 51 && code <= 55) return 'am:bruine';
@@ -324,6 +324,14 @@ export function pictoDepuisCodeMeteo(code: number | null | undefined, jeu: JeuPi
 }
 
 /** Ce qui détermine le picto d'une période : ciel (%), cumul de pluie (mm), température (°C) et code météo du modèle. */
+/**
+ * Carte avec pictos : le picto « éclaircies » du jeu Alertes prend le nuage gris (« am:eclaircies-gris »). Les autres usages
+ * (vidéo, planches) gardent le nuage blanc ; les autres jeux et les autres pictos ne changent pas.
+ */
+export function eclairciesNuageGris(picto: PictoMeteo, jeu: JeuPictos): PictoMeteo {
+  return jeu === 'alertes' && picto === 'am:eclaircies' ? 'am:eclaircies-gris' : picto;
+}
+
 export interface EntreePicto {
   code: number | null;
   nuages: number | null;
@@ -366,7 +374,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
     if (e.voile) return 'am:ciel-voile';
     if (ciel < 20) return 'am:soleil';
     if (ciel < 45) return 'am:peu-nuageux';
-    if (ciel < 75) return 'am:eclaircies-gris';
+    if (ciel < 75) return 'am:eclaircies';
     return 'am:couvert';
   }
   if (jeu === 'meteocons') {
