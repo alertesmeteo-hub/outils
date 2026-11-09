@@ -103,7 +103,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v19'; // v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v20'; // v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -280,12 +280,23 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
   const gardees = communes.filter((x) => retouche?.garder?.includes(x.nom));
   const candidates = communes.filter((x) => !retouche?.ecarter?.includes(x.nom) && !gardees.includes(x)).slice(0, CANDIDATES_VILLES);
   const choisies = [...gardees, ...repartir(candidates, VILLES_PAR_DEPARTEMENT - gardees.length)].sort((a, b) => b.population - a.population);
+  // Ville de vallée dont le point de grille est en altitude (grille grossière, ex. CEP : Prades, Arles-sur-Tech, Vernet sur un point
+  // à 1 245 m) : le vent et les rafales d'altitude (140 km/h) ne sont pas ceux de la ville. On prend ceux du point de plaine le
+  // plus proche (500 m au plus), s'il est à moins de 0,4° ; les communes de montagne ont leurs propres cartes (`montagne`).
+  const pointsBas = communes.filter((x) => altitude(x.pointId) <= ALTITUDE_MAX_FRANCE);
+  const ventDeVallee = (v: (typeof communes)[number], serie: Serie): Serie => {
+    if (altitude(v.pointId) <= ALTITUDE_MAX_FRANCE || !pointsBas.length) return serie;
+    const proche = pointsBas.reduce((a, b) => (distance(v, b) < distance(v, a) ? b : a));
+    if (distance(v, proche) > 0.4) return serie;
+    const bas = serieDuPoint(fichier, c, proche.pointId);
+    return { ...serie, rafale: bas.rafale, vent: bas.vent, direction: bas.direction };
+  };
   const villes = choisies.map((v) => ({
     code: v.code,
     nom: v.nom,
     lat: retouche?.centres?.[v.nom]?.[0] ?? v.lat,
     lon: retouche?.centres?.[v.nom]?.[1] ?? v.lon,
-    serie: serieALAltitude(serieDuPoint(fichier, c, v.pointId), altitude(v.pointId), retouche?.altitudes?.[v.nom]),
+    serie: ventDeVallee(v, serieALAltitude(serieDuPoint(fichier, c, v.pointId), altitude(v.pointId), retouche?.altitudes?.[v.nom])),
     ...(gardees.includes(v) ? { prioritaire: true } : {}),
     ...(gardees.includes(v) || retouche?.exactes?.includes(v.nom) ? { placeExacte: true } : {}),
     // Altitude de la ville (retouche manuelle, sinon point du modèle) : sert à classer côte / terres / reliefs dans le texte des vidéos.
