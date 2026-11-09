@@ -406,7 +406,8 @@ interface Props {
   initialVilles?: DonneesVilles | null;
   /** Réglages de départ : la carte peut être préréglée (ex. un département, demain). */
   /** `modele` : modèle par défaut au-delà d'aujourd'hui (ex. « Moyenne des modèles » pour la carte des Pyrénées-Orientales). */
-  reglages?: { niveau?: Niveau; departement?: string; jour?: number; miniMaxi?: boolean; modele?: ModeleMeteo };
+  /** `densite`, `periode` et `tailleIcones` : réglages de départ (ex. carte des Pyrénées-Orientales : peu de pictos, grands, mini et maxi de la journée). */
+  reglages?: { niveau?: Niveau; departement?: string; jour?: number; miniMaxi?: boolean; modele?: ModeleMeteo; densite?: Densite; periode?: Periode; tailleIcones?: number };
   /** Vignette : seulement la carte et son bouton d'export (page des 16 jours), sans les menus de réglage. */
   compact?: boolean;
   /** Habillage léger aux couleurs catalanes (page Pyrénées-Orientales). */
@@ -428,16 +429,16 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [niveau, setNiveau] = useState<Niveau>(reglages?.niveau ?? 'france');
   const [region, setRegion] = useState(REGIONS_FR[0]);
   const [departement, setDepartement] = useState(reglages?.departement ?? '29');
-  const [densite, setDensite] = useState<Densite>('moyen');
+  const [densite, setDensite] = useState<Densite>(reglages?.densite ?? 'moyen');
   const [donneesVilles, setDonneesVilles] = useState<DonneesVilles | null>(initialVilles);
   // Emojis par défaut, quelle que soit la zone (France, région, département) et sur la page des 16 jours.
   const jeuInitial: JeuPictos = 'alertes';
   const [jeuPictos, setJeuPictos] = useState<JeuPictos>(jeuInitial);
   /** Taille des icônes (%), températures inchangées. */
-  const [tailleIcones, setTailleIcones] = useState(100);
+  const [tailleIcones, setTailleIcones] = useState(reglages?.tailleIcones ?? 100);
   const jeuRef = useRef<JeuPictos>(jeuInitial);
   jeuRef.current = jeuPictos;
-  const [periode, setPeriode] = useState<Periode>('apres-midi');
+  const [periode, setPeriode] = useState<Periode>(reglages?.periode ?? 'apres-midi');
   const [theme, setTheme] = useState<ThemeCarte | null>(null);
   /** Après-midi : afficher aussi le mini et le maxi de la journée (picto de l'après-midi), au lieu de la T° de l'après-midi. */
   const [miniMaxi, setMiniMaxi] = useState(reglages?.miniMaxi ?? false);
