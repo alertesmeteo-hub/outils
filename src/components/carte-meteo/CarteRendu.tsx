@@ -6,6 +6,8 @@ import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { MATRICE_RELIEF, TAILLE_TUILE_VIDE, coucheParDefaut, tuileParente, tuilesVisibles, type Couche, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_DEFAUT_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
+import { DecorStyle, FondStyleSvg, useTerres } from './FondStyle';
+import { STYLES_FOND, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 
 /**
@@ -243,6 +245,8 @@ interface Props {
   theme?: ThemeCarte | null;
   /** Habillage léger aux couleurs catalanes (bandes de la senyera, cartouche crème) : carte des Pyrénées-Orientales. */
   habillage?: 'catalan' | null;
+  /** Style de fond (couleurs, dégradés, mer dessinée) à la place des tuiles du fond de carte. */
+  styleFond?: StyleFond | null;
   /** Carte en emojis : le ciel voilé (image) prend la taille d'un emoji au lieu de celle des jeux d'images. */
   pictosEmoji?: boolean;
   /** Présentation des rafales (pastille par défaut). */
@@ -447,6 +451,7 @@ export default function CarteRendu({
   pictosEmoji = false,
   theme = null,
   habillage = null,
+  styleFond = null,
   styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
@@ -491,6 +496,11 @@ export default function CarteRendu({
   onDeplacerRafale,
 }: Props) {
   const [partout, setPartout] = useState(false);
+  const terresEurope = useTerres(styleFond != null);
+  const defStyle = styleFond ? STYLES_FOND[styleFond] : null;
+  // Style de fond : territoire plein (contour du style), voisins en simple trait ; sinon les traits habituels.
+  const traitSelectionStyle = defStyle ? { ...TRAIT_SELECTION, fill: defStyle.territoire, fillOpacity: 1, stroke: defStyle.contour, strokeOpacity: 1, strokeWidth: 1.6 } : null;
+  const traitVoisinsStyle = defStyle ? { ...TRAIT_HORS_SELECTION, fill: 'none', fillOpacity: 1, stroke: defStyle.voisins, strokeOpacity: 1, strokeWidth: 1 } : null;
   /** Rafale ajoutée dont le choix de direction est ouvert. */
   const [directionOuvertePour, setDirectionOuvertePour] = useState<string | null>(null);
   const idClip = `fleuves-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
@@ -568,7 +578,7 @@ export default function CarteRendu({
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
         ref={carteRef}
-        className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''} ${theme ? `cmap-theme cmap-theme-${theme}` : ''} ${habillage === 'catalan' ? 'cmap-catalan' : ''}`}
+        className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''} ${theme ? `cmap-theme cmap-theme-${theme}` : ''} ${habillage === 'catalan' && !styleFond ? 'cmap-catalan' : ''}`}
         style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
         onClick={(e) => {
           if (!onClicCarte || (e.target as HTMLElement).closest('.cmap-marqueur, .cmap-palette, .cmap-vent-ajoute')) return;
@@ -586,25 +596,26 @@ export default function CarteRendu({
               </filter>
             )}
             <g filter={couche === 'relief' ? `url(#${idFiltreFond})` : undefined}>
-              {!theme && tuilesVisibles(couche, vue, largeur, HAUTEUR_CARTE).map((t) => (
+              {!theme && !styleFond && tuilesVisibles(couche, vue, largeur, HAUTEUR_CARTE).map((t) => (
                 <TuileFond key={t.cle} t={t} couche={couche} />
               ))}
             </g>
+            {styleFond && <FondStyleSvg style={styleFond} vue={vue} largeur={largeur} hauteur={HAUTEUR_CARTE} terres={terresEurope} />}
             {departements.filter((c) => !selection.has(c.code)).map((c) => (
-              <path key={c.code} d={c.d} {...(theme ? traitsTheme(theme).hors : TRAIT_HORS_SELECTION)} {...(regions ? { stroke: 'none' } : {})} />
+              <path key={c.code} d={c.d} {...(traitVoisinsStyle ?? (theme ? traitsTheme(theme).hors : TRAIT_HORS_SELECTION))} {...(regions ? { stroke: 'none' } : {})} />
             ))}
             {/* Reliefs : le territoire est teinté en transparence (opacité du groupe, donc sans jointures visibles) pour laisser voir le relief. */}
-            <g opacity={afficherRelief ? 1 - reliefVisible : 1}>
+            <g opacity={afficherRelief && !styleFond ? 1 - reliefVisible : 1}>
               {departements.filter((c) => selection.has(c.code)).map((c) =>
                 regions && regions.length === 0 ? (
-                  <path key={c.code} d={c.d} {...(theme ? traitsTheme(theme).uni : TRAIT_UNI)} />
+                  <path key={c.code} d={c.d} {...(traitSelectionStyle ?? (theme ? traitsTheme(theme).uni : TRAIT_UNI))} />
                 ) : (
-                  <path key={c.code} d={c.d} {...(theme ? (carteLocale ? traitsTheme(theme).selection : traitsTheme(theme).selectionFrance) : carteLocale ? TRAIT_SELECTION : TRAIT_SELECTION_FRANCE)} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} {...(remplissages?.[c.code] ? { fill: remplissages[c.code] } : {})} />
+                  <path key={c.code} d={c.d} {...(traitSelectionStyle ?? (theme ? (carteLocale ? traitsTheme(theme).selection : traitsTheme(theme).selectionFrance) : carteLocale ? TRAIT_SELECTION : TRAIT_SELECTION_FRANCE))} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} {...(remplissages?.[c.code] ? { fill: remplissages[c.code] } : {})} />
                 )
               )}
             </g>
             {cellules && (
-              <g opacity={afficherRelief ? 1 - reliefVisible : 1}>
+              <g opacity={afficherRelief && !styleFond ? 1 - reliefVisible : 1}>
                 <defs>
                   {departements.filter((c) => selection.has(c.code)).map((c) => (
                     <clipPath key={c.code} id={`${idClip}-zone-${c.code}`}><path d={c.d} /></clipPath>
@@ -646,6 +657,7 @@ export default function CarteRendu({
           </g>
         </svg>
         {theme && <DecorTheme theme={theme} largeur={largeur} hauteur={HAUTEUR_CARTE} />}
+        {styleFond && !theme && <DecorStyle style={styleFond} vue={vue} largeur={largeur} hauteur={HAUTEUR_CARTE} />}
 
         {logoUrl && (
           <img

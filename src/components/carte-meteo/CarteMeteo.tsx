@@ -15,6 +15,7 @@ import { ChoixPicto } from './ChoixPicto';
 import { THEMES_CARTE, averseNuageGris, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo, type ThemeCarte } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { CalqueAnnotations, PanneauAnnotations, type Annotation, type ReglagesAnnotation } from './Annotations';
+import { DEPARTEMENTS_MER_A_L_EST, ORDRE_STYLES_FOND, STYLES_FOND, estStyleFond, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 import { CREDITS_COUCHES, LIBELLES_COUCHES, coucheParDefaut, type Couche } from '@/lib/carte-meteo/tuiles';
 import {
   LATITUDE_SEUIL_NORD_SUD,
@@ -510,6 +511,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [reliefPourcent, setReliefPourcent] = useState(28);
   /** Fond de carte choisi ; nul = selon le zoom (relief NASA pour la France et les régions, photos IGN pour un département). */
   const [fondChoisi, setFondChoisi] = useState<Couche | null>(null);
+  /** Style de fond (couleurs, dégradés, mer dessinée) ; nul = fond de carte en tuiles. */
+  const [styleFond, setStyleFond] = useState<StyleFond | null>(null);
   const [enExport, setEnExport] = useState(false);
   const [erreurExport, setErreurExport] = useState<string | null>(null);
 
@@ -533,7 +536,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   // et rétablis à la prochaine ouverture. Pas les prévisions ni les retouches faites sur la carte (voir « Figer la carte »).
   const [memoriser, setMemoriser] = useState(false);
   const [erreurMemo, setErreurMemo] = useState<string | null>(null);
-  const parametres = JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, jeuPictos, tailleIcones, tailleVent, periode, miniMaxi, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, altitudeNeige, reglagesTexte, tailleIcone, texteNouveau, iconeNouvelle, rafaleNouvelle, provenanceNouvelle });
+  const parametres = JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, jeuPictos, tailleIcones, tailleVent, periode, miniMaxi, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, altitudeNeige, reglagesTexte, tailleIcone, texteNouveau, iconeNouvelle, rafaleNouvelle, provenanceNouvelle });
   useEffect(() => {
     if (compact) return;
     try {
@@ -567,6 +570,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       if ('afficherRelief' in e) setAfficherRelief(e.afficherRelief as never);
       if ('reliefPourcent' in e) setReliefPourcent(e.reliefPourcent as never);
       if ('fondChoisi' in e) setFondChoisi(e.fondChoisi as never);
+      if ('styleFond' in e) setStyleFond(estStyleFond(e.styleFond) ? e.styleFond : null);
       if ('altitudeNeige' in e) setAltitudeNeige(e.altitudeNeige as never);
       if ('reglagesTexte' in e) setReglagesTexte(e.reglagesTexte as never);
       if ('tailleIcone' in e) setTailleIcone(e.tailleIcone as never);
@@ -657,6 +661,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       if ('afficherRelief' in e) setAfficherRelief(e.afficherRelief as never);
       if ('reliefPourcent' in e) setReliefPourcent(e.reliefPourcent as never);
       if ('fondChoisi' in e) setFondChoisi(e.fondChoisi as never);
+      if ('styleFond' in e) setStyleFond(estStyleFond(e.styleFond) ? e.styleFond : null);
       if (Array.isArray(e.rafalesRetirees)) setRafalesRetirees(new Set(e.rafalesRetirees as string[]));
       if (Array.isArray(e.pictosRetires)) setPictosRetires(new Set(e.pictosRetires as string[]));
       setJour(Math.round((Date.parse(e.dateISO) - Date.parse(aujourdhui)) / 86400000));
@@ -671,7 +676,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     if (!figee || compact) return;
     const minuteur = setTimeout(() => {
       try {
-        localStorage.setItem(cleCarteFigee(reglages), JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, rafalesRetirees: [...rafalesRetirees], pictosRetires: [...pictosRetires], dateISO, figeeLe }));
+        localStorage.setItem(cleCarteFigee(reglages), JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, rafalesRetirees: [...rafalesRetirees], pictosRetires: [...pictosRetires], dateISO, figeeLe }));
         setErreurFiger(null);
       } catch {
         setErreurFiger('Sauvegarde impossible dans ce navigateur (navigation privée ou stockage plein, logo importé trop lourd ?).');
@@ -679,7 +684,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     }, 400);
     return () => clearTimeout(minuteur);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, rafalesRetirees, pictosRetires, dateISO, figee, compact, figeeLe]);
+  }, [modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, rafalesRetirees, pictosRetires, dateISO, figee, compact, figeeLe]);
   function basculerFiger() {
     if (figee) {
       setFigee(false);
@@ -782,8 +787,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const selection = useMemo(() => new Set(codes), [codes]);
 
   const departementsAffiches = useMemo(
-    () => (zone === 'france' ? contoursDep : contoursDep.filter((c) => selection.has(c.code))),
-    [contoursDep, selection, zone]
+    () => (zone === 'france' || styleFond ? contoursDep : contoursDep.filter((c) => selection.has(c.code))),
+    [contoursDep, selection, zone, styleFond]
   );
   const regionsAffichees = useMemo(() => {
     if (fond === 'aucun') return []; // liste vide : pas de contours (les départements ne sont alors tracés que par leur remplissage)
@@ -797,9 +802,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       .map((c) => c.boite);
     const boite = unirBoites(boites) ?? BOITE_FRANCE;
     if (zone === 'france') return ajusterVue(boite, ZONE_FRANCE, 0.01);
-    if (zone.startsWith('dep:')) return ajusterVue(boite, ZONE_DEPARTEMENT, 0.02);
+    // Style de fond sur un département du littoral méditerranéen : bande de mer à droite (la mer apparaît toujours).
+    if (zone.startsWith('dep:')) return ajusterVue(boite, styleFond && DEPARTEMENTS_MER_A_L_EST.includes(zone.slice(4)) ? { ...ZONE_DEPARTEMENT, droite: LARGEUR_CARTE - 170 } : ZONE_DEPARTEMENT, 0.02);
     return ajusterVue(boite, ZONE_UTILE);
-  }, [contoursDep, selection, zone]);
+  }, [contoursDep, selection, zone, styleFond]);
   const couche = fondChoisi ?? coucheParDefaut(vue);
 
   const logoDefaut = useMemo(() => logoParDefaut(codes), [codes]);
@@ -1545,6 +1551,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       afficherRelief={afficherRelief}
       reliefVisible={reliefPourcent / 100}
       fond={couche}
+      styleFond={styleFond}
       vue={vue}
       departements={departementsAffiches}
       regions={regionsAffichees}
@@ -2175,6 +2182,17 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </label>
             </>
           )}
+          <label className="text-sm font-medium">
+            <span className={legendeBarre}>Style de fond</span>
+            <select value={styleFond ?? ''} onChange={(e) => setStyleFond(estStyleFond(e.target.value) ? e.target.value : null)} className={selectBarre}>
+              <option value="">Aucun (fond de carte ci-dessous)</option>
+              {ORDRE_STYLES_FOND.map((s) => (
+                <option key={s} value={s}>
+                  {STYLES_FOND[s].libelle}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="text-sm font-medium">
             <span className={legendeBarre}>Fond de carte</span>
             <select value={couche} onChange={(e) => setFondChoisi(e.target.value as Couche)} className={selectBarre}>
