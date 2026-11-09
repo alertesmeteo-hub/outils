@@ -208,10 +208,10 @@ const TOUS_PICTOS_THEMES = Object.values(PICTOS_PAR_THEME).flat();
 
 /** Icône Alertes Météo → situation illustrée du thème (les autres icônes restent telles quelles). */
 const VERS_THEME: Record<string, string> = {
-  soleil: 'clair', 'ciel-voile': 'eclaircies', 'peu-nuageux': 'eclaircies', eclaircies: 'eclaircies', 'eclaircies-gris': 'eclaircies', nuageux: 'nuage', couvert: 'nuage',
+  soleil: 'clair', 'ciel-voile': 'eclaircies', 'peu-nuageux': 'eclaircies', eclaircies: 'eclaircies', nuageux: 'nuage', couvert: 'nuage',
   brume: 'brouillard', brouillard: 'brouillard', 'brouillard-givrant': 'brouillard',
   'nuit-claire': 'nuit-claire', 'nuit-peu-nuageuse': 'nuit-peu-nuageuse', 'nuit-nuageuse': 'nuit-nuageuse', 'nuit-brouillard': 'nuit-brouillard',
-  bruine: 'pluie', 'pluie-faible': 'pluie', pluie: 'pluie', 'forte-pluie': 'forte-pluie', averses: 'averses', 'averses-nuit': 'averses',
+  bruine: 'pluie', 'pluie-faible': 'pluie', pluie: 'pluie', 'forte-pluie': 'forte-pluie', averses: 'averses', 'averses-gris': 'averses', 'averses-nuit': 'averses',
   'pluie-verglacante': 'gel', verglas: 'gel', gel: 'gel', givre: 'gel', 'pluie-neige': 'neige',
   orage: 'orage', 'orage-pluie': 'orage', 'averse-orageuse': 'orage', foudre: 'orage',
   grele: 'grele', 'forte-grele': 'grele', 'orage-grele': 'grele', 'averse-grele': 'grele', 'pluie-grele': 'grele', gresil: 'grele',
@@ -325,11 +325,11 @@ export function pictoDepuisCodeMeteo(code: number | null | undefined, jeu: JeuPi
 
 /** Ce qui détermine le picto d'une période : ciel (%), cumul de pluie (mm), température (°C) et code météo du modèle. */
 /**
- * Carte avec pictos : le picto « éclaircies » du jeu Alertes prend le nuage gris (« am:eclaircies-gris »). Les autres usages
- * (vidéo, planches) gardent le nuage blanc ; les autres jeux et les autres pictos ne changent pas.
+ * Carte avec pictos : le picto « averses » du jeu Alertes (soleil, nuage et pluie) prend le nuage gris (« am:averses-gris »).
+ * Les autres usages (vidéo, planches) gardent le nuage blanc ; les autres jeux et les autres pictos ne changent pas.
  */
-export function eclairciesNuageGris(picto: PictoMeteo, jeu: JeuPictos): PictoMeteo {
-  return jeu === 'alertes' && picto === 'am:eclaircies' ? 'am:eclaircies-gris' : picto;
+export function averseNuageGris(picto: PictoMeteo, jeu: JeuPictos): PictoMeteo {
+  return jeu === 'alertes' && picto === 'am:averses' ? 'am:averses-gris' : picto;
 }
 
 export interface EntreePicto {

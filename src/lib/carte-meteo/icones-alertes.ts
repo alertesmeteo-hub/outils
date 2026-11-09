@@ -23,6 +23,7 @@ export const ICONES_ALERTES: [string, string, string, string][] = [
   ["pluie", "Pluie", "Pluie et orages", ""],
   ["forte-pluie", "Forte pluie", "Pluie et orages", "pluie intense déluge"],
   ["averses", "Averses", "Pluie et orages", ""],
+  ["averses-gris", "Averses (nuage gris)", "Pluie et orages", "nuage gris soleil pluie"],
   ["averses-nuit", "Averses (nuit)", "Pluie et orages", ""],
   ["pluie-verglacante", "Pluie verglaçante", "Pluie et orages", "verglas"],
   ["pluie-neige", "Pluie et neige mêlées", "Pluie et orages", "neige fondue"],

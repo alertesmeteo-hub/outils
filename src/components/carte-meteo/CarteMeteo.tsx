@@ -12,7 +12,7 @@ import { saisieAcceptee } from '@/lib/carte-meteo/limites';
 import { DIRECTIONS_VENT, angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { ChoixPicto } from './ChoixPicto';
-import { THEMES_CARTE, eclairciesNuageGris, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo, type ThemeCarte } from '@/lib/carte-meteo/pictos';
+import { THEMES_CARTE, averseNuageGris, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo, type ThemeCarte } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { CalqueAnnotations, PanneauAnnotations, type Annotation, type ReglagesAnnotation } from './Annotations';
 import { CREDITS_COUCHES, LIBELLES_COUCHES, coucheParDefaut, type Couche } from '@/lib/carte-meteo/tuiles';
@@ -315,11 +315,11 @@ const texte = (v: number | null) => (v == null ? '' : String(Math.round(v)));
 /** Pictos de l'après-midi et de la journée d'un point, d'après la nébulosité et les précipitations de la période. */
 function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoM: PictoMeteo; pictoAM: PictoMeteo; pictoJ: PictoMeteo; pictoS: PictoMeteo; pictoN: PictoMeteo } {
   return {
-    pictoS: eclairciesNuageGris(pictoDepuisPrevision({ code: p.codeSoiree ?? null, nuages: p.nuagesSoiree ?? null, pluie: p.pluieSoiree ?? null, temperature: p.tempSoiree ?? null, voile: p.voileSoiree, nuit: true }, jeu), jeu),
-    pictoN: eclairciesNuageGris(pictoDepuisPrevision({ code: p.codeNuit ?? null, nuages: p.nuagesNuit ?? null, pluie: p.pluieNuit ?? null, temperature: p.tempNuit ?? null, voile: p.voileNuit, nuit: true }, jeu), jeu),
-    pictoM: eclairciesNuageGris(pictoDepuisPrevision({ code: p.codeMatin, nuages: p.nuagesMatin, pluie: p.pluieMatin, temperature: p.tempMatin, voile: p.voileMatin }, jeu), jeu),
-    pictoAM: eclairciesNuageGris(pictoDepuisPrevision({ code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: p.pluieApresMidi, temperature: p.tempApresMidi, voile: p.voileApresMidi }, jeu), jeu),
-    pictoJ: eclairciesNuageGris(pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: p.pluieJournee, temperature: p.maxi, voile: p.voileJournee }, jeu), jeu),
+    pictoS: averseNuageGris(pictoDepuisPrevision({ code: p.codeSoiree ?? null, nuages: p.nuagesSoiree ?? null, pluie: p.pluieSoiree ?? null, temperature: p.tempSoiree ?? null, voile: p.voileSoiree, nuit: true }, jeu), jeu),
+    pictoN: averseNuageGris(pictoDepuisPrevision({ code: p.codeNuit ?? null, nuages: p.nuagesNuit ?? null, pluie: p.pluieNuit ?? null, temperature: p.tempNuit ?? null, voile: p.voileNuit, nuit: true }, jeu), jeu),
+    pictoM: averseNuageGris(pictoDepuisPrevision({ code: p.codeMatin, nuages: p.nuagesMatin, pluie: p.pluieMatin, temperature: p.tempMatin, voile: p.voileMatin }, jeu), jeu),
+    pictoAM: averseNuageGris(pictoDepuisPrevision({ code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: p.pluieApresMidi, temperature: p.tempApresMidi, voile: p.voileApresMidi }, jeu), jeu),
+    pictoJ: averseNuageGris(pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: p.pluieJournee, temperature: p.maxi, voile: p.voileJournee }, jeu), jeu),
   };
 }
 
