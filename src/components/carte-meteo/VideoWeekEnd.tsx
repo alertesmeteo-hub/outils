@@ -5,6 +5,8 @@ import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { cheminPictoImage, pictoDepuisPrevision } from '@/lib/carte-meteo/pictos';
+import { selonJeu, useJeuAlertes, type JeuAlertes } from '@/lib/carte-meteo/jeu-alertes';
+import ChoixJeuAlertes from './ChoixJeuAlertes';
 import { chargerPictoAnime, dessinerPictoAnime, type PictoAnime } from '@/lib/carte-meteo/pictos-animes';
 import { ICONES_ALERTES } from '@/lib/carte-meteo/icones-alertes';
 import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
@@ -141,10 +143,10 @@ const degre = (v: number | null) => (v == null ? '–' : `${v}°`);
 const SEUIL_PLUIE = 0.5;
 const pluieRetenue = (mm: number | null | undefined) => (mm != null && mm >= SEUIL_PLUIE ? mm : 0);
 
-function versJour(p: PointCarte | undefined): JourVille {
+function versJour(p: PointCarte | undefined, jeu: JeuAlertes = 'alertes'): JourVille {
   if (!p) return { maxi: null, mini: null, rafale: null, pluie: null, picto: null };
   const picto = pictoDepuisPrevision({ code: p.codeJournee ?? null, nuages: p.nuagesJournee ?? null, pluie: p.pluieJournee == null ? null : pluieRetenue(p.pluieJournee), temperature: p.maxi ?? null, voile: p.voileJournee }, 'alertes') as string;
-  return { maxi: arrondi(p.maxi), mini: arrondi(p.mini), rafale: arrondi(p.rafaleJournee), pluie: pluieRetenue(p.pluieJournee), picto: cheminPictoImage(picto) ?? null };
+  return { maxi: arrondi(p.maxi), mini: arrondi(p.mini), rafale: arrondi(p.rafaleJournee), pluie: pluieRetenue(p.pluieJournee), picto: cheminPictoImage(selonJeu(picto, jeu)) ?? null };
 }
 
 const cacheImages = new Map<string, Promise<HTMLImageElement>>();
@@ -893,19 +895,20 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     () => (listeVilles?.dep === dep ? [...listeVilles.villes, ...listeVilles.reliefs].map((v) => v.nom).sort((a, b) => a.localeCompare(b, 'fr')) : []),
     [listeVilles, dep]
   );
+  const [jeuAlertes, setJeuAlertes] = useJeuAlertes();
   const semaine: Semaine | null = useMemo(() => {
     if (!donnees || donnees.cle !== cle) return null;
     const parJour = donnees.points.map((liste, i) => new Map([...liste, ...pointsReliefs(jours[i])].map((p) => [p.nom, p])));
-    return { jours, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, parJour.map((m) => versJour(m.get(n)))])) };
+    return { jours, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, parJour.map((m) => versJour(m.get(n), jeuAlertes))])) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [donnees, cle, jours, toutesLesVilles, reliefsParDate]);
+  }, [donnees, cle, jours, toutesLesVilles, reliefsParDate, jeuAlertes]);
 
   const tendance = useMemo(() => {
     if (!donneesTendance || donneesTendance.cle !== cleTendance || toutesLesVilles.length === 0) return null;
     const parJour = donneesTendance.points.map((liste, i) => new Map([...liste, ...pointsReliefs(joursTendance[i])].map((p) => [p.nom, p])));
-    return { jours: joursTendance, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, parJour.map((m) => versJour(m.get(n)))])) };
+    return { jours: joursTendance, villes: Object.fromEntries(toutesLesVilles.map((n) => [n, parJour.map((m) => versJour(m.get(n), jeuAlertes))])) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [donneesTendance, cleTendance, joursTendance, toutesLesVilles, reliefsParDate]);
+  }, [donneesTendance, cleTendance, joursTendance, toutesLesVilles, reliefsParDate, jeuAlertes]);
 
   // Images des pictos et logo, chargées avant de dessiner.
   useEffect(() => {
@@ -918,7 +921,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     let vivant = true;
     Promise.all(
       [...fichiers].map((f) =>
-        Promise.all([charger(f).then((img) => imageDe.set(f, img)), chargerPictoAnime(f).then((a) => (a ? animes.set(f, a) : animes.delete(f)))])
+        Promise.all([charger(f).then((img) => imageDe.set(f, img)), (f.includes('/pictos-alertes-pro/') ? Promise.resolve(null) : chargerPictoAnime(f)).then((a) => (a ? animes.set(f, a) : animes.delete(f)))])
       )
     ).then(() => vivant && setPrets((n) => n + 1)).catch(() => {});
     // Fond de carte du début : chargé ici pour que l'aperçu le montre dès qu'il est prêt.
@@ -1117,6 +1120,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
             ))}
           </div>
         </div>
+        <ChoixJeuAlertes jeu={jeuAlertes} onChange={setJeuAlertes} />
         {mode === 'jour' && (
           <label className="text-sm font-medium">
             <span className={legende}>Jour</span>

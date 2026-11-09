@@ -9,6 +9,8 @@ import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR, REGION_PAR_DEPARTEMENT } from '@/lib/carte-meteo/regions-fr';
 import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
 import { cheminPictoImage, estPictoImage } from '@/lib/carte-meteo/pictos';
+import { selonJeu, useJeuAlertes } from '@/lib/carte-meteo/jeu-alertes';
+import ChoixJeuAlertes from './ChoixJeuAlertes';
 import { angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 import { CODES_DEPARTEMENTS, DUREES_TENDANCES, ajouterJours, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import { MATRICE_RELIEF, CREDITS_COUCHES, LIBELLES_COUCHES, coucheParDefaut, tuilesVisibles, type Couche } from '@/lib/carte-meteo/tuiles';
@@ -57,6 +59,7 @@ interface Props {
  * région ou un département, avec un seul picto par point (le temps de la journée) et ses températures.
  */
 export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france' }: Props) {
+  const [jeuAlertes, setJeuAlertes] = useJeuAlertes();
   const [dureeChoisie, setDuree] = useState<number>(4);
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
   const [departChoisi, setDepart] = useState(1);
@@ -276,7 +279,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
       };
       const comptes = new Map<string, number>();
       for (const p of liste) comptes.set(pictoDuJour(p), (comptes.get(pictoDuJour(p)) ?? 0) + 1);
-      const picto = [...comptes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      const pictoBrut = [...comptes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      const picto = pictoBrut ? selonJeu(pictoBrut, jeuAlertes) : null;
       const rafales = liste.map((p) => p.rafale ?? 0);
       return { maxi: moy(liste.map((p) => p.maxi)), mini: moy(liste.map((p) => p.mini)), picto, rafale: Math.max(...rafales) || null };
     };
@@ -288,7 +292,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
     return [...noms.entries()]
       .map(([code, nom]) => ({ nom, cellules: dates.map((d) => cellule(brutDuJour(d).filter((p) => p.code === code))) }))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
-  }, [zone, parQuarts, enDepartement, dates, jours, donneesDep, codes]);
+  }, [zone, parQuarts, enDepartement, dates, jours, donneesDep, codes, jeuAlertes]);
 
   const nomZone = parQuarts ? 'France' : zone === 'france' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
   /** Données du texte automatique : températures maximales des premiers jours de la planche. */
@@ -388,6 +392,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
           <input type="checkbox" checked={risques} onChange={(e) => setRisques(e.target.checked)} />
           Risques : gel, orage, neige
         </label>
+        <ChoixJeuAlertes jeu={jeuAlertes} onChange={setJeuAlertes} />
         <label className="text-sm font-medium">
           <span className="mb-1 block">Période</span>
           <select value={periode} onChange={(e) => setPeriode(e.target.value as PeriodePlanche)} className={selectBarre}>
@@ -570,7 +575,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                       <div key={p.code} style={{ position: 'absolute', left: x, top: y, transform: `${parQuarts ? 'translate(-50%, -50%)' : `translate(-50%, ${-taillePicto / 2}px)`}${dec ? ` translate(${dec[0]}px, ${dec[1]}px)` : ''}`, display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={pictoId ? cheminPictoImage(pictoId) ?? '' : undefined}
+                          src={pictoId ? cheminPictoImage(selonJeu(pictoId, jeuAlertes)) ?? '' : undefined}
                           alt=""
                           draggable={false}
                           title="Cliquer pour changer le picto, glisser pour déplacer le picto et ses températures"
