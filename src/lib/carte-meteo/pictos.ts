@@ -208,7 +208,7 @@ const TOUS_PICTOS_THEMES = Object.values(PICTOS_PAR_THEME).flat();
 
 /** Icône Alertes Météo → situation illustrée du thème (les autres icônes restent telles quelles). */
 const VERS_THEME: Record<string, string> = {
-  soleil: 'clair', 'ciel-voile': 'eclaircies', 'peu-nuageux': 'eclaircies', eclaircies: 'eclaircies', nuageux: 'nuage', couvert: 'nuage',
+  soleil: 'clair', 'ciel-voile': 'eclaircies', 'peu-nuageux': 'eclaircies', eclaircies: 'eclaircies', 'eclaircies-gris': 'eclaircies', nuageux: 'nuage', couvert: 'nuage',
   brume: 'brouillard', brouillard: 'brouillard', 'brouillard-givrant': 'brouillard',
   'nuit-claire': 'nuit-claire', 'nuit-peu-nuageuse': 'nuit-peu-nuageuse', 'nuit-nuageuse': 'nuit-nuageuse', 'nuit-brouillard': 'nuit-brouillard',
   bruine: 'pluie', 'pluie-faible': 'pluie', pluie: 'pluie', 'forte-pluie': 'forte-pluie', averses: 'averses', 'averses-nuit': 'averses',
@@ -290,7 +290,7 @@ function meteoconsDepuisCode(code: number | null | undefined): PictoMeteo {
 /** Code météo WMO → icône Alertes Météo. */
 function alertesDepuisCode(code: number | null | undefined): PictoMeteo {
   if (code == null || code <= 1) return 'am:soleil';
-  if (code === 2) return 'am:eclaircies';
+  if (code === 2) return 'am:eclaircies-gris';
   if (code === 3) return 'am:couvert';
   if (code === 45 || code === 48) return 'am:brouillard';
   if (code >= 51 && code <= 55) return 'am:bruine';
@@ -366,7 +366,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
     if (e.voile) return 'am:ciel-voile';
     if (ciel < 20) return 'am:soleil';
     if (ciel < 45) return 'am:peu-nuageux';
-    if (ciel < 75) return 'am:eclaircies';
+    if (ciel < 75) return 'am:eclaircies-gris';
     return 'am:couvert';
   }
   if (jeu === 'meteocons') {
