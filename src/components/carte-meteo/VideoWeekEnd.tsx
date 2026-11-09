@@ -1026,7 +1026,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     };
     const nomJour = (iso: string) => libelleJour(iso).toLowerCase();
     const ciel = (picto: string | null) => {
-      const nom = picto?.match(/pictos-alertes\/([^./?]+)\.svg/)?.[1];
+      const nom = picto?.match(/pictos-alertes(?:-pro)?\/([^./?]+)\.svg/)?.[1];
       return ICONES_ALERTES.find(([n]) => n === nom)?.[1] ?? null;
     };
     const lignes = (d: number, valeur: (j: JourVille) => number | null, avecCiel = false) =>

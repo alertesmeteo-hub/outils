@@ -1333,7 +1333,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Mode « ajouter un picto » : un clic sur la carte pose un picto (soleil par défaut) et ouvre sa palette. */
   function ajouterPicto(x: number, y: number) {
     const id = Date.now();
-    setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : jeuPictos === 'alertes' ? 'am:soleil' : THEMES_CARTE.some((t) => t.id === jeuPictos) ? `${THEMES_CARTE.find((t) => t.id === jeuPictos)!.prefixe}:clair` : '☀️', valeur: '' }]);
+    setAjouts((liste) => [...liste, { id, zone, x: Math.round(x), y: Math.round(y), picto: jeuPictos === 'images' ? 'img:1' : jeuPictos === 'meteocons' ? 'mc:clear-day' : jeuPictos === 'alertes' ? 'am:soleil' : jeuPictos === 'alertes-pro' ? 'ap:soleil' : THEMES_CARTE.some((t) => t.id === jeuPictos) ? `${THEMES_CARTE.find((t) => t.id === jeuPictos)!.prefixe}:clair` : '☀️', valeur: '' }]);
     setPictosSelectionnes(new Set());
     setPaletteOuvertePour(`ajout:${id}`);
   }
@@ -1726,6 +1726,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             {(
               [
                 ['alertes', 'Icônes Alertes Météo'],
+                ['alertes-pro', 'Alertes-meteo-Pro (contours épais)'],
                 ['emoji', 'Emojis'],
                 ['images', 'Mes pictos (images)'],
                 ['meteocons', 'Meteocons (icônes libres)'],

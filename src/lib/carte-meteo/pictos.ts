@@ -156,6 +156,15 @@ export const PICTOS_ALERTES: PictoAlertes[] = ICONES_ALERTES.map(([nom, label, c
   motsCles,
 }));
 
+/** Icônes Alertes-meteo-Pro : les mêmes icônes, contour sombre épais et couleurs franches (voir scripts/pictos-pro.mjs). */
+export const PICTOS_ALERTES_PRO: PictoAlertes[] = ICONES_ALERTES.map(([nom, label, categorie, motsCles]) => ({
+  id: `ap:${nom}`,
+  fichier: `/pictos-alertes-pro/${nom}.svg?v=1`,
+  label,
+  categorie,
+  motsCles,
+}));
+
 /** Libellés des emojis, pour l'infobulle et la recherche. */
 export const LIBELLES_EMOJIS: Record<string, string> = {
   '☀️': 'Soleil',
@@ -219,32 +228,32 @@ const VERS_THEME: Record<string, string> = {
   vent: 'vent', rafales: 'vent', tempete: 'tempete', tornade: 'tornade',
 };
 export function enTheme(picto: string, theme: ThemeCarte): PictoMeteo {
-  const nom = VERS_THEME[picto.replace(/^am:/, '')];
+  const nom = VERS_THEME[picto.replace(/^a[mp]:/, '')];
   const prefixe = THEMES_CARTE.find((t) => t.id === theme)!.prefixe;
   return nom ? `${prefixe}:${nom}` : picto;
 }
 
 export function estPictoImage(picto: string): boolean {
-  return picto.startsWith('img:') || picto.startsWith('mc:') || picto.startsWith('am:') || estPictoTheme(picto);
+  return picto.startsWith('img:') || picto.startsWith('mc:') || picto.startsWith('am:') || picto.startsWith('ap:') || estPictoTheme(picto);
 }
 
 /** Picto de neige (emojis, images ou Meteocons) : on peut y afficher une altitude (ex. « 2000 m »). */
 export function estPictoNeige(picto: string): boolean {
   if (picto === '🌨️' || picto === '❄️' || picto === '☃️') return true;
   if (picto.startsWith('mc:')) return /snow|sleet/.test(picto);
-  if (picto.startsWith('am:')) return /neige|blizzard/.test(picto);
+  if (picto.startsWith('am:') || picto.startsWith('ap:')) return /neige|blizzard/.test(picto);
   if (estPictoTheme(picto)) return /:neige$/.test(picto);
   if (picto.startsWith('img:')) return /neige/i.test(PICTOS_IMAGES.find((p) => p.id === picto)?.label ?? '');
   return false;
 }
 
 export function cheminPictoImage(picto: string): string | undefined {
-  const jeu = picto.startsWith('mc:') ? PICTOS_METEOCONS : picto.startsWith('am:') ? PICTOS_ALERTES : estPictoTheme(picto) ? TOUS_PICTOS_THEMES : PICTOS_IMAGES;
+  const jeu = picto.startsWith('mc:') ? PICTOS_METEOCONS : picto.startsWith('am:') ? PICTOS_ALERTES : picto.startsWith('ap:') ? PICTOS_ALERTES_PRO : estPictoTheme(picto) ? TOUS_PICTOS_THEMES : PICTOS_IMAGES;
   return jeu.find((p) => p.id === picto)?.fichier;
 }
 
 /** Jeu de pictos appliqué automatiquement à toute la carte : emojis, ou les images fournies (public/pictos). */
-export type JeuPictos = 'emoji' | 'images' | 'meteocons' | 'alertes' | ThemeCarte;
+export type JeuPictos = 'emoji' | 'images' | 'meteocons' | 'alertes' | 'alertes-pro' | ThemeCarte;
 
 /**
  * Code météo WMO → image du jeu fourni : ciel peu nuageux → soleil et petit nuage (101), nuageux → soleil et nuages (102),
@@ -306,7 +315,11 @@ function alertesDepuisCode(code: number | null | undefined): PictoMeteo {
   return 'am:pluie';
 }
 
+/** Icône Alertes Météo → la même dans le jeu Alertes-meteo-Pro. */
+const versPro = (picto: PictoMeteo): PictoMeteo => picto.replace(/^am:/, 'ap:');
+
 export function pictoDepuisCodeMeteo(code: number | null | undefined, jeu: JeuPictos = 'emoji'): PictoMeteo {
+  if (jeu === 'alertes-pro') return versPro(alertesDepuisCode(code));
   if (jeu === 'halloween' || jeu === 'noel' || jeu === 'paques') return enTheme(alertesDepuisCode(code), jeu);
   if (jeu === 'meteocons') return meteoconsDepuisCode(code);
   if (jeu === 'alertes') return alertesDepuisCode(code);
@@ -329,6 +342,7 @@ export function pictoDepuisCodeMeteo(code: number | null | undefined, jeu: JeuPi
  * Les autres usages (vidéo, planches) gardent le nuage blanc ; les autres jeux et les autres pictos ne changent pas.
  */
 export function averseNuageGris(picto: PictoMeteo, jeu: JeuPictos): PictoMeteo {
+  if (jeu === 'alertes-pro' && picto === 'ap:averses') return 'ap:averses-gris';
   return jeu === 'alertes' && picto === 'am:averses' ? 'am:averses-gris' : picto;
 }
 
@@ -352,6 +366,7 @@ const CODES_NEIGE = [71, 73, 75, 77, 85, 86];
  * Sans nébulosité (données absentes), on retombe sur le code météo du modèle.
  */
 export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): PictoMeteo {
+  if (jeu === 'alertes-pro') return versPro(pictoDepuisPrevision(e, 'alertes'));
   if (jeu === 'halloween' || jeu === 'noel' || jeu === 'paques') return enTheme(pictoDepuisPrevision(e, 'alertes'), jeu);
   const { code, nuages, pluie, temperature } = e;
   const images = jeu === 'images';
