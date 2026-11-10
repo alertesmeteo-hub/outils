@@ -22,7 +22,7 @@ import { TuileFond } from './CarteRendu';
 import { DecorStyle, FondStyleSvg, positionMer, useTerres } from './FondStyle';
 import { ORDRE_STYLES_FOND, STYLES_FOND, estStyleFond, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 import TableauPrevisions, { type CelluleJour, type LigneTableau } from './TableauPrevisions';
-import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, FICHIERS_CONTOURS } from './CarteMeteo';
+import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, useFleuves, FICHIERS_CONTOURS } from './CarteMeteo';
 import { statsDe, type CarteTexte, type RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from './TexteSurCarte';
 
@@ -30,7 +30,7 @@ const LARGEUR = 1600;
 const MARGE = 24;
 const ECART = 14;
 const HAUTEUR_TITRE = 120;
-const HAUTEUR_PIED = 44;
+const HAUTEUR_PIED = 64;
 const HAUTEUR_JOUR = 36;
 /** Colonnes de la grille selon le nombre de cartes : 2 cartes côte à côte, 16 cartes en 4 × 4… */
 const COLONNES: Record<number, number> = { 2: 2, 4: 2, 6: 3, 8: 4, 10: 5, 12: 4, 14: 5, 16: 4 };
@@ -44,8 +44,12 @@ const SEUIL_NEIGE = 1;
 const NIVEAUX_ORAGE = ['', 'FAIBLE', 'MODÉRÉ', 'FORT', 'SÉVÈRE'];
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
+/** Jour en toutes lettres : « MERCREDI 11 NOVEMBRE » (le 1er du mois : « 1ER »). */
 const jourLibelle = (dateISO: string) =>
-  new Date(`${dateISO}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).toUpperCase();
+  new Date(`${dateISO}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).toUpperCase().replace(/ 1 /, ' 1ER ');
+/** Cours d'eau : tracés arrondis d'épaisseur constante à l'écran. */
+const COURS_EAU = { fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke' } as const;
+const LOGO_PIED = LOGOS_PRESETS.find((l) => l.id === 'pays-catalan-hd')!;
 
 interface Props {
   aujourdhui: string;
@@ -81,6 +85,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState(zoneInitiale);
   const [logoId, setLogoId] = useState('alertesmeteo');
+  const fleuves = useFleuves(true);
   const [donneesDepBrutes, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
   // Valeurs du moment choisi (matin, après-midi…) : pictos, températures, rafales et tableau suivent la période.
   const auMoment = useMemo(() => (liste: PointJour[] | null | undefined) => (liste ? liste.map((p) => pointDeLaPeriode(p, periode)) : liste), [periode]);
@@ -185,7 +190,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [zonageFin, setZonageFin] = useState(false);
   /** Fond de carte : automatique (relief ou photos pour un département ou une région, uni pour la France), uni, relief NASA ou photos IGN. */
   const [fondChoisi, setFondChoisi] = useState<'auto' | 'uni' | Couche>('auto');
-  const [styleFond, setStyleFond] = useState<StyleFond | null>(null);
+  const [styleFond, setStyleFond] = useState<StyleFond | null>('rouge-or');
   const terresEurope = useTerres(styleFond != null);
   const fin = zonageFin && zone === 'france' && !parQuarts;
   type PointZone = { dep: string; lat: number; lon: number; maxi: number | null };
@@ -580,6 +585,32 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                             ))}
                           </g>
                         )}
+                        {fleuves && (
+                          <>
+                            <clipPath id={`fleuves-${date}`}>
+                              {contours.filter((c) => codes.has(c.code)).map((c) => <path key={c.code} d={c.d} />)}
+                            </clipPath>
+                            {/* Département : fleuves et rivières principales ; France et région : les quatre grands fleuves. */}
+                            <g clipPath={`url(#fleuves-${date})`}>
+                              {enDepartement && vue.echelle >= 1.2 && (
+                                <>
+                                  <path d={fleuves.d3} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={4} />
+                                  <path d={fleuves.d3} {...COURS_EAU} stroke="#2f62c9" strokeWidth={2.2} />
+                                </>
+                              )}
+                              {zoneCarte !== 'france' && (
+                                <>
+                                  <path d={fleuves.d2} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 4.8 : 2.2} />
+                                  <path d={fleuves.d2} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 2.8 : 1.1} />
+                                  <path d={fleuves.d1} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
+                                  <path d={fleuves.d1} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 3.6 : 1.8} />
+                                </>
+                              )}
+                              <path d={fleuves.d0} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
+                              <path d={fleuves.d0} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 3.6 : 1.8} />
+                            </g>
+                          </>
+                        )}
                       </g>
                     </svg>
                     {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={merVisible} bandes={false} />}
@@ -657,7 +688,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
               <span>
                 Prévisions {modele.libelle} ({modele.fournisseur}) · {parQuarts ? 'moyenne par zone' : `un point par ${enDepartement ? 'ville' : 'département'}`} · <span style={{ color: '#ff8a8a' }}>maximale</span> puis <span style={{ color: '#7db4ff' }}>minimale</span>{couche ? ` · Fond : ${CREDITS_COUCHES[couche]}` : ''}
               </span>
-              <span style={{ fontFamily: POLICE, fontSize: 24, color: '#fff' }}>www.alertes-meteo.com</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={LOGO_PIED.fichier} alt="Météo Pays Catalan" style={{ height: 56 }} />
             </div>
           </div>
         </div>
