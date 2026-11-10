@@ -11,6 +11,7 @@ import { chargerPictoAnime, dessinerPictoAnime, type PictoAnime } from '@/lib/ca
 import { ICONES_ALERTES } from '@/lib/carte-meteo/icones-alertes';
 import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import { chargerCote, secteurDe } from '@/lib/carte-meteo/secteurs';
+import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, canEncodeVideo } from 'mediabunny';
 
 /** Vidéo « Quel temps ce week-end ? » ou « Quel temps aujourd'hui / demain / J+n ? » (TikTok, Reels, Shorts, Facebook, YouTube) : 3 ou 4 villes, picto animé, maxi, mini, rafales, pluie. */
 
@@ -972,13 +973,46 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
     setLecture(false);
     await chargerGeoFond();
     try {
-      const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
-      const type = types.find((x) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(x));
-      if (!type) throw new Error("Ce navigateur n'enregistre pas de vidéo.");
       const c = document.createElement('canvas');
       c.width = format.l;
       c.height = format.h;
       const ctx = c.getContext('2d')!;
+      const nomFichier = (ext: string) => `meteo-${mode === 'weekend' ? 'weekend' : 'jour'}-${dep}-${format.id}-${jours[0]}.${ext}`;
+      const telecharger = (blob: Blob, ext: string) => {
+        const url = URL.createObjectURL(blob);
+        const lien = document.createElement('a');
+        lien.href = url;
+        lien.download = nomFichier(ext);
+        lien.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      };
+
+      // Voie principale : encodage image par image en H.264 (30 i/s constantes, durée et images clés exactes, moov en tête).
+      // C'est le seul MP4 que TikTok lit sans caler ; l'enregistrement en temps réel du navigateur donne un MP4 fragmenté à cadence variable.
+      if (await canEncodeVideo('avc', { width: format.l, height: format.h, bitrate: 8_000_000 }).catch(() => false)) {
+        const sortie = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target: new BufferTarget() });
+        const source = new CanvasSource(c, { codec: 'avc', bitrate: 8_000_000, keyFrameInterval: 1 });
+        sortie.addVideoTrack(source, { frameRate: FPS });
+        await sortie.start();
+        const nb = Math.round(total * FPS);
+        for (let i = 0; i < nb; i++) {
+          dessiner(ctx, i / FPS, contexte);
+          await source.add(i / FPS, 1 / FPS);
+          if (i % 5 === 0) {
+            setEtat(`Encodage de la vidéo… ${Math.round((i / nb) * 100)} %`);
+            await new Promise((r) => setTimeout(r, 0));
+          }
+        }
+        source.close();
+        await sortie.finalize();
+        telecharger(new Blob([sortie.target.buffer!], { type: 'video/mp4' }), 'mp4');
+        return;
+      }
+
+      // Repli (navigateur sans WebCodecs) : enregistrement en temps réel.
+      const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+      const type = types.find((x) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(x));
+      if (!type) throw new Error("Ce navigateur n'enregistre pas de vidéo.");
       dessiner(ctx, 0, contexte);
       const flux = c.captureStream(FPS);
       const enregistreur = new MediaRecorder(flux, { mimeType: type, videoBitsPerSecond: 8_000_000 });
@@ -999,12 +1033,7 @@ export default function VideoWeekEnd({ aujourdhui }: { aujourdhui: string }) {
       });
       enregistreur.stop();
       await fini;
-      const url = URL.createObjectURL(new Blob(morceaux, { type: type.split(';')[0] }));
-      const lien = document.createElement('a');
-      lien.href = url;
-      lien.download = `meteo-${mode === 'weekend' ? 'weekend' : 'jour'}-${dep}-${format.id}-${jours[0]}.${type.startsWith('video/mp4') ? 'mp4' : 'webm'}`;
-      lien.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      telecharger(new Blob(morceaux, { type: type.split(';')[0] }), type.startsWith('video/mp4') ? 'mp4' : 'webm');
     } catch (e) {
       console.error('Export vidéo week-end', e);
       setErreur((e as Error).message || "L'export de la vidéo a échoué.");

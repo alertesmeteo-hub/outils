@@ -33,6 +33,9 @@ const nextConfig = {
     // Page statique privée (protégée par le middleware) : /prompts-meteo/ sert public/prompts-meteo/index.html.
     return [{ source: '/prompts-meteo/', destination: '/prompts-meteo/index.html' }];
   },
+  async redirects() {
+    return [{ source: '/outils/carte-meteo/video-weekend', destination: '/outils/carte-meteo/video/', permanent: true }];
+  },
   async headers() {
     // EMBED_ALLOWED_ORIGINS : liste d'origines autorisées à intégrer /embed (défaut : toutes).
     const embedAncestors = process.env.EMBED_ALLOWED_ORIGINS?.trim() || '*';

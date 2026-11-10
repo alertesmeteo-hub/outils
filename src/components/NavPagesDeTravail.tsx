@@ -29,7 +29,7 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
       { href: '/outils/pyrenees-orientales/#animation-releves', libelle: 'Relevés animés (observations)' },
       { href: '/outils/pyrenees-orientales/#animation', libelle: 'Animations pluie, vent, températures' },
       { href: '/outils/carte-meteo/bilan-mois/', libelle: 'Bilan du mois' },
-      { href: '/outils/carte-meteo/video-weekend/', libelle: '🎬 Vidéo TikTok du week-end' },
+      { href: '/outils/carte-meteo/video/', libelle: '🎬 Vidéo TikTok du week-end' },
     ],
   },
   {

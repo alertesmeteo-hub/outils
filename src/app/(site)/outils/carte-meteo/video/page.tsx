@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: "Vidéo météo : quel temps ce week-end, aujourd'hui ou demain",
   description: "Vidéo météo (TikTok, Reels, Shorts, Facebook, YouTube) du week-end ou d'un jour (J, J+1, J+2…) : 3 ou 4 villes, pictos animés, températures, rafales et pluie. Export MP4.",
-  alternates: { canonical: '/outils/carte-meteo/video-weekend/' },
+  alternates: { canonical: '/outils/carte-meteo/video/' },
 };
 
 export default function PageVideoWeekEnd() {
