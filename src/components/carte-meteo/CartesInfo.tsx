@@ -863,7 +863,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                               }}
                               className={`block w-full px-3 py-1.5 text-left ${(t.groupe === GROUPE_RISQUES ? baseRisque(t.id) === baseRisque(carteEffective?.id ?? '') : t.id === carteEffective?.id) ? 'bg-primary text-white' : 'hover:bg-bg'}`}
                             >
-                              <span className="block">{t.court}</span>
+                              <span className={`block ${(t as ThemePrevision).run && t.id !== carteEffective?.id ? 'font-semibold text-red-600' : ''}`}>{t.court}</span>
                               {t.aide && <span className={`mt-0.5 block text-xs font-normal ${t.id === carteEffective?.id ? 'text-white/85' : 'text-muted'}`}>{t.aide}</span>}
                             </button>
                           </li>
@@ -1102,7 +1102,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             <div key={g.groupe} className="flex flex-wrap items-center gap-1.5">
               <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{nomGroupe(g.groupe)}</span>
               {g.themes.map((t) => (
-                <a key={t.id} href={`#carte-${t.id}`} className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-bg">
+                <a key={t.id} href={`#carte-${t.id}`} className={`rounded-md border px-2 py-1 text-xs font-medium hover:bg-bg ${(t as ThemePrevision).run ? 'border-red-600 font-semibold text-red-600' : 'border-border'}`}>
                   {t.court}
                 </a>
               ))}
