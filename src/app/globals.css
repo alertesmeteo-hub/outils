@@ -311,6 +311,13 @@ body {
 .cmap-palette-aide { font-size: 11px; color: #64748b; margin: 0 2px 6px; }
 .cmap-pied { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; z-index: 3; font-size: 21px; font-weight: 800; letter-spacing: 0.02em; color: #fff; text-shadow: 0 0 4px #000, 0 0 4px #000, 1px 1px 2px #000; pointer-events: none; }
 .cmap-titre-droite { left: auto; right: 28px; transform: none; text-align: right; }
+/* Cartouche de parchemin catalan (vide) : papier ancien, double filet or et rouge (senyera), ombre portée. */
+.cmap-parchemin {
+  position: absolute; left: 29px; top: 8px; width: 330px; height: 62px; z-index: 3; border-radius: 8px; pointer-events: none;
+  background: radial-gradient(ellipse at 28% 18%, #fbf0d2 0%, #f1dfb0 55%, #dcc088 100%);
+  border: 2px solid #8f1b20;
+  box-shadow: inset 0 0 0 3px #fcdd09, inset 0 0 0 5px #da121a, inset 0 0 16px rgba(120, 80, 20, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
 /* Carte de France : date et sous-titre en haut à gauche (position donnée par CarteRendu). */
 .cmap-titre-gauche { transform: none; text-align: left; }
 
