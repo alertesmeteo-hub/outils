@@ -247,6 +247,8 @@ interface Props {
   habillage?: 'catalan' | null;
   /** Style de fond (couleurs, dégradés, mer dessinée) à la place des tuiles du fond de carte. */
   styleFond?: StyleFond | null;
+  /** Sans les bandes de la senyera en coin (cartes tendances). */
+  sansBandes?: boolean;
   /** Carte en emojis : le ciel voilé (image) prend la taille d'un emoji au lieu de celle des jeux d'images. */
   pictosEmoji?: boolean;
   /** Présentation des rafales (pastille par défaut). */
@@ -452,6 +454,7 @@ export default function CarteRendu({
   theme = null,
   habillage = null,
   styleFond = null,
+  sansBandes = false,
   styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
@@ -658,7 +661,7 @@ export default function CarteRendu({
           </g>
         </svg>
         {theme && <DecorTheme theme={theme} largeur={largeur} hauteur={HAUTEUR_CARTE} />}
-        {styleFond && !theme && <DecorStyle style={styleFond} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} />}
+        {styleFond && !theme && <DecorStyle style={styleFond} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} bandes={!sansBandes} />}
 
         {logoUrl && (
           <img

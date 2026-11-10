@@ -582,7 +582,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                         )}
                       </g>
                     </svg>
-                    {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={merVisible} />}
+                    {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={merVisible} bandes={false} />}
                     <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: 'rgba(255,255,255,0.94)', color: '#0b2a4a', fontFamily: POLICE, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
                       {jourLibelle(date)}
                     </div>

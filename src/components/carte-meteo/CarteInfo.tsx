@@ -117,6 +117,8 @@ interface Props {
   valeurMin?: number;
   /** Style de fond de cette carte (sinon celui de la page). */
   styleFond?: StyleFond | null;
+  /** Sans les bandes de la senyera en coin. */
+  sansBandes?: boolean;
   /** Nom de la ville sous chaque valeur et flèche vers la station (sinon : réglage du bloc « Affichage de la carte »). */
   reperes?: boolean;
   policeValeurs?: PoliceValeurs;
@@ -147,7 +149,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -571,6 +573,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         reliefVisible={(affichage?.reliefPourcent ?? 22) / 100}
         fond={affichage?.fond ?? undefined}
         styleFond={styleFond}
+        sansBandes={sansBandes}
         theme={affichage?.theme ?? null}
         vue={vue}
         departements={departements}

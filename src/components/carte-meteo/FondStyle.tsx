@@ -249,7 +249,7 @@ const JAUNE = '#fcdd09';
 const ROUGE = '#da121a';
 
 /** Décor posé sur la carte (coordonnées écran) : bandes de la senyera en coin et nom de la mer, centré dans la mer visible. */
-export function DecorStyle({ style, largeur, hauteur, mer }: { style: StyleFond; largeur: number; hauteur: number; mer: { x: number; y: number } | null }) {
+export function DecorStyle({ style, largeur, hauteur, mer, bandes: avecBandes = true }: { style: StyleFond; largeur: number; hauteur: number; mer: { x: number; y: number } | null; bandes?: boolean }) {
   const def = STYLES_FOND[style];
   const l = largeur;
   const h = hauteur;
@@ -267,7 +267,7 @@ export function DecorStyle({ style, largeur, hauteur, mer }: { style: StyleFond;
   ));
   return (
     <svg className="cmap-decor" viewBox={`0 0 ${l} ${h}`} width={l} height={h} aria-hidden>
-      {def.senyera && (
+      {def.senyera && avecBandes && (
         <>
           <g opacity={0.96} transform={`scale(${k})`}>{bandes}</g>
           <g opacity={0.96} transform={`rotate(180 ${l / 2} ${h / 2}) scale(${k})`}>

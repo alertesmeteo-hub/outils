@@ -275,6 +275,7 @@ export default function PlanchesTendances({ aujourdhui, modele, periodes, zones6
               ) : (
                 <CarteInfo
                   styleFond={styleFond}
+                  sansBandes
                   theme={theme}
                   zone={enZones66 ? 'dep:66' : regionCarte ? `reg:${regionCarte}` : 'france'}
                   points={points}
