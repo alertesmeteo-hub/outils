@@ -6,7 +6,7 @@ import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { MATRICE_RELIEF, TAILLE_TUILE_VIDE, coucheParDefaut, tuileParente, tuilesVisibles, type Couche, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_DEFAUT_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
-import { DecorStyle, FondStyleSvg, positionMer, useTerres } from './FondStyle';
+import { DecorMer, DecorStyle, FondStyleSvg, positionMer, useTerres } from './FondStyle';
 import { STYLES_FOND, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 
@@ -235,6 +235,10 @@ interface Props {
   titreADroite?: boolean;
   /** Date et sous-titre alignés à gauche, à cette position (px de la carte) : carte de France. */
   titreGauche?: number;
+  /** Logo en bas à gauche (au lieu du haut à gauche). */
+  logoEnBas?: boolean;
+  /** Écrit « Mer Méditerranée » dans la mer visible quand la carte n'a pas de style de fond. */
+  etiquetteMer?: boolean;
   /** Pictos plus grands (vue département). */
   grosPictos?: boolean;
   /** Carte de région ou de département : températures +15 % et pictos +5 % (voir `.cmap-local` dans globals.css). */
@@ -449,6 +453,8 @@ export default function CarteRendu({
   pied = '',
   titreADroite = false,
   titreGauche,
+  logoEnBas = false,
+  etiquetteMer = false,
   grosPictos = false,
   carteLocale = false,
   styleCapture = false,
@@ -502,8 +508,9 @@ export default function CarteRendu({
   onDeplacerRafale,
 }: Props) {
   const [partout, setPartout] = useState(false);
-  const terresEurope = useTerres(styleFond != null);
-  const merVisible = useMemo(() => (styleFond ? positionMer(terresEurope, vue, largeur, HAUTEUR_CARTE) : null), [styleFond, terresEurope, vue, largeur]);
+  const nomMer = etiquetteMer && !styleFond && !theme;
+  const terresEurope = useTerres(styleFond != null || nomMer);
+  const merVisible = useMemo(() => (styleFond || nomMer ? positionMer(terresEurope, vue, largeur, HAUTEUR_CARTE) : null), [styleFond, nomMer, terresEurope, vue, largeur]);
   const defStyle = styleFond ? STYLES_FOND[styleFond] : null;
   // Style de fond : territoire plein (contour du style), voisins en simple trait ; sinon les traits habituels.
   const traitSelectionStyle = defStyle ? { ...TRAIT_SELECTION, fill: defStyle.territoire, fillOpacity: 1, stroke: defStyle.contour, strokeOpacity: 1, strokeWidth: 1.6 } : null;
@@ -666,12 +673,14 @@ export default function CarteRendu({
         {theme && <DecorTheme theme={theme} largeur={largeur} hauteur={HAUTEUR_CARTE} />}
         {styleFond && !theme && <DecorStyle style={styleFond} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} bandes={!sansBandes} />}
 
+        {nomMer && <DecorMer largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} />}
+
         {logoUrl && (
           <img
             src={logoUrl}
             alt="Logo"
             className="cmap-logo"
-            style={{ ...(logoDroite != null ? { left: 'auto', right: largeur - logoDroite } : {}), ...(logoFondBlanc ? {} : { background: 'none' }), ...(hauteurLogo ? { height: hauteurLogo, maxWidth: 'none' } : {}) }}
+            style={{ ...(logoEnBas ? { top: 'auto', bottom: 21 } : {}), ...(logoDroite != null ? { left: 'auto', right: largeur - logoDroite } : {}), ...(logoFondBlanc ? {} : { background: 'none' }), ...(hauteurLogo ? { height: hauteurLogo, maxWidth: 'none' } : {}) }}
           />
         )}
 

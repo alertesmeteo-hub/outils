@@ -1121,8 +1121,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const logoDroite = 29 + Math.max(205, hauteurLogo);
     const moyennesGauche = 29;
     const obstacles: Rect[] = [
-      enFrance ? { x: largeurCarte - 28 - largeurLogo, y: 21, w: largeurLogo, h: hauteurLogo + 1 } : { x: 29, y: 21, w: logoDroite - 29, h: hauteurLogo + 1 },
-      enFrance ? { x: xTitreFrance, y: 6, w: 410, h: 67 } : { x: largeurCarte / 2 - 250, y: 6, w: 500, h: 67 },
+      enFrance ? { x: largeurCarte - 28 - largeurLogo, y: 21, w: largeurLogo, h: hauteurLogo + 1 } : { x: 29, y: HAUTEUR_CARTE - 21 - hauteurLogo - 1, w: logoDroite - 29, h: hauteurLogo + 1 },
+      enFrance ? { x: xTitreFrance, y: 6, w: 410, h: 67 } : { x: 29, y: 6, w: 500, h: 67 },
       ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : []),
     ];
@@ -1615,7 +1615,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       logoFondBlanc={logoFondBlanc}
       hauteurLogo={hauteurLogo}
       pied={pied}
-      titreGauche={enFrance ? xTitreFrance : undefined}
+      titreGauche={enFrance ? xTitreFrance : 29}
+      logoEnBas={!enFrance}
+      etiquetteMer
       logoDroite={enFrance ? largeurCarte - 28 : null}
       grosPictos={enDepartement}
       carteLocale={!enFrance}

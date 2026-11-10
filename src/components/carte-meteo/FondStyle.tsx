@@ -285,13 +285,30 @@ export function DecorStyle({ style, largeur, hauteur, mer, bandes: avecBandes = 
           </g>
         </>
       )}
-      {mer && (
-        <g fill={def.texteMer} fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight={700} fontSize={22} textAnchor="middle">
-          <text x={mer.x} y={mer.y - 12}>Mer</text>
-          <text x={mer.x} y={mer.y + 12}>Méditerranée</text>
-          <path d={`M ${mer.x - 34} ${mer.y + 30} q 11 -9 22 0 t 22 0 t 22 0 M ${mer.x - 34} ${mer.y + 40} q 11 -9 22 0 t 22 0 t 22 0`} fill="none" stroke={def.texteMer} strokeWidth={2.4} strokeLinecap="round" />
-        </g>
-      )}
+      {mer && <EtiquetteMer mer={mer} couleur={def.texteMer} />}
+    </svg>
+  );
+}
+
+/** « Mer Méditerranée » et deux vagues, centrés sur le point donné (pixels écran). Avec `contour`, un liseré sombre aide la lecture sur photos. */
+function EtiquetteMer({ mer, couleur, contour = false }: { mer: { x: number; y: number }; couleur: string; contour?: boolean }) {
+  const halo = contour ? { stroke: 'rgba(5,25,60,0.85)', strokeWidth: 4, paintOrder: 'stroke' as const, strokeLinejoin: 'round' as const } : {};
+  return (
+    <g fill={couleur} fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight={700} fontSize={22} textAnchor="middle">
+      <text x={mer.x} y={mer.y - 12} {...halo}>Mer</text>
+      <text x={mer.x} y={mer.y + 12} {...halo}>Méditerranée</text>
+      {contour && <path d={`M ${mer.x - 34} ${mer.y + 30} q 11 -9 22 0 t 22 0 t 22 0 M ${mer.x - 34} ${mer.y + 40} q 11 -9 22 0 t 22 0 t 22 0`} fill="none" stroke="rgba(5,25,60,0.85)" strokeWidth={5.4} strokeLinecap="round" />}
+      <path d={`M ${mer.x - 34} ${mer.y + 30} q 11 -9 22 0 t 22 0 t 22 0 M ${mer.x - 34} ${mer.y + 40} q 11 -9 22 0 t 22 0 t 22 0`} fill="none" stroke={couleur} strokeWidth={2.4} strokeLinecap="round" />
+    </g>
+  );
+}
+
+/** Nom de la mer seul, sur une carte à fond photo (sans style de fond). */
+export function DecorMer({ largeur, hauteur, mer }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null }) {
+  if (!mer) return null;
+  return (
+    <svg className="cmap-decor" viewBox={`0 0 ${largeur} ${hauteur}`} width={largeur} height={hauteur} aria-hidden>
+      <EtiquetteMer mer={mer} couleur="#ffffff" contour />
     </svg>
   );
 }
