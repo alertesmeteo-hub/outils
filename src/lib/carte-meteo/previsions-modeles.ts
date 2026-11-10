@@ -330,6 +330,15 @@ function extremeEntre(serie: Serie, debut: number, fin: number, champ: 'temp' | 
   return arrondi(sens === 'max' ? Math.max(...valeurs) : Math.min(...valeurs), 1);
 }
 
+/** Rafale la plus forte (km/h) et sa direction de maintenant à la fin du run, pour une série brute (carte de France : maximum du département). */
+export function rafaleJusquaFinDuRun(brute: Serie): { valeur: number | null; direction: number | null } {
+  const serie: Serie = { ...brute, rafale: brute.rafale.map((v) => (v != null && ventPlausible(v) ? v : null)) };
+  const echeances = serie.t.map((t) => Date.parse(t)).filter((t) => Number.isFinite(t));
+  const finRun = echeances.length ? Math.max(...echeances) : null;
+  const maintenant = Date.now();
+  return finRun != null && finRun > maintenant ? rafaleEntre(serie, maintenant, finRun) : { valeur: null, direction: null };
+}
+
 /** Cumuls de pluie et rafales les plus fortes sur 3, 5, 10 et 16 jours à partir de minuit (Paris) de `dateISO`. */
 function cumulsPluie(
   serie: Serie,

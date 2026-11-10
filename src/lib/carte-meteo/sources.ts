@@ -6,7 +6,7 @@ import { COORDS_DEPARTEMENTS } from './departements-coords';
 import { DEPARTEMENTS_FR } from './departements-fr';
 import { ALTITUDE_MAX_VILLE_FRANCE, VILLES_FRANCE } from './villes-france';
 import { pictoDepuisPrevision } from './pictos';
-import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pointDepuisSerie, type ModeleMeteo, type ModeleSource, type PointCarte, type Serie } from './previsions-modeles';
+import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pointDepuisSerie, rafaleJusquaFinDuRun, type ModeleMeteo, type ModeleSource, type PointCarte, type Serie } from './previsions-modeles';
 
 /**
  * Prévisions de la carte météo : les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (branche `data`),
@@ -450,6 +450,16 @@ export async function chargerPrevisionsCarteJours(
     for (const date of datesISO) {
       const { nom: ville, lat, lon } = r.value.chefCommune;
       const point = { ...pointDepuisSerie(dep, DEPARTEMENTS_FR[dep] ?? dep, r.value.chef, date, finPeriode), ville, lat, lon };
+      // Rafale jusqu'à la fin du run : la plus forte de tout le département (toutes ses communes), pas seulement de la ville du point.
+      let plusForte: { valeur: number | null; direction: number | null } | null = null;
+      for (const serie of [r.value.chef, ...r.value.villes.map((v) => v.serie)]) {
+        const x = rafaleJusquaFinDuRun(serie);
+        if (x.valeur != null && (plusForte == null || x.valeur > (plusForte.valeur ?? -1))) plusForte = x;
+      }
+      if (plusForte) {
+        point.rafaleRun = plusForte.valeur;
+        point.directionRafaleRun = plusForte.direction;
+      }
       if (finPeriode ? aValeursPeriode(point) : point.tempApresMidi != null || (!apresMidiSeulement && point.maxi != null)) (sortie[date] as PointCarte[]).push(point);
     }
   });
