@@ -103,8 +103,8 @@ export interface PointCarte {
   /** Pluie (mm) dans les 24 et 36 prochaines heures, à partir de maintenant (pas de minuit). */
   pluie24h?: number | null;
   pluie36h?: number | null;
-  /** Toute la durée du run du modèle (AROME 48 h, Harmonie 60 h…) : pluie cumulée (mm), rafale la plus forte (km/h) et sa
-   * direction, premier et dernier instants de la série (ISO UTC). */
+  /** De maintenant à la fin du run du modèle (AROME 48 h, Harmonie 60 h…) : pluie cumulée (mm), rafale la plus forte (km/h) et sa
+   * direction, instant de départ (maintenant) et dernière échéance de la série (ISO UTC). */
   pluieRun?: number | null;
   rafaleRun?: number | null;
   directionRafaleRun?: number | null;
@@ -346,12 +346,12 @@ function cumulsPluie(
   const c24 = cumulEntre(serie, maintenant, maintenant + 24 * 3_600_000);
   const c36 = cumulEntre(serie, maintenant, maintenant + 36 * 3_600_000);
   const n36 = cumulEntre(serie, maintenant, maintenant + 36 * 3_600_000, 'neige');
-  // Tout le run : de la première à la dernière échéance de la série (le modèle fixe la durée : AROME 48 h, Harmonie 60 h).
+  // Jusqu'à la fin du run : de maintenant (création de la carte) à la dernière échéance de la série (AROME 48 h, Harmonie 60 h…).
   const echeances = serie.t.map((t) => Date.parse(t)).filter((t) => Number.isFinite(t));
-  const debutRun = echeances.length ? Math.min(...echeances) : null;
   const finRun = echeances.length ? Math.max(...echeances) : null;
-  const cRun = debutRun != null && finRun != null ? cumulEntre(serie, debutRun - 1, finRun) : { valeur: null, derniere: null };
-  const rRun = debutRun != null && finRun != null ? rafaleEntre(serie, debutRun - 1, finRun) : { valeur: null, direction: null };
+  const debutRun = finRun != null && finRun > maintenant ? maintenant : null;
+  const cRun = debutRun != null && finRun != null ? cumulEntre(serie, debutRun, finRun) : { valeur: null, derniere: null };
+  const rRun = debutRun != null && finRun != null ? rafaleEntre(serie, debutRun, finRun) : { valeur: null, direction: null };
   const [c3, c5, c10, c16] = DUREES_CUMUL.map((jours) => cumulEntre(serie, debut, debut + jours * 86_400_000));
   const [r3, r5, r10, r16] = DUREES_CUMUL.map((jours) => rafaleEntre(serie, debut, debut + jours * 86_400_000));
   return {
