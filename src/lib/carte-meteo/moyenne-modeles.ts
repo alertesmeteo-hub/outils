@@ -36,6 +36,9 @@ function plusFrequente(valeurs: number[]): number {
 /** Champs repris tels quels du point de base (identité, position, échéances). */
 const IDENTITE = new Set(['code', 'nom', 'ville', 'lat', 'lon', 'altitude', 'prioritaire', 'placeExacte', 'dep', 'finPrevision', 'finPeriode']);
 
+/** Valeurs « tout le run » : propres à la durée de chaque modèle (48 h, 60 h, 15 jours), jamais moyennées entre elles. */
+const CHAMPS_RUN = new Set(['pluieRun', 'rafaleRun', 'directionRafaleRun', 'debutRun', 'finRun']);
+
 /** Moyenne point par point (même code) de listes produites par plusieurs modèles ; la liste la plus fournie sert de base. */
 export function moyennePoints<P extends PointCarte>(listes: P[][]): P[] {
   const base = [...listes].sort((a, b) => b.length - a.length)[0] ?? [];
@@ -46,6 +49,10 @@ export function moyennePoints<P extends PointCarte>(listes: P[][]): P[] {
     const champs = new Set(memes.flatMap((p) => Object.keys(p)));
     for (const champ of champs) {
       if (IDENTITE.has(champ)) continue;
+      if (CHAMPS_RUN.has(champ)) {
+        point[champ] = null;
+        continue;
+      }
       const brutes = memes.map((p) => (p as unknown as Record<string, unknown>)[champ]);
       if (brutes.some((v) => typeof v === 'boolean')) {
         // Ciel voilé : retenu si la majorité des modèles le voient.

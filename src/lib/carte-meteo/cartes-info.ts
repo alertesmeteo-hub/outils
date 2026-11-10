@@ -64,6 +64,8 @@ export interface ThemePrevision extends ThemeInfo {
   montagne?: boolean;
   /** Valeur sur la période choisie sur la page (« du … au … »), avec le modèle choisi, lue à part (?fin=). */
   periode?: boolean;
+  /** Toute la durée du run du modèle (AROME 48 h, Harmonie 60 h…), du premier au dernier pas de la série. */
+  run?: boolean;
   /** Fenêtre glissante : pluie des N prochaines heures à partir de maintenant (et non d'un jour entier). */
   fenetreHeures?: number;
   /** Carte mixte : pluie (mm) en plaine et neige fraîche (cm) sur les communes de montagne (lues à part, ?montagne=1). */
@@ -462,12 +464,14 @@ const THEMES_PREVISION_BASE: ThemePrevision[] = [
   { id: 'pluie-24h', groupe: 'Pluie', fenetreHeures: 24, titre: 'PLUIE DANS LES 24 PROCHAINES HEURES', court: 'Pluie 24 h (prochaines heures)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie24h },
   { id: 'pluie-36h', groupe: 'Pluie', fenetreHeures: 36, titre: 'PLUIE DANS LES 36 PROCHAINES HEURES', court: 'Pluie 36 h (prochaines heures)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie36h },
   { id: 'pluie-neige-36h', groupe: 'Pluie', fenetreHeures: 36, pluieEtNeige: true, sansTeinte: true, titre: 'PLUIE ET NEIGE EN MONTAGNE · 36 PROCHAINES HEURES', court: 'Pluie + neige en montagne (36 h)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie36h },
+  { id: 'pluie-run', groupe: 'Pluie', run: true, titre: 'CUMULS DE PLUIE SUR TOUTE LA DURÉE DU RUN', court: 'Pluie sur tout le run (AROME 48 h, Harmonie 60 h)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluieRun },
   { id: 'pluie-3j', groupe: 'Pluie', cumulJours: 3, titre: 'CUMULS DE PLUIE SUR 3 JOURS', court: 'Pluie sur 3 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie3j },
   { id: 'pluie-5j', groupe: 'Pluie', cumulJours: 5, titre: 'CUMULS DE PLUIE SUR 5 JOURS', court: 'Pluie sur 5 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie5j },
   { id: 'pluie-10j', groupe: 'Pluie', cumulJours: 10, titre: 'CUMULS DE PLUIE SUR 10 JOURS', court: 'Pluie sur 10 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie10j },
   { id: 'pluie-16j', groupe: 'Pluie', cumulJours: 16, titre: 'CUMULS DE PLUIE SUR 16 JOURS', court: 'Pluie sur 16 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie16j },
   { id: 'pluie-periode', groupe: 'Pluie', periode: true, titre: 'CUMULS DE PLUIE SUR LA PÉRIODE', court: 'Pluie sur une période', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluiePeriode },
   { id: 'rafales', groupe: 'Vent', titre: 'RAFALES MAXIMALES', court: 'Rafales maximales', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafaleJournee, direction: (x) => x.directionRafaleJournee },
+  { id: 'rafales-run', groupe: 'Vent', run: true, titre: 'RAFALES MAXIMALES SUR TOUTE LA DURÉE DU RUN', court: 'Rafales sur tout le run (AROME 48 h, Harmonie 60 h)', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafaleRun, direction: (x) => x.directionRafaleRun },
   { id: 'rafales-3j', groupe: 'Vent', cumulJours: 3, titre: 'RAFALES MAXIMALES SUR 3 JOURS', court: 'Rafales sur 3 jours', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafale3j, direction: (x) => x.directionRafale3j },
   { id: 'rafales-5j', groupe: 'Vent', cumulJours: 5, titre: 'RAFALES MAXIMALES SUR 5 JOURS', court: 'Rafales sur 5 jours', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafale5j, direction: (x) => x.directionRafale5j },
   { id: 'rafales-10j', groupe: 'Vent', cumulJours: 10, titre: 'RAFALES MAXIMALES SUR 10 JOURS', court: 'Rafales sur 10 jours', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafale10j, direction: (x) => x.directionRafale10j },

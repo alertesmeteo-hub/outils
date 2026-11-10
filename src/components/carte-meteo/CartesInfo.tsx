@@ -441,6 +441,18 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
       : `DU ${jourCourt(debutPeriodeISO)} AU ${jourCourt(fin)}${fin < finPeriodeISO ? ' (FIN DU MODÈLE)' : ''} · ${libelle}`;
   }, [pluiePeriode, clePeriode, finPeriodeISO, debutPeriodeISO, modele]);
 
+  /** Cartes « tout le run » : fenêtre réellement couverte par la série du modèle (début, fin et durée en heures), pour le sous-titre. */
+  const sousTitreRun = useMemo(() => {
+    const pts = (previsions?.cle === cle ? previsions.points : []).filter((p) => p.debutRun && p.finRun);
+    if (!pts.length) return null;
+    const debut = Math.min(...pts.map((p) => Date.parse(p.debutRun as string)));
+    const fin = Math.max(...pts.map((p) => Date.parse(p.finRun as string)));
+    const fmt = (ms: number) =>
+      new Date(ms).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', timeZone: 'Europe/Paris' }).replace(':00', '').replace(/\s+/g, ' ').toUpperCase();
+    const heures = Math.round((fin - debut) / 3_600_000);
+    return `RUN DE ${heures} H : DU ${fmt(debut)} H AU ${fmt(fin)} H · ${infosModele(modele, previsions?.modeles).libelle}`;
+  }, [previsions, cle, modele]);
+
   /** Cumuls : période réellement couverte (le CEP s'arrête à 15 jours), pour le sous-titre. */
   const finCumuls = useMemo(() => {
     const fins = (cumuls?.cle === cleCumul ? cumuls.points : []).map((p) => p.finPrevision).filter((f): f is string => !!f).sort();
@@ -1270,6 +1282,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                         sousTitre={
                           ((theme as ThemePrevision).fenetreHeures
                             ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!)
+                            : (theme as ThemePrevision).run && sousTitreRun
+                            ? sousTitreRun
                             : (theme as ThemePrevision).periode
                             ? (theme as ThemePrevision).montagne
                               ? `${sousTitrePeriode} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET PLUS`
