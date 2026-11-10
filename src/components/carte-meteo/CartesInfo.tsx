@@ -445,12 +445,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const sousTitreRun = useMemo(() => {
     const pts = (previsions?.cle === cle ? previsions.points : []).filter((p) => p.debutRun && p.finRun);
     if (!pts.length) return null;
-    const debut = Math.round(Date.now() / 3_600_000) * 3_600_000;
-    const fin = Math.max(...pts.map((p) => Date.parse(p.finRun as string)));
-    const fmt = (ms: number) =>
-      new Date(ms).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', timeZone: 'Europe/Paris' }).replace(':00', '').replace(/\s+/g, ' ').toUpperCase();
-    const heures = Math.round((fin - debut) / 3_600_000);
-    return `JUSQU’À LA FIN DU RUN (${heures} H) : DU ${fmt(debut)} H AU ${fmt(fin)} H · ${infosModele(modele, previsions?.modeles).libelle}`;
+    const fin = new Date(Math.max(...pts.map((p) => Date.parse(p.finRun as string))));
+    const jour = fin.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
+    const heure = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(fin);
+    return { fin: `${jour} à ${heure} h`.toUpperCase(), modele: infosModele(modele, previsions?.modeles).libelle };
   }, [previsions, cle, modele]);
 
   /** Cumuls : période réellement couverte (le CEP s'arrête à 15 jours), pour le sous-titre. */
@@ -1276,14 +1274,14 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                     ) : mode === 'prevision' ? (
                       <CarteInfo
                           zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs}
-                        theme={theme}
+                        theme={(theme as ThemePrevision).run && sousTitreRun ? { ...theme, titre: theme.titre.replace('À LA FIN DU RUN', `AU ${sousTitreRun.fin}`) } : theme}
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
                         sousTitre={
                           ((theme as ThemePrevision).fenetreHeures
                             ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!)
                             : (theme as ThemePrevision).run && sousTitreRun
-                            ? sousTitreRun
+                            ? sousTitreRun.modele
                             : (theme as ThemePrevision).periode
                             ? (theme as ThemePrevision).montagne
                               ? `${sousTitrePeriode} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET PLUS`
