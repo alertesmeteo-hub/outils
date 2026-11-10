@@ -852,7 +852,7 @@ export default function CarteRendu({
                   {degres && m.valeur.trim() !== '' && <span className={`cmap-degre ${m.ton === 'chaud' || m.mini != null ? 'cmap-chaud' : m.ton === 'froid' ? 'cmap-froid' : ''}`}>°</span>}
                 </span>
                 {m.mini != null && (
-                  <span className="cmap-valeur-ligne">
+                  <span className={`cmap-valeur-ligne ${carteLocale ? 'cmap-mini-local' : ''}`}>
                     <input
                       className="cmap-valeur cmap-froid"
                       value={m.mini}
