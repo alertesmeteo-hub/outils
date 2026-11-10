@@ -253,12 +253,14 @@ export function DecorStyle({ style, largeur, hauteur, mer }: { style: StyleFond;
   const def = STYLES_FOND[style];
   const l = largeur;
   const h = hauteur;
-  const bandes = Array.from({ length: 5 }, (_, k) => (
+  // Bandes dessinées pour une carte de 1 280 px de large, mises à l'échelle des petites cartes (planches, tendances).
+  const k = Math.min(1, l / 1280);
+  const bandes = Array.from({ length: 5 }, (_, n) => (
     <path
-      key={k}
-      d={`M -40 ${120 + k * 27} C ${l * 0.08} ${112 + k * 25}, ${l * 0.17} ${60 + k * 19}, ${l * 0.3 + k * 30} -40`}
+      key={n}
+      d={`M -40 ${120 + n * 27} C ${1280 * 0.08} ${112 + n * 25}, ${1280 * 0.17} ${60 + n * 19}, ${1280 * 0.3 + n * 30} -40`}
       fill="none"
-      stroke={k % 2 === 0 ? JAUNE : ROUGE}
+      stroke={n % 2 === 0 ? JAUNE : ROUGE}
       strokeWidth={27}
       strokeLinecap="butt"
     />
@@ -267,8 +269,8 @@ export function DecorStyle({ style, largeur, hauteur, mer }: { style: StyleFond;
     <svg className="cmap-decor" viewBox={`0 0 ${l} ${h}`} width={l} height={h} aria-hidden>
       {def.senyera && (
         <>
-          <g opacity={0.96}>{bandes}</g>
-          <g opacity={0.96} transform={`rotate(180 ${l / 2} ${h / 2})`}>
+          <g opacity={0.96} transform={`scale(${k})`}>{bandes}</g>
+          <g opacity={0.96} transform={`rotate(180 ${l / 2} ${h / 2}) scale(${k})`}>
             {bandes}
           </g>
         </>

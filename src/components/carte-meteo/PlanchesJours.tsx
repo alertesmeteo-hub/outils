@@ -457,7 +457,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
           <span className="mb-1 block">Style de fond</span>
           <select value={styleFond ?? ''} onChange={(e) => setStyleFond(estStyleFond(e.target.value) ? e.target.value : null)} className={selectBarre}>
             <option value="">Aucun (fond de carte ci-dessous)</option>
-            {ORDRE_STYLES_FOND.map((s) => (
+            {ORDRE_STYLES_FOND.filter((s) => s !== 'parchemin').map((s) => (
               <option key={s} value={s}>
                 {STYLES_FOND[s].libelle}
               </option>
