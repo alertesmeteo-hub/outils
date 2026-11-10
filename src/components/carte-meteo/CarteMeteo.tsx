@@ -210,7 +210,7 @@ const FRANCE_SE = versMonde(41.3, 9.6);
 export const BOITE_FRANCE: Boite = { minX: FRANCE_NO.x, minY: FRANCE_NO.y, maxX: FRANCE_SE.x, maxY: FRANCE_SE.y };
 
 export const FICHIERS_CONTOURS: Record<'departements' | 'regions', string> = {
-  departements: '/geo/departements.geojson',
+  departements: '/geo/departements.geojson?v=2', // v2 : contours plus fins (IGN, ~100 m)
   regions: '/geo/regions.geojson',
 };
 
