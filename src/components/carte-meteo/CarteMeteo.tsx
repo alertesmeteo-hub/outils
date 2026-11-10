@@ -92,11 +92,25 @@ const VILLES_IMPOSEES = [
   { code: '59', lat: 50.629, lon: 3.057 }, // Lille
   { code: '66', lat: 42.699, lon: 2.895 }, // Perpignan
 ];
-/** Date du titre de la carte des Pyrénées-Orientales : orange. */
-const COULEUR_TITRE_PO = '#ff8c1a';
+/** Date du titre de la carte des Pyrénées-Orientales : rouge de la senyera. */
+const COULEUR_TITRE_PO = '#da121a';
+/**
+ * Carte des Pyrénées-Orientales : places des pictos choisies à la main (centre du bloc picto + températures, en pixels de la carte de
+ * 1 280 × 720). Chaque ville affichée prend la place la plus proche ; elle reste déplaçable à la souris.
+ */
+const PLACES_PO: { x: number; y: number }[] = [
+  { x: 647, y: 225 },
+  { x: 942, y: 160 },
+  { x: 956, y: 336 },
+  { x: 667, y: 412 },
+  { x: 351, y: 537 },
+  { x: 657, y: 608 },
+  { x: 873, y: 535 },
+  { x: 1107, y: 465 },
+];
 /** Hauteur du logo (px de la carte) : agrandi sur la carte des Pyrénées-Orientales (logo rond Météo Pays Catalan). */
 const HAUTEUR_LOGO = 83;
-const HAUTEUR_LOGO_PO = 150;
+const HAUTEUR_LOGO_PO = 105;
 const SEUIL_RAFALES_DEFAUT = 50; // France et région : vent fort (la tramontane à 50-60 km/h doit apparaître)
 /** Vue département : rafales signalées dès 35 km/h par défaut (les villes sont proches, les rafales plus faibles). */
 const SEUIL_RAFALES_DEPARTEMENT = 35;
@@ -1302,11 +1316,25 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   }, [pointsAffiches, points, editions, vue, periode, niveauNoms, codesRafales, enDepartement, seuilRafales, nomsVisibles, echelleMarqueurs, zone, densite, largeurCarte, grilleFrance, pied, afficherFleches, terre, maxRafales, styleVent, afficherRessenti, hauteurLogo, rafalesManuelles, rafalesRetirees, rafalesAjoutees, miniMaxiAM, xTitreFrance, tailleIcones, tailleVent]);
 
   const altitudeDe = (code: string, picto: string) => (estPictoNeige(picto) ? altitudes[`${periode}|${code}`] ?? altitudeNeige : undefined);
+  // Pyrénées-Orientales : chaque ville prend la place voulue la plus proche de sa position calculée (les plus proches d'abord).
+  const placesPO = useMemo(() => {
+    const r = new Map<string, { x: number; y: number }>();
+    if (zone !== 'dep:66' || grilleFrance) return r;
+    const paires = marqueurs.flatMap((m, i) => PLACES_PO.map((c, j) => ({ i, j, d: Math.hypot(m.x - c.x, m.y - c.y) })));
+    const pris = new Set<number>();
+    for (const { i, j, d } of paires.sort((a, b) => a.d - b.d)) {
+      if (d > 260 || r.has(marqueurs[i].code) || pris.has(j)) continue;
+      r.set(marqueurs[i].code, PLACES_PO[j]);
+      pris.add(j);
+    }
+    return r;
+  }, [marqueurs, zone, grilleFrance]);
   const marqueursAffiches: Marqueur[] = [
     ...marqueurs
       .filter((m) => !pictosRetires.has(`${zone}|${m.code}`))
       .map((m) => ({
         ...m,
+        ...(placesPO.get(m.code) ?? {}),
         ...(pictosDeplaces[`${zone}|${m.code}`] ?? {}),
         neige: estPictoNeige(m.picto),
         altitude: altitudeDe(m.code, m.picto),
