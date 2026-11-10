@@ -393,3 +393,10 @@ body {
 .cinfo-classement ol li:last-child { border-bottom: 0; }
 .cinfo-classement ol li strong { min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .cinfo-classement .cinfo-encadre-titre { margin-bottom: 8px; }
+
+/* Carte de France « mini et maxi » : mini bien plus petite, maxi un peu moins grosse, icône météo plus grande. */
+.cmap-minimaxi-france .cmap-valeur.cmap-chaud { font-size: 1.19em; }
+.cmap-minimaxi-france .cmap-valeur.cmap-froid { font-size: 0.8em; }
+.cmap-minimaxi-france .cmap-degre.cmap-chaud { font-size: 0.64em; }
+.cmap-minimaxi-france .cmap-degre.cmap-froid { font-size: 0.46em; }
+.cmap-minimaxi-france .cmap-ligne .cmap-picto-image { width: 1.75em; height: 1.75em; }

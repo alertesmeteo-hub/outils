@@ -41,12 +41,12 @@ export default async function PageCarteMeteo() {
         Températures de l&apos;après-midi et rafales de vent, par région ou département. Pictos et valeurs modifiables avant export en JPG.
       </p>
       <div className="mt-6">
-        <CarteMeteo aujourdhui={aujourdhui} initial={initial} />
+        <CarteMeteo aujourdhui={aujourdhui} initial={initial} reglages={{ jeuPictos: 'alertes-pro' }} />
       </div>
 
       <h2 className="mt-12 text-2xl font-extrabold">France : demain après-midi, mini et maxi</h2>
       <div className="mt-6">
-        <CarteMeteo aujourdhui={aujourdhui} initial={initialDemain} reglages={{ jour: 1, miniMaxi: true }} />
+        <CarteMeteo aujourdhui={aujourdhui} initial={initialDemain} reglages={{ jour: 1, miniMaxi: true, jeuPictos: 'alertes-pro' }} />
       </div>
     </>
   );

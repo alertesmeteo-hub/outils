@@ -1620,6 +1620,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       grosPictos={enDepartement}
       carteLocale={!enFrance}
       styleCapture={modeCapture}
+      miniMaxiFrance={enFrance && miniMaxiAM}
       pictosEmoji={jeuPictos === 'emoji'}
       theme={theme}
       habillage={habillage}

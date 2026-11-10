@@ -249,6 +249,8 @@ interface Props {
   styleFond?: StyleFond | null;
   /** Sans les bandes de la senyera en coin (cartes tendances). */
   sansBandes?: boolean;
+  /** Carte de France « mini et maxi » : mini bien plus petite, maxi un peu moins grosse, icône météo plus grande (voir globals.css). */
+  miniMaxiFrance?: boolean;
   /** Carte en emojis : le ciel voilé (image) prend la taille d'un emoji au lieu de celle des jeux d'images. */
   pictosEmoji?: boolean;
   /** Présentation des rafales (pastille par défaut). */
@@ -455,6 +457,7 @@ export default function CarteRendu({
   habillage = null,
   styleFond = null,
   sansBandes = false,
+  miniMaxiFrance = false,
   styleVent = 'pastille',
   couleurTitre,
   fleuves = null,
@@ -582,7 +585,7 @@ export default function CarteRendu({
     <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
         ref={carteRef}
-        className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''} ${theme ? `cmap-theme cmap-theme-${theme}` : ''} ${habillage === 'catalan' && !styleFond ? 'cmap-catalan' : ''}`}
+        className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''} ${theme ? `cmap-theme cmap-theme-${theme}` : ''} ${habillage === 'catalan' && !styleFond ? 'cmap-catalan' : ''} ${miniMaxiFrance ? 'cmap-minimaxi-france' : ''}`}
         style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
         onClick={(e) => {
           if (!onClicCarte || (e.target as HTMLElement).closest('.cmap-marqueur, .cmap-palette, .cmap-vent-ajoute')) return;
