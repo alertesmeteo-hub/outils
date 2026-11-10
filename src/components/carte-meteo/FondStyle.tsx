@@ -290,6 +290,20 @@ export function DecorStyle({ style, largeur, hauteur, mer, bandes: avecBandes = 
   );
 }
 
+/** Bandes de la senyera dans le coin haut gauche seul (carte locale à habillage catalan). */
+export function BandesCoin({ largeur, hauteur }: { largeur: number; hauteur: number }) {
+  const k = Math.min(1, largeur / 1280);
+  return (
+    <svg className="cmap-decor" viewBox={`0 0 ${largeur} ${hauteur}`} width={largeur} height={hauteur} aria-hidden>
+      <g opacity={0.96} transform={`scale(${k})`}>
+        {Array.from({ length: 5 }, (_, n) => (
+          <path key={n} d={`M -40 ${120 + n * 27} C ${1280 * 0.08} ${112 + n * 25}, ${1280 * 0.17} ${60 + n * 19}, ${1280 * 0.3 + n * 30} -40`} fill="none" stroke={n % 2 === 0 ? JAUNE : ROUGE} strokeWidth={27} strokeLinecap="butt" />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
 /** « Mer Méditerranée » et deux vagues, centrés sur le point donné (pixels écran). Avec `contour`, un liseré sombre aide la lecture sur photos. */
 function EtiquetteMer({ mer, couleur, contour = false }: { mer: { x: number; y: number }; couleur: string; contour?: boolean }) {
   const halo = contour ? { stroke: 'rgba(5,25,60,0.85)', strokeWidth: 4, paintOrder: 'stroke' as const, strokeLinejoin: 'round' as const } : {};

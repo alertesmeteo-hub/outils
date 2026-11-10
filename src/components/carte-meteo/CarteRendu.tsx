@@ -6,7 +6,7 @@ import type { Vue } from '@/lib/carte-meteo/projection-france';
 import { MATRICE_RELIEF, TAILLE_TUILE_VIDE, coucheParDefaut, tuileParente, tuilesVisibles, type Couche, type Tuile } from '@/lib/carte-meteo/tuiles';
 import { PICTOS_DEFAUT_IMAGES, estPictoImage, cheminPictoImage, type PictoMeteo } from '@/lib/carte-meteo/pictos';
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
-import { DecorMer, DecorStyle, FondStyleSvg, positionMer, useTerres } from './FondStyle';
+import { BandesCoin, DecorMer, DecorStyle, FondStyleSvg, positionMer, useTerres } from './FondStyle';
 import { STYLES_FOND, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 import { DIRECTIONS_VENT, angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
 
@@ -673,8 +673,8 @@ export default function CarteRendu({
         {theme && <DecorTheme theme={theme} largeur={largeur} hauteur={HAUTEUR_CARTE} />}
         {styleFond && !theme && <DecorStyle style={styleFond} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} bandes={!sansBandes} />}
 
-        {/* Habillage catalan, carte locale : cartouche de parchemin vide en haut à gauche (la date est à droite). */}
-        {habillage === 'catalan' && logoEnBas && !styleFond && !theme && <div className="cmap-parchemin" aria-hidden />}
+        {/* Habillage catalan, carte locale : bandes de la senyera en haut à gauche (la date est à droite). */}
+        {habillage === 'catalan' && logoEnBas && !styleFond && !theme && <BandesCoin largeur={largeur} hauteur={HAUTEUR_CARTE} />}
 
         {nomMer && <DecorMer largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} />}
 
