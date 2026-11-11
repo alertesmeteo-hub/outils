@@ -13,6 +13,8 @@ export interface GroupeDePages {
   logo?: string;
   /** Page du groupe elle-même (titre cliquable) ; sinon le groupe ne fait que replier ses liens. */
   href?: string;
+  /** Rubrique d'alertes : titre en rouge dans le menu. */
+  rouge?: boolean;
   pages: PageDeTravail[];
 }
 
@@ -44,6 +46,13 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
       { href: '/outils/carte-meteo-info/?cartes=europe', libelle: 'Europe : isobares' },
       { href: '/outils/previsions-saisonnieres/', libelle: 'Prévisions saisonnières' },
       { href: '/outils/carte-meteo/animations/', libelle: 'Animations GIF / MP4' },
+    ],
+  },
+  {
+    titre: 'ALERTES',
+    rouge: true,
+    pages: [
+      { href: '/outils/carte-meteo-info/?cartes=alertes', libelle: '⚠️ Toutes les cartes d’alertes' },
     ],
   },
   {

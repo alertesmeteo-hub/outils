@@ -110,8 +110,8 @@ export default function MenuLateral() {
       {GROUPES_DE_PAGES.map((g, k) => {
         const dedans = (g.href && sansAncre(g.href) === chemin) || g.pages.some((x) => sansAncre(x.href) === chemin && !x.href.includes('?'));
         return (
-          <details key={g.titre} open={k === 0 || dedans} className="group">
-            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] font-bold uppercase tracking-wide text-muted hover:bg-surface [&::-webkit-details-marker]:hidden">
+          <details key={g.titre} open={k === 0 || dedans || g.rouge} className="group">
+            <summary className={`flex cursor-pointer list-none items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] font-bold uppercase tracking-wide ${g.rouge ? 'text-red-600' : 'text-muted'} hover:bg-surface [&::-webkit-details-marker]:hidden`}>
               <span aria-hidden className="inline-block transition-transform group-open:rotate-90">▸</span>
               {g.logo ? (
                 // eslint-disable-next-line @next/next/no-img-element

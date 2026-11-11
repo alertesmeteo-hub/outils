@@ -171,6 +171,14 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   /** Thème affiché (« tous » : toutes les cartes de la catégorie, rangées par thème). */
   const [groupeChoisi, setGroupeChoisi] = useState(uneCarte ? 'Températures' : 'tous');
   const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
+  // Lien « ALERTES » du menu (?cartes=alertes) : ouvre d'office toutes les cartes de risque.
+  const alertesDemandees = modeInitial === 'alertes';
+  useEffect(() => {
+    if (!alertesDemandees) return;
+    setMode('prevision');
+    setGroupeChoisi(GROUPE_RISQUES);
+    setChiffres(true);
+  }, [alertesDemandees]);
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
   const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', seuilPluie: 0, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
