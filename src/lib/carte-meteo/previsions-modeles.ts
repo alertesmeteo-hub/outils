@@ -20,12 +20,13 @@ import { temperaturePlausible, ventPlausible } from './limites';
 export type ModeleMeteo = 'moyenne' | 'arome' | 'aromeifs' | 'harmonie2km' | 'harmonie' | 'arpege' | 'arpege025' | 'icon' | 'ukmo' | 'iconeu' | 'wrf' | 'cep' | 'aifs' | 'gfs';
 /** Modèles qui ont leurs propres fichiers de prévision (tous sauf la moyenne). */
 export type ModeleSource = Exclude<ModeleMeteo, 'moyenne'>;
-/** Modèles moyennés par « Moyenne des modèles » (Harmonie 2 km seulement là où il est publié). */
-export const MODELES_MOYENNE: ModeleSource[] = ['arome', 'harmonie2km', 'harmonie', 'arpege', 'cep', 'gfs'];
+/** Modèles moyennés par « Moyenne des modèles » (Harmonie 2 km et WRF seulement là où ils sont publiés). */
+// Les premiers (AROME, Harmonie…) servent de base : le vent et les identités de villes viennent du premier modèle disponible.
+export const MODELES_MOYENNE: ModeleSource[] = ['arome', 'harmonie2km', 'harmonie', 'arpege', 'cep', 'gfs', 'aromeifs', 'arpege025', 'icon', 'ukmo', 'iconeu', 'wrf', 'aifs'];
 
 export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string; departements?: string[]; vueDepartement?: boolean }[] = [
   // Températures moyennées sur les modèles disponibles ; pictos, nuages et vent d'AROME. Vue département seulement.
-  { id: 'moyenne', libelle: 'Moyenne des modèles', fournisseur: 'T° : AROME, Harmonie, ARPEGE, CEP, GFS', vueDepartement: true },
+  { id: 'moyenne', libelle: 'Moyenne des modèles', fournisseur: 'AROME, Harmonie, ARPEGE, CEP, GFS, AROME-IFS, ICON, UKMO, AIFS…', vueDepartement: true },
   { id: 'arome', libelle: 'AROME', fournisseur: 'Météo-France' },
   // HARMONIE DINI du DMI à 2 km, publié pour les Pyrénées-Orientales seulement (dépôt harmonie-dmi-2km).
   { id: 'harmonie2km', libelle: 'Harmonie 2 km', fournisseur: 'DMI', departements: ['66'] },
