@@ -173,6 +173,13 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
   // Lien « ALERTES » du menu (?cartes=alertes) : ouvre d'office toutes les cartes de risque.
   const alertesDemandees = modeInitial === 'alertes';
+  // Lien « Bilan du mois France » du menu (?cartes=bilan-mois) : cartes du mois (maxi, mini, pluie, soleil) pour toute la France.
+  const bilanMoisDemande = modeInitial === 'bilan-mois';
+  useEffect(() => {
+    if (!bilanMoisDemande) return;
+    setMode('bilan');
+    setGroupeChoisi(GROUPE_MOIS);
+  }, [bilanMoisDemande]);
   useEffect(() => {
     if (!alertesDemandees) return;
     setMode('prevision');

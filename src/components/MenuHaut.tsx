@@ -52,7 +52,8 @@ const RUBRIQUES: Rubrique[] = [
   {
     titre: 'Bilan',
     pages: [
-      lien('/outils/carte-meteo/bilan-mois/'),
+      { href: '/outils/carte-meteo-info/?cartes=bilan-mois', libelle: 'Bilan du mois : France' },
+      { href: '/outils/carte-meteo/bilan-mois/', libelle: 'Bilan du mois : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo-info/?cartes=bilan', libelle: 'Bilans des stations (cartes)' },
       { href: '/classements/', libelle: 'Classements' },
     ],
