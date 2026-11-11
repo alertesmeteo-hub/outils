@@ -340,6 +340,8 @@ interface Contexte {
   textes: { intro: [string, string]; sous: string; bandeau: string; recap: string; /** Période (« CE WEEK-END ? ») : reprise après l'accroche quand l'intro parle de montagne ou de côte. */ periode?: string; /** Fin de l'accroche (« CHEZ NOUS ? »). */ accroche?: string; /** Icônes de l'accroche : par défaut le temps (soleil, nuage, pluie, vent) ; flocons pour la vidéo montagne. */ icones?: 'flocons' };
   /** Format « TikTok Hook » : l'écran d'accroche précède l'intro. */
   hook?: boolean;
+  /** Écran carte (villes placées sur la carte du département) après l'intro. */
+  carte?: boolean;
   /** Code du département : le fond de carte du début zoome dessus. */
   codeDep?: string;
   /** Tendance des jours suivant la vidéo (absente si les prévisions ne sont pas disponibles : l'écran est alors omis). */
@@ -348,8 +350,11 @@ interface Contexte {
   tendance?: { jours: string[]; villes: Record<string, JourVille[]>; /** Ville montrée : la première de la vidéo dont la tendance est connue (les villes de relief n'ont pas de prévision au-delà d'AROME). */ ville: string } | null;
 }
 
-function dureeTotale(n: number, avecHook = false, avecTendance = false) {
-  return (avecHook ? DUREE_HOOK : 0) + DUREE_INTRO + n * DUREE_VILLE + DUREE_BILAN + (avecTendance ? DUREE_TENDANCE : 0);
+/** Écran « carte » après l'intro : les villes apparaissent une à une sur la carte, puis la carte reste affichée. */
+const dureeCarte = (n: number) => 1 + 0.55 * n + 3.2;
+
+function dureeTotale(n: number, avecHook = false, avecTendance = false, avecCarte = false) {
+  return (avecHook ? DUREE_HOOK : 0) + DUREE_INTRO + (avecCarte ? dureeCarte(n) : 0) + n * DUREE_VILLE + DUREE_BILAN + (avecTendance ? DUREE_TENDANCE : 0);
 }
 
 /** Tendance des jours qui suivent la vidéo : une ville (la première), un jour par carte (picto, maxi, mini). */
@@ -667,7 +672,7 @@ function cheminAnneaux(ctx: CanvasRenderingContext2D, anneaux: Anneau[], X: (lon
  * Fond du début (accroche et intro) : carte météo bleue (mer claire, terres bleues cernées d'un trait sombre, départements),
  * zoom de la France entière vers le département choisi. `t` : secondes depuis le début ; `duree` : durée du zoom.
  */
-function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, codeDep: string, cadrage = false): { X: (lon: number) => number; Y: (lat: number) => number } | null {
+function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, codeDep: string, cadrage = 0): { X: (lon: number) => number; Y: (lat: number) => number } | null {
   let projection: { X: (lon: number) => number; Y: (lat: number) => number } | null = null;
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
@@ -687,7 +692,7 @@ function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, code
     const s0 = H / 11;
     const dLat = trouve ? Math.max(lat1 - lat0, 0.3) : 11;
     const dLon = trouve ? Math.max(lon1 - lon0, 0.3) : 14;
-    const s1 = trouve ? Math.min(H / (dLat * (cadrage ? 1.9 : 2.6)), W / (dLon * k * (cadrage ? 1.3 : 1.8))) : s0;
+    const s1 = trouve ? Math.min(H / (dLat * (2.6 - 0.7 * cadrage)), W / (dLon * k * (1.8 - 0.5 * cadrage))) : s0;
     const s = s0 * Math.pow(s1 / s0, e);
     const lonC = 2.5 + ((trouve ? lon0 + dLon / 2 : 2.5) - 2.5) * e;
     const latC = 46.6 + ((trouve ? lat0 + dLat / 2 : 46.6) - 46.6) * e;
@@ -734,11 +739,13 @@ function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, code
  * Carte du département (ou de la France) : le fond cartographique de l'ouverture de la vidéo, avec chaque ville de la vidéo à sa place
  * (nom, picto, maxi et mini ; un rang par jour pour le week-end), sous le titre « Quel temps … ? ». Image fixe, mêmes formats que la vidéo.
  */
-function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte) {
+function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte, local?: number, t = 0) {
   const { semaine, villes, logo, departement, textes } = c;
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
-  const proj = fondCarte(ctx, 99, 1, c.codeDep ?? '', true);
+  // Dans la vidéo, le zoom de l'intro se resserre sur le département, puis les villes arrivent une à une ; en image fixe, tout est affiché.
+  const proj = fondCarte(ctx, 99, 1, c.codeDep ?? '', local === undefined ? 1 : sortie(local / 1));
+  const apparition = (i: number) => (local === undefined ? 1 : sortie((local - 1 - i * 0.55) / 0.4));
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'center';
   texteAjuste(ctx, departement.toUpperCase(), W / 2, 92 * u, 60 * u, POLICE, W * 0.9, '#ffe27a');
@@ -785,7 +792,9 @@ function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte) {
     if (!bouge) break;
   }
   // Traits et points d'abord, bulles ensuite (elles passent par-dessus).
-  for (const b of bulles) {
+  bulles.forEach((b, i) => {
+    ctx.save();
+    ctx.globalAlpha = apparition(i);
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 3 * u;
     ctx.beginPath();
@@ -799,8 +808,13 @@ function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte) {
     ctx.lineWidth = 3.5 * u;
     ctx.strokeStyle = '#fff';
     ctx.stroke();
-  }
-  for (const b of bulles) {
+    ctx.restore();
+  });
+  bulles.forEach((b, i) => {
+    const a = apparition(i);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(0, (1 - a) * 40 * u);
     ctx.fillStyle = 'rgba(8,30,70,0.86)';
     rectArrondi(ctx, b.x, b.y, bw, bh, 28 * u);
     ctx.fill();
@@ -821,7 +835,7 @@ function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte) {
         ctx.fillText(courtJour(semaine.jours[k]), x, y0 + lh / 2 + 9 * u);
         x += 64 * u;
       }
-      if (j.picto) dessinerPicto(ctx, j.picto, x, y0 + 4 * u, ps, 0, k * 1.7);
+      if (j.picto) dessinerPicto(ctx, j.picto, x, y0 + 4 * u, ps, t, k * 1.7);
       x += ps + 8 * u;
       ctx.fillStyle = '#ff9d6b';
       ctx.font = `${(n === 1 ? 74 : 44) * u}px ${POLICE}`;
@@ -830,7 +844,8 @@ function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte) {
       ctx.font = `${(n === 1 ? 46 : 30) * u}px ${POLICE}`;
       ctx.fillText(degre(j.mini), x, y0 + lh / 2 + (n === 1 ? 52 : 30) * u);
     });
-  }
+    ctx.restore();
+  });
   ctx.textAlign = 'center';
   pied(ctx, logo);
 }
@@ -875,7 +890,11 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     pied(ctx, logo);
     return;
   }
-  const apresIntro = t - DUREE_INTRO;
+  if (c.carte && t < DUREE_INTRO + dureeCarte(villes.length)) {
+    dessinerCarte(ctx, c, t - DUREE_INTRO, t);
+    return;
+  }
+  const apresIntro = t - DUREE_INTRO - (c.carte ? dureeCarte(villes.length) : 0);
   const indice = Math.floor(apresIntro / DUREE_VILLE);
   if (indice < villes.length) {
     const local = apresIntro - indice * DUREE_VILLE;
@@ -987,6 +1006,8 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   const [lecture, setLecture] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Aperçu et export : la vidéo, ou la même chose en carte (image fixe).
+  // Écran carte dans la vidéo (villes placées sur la carte du département) : par défaut, oui.
+  const [avecCarte, setAvecCarte] = useState(true);
   const [apercu, setApercu] = useState<'video' | 'carte'>(vueInitiale === 'carte' ? 'carte' : 'video');
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   const [prets, setPrets] = useState(0);
@@ -1153,13 +1174,14 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   }, [semaine, villes, logoId, format.id, tendance]);
 
   const avecHook = format.id === 'hook';
-  const total = dureeTotale(villes.length, avecHook, !!tendance);
-  const textes = useMemo(() => textesVideo(mode, jours, ecart, france ? 'auto' : special), [mode, jours, ecart, special, france]);
   const positions = useMemo(() => {
     const parNom = new Map((listeVilles?.dep === dep ? [...listeVilles.villes, ...listeVilles.reliefs] : []).map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
     return Object.fromEntries(villes.map((v) => [v, parNom.get(v)]));
   }, [listeVilles, dep, villes]);
-  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, tendance, codeDep: dep, positions } : null;
+  const carteDansVideo = avecCarte && villes.some((v) => positions[v]);
+  const total = dureeTotale(villes.length, avecHook, !!tendance, carteDansVideo);
+  const textes = useMemo(() => textesVideo(mode, jours, ecart, france ? 'auto' : special), [mode, jours, ecart, special, france]);
+  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions } : null;
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -1493,6 +1515,10 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
               </option>
             ))}
           </select>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={avecCarte} onChange={(e) => setAvecCarte(e.target.checked)} />
+          🗺️ Écran carte dans la vidéo (toutes les villes sur la carte)
         </label>
         <label className="text-sm font-medium">
           <span className={legende}>Logo</span>
