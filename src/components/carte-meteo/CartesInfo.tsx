@@ -165,6 +165,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [region, setRegion] = useState(REGIONS_FR[0]);
   const [departement, setDepartement] = useState(departementInitial ?? '66');
   const [modele, setModele] = useState<ModeleMeteo>('arome');
+  useEffect(() => {
+    if (modele === 'harmonie2km' && !(niveau === 'departement' && departement === '66')) setModele('arome');
+  }, [modele, niveau, departement]);
   const [jour, setJour] = useState(0);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
   /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
@@ -210,7 +213,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   }, [alertesDemandees]);
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
-  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', seuilPluie: 0, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
+  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', seuilPluie: uneCarte ? 10 : 0, seuils: uneCarte ? { mm: 10, 'km/h': 60 } : undefined, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
   const regler = (changement: Partial<AffichageCarte>) => setAffichage((a) => ({ ...a, ...changement }));
   const [filtreGroupe, setFiltreGroupe] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
@@ -745,12 +748,16 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               <fieldset className={uneCarte ? 'lg:col-span-5' : undefined}>
                 <legend className={legende}>Modèle</legend>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                  {MODELES.filter((m) => !m.departements && (!m.vueDepartement || m.id === 'moyenne')).map((m) => (
-                    <label key={m.id} className="text-sm">
+                  {MODELES.filter((m) => !m.vueDepartement || m.id === 'moyenne').map((m) => {
+                    // Modèles publiés pour certains départements seulement (Harmonie 2 km : Pyrénées-Orientales) : choisissables dans ce département.
+                    const indisponible = !!m.departements && !(niveau === 'departement' && m.departements.includes(departement));
+                    return (
+                    <label key={m.id} className={`text-sm ${indisponible ? 'opacity-50' : ''}`} title={indisponible ? `${m.libelle} : publié pour ${m.departements!.join(', ')} seulement (choisir ce département)` : undefined}>
                       <input
                         type="radio"
                         name={nom('modele')}
                         checked={modele === m.id}
+                        disabled={indisponible}
                         onChange={() => {
                           setModele(m.id);
                           setJour((j) => Math.min(j, echeanceDe(m.id)));
@@ -760,7 +767,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                       />
                       {m.libelle}
                     </label>
-                  ))}
+                    );
+                  })}
                 </div>
               </fieldset>
               <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
@@ -1243,7 +1251,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-primary">Affichage de la carte</summary>
             <div className="mt-3 grid grid-cols-1 items-end gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-sm font-medium">
-                <span className={legende}>Thème de la carte</span>
+                <span className={legende}>🎨 Thème de la carte</span>
                 <select value={affichage.theme ?? ''} onChange={(e) => regler({ theme: (e.target.value || null) as AffichageCarte['theme'] })} className={`${selectBarre} w-full`}>
                   <option value="">Aucun (carte habituelle)</option>
                   {THEMES_CARTE.map((t) => (
@@ -1254,7 +1262,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 </select>
               </label>
               <label className="text-sm font-medium">
-                <span className={legende}>Style de fond</span>
+                <span className={legende}>🖼️ Style de fond</span>
                 <select value={affichage.styleFond ?? ''} onChange={(e) => regler({ styleFond: estStyleFond(e.target.value) ? e.target.value : null })} className={`${selectBarre} w-full`}>
                   <option value="">Aucun (fond de carte ci-dessous)</option>
                   {ORDRE_STYLES_FOND.map((s) => (
@@ -1265,7 +1273,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 </select>
               </label>
               <label className="text-sm font-medium">
-                <span className={legende}>Fond de carte</span>
+                <span className={legende}>🗺️ Fond de carte</span>
                 <select value={affichage.fond ?? ''} onChange={(e) => regler({ fond: (e.target.value || null) as Couche | null })} className={`${selectBarre} w-full`}>
                   <option value="">Automatique (relief ou photos IGN)</option>
                   {(Object.keys(LIBELLES_COUCHES) as Couche[]).map((c) => (
@@ -1276,7 +1284,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 </select>
               </label>
               <label className="text-sm font-medium">
-                <span className={legende}>Contours</span>
+                <span className={legende}>🔲 Contours</span>
                 <select value={affichage.contours} onChange={(e) => regler({ contours: e.target.value as AffichageCarte['contours'] })} className={`${selectBarre} w-full`}>
                   <option value="defaut">Habituels</option>
                   <option value="aucun">Aucun</option>
@@ -1284,7 +1292,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 </select>
               </label>
               <label className="text-sm font-medium">
-                <span className={legende}>Fleuves</span>
+                <span className={legende}>🏞️ Fleuves</span>
                 <select value={affichage.fleuves ?? ''} onChange={(e) => regler({ fleuves: (e.target.value || null) as AffichageCarte['fleuves'] })} className={`${selectBarre} w-full`}>
                   <option value="">Automatique selon la zone</option>
                   <option value="aucun">Aucun</option>
@@ -1294,7 +1302,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 </select>
               </label>
               <label className="text-sm font-medium">
-                <span className={legende}>Pluie : valeurs à partir de</span>
+                <span className={legende}>🌧️ Pluie : valeurs à partir de</span>
                 <select value={affichage.seuils?.mm ?? affichage.seuilPluie ?? 0} onChange={(e) => regler({ seuilPluie: Number(e.target.value), seuils: { ...affichage.seuils, mm: Number(e.target.value) } })} className={`${selectBarre} w-full`}>
                   <option value={0}>Toutes les valeurs</option>
                   {[1, 2, 5, 10, 20, 30, 50, 100].map((mm) => (
@@ -1306,9 +1314,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               </label>
               {(
                 [
-                  ['km/h', 'Vent et rafales : valeurs à partir de', [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140], ' km/h et plus'],
-                  ['cm', 'Neige : valeurs à partir de', [1, 2, 5, 10, 20, 30, 50], ' cm et plus'],
-                  ['niveau', 'Risques (niveaux) : à partir de', [1, 2, 3, 4], ''],
+                  ['km/h', '💨 Vent et rafales : valeurs à partir de', [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140], ' km/h et plus'],
+                  ['cm', '❄️ Neige : valeurs à partir de', [1, 2, 5, 10, 20, 30, 50], ' cm et plus'],
+                  ['niveau', '⚠️ Risques (niveaux) : à partir de', [1, 2, 3, 4], ''],
                 ] as const
               ).map(([cle, titre, valeurs, suffixe]) => (
                 <label key={cle} className="text-sm font-medium">
@@ -1325,10 +1333,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               ))}
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={!!affichage.reperes} onChange={(e) => regler({ reperes: e.target.checked })} />
-                Flèches et noms des villes
+                🧭 Flèches et noms des villes
               </label>
               <label className="text-sm font-medium">
-                <span className={legende}>Police des valeurs</span>
+                <span className={legende}>🔤 Police des valeurs</span>
                 <select value={affichage.policeValeurs ?? 'condensee'} onChange={(e) => regler({ policeValeurs: e.target.value as PoliceValeurs })} className={`${selectBarre} w-full`}>
                   <option value="impact">Impact (très gras)</option>
                   <option value="condensee">Condensée grasse (par défaut)</option>
@@ -1336,7 +1344,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 </select>
               </label>
               <label className="text-sm font-medium">
-                <span className={legende}>Taille des noms de villes</span>
+                <span className={legende}>🏙️ Taille des noms de villes</span>
                 <select value={affichage.tailleNoms ?? 1.2} onChange={(e) => regler({ tailleNoms: Number(e.target.value) })} className={`${selectBarre} w-full`}>
                   {[0.8, 1, 1.2, 1.5, 1.8, 2.2].map((n) => (
                     <option key={n} value={n}>
@@ -1347,15 +1355,15 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={affichage.relief} onChange={(e) => regler({ relief: e.target.checked })} />
-                Reliefs
+                ⛰️ Reliefs
               </label>
               <label className={`flex items-center gap-2 text-sm ${affichage.relief ? '' : 'opacity-50'}`}>
-                Opacité du relief
+                🌓 Opacité du relief
                 <input type="range" min={0} max={90} step={5} value={affichage.reliefPourcent} disabled={!affichage.relief} onChange={(e) => regler({ reliefPourcent: Number(e.target.value) })} aria-label="Opacité du relief" />
                 <span className="w-9 tabular-nums text-muted">{affichage.reliefPourcent} %</span>
               </label>
               <label className={`flex items-center gap-2 text-sm ${affichage.fleuves === 'aucun' ? 'opacity-50' : ''}`}>
-                Opacité des fleuves
+                💧 Opacité des fleuves
                 <input type="range" min={10} max={100} step={5} value={affichage.opaciteFleuves} disabled={affichage.fleuves === 'aucun'} onChange={(e) => regler({ opaciteFleuves: Number(e.target.value) })} aria-label="Opacité des fleuves" />
                 <span className="w-10 tabular-nums text-muted">{affichage.opaciteFleuves} %</span>
               </label>
