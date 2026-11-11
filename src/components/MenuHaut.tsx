@@ -29,7 +29,7 @@ const RUBRIQUES: Rubrique[] = [
       '/outils/carte-meteo/tendances/',
       '/outils/carte-meteo/tendances-par-theme/',
       '/outils/carte-meteo-info/',
-      '/outils/previsions-saisonnieres/',
+      '/outils/previsions-saisonnieres/', '/outils/tendance-9-mois-france/',
     ].map(lien),
   },
   { titre: 'Alertes', rouge: true, pages: ['/outils/carte-meteo-info/?cartes=alertes'].map(lien) },
