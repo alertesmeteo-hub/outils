@@ -186,7 +186,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [jour, setJour] = useState(0);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
   /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
-  const [tailleValeurs, setTailleValeurs] = useState(100);
+  const [tailleValeurs, setTailleValeurs] = useState(uneCarte ? 160 : 100);
   const [sansTableau, setSansTableau] = useState(false);
   /** Cartes de risque : afficher les chiffres (km/h, mm, °C) à la place des niveaux (faible, modéré…). */
   const [chiffres, setChiffres] = useState(false);
@@ -1027,7 +1027,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-1' : ''}`}>
             <span className={legende}>{uneCarte ? 'Police' : 'Grosseur de la police des valeurs'}</span>
             <select value={tailleValeurs} onChange={(e) => setTailleValeurs(Number(e.target.value))} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Petite : plus de valeurs sur la carte ; grande : plus lisible">
-              {[60, 80, 100, 125, 150, 190, 240, 300].map((n) => (
+              {[60, 80, 100, 125, 150, 160, 190, 240, 300].map((n) => (
               <option key={n} value={n}>
                 {n === 100 ? '100 % (normale)' : `${n} %`}
               </option>
@@ -1337,6 +1337,22 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                   ))}
                 </select>
               </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>🌦️ Pluie : valeurs jusqu’à</span>
+                <select value={affichage.seuilPluieMax ?? 0} onChange={(e) => {
+                  const max = Number(e.target.value);
+                  // Le plancher « à partir de » ne doit pas dépasser le plafond : il repasse à « toutes les valeurs ».
+                  const min = affichage.seuils?.mm ?? affichage.seuilPluie ?? 0;
+                  regler(max && min >= max ? { seuilPluieMax: max, seuilPluie: 0, seuils: { ...affichage.seuils, mm: 0 } } : { seuilPluieMax: max });
+                }} className={`${selectBarre} w-full`}>
+                  <option value={0}>Toutes les valeurs</option>
+                  {[5, 10, 20].map((mm) => (
+                    <option key={mm} value={mm}>
+                      Moins de {mm} mm
+                    </option>
+                  ))}
+                </select>
+              </label>
               {(
                 [
                   ['km/h', '💨 Vent et rafales : valeurs à partir de', [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140], ' km/h et plus'],
@@ -1368,6 +1384,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                 <input type="checkbox" checked={!!affichage.dateElaboration} onChange={(e) => regler({ dateElaboration: e.target.checked })} />
                 📅 « Carte élaborée le » en bas à droite
               </label>
+              <label className={`flex items-center gap-2 text-sm ${affichage.dateElaboration ? '' : 'opacity-50'}`}>
+                <input type="checkbox" checked={!!affichage.heureElaboration} disabled={!affichage.dateElaboration} onChange={(e) => regler({ heureElaboration: e.target.checked })} />
+                🕒 Avec l’heure (« le 11/11/2026 à 14h35 »)
+              </label>
               <label className="text-sm font-medium">
                 <span className={legende}>🔤 Police des valeurs</span>
                 <select value={affichage.policeValeurs ?? 'condensee'} onChange={(e) => regler({ policeValeurs: e.target.value as PoliceValeurs })} className={`${selectBarre} w-full`}>
@@ -1389,6 +1409,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={affichage.relief} onChange={(e) => regler({ relief: e.target.checked })} />
                 ⛰️ Reliefs
+              </label>
+              <label className={`flex items-center gap-2 text-sm ${affichage.relief ? '' : 'opacity-50'}`}>
+                <input type="checkbox" checked={!!affichage.reliefAccentue} disabled={!affichage.relief} onChange={(e) => regler({ reliefAccentue: e.target.checked })} />
+                🏔️ Accentuer les reliefs
               </label>
               <label className={`flex items-center gap-2 text-sm ${affichage.relief ? '' : 'opacity-50'}`}>
                 🌓 Opacité du relief

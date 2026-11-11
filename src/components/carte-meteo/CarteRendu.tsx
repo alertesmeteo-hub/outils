@@ -235,6 +235,8 @@ interface Props {
   pied?: string;
   /** Date et sous-titre alignés en haut à droite (vue France) au lieu d'être centrés. */
   titreADroite?: boolean;
+  /** Réduction du bandeau du titre aligné à droite (1 = taille normale), pour qu'il ne passe pas sur le logo. */
+  titreEchelle?: number;
   /** Date et sous-titre alignés à gauche, à cette position (px de la carte) : carte de France. */
   titreGauche?: number;
   /** Logo en bas à gauche (au lieu du haut à gauche). */
@@ -274,6 +276,8 @@ interface Props {
   afficherRelief?: boolean;
   /** Part du relief qui transparaît à travers la teinte du territoire (0 à 1) quand « Reliefs » est coché. */
   reliefVisible?: number;
+  /** Relief accentué : fond plus contrasté et territoire plus transparent, pour mieux voir les montagnes. */
+  reliefAccentue?: boolean;
   /** Fond de carte ; par défaut, relief NASA pour la France et les régions, photos IGN pour les départements. */
   fond?: Couche;
   vue: Vue;
@@ -456,6 +460,7 @@ export default function CarteRendu({
   largeur = LARGEUR_CARTE,
   pied = '',
   titreADroite = false,
+  titreEchelle = 1,
   titreGauche,
   logoEnBas = false,
   etiquetteMer = false,
@@ -476,7 +481,8 @@ export default function CarteRendu({
   densiteFleuves = 'faible',
   opaciteFleuves = 1,
   afficherRelief = true,
-  reliefVisible = 0.28,
+  reliefVisible: reliefVisibleBase = 0.28,
+  reliefAccentue = false,
   fond,
   vue,
   departements,
@@ -526,7 +532,10 @@ export default function CarteRendu({
   const [directionOuvertePour, setDirectionOuvertePour] = useState<string | null>(null);
   const idClip = `fleuves-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const idFiltreFond = `${idClip}-fond`;
+  // Relief accentué : au moins 60 % du relief transparaît sous le territoire.
+  const reliefVisible = reliefAccentue ? Math.max(reliefVisibleBase, 0.6) : reliefVisibleBase;
   const couche = fond ?? coucheParDefaut(vue);
+  const filtreFond = couche === 'relief' || reliefAccentue;
   const degres = styleCapture || carteLocale;
   const largeurValeur = (v: string) => `${Math.max(1, v.length) * (styleCapture ? 0.58 : 0.54) + 0.05}em`;
 
@@ -611,12 +620,19 @@ export default function CarteRendu({
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
             {/* Fond : relief NASA (couleurs recalées) ou photographies aériennes IGN. Léger chevauchement (+0,6) pour éviter
                 les joints entre tuiles. Filtre en attributs SVG (et en sRGB) pour qu'il passe dans l'export JPG. */}
-            {couche === 'relief' && (
+            {filtreFond && (
               <filter id={idFiltreFond} colorInterpolationFilters="sRGB">
-                <feColorMatrix type="matrix" values={MATRICE_RELIEF} />
+                {couche === 'relief' && <feColorMatrix type="matrix" values={MATRICE_RELIEF} />}
+                {reliefAccentue && (
+                  <feComponentTransfer>
+                    <feFuncR type="linear" slope="1.5" intercept="-0.22" />
+                    <feFuncG type="linear" slope="1.5" intercept="-0.22" />
+                    <feFuncB type="linear" slope="1.5" intercept="-0.22" />
+                  </feComponentTransfer>
+                )}
               </filter>
             )}
-            <g filter={couche === 'relief' ? `url(#${idFiltreFond})` : undefined}>
+            <g filter={filtreFond ? `url(#${idFiltreFond})` : undefined}>
               {!theme && !styleFond && tuilesVisibles(couche, vue, largeur, HAUTEUR_CARTE).map((t) => (
                 <TuileFond key={t.cle} t={t} couche={couche} />
               ))}
@@ -697,7 +713,7 @@ export default function CarteRendu({
 
         <div
           className={`cmap-titre ${titreGauche != null ? 'cmap-titre-gauche' : titreADroite ? 'cmap-titre-droite' : ''}`}
-          style={titreGauche != null ? { left: titreGauche } : undefined}
+          style={titreGauche != null ? { left: titreGauche } : titreADroite && titreEchelle < 1 ? { transform: `scale(${titreEchelle})`, transformOrigin: 'top right' } : undefined}
         >
           <div className="cmap-date" style={couleurTitre ? { color: couleurTitre } : undefined}>{titre}</div>
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}

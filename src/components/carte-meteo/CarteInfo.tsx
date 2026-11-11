@@ -34,12 +34,16 @@ export interface AffichageCarte {
   relief: boolean;
   /** Part du relief qui transparaît (0 à 90). */
   reliefPourcent: number;
+  /** Relief accentué (fond plus contrasté, territoire plus transparent). */
+  reliefAccentue?: boolean;
   /** Cours d'eau : aucun, ou densité ; null = selon la zone. */
   fleuves: 'aucun' | 'faible' | 'moyen' | 'dense' | null;
   opaciteFleuves: number;
   contours: 'defaut' | 'aucun' | 'regions';
   /** Cartes en mm (pluie) : valeurs affichées à partir de ce cumul ; 0 = toutes. */
   seuilPluie?: number;
+  /** Cartes en mm (pluie) : seules les valeurs strictement inférieures à ce cumul sont affichées (< 5, < 10, < 20 mm) ; 0 ou absent = toutes. */
+  seuilPluieMax?: number;
   /** Seuil d'affichage par grandeur (« mm », « km/h », « cm », « niveau » pour les cartes de risque en niveaux) : les valeurs plus basses sont masquées. */
   seuils?: Record<string, number>;
   /** Nom de la ville sous chaque valeur, et flèche vers la station quand la valeur est décalée. */
@@ -52,6 +56,8 @@ export interface AffichageCarte {
   heureRun?: boolean;
   /** « Carte élaborée le : JJ/MM/AAAA » en bas à droite. */
   dateElaboration?: boolean;
+  /** Ajoute l'heure à « Carte élaborée le » (décochée par défaut). */
+  heureElaboration?: boolean;
 }
 export const AffichageContexte = createContext<AffichageCarte | null>(null);
 
@@ -213,7 +219,10 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
   })();
   const sousTitreAffiche = sousTitreSaisi ?? sousTitreAvecRun;
   /** Date d'élaboration de la carte (Paris), en bas à droite. */
-  const dateElaboree = new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
+  const maintenant = new Date();
+  const dateElaboree =
+    maintenant.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' }) +
+    (affichage?.heureElaboration ? ` à ${maintenant.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }).replace(':', 'h')}` : '');
   const titreTop = titreTopSaisi ?? theme.titreTop;
   const pointsCorriges = useMemo(
     () => points.filter((p) => !retires.has(p.code)).map((p) => (corrections[p.code] != null ? { ...p, valeur: corrections[p.code] } : p)),
@@ -282,9 +291,11 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
   const policeV = policeValeurs ?? affichage?.policeValeurs ?? 'condensee';
   const echNoms = tailleNoms ?? affichage?.tailleNoms ?? 1.2;
   const seuil = valeurMin ?? affichage?.seuils?.[theme.texteValeur ? 'niveau' : theme.unite] ?? (theme.unite === 'mm' ? affichage?.seuilPluie ?? 0 : 0);
+  // Plafond (cartes en mm) : « moins de 5 mm », « moins de 10 mm », « moins de 20 mm ».
+  const seuilMax = theme.unite === 'mm' ? affichage?.seuilPluieMax ?? 0 : 0;
   const dansZone = useMemo(
-    () => pointsCorriges.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur) && (!seuil || p.neige || p.valeur >= seuil)),
-    [pointsCorriges, selection, theme, seuil]
+    () => pointsCorriges.filter((p) => selection.has(p.dep) && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur) && (!seuil || p.neige || p.valeur >= seuil) && (!seuilMax || p.neige || p.valeur < seuilMax)),
+    [pointsCorriges, selection, theme, seuil, seuilMax]
   );
   // Du « meilleur » (le plus chaud, le plus arrosé…) au moins remarquable.
   const tries = useMemo(
@@ -365,6 +376,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
   const titreAGauche = !logoUrl && !titreDroite;
   // Bandeau du titre : Impact 32 px (≈ 15,5 px par lettre) et sous-titre 19 px (≈ 10 px par lettre), plus les marges.
   const largeurTitre = Math.round(Math.max(titre.length * 15.5, sousTitreAffiche.length * 10) + 34);
+  // Titre à droite et logo en haut à gauche : un titre plus large que la place libre (ex. « CUMULS DE PLUIE JUSQU'AU VENDREDI 13 NOVEMBRE À 13 H ») est réduit au lieu de passer sur le logo.
+  const placeTitre = largeur - 28 - (29 + 240 + 14);
+  const titreEchelle = logoUrl && ((enFrance && !titreAGauche) || titreDroite) ? Math.min(1, placeTitre / largeurTitre) : 1;
   const rectTitre: Rect = titreAGauche
     ? { x: MARGE_COLONNE, y: 6, w: largeurTitre, h: 76 }
     : titreDroite
@@ -587,6 +601,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
         opaciteFleuves={(affichage?.opaciteFleuves ?? 100) / 100}
         afficherRelief={affichage?.relief ?? true}
         reliefVisible={(affichage?.reliefPourcent ?? 22) / 100}
+        reliefAccentue={!!affichage?.reliefAccentue}
         fond={affichage?.fond ?? undefined}
         styleFond={styleFond}
         sansBandes={sansBandes}
@@ -605,6 +620,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
         hauteurLogo={hauteurLogo || undefined}
         pied="www.alertes-meteo.com"
         titreADroite={(enFrance && !titreAGauche) || titreDroite}
+        titreEchelle={titreEchelle}
         titreGauche={titreAGauche ? MARGE_COLONNE : undefined}
         moyennes={[]}
         paletteOuvertePour={null}

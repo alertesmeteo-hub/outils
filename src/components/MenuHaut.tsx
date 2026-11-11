@@ -32,7 +32,7 @@ const RUBRIQUES: Rubrique[] = [
       '/outils/previsions-saisonnieres/', '/outils/tendance-9-mois-france/',
     ].map(lien),
   },
-  { titre: 'Alertes', rouge: true, pages: ['/outils/carte-meteo-info/?cartes=alertes'].map(lien) },
+  { titre: 'Alertes', rouge: true, pages: ['/outils/carte-meteo-info/?cartes=alertes', '/outils/carte-meteo/carte-alerte/'].map(lien) },
   {
     titre: 'PO',
     pages: [
@@ -40,6 +40,10 @@ const RUBRIQUES: Rubrique[] = [
       ...['#carte', '#planche', '#infos'].map((a) => lien(`/outils/pyrenees-orientales/${a}`)),
       lien('/outils/carte-meteo/bilan-mois/'),
       lien('/outils/carte-meteo/video/'),
+      lien('/outils/carte-meteo/video/?format=facebook&zone=66'),
+      lien('/outils/carte-meteo/video/?zone=66&special=montagne'),
+      lien('/outils/carte-meteo/video/?zone=66&special=ete'),
+      lien('/outils/carte-meteo/carte-alerte/'),
     ],
   },
   { titre: 'Tableau', pages: ['/outils/releves-en-direct/'].map(lien) },
@@ -59,7 +63,10 @@ const RUBRIQUES: Rubrique[] = [
       { href: '/classements/', libelle: 'Classements' },
     ],
   },
-  { titre: 'TikTok', pages: ['/outils/carte-meteo/video/'].map(lien) },
+  {
+    titre: 'TikTok',
+    pages: ['/outils/carte-meteo/video/', '/outils/carte-meteo/video/?format=facebook&zone=66', '/outils/carte-meteo/video/?format=facebook&zone=FR', '/outils/carte-meteo/video/?zone=66&special=montagne', '/outils/carte-meteo/video/?zone=66&special=ete', '/outils/carte-meteo/carte-alerte/'].map(lien),
+  },
   {
     titre: 'Liens',
     pages: [

@@ -32,6 +32,10 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
       { href: '/outils/pyrenees-orientales/#animation', libelle: 'Animations pluie, vent, températures' },
       { href: '/outils/carte-meteo/bilan-mois/', libelle: 'Bilan du mois' },
       { href: '/outils/carte-meteo/video/', libelle: '🎬 Vidéo TikTok du week-end' },
+      { href: '/outils/carte-meteo/video/?format=facebook&zone=66', libelle: '📘 Vidéo Facebook : Pyrénées-Orientales' },
+      { href: '/outils/carte-meteo/video/?zone=66&special=montagne', libelle: '🏔️ Vidéo spéciale montagne : Pyrénées-Orientales' },
+      { href: '/outils/carte-meteo/video/?zone=66&special=ete', libelle: '🏖️ Vidéo spéciale été : Pyrénées-Orientales' },
+      { href: '/outils/carte-meteo/carte-alerte/', libelle: '🚨 Carte alerte TikTok / Facebook' },
     ],
   },
   {
@@ -47,6 +51,7 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
       { href: '/outils/previsions-saisonnieres/', libelle: 'Prévisions saisonnières' },
       { href: '/outils/tendance-9-mois-france/', libelle: 'Tendance à 9 mois : France' },
       { href: '/outils/carte-meteo/animations/', libelle: 'Animations GIF / MP4' },
+      { href: '/outils/carte-meteo/video/?format=facebook&zone=FR', libelle: '📘 Vidéo Facebook : France' },
     ],
   },
   {
