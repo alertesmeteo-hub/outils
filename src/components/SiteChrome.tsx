@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { categories } from '@/lib/tools/categories';
 import { SITE_NAME } from '@/lib/config';
+import MenuHaut from './MenuHaut';
 import ThemeToggle from './ThemeToggle';
 
 export function Header() {
@@ -26,6 +27,7 @@ export function Header() {
           <ThemeToggle />
         </div>
       </div>
+      <MenuHaut />
     </header>
   );
 }

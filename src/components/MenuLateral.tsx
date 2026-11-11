@@ -92,7 +92,7 @@ export default function MenuLateral() {
   const estActif = (href: string) => (href.includes('#') ? sansAncre(href) === chemin && href.split('#')[1] === ancre : !href.includes('?') && sansAncre(href) === chemin);
 
   return (
-    <nav aria-label="Pages de travail" className="sticky top-14 hidden max-h-[calc(100vh-4.5rem)] flex-col gap-1 overflow-y-auto pr-1 text-[15px] xl:flex">
+    <nav aria-label="Pages de travail" className="sticky top-24 hidden max-h-[calc(100vh-7rem)] flex-col gap-1 overflow-y-auto pr-1 text-[15px] xl:flex">
       <Link href="/outils/" aria-current={chemin === '/outils' ? 'page' : undefined} className={`${lien(chemin === '/outils')} flex-none`}>
         Tous les outils
       </Link>
