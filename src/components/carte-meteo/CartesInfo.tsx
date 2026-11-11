@@ -228,7 +228,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   }, [alertesDemandees]);
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
-  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', heureRun: uneCarte, dateElaboration: uneCarte, seuilPluie: uneCarte ? 10 : 0, seuils: uneCarte ? { mm: 10, 'km/h': 60 } : undefined, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
+  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', heureRun: true, dateElaboration: true, seuilPluie: uneCarte ? 10 : 0, seuils: uneCarte ? { mm: 10, 'km/h': 60 } : undefined, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
   const regler = (changement: Partial<AffichageCarte>) => setAffichage((a) => ({ ...a, ...changement }));
   const [filtreGroupe, setFiltreGroupe] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
