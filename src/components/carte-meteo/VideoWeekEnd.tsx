@@ -35,6 +35,18 @@ const FRANCE = 'FR';
 const GRANDES_VILLES_FRANCE = ['Paris', 'Lyon', 'Marseille', 'Lille', 'Toulouse', 'Bordeaux', 'Nantes', 'Strasbourg', 'Nice', 'Rennes', 'Montpellier', 'Brest'];
 /** France entière : la prévision d'un département est celle de son chef-lieu, qui donne son nom au point. */
 const versVilles = (points: PointCarte[], france: boolean): PointCarte[] => (france ? points.map((p) => ({ ...p, nom: p.ville ?? p.nom })) : points);
+/** Noms trop longs pour les écrans de la vidéo : forme courte (le nom complet reste dans les listes). */
+const NOMS_COURTS: Record<string, string> = {
+  'Font-Romeu-Odeillo-Via': 'Font-Romeu',
+  'Prats-de-Mollo-la-Preste': 'Prats-de-Mollo',
+  'Amélie-les-Bains-Palalda': 'Amélie-les-Bains',
+  'Saint-Laurent-de-Cerdans': 'St-Laurent-de-Cerdans',
+  'Saint-Paul-de-Fenouillet': 'St-Paul-de-Fenouillet',
+  'Charleville-Mézières': 'Charleville',
+  'Cherbourg-en-Cotentin': 'Cherbourg',
+  'Le Puy-en-Velay': 'Le Puy',
+};
+const nomAffiche = (nom: string): string => NOMS_COURTS[nom] ?? (nom.length > 16 ? nom.replace(/^Sainte-/, 'Ste-').replace(/^Saint-/, 'St-') : nom);
 /** Grandes villes seulement : la liste du département est triée par population, on ne tire que parmi les plus peuplées. */
 const NB_GRANDES_VILLES = 12;
 
@@ -368,7 +380,7 @@ function dessinerTendance(ctx: CanvasRenderingContext2D, local: number, c: Conte
   const ville = tendance.ville;
   const jours = tendance.villes[ville] ?? [];
   texteAjuste(ctx, 'TENDANCE DES PROCHAINS JOURS', W / 2, 150 * u, 80 * u, POLICE, W * 0.92, '#ffe27a');
-  texteHook(ctx, ville.replace('-la-Preste', '').toUpperCase(), W / 2, 240 * u, 60 * u, W * 0.9, ROUGE_CATALAN);
+  texteHook(ctx, nomAffiche(ville).toUpperCase(), W / 2, 240 * u, 60 * u, W * 0.9, ROUGE_CATALAN);
   const haut = 290 * u;
   const n = tendance.jours.length;
   const vertical = empile(W, H);
@@ -623,9 +635,9 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
 }
 
 /** Textes de la vidéo : week-end, ou un jour (aujourd'hui, ou le jour de la semaine : jamais « demain »). */
-function textesVideo(mode: Mode, jours: string[], ecart: number, special: Special = 'auto'): Contexte['textes'] {
+function textesVideo(mode: Mode, jours: string[], ecart: number, special: Special = 'auto', france = false): Contexte['textes'] {
   const base = textesDeBase(mode, jours, ecart);
-  if (special === 'auto') return base;
+  if (special === 'auto') return france ? { ...base, accroche: 'EN FRANCE ?' } : base;
   const lieu = special === 'montagne' ? 'EN MONTAGNE ?' : 'SUR LA CÔTE ?';
   const etiquette = special === 'montagne' ? 'MONTAGNE' : 'CÔTE';
   return { intro: ['QUEL TEMPS', lieu], sous: base.sous, bandeau: `${etiquette} · ${base.bandeau}`, recap: `${base.recap} · ${etiquette}`, periode: base.intro[1], accroche: lieu, ...(special === 'montagne' ? { icones: 'flocons' as const } : {}) };
@@ -824,7 +836,7 @@ function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte, local?: numbe
     ctx.lineWidth = 2.5 * u;
     ctx.stroke();
     ctx.textAlign = 'center';
-    texteAjuste(ctx, b.nom.replace('-la-Preste', '').toUpperCase(), b.x + bw / 2, b.y + (n === 1 ? 42 : 36) * u, (n === 1 ? 34 : 30) * u, POLICE, bw - 28 * u, '#ffe27a');
+    texteAjuste(ctx, nomAffiche(b.nom).toUpperCase(), b.x + bw / 2, b.y + (n === 1 ? 42 : 36) * u, (n === 1 ? 34 : 30) * u, POLICE, bw - 28 * u, '#ffe27a');
     const jours = semaine.villes[b.nom] ?? [];
     jours.slice(0, n).forEach((j, k) => {
       const y0 = b.y + entete - 4 * u + k * lh;
@@ -906,7 +918,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     const a = sortie(local / 0.5);
     ctx.save();
     ctx.globalAlpha = a;
-    texteHook(ctx, ville.toUpperCase().replace('-LA-PRESTE', ''), W / 2, 280 * u, 160 * u, W * 0.9, ROUGE_CATALAN);
+    texteHook(ctx, nomAffiche(ville).toUpperCase(), W / 2, 280 * u, 160 * u, W * 0.9, ROUGE_CATALAN);
     ctx.restore();
     const haut = 340 * u;
     const bord = bas - 60 * u;
@@ -962,7 +974,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
     rectArrondi(ctx, 50 * u, y, W - 100 * u, hauteurLigne - 24 * u, 36 * u);
     ctx.fill();
     ctx.textAlign = 'left';
-    texteHook(ctx, ville.replace('-la-Preste', '').toUpperCase(), 80 * u, y + hauteurLigne / 2 + 18 * u, 64 * u, colSam - 100 * u, ROUGE_CATALAN);
+    texteHook(ctx, nomAffiche(ville).toUpperCase(), 80 * u, y + hauteurLigne / 2 + 18 * u, 64 * u, colSam - 100 * u, ROUGE_CATALAN);
     ctx.textAlign = 'left';
     const jours = semaine.villes[ville] ?? [versJour(undefined), versJour(undefined)];
     jours.slice(0, deuxJours ? 2 : 1).forEach((j, col) => {
@@ -1188,7 +1200,7 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   }, [listeVilles, dep, villes]);
   const carteDansVideo = avecCarte && villes.some((v) => positions[v]);
   const total = dureeTotale(villes.length, avecHook, !!tendance, carteDansVideo);
-  const textes = useMemo(() => textesVideo(mode, jours, ecart, france ? 'auto' : special), [mode, jours, ecart, special, france]);
+  const textes = useMemo(() => textesVideo(mode, jours, ecart, france ? 'auto' : special, france), [mode, jours, ecart, special, france]);
   const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions } : null;
 
   useEffect(() => {
