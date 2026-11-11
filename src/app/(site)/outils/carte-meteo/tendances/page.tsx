@@ -98,7 +98,7 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
       ) : (
         <>
           <div className="mt-8">
-            <PlanchesJours aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} jours={jours} />
+            <PlanchesJours aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} jours={jours} fondCarteMeteo />
           </div>
           <h2 className="mt-12 text-2xl font-extrabold">Cartes de tendance par thème</h2>
           <PlanchesTendances aujourdhui={aujourdhui} modele={{ id: modele, libelle: infos.libelle, fournisseur: infos.fournisseur }} periodes={periodes} />

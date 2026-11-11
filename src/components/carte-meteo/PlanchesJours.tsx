@@ -58,13 +58,15 @@ interface Props {
   jours: Record<string, PointJour[] | null>;
   /** Zone choisie d'office : « dep:66 », « reg:Occitanie »… (France par défaut). */
   zoneInitiale?: string;
+  /** Fond des autres cartes (relief satellite NASA, territoire violet uni, reste assombri) au lieu du style « rouge et or ». */
+  fondCarteMeteo?: boolean;
 }
 
 /**
  * Planches « jours » : un seul JPG avec une carte par jour (2 cartes pour 2 jours, 4 pour 4… 16 pour 16 jours), pour la France, une
  * région ou un département, avec un seul picto par point (le temps de la journée) et ses températures.
  */
-export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france' }: Props) {
+export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false }: Props) {
   const [jeuAlertes, setJeuAlertes] = useJeuAlertes();
   const [dureeChoisie, setDuree] = useState<number>(4);
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
@@ -189,8 +191,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   // Zonage fin (jusqu'à 864 zones) : une teinte par zone au lieu d'une par département, pour la France entière.
   const [zonageFin, setZonageFin] = useState(false);
   /** Fond de carte : automatique (relief ou photos pour un département ou une région, uni pour la France), uni, relief NASA ou photos IGN. */
-  const [fondChoisi, setFondChoisi] = useState<'auto' | 'uni' | Couche>('auto');
-  const [styleFond, setStyleFond] = useState<StyleFond | null>('rouge-or');
+  const [fondChoisi, setFondChoisi] = useState<'auto' | 'uni' | Couche>(fondCarteMeteo ? 'relief' : 'auto');
+  const [styleFond, setStyleFond] = useState<StyleFond | null>(fondCarteMeteo ? null : 'rouge-or');
   const terresEurope = useTerres(styleFond != null);
   const fin = zonageFin && zone === 'france' && !parQuarts;
   type PointZone = { dep: string; lat: number; lon: number; maxi: number | null };
@@ -567,6 +569,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           const fond = dedans && point?.maxi != null ? palierDe(PALIERS_TEMPERATURE, point.maxi).fond : dedans ? '#6f86d6' : '#061428';
                           // Avec un fond de carte : le territoire est teinté en transparence (le relief reste visible), le reste assombri.
                           if (styleFond) return <path key={c.code} d={c.d} fill={dedans ? fond : 'none'} fillOpacity={dedans ? 0.92 : 1} stroke={dedans ? STYLES_FOND[styleFond].contour : STYLES_FOND[styleFond].voisins} strokeOpacity={1} strokeWidth={(dedans ? 1.6 : 1) / vue.echelle} />;
+                          if (couche && fondCarteMeteo) return <path key={c.code} d={c.d} fill={dedans ? '#8f9ee8' : '#061428'} fillOpacity={dedans ? 0.9 : 0.5} stroke="#fff" strokeOpacity={dedans ? 0.4 : 0.2} strokeWidth={(dedans ? 0.7 : 0.6) / vue.echelle} />;
                           if (couche) return <path key={c.code} d={c.d} fill={dedans ? fond : '#061428'} fillOpacity={dedans ? 0.5 : 0.55} stroke="#fff" strokeOpacity={dedans ? 0.9 : 0.25} strokeWidth={(dedans ? 1.4 : 0.7) / vue.echelle} />;
                           return <path key={c.code} d={c.d} fill={fond} fillOpacity={dedans ? 0.88 : 0.4} stroke="#fff" strokeOpacity={dedans ? 0.55 : 0.2} strokeWidth={0.7 / vue.echelle} />;
                         })}
