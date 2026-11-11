@@ -187,6 +187,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   }, [enDepartement, zone, dates, modele.id]);
 
   const contours = useContours(FICHIERS_CONTOURS.departements);
+  /** Fond des autres cartes : frontières des régions (et non des départements). */
+  const contoursRegions = useContours(fondCarteMeteo ? FICHIERS_CONTOURS.regions : null);
   const codes = useMemo(() => new Set(codesDeLaZone(zoneCarte)), [zoneCarte]);
   // Zonage fin (jusqu'à 864 zones) : une teinte par zone au lieu d'une par département, pour la France entière.
   const [zonageFin, setZonageFin] = useState(false);
@@ -569,10 +571,13 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           const fond = dedans && point?.maxi != null ? palierDe(PALIERS_TEMPERATURE, point.maxi).fond : dedans ? '#6f86d6' : '#061428';
                           // Avec un fond de carte : le territoire est teinté en transparence (le relief reste visible), le reste assombri.
                           if (styleFond) return <path key={c.code} d={c.d} fill={dedans ? fond : 'none'} fillOpacity={dedans ? 0.92 : 1} stroke={dedans ? STYLES_FOND[styleFond].contour : STYLES_FOND[styleFond].voisins} strokeOpacity={1} strokeWidth={(dedans ? 1.6 : 1) / vue.echelle} />;
-                          if (couche && fondCarteMeteo) return <path key={c.code} d={c.d} fill={dedans ? '#8f9ee8' : '#061428'} fillOpacity={dedans ? 0.9 : 0.5} stroke="#fff" strokeOpacity={dedans ? 0.4 : 0.2} strokeWidth={(dedans ? 0.7 : 0.6) / vue.echelle} />;
+                          if (couche && fondCarteMeteo) return <path key={c.code} d={c.d} fill={dedans ? '#8f9ee8' : '#061428'} fillOpacity={dedans ? 0.9 : 0.5} stroke="none" />;
                           if (couche) return <path key={c.code} d={c.d} fill={dedans ? fond : '#061428'} fillOpacity={dedans ? 0.5 : 0.55} stroke="#fff" strokeOpacity={dedans ? 0.9 : 0.25} strokeWidth={(dedans ? 1.4 : 0.7) / vue.echelle} />;
                           return <path key={c.code} d={c.d} fill={fond} fillOpacity={dedans ? 0.88 : 0.4} stroke="#fff" strokeOpacity={dedans ? 0.55 : 0.2} strokeWidth={0.7 / vue.echelle} />;
                         })}
+                        {fondCarteMeteo && couche && contoursRegions.map((c) => (
+                          <path key={`reg-${c.code}`} d={c.d} fill="none" stroke="#fff" strokeOpacity={0.9} strokeWidth={1.5 / vue.echelle} strokeLinejoin="round" />
+                        ))}
                         {fin && cellulesJours[date] && (
                           <g>
                             <defs>
