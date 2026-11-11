@@ -44,6 +44,8 @@ interface VilleListe {
   lon: number;
   /** Altitude (m) de la ville, si l'API la donne : sert à repérer les reliefs dans le texte du post. */
   altitude?: number;
+  /** France : code du département dont la ville est le chef-lieu. */
+  dep?: string;
 }
 
 /**
@@ -1017,11 +1019,19 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   const dateListeRelief = modeleRelief === 'arome' ? aujourdhui : jours[jours.length - 1];
   const france = dep === FRANCE;
   const nomDepartement = france ? 'France' : DEPARTEMENTS_FR[dep] ?? dep;
-  /** Paramètre de zone des requêtes de prévisions : un département, ou rien pour la France (un point par département, nommé d'après son chef-lieu). */
-  const zoneRequete = france ? '' : `&dep=${dep}`;
-  const cle = `${modele}|${jours.join(',')}|${dep}`;
   // Mémorisées : ces listes servent de dépendances aux effets (une nouvelle liste à chaque rendu les relancerait sans fin).
   const villes = useMemo(() => choix.filter(Boolean), [choix]);
+  /**
+   * Paramètre de zone des requêtes de prévisions : un département ; pour la France, les seuls départements des villes choisies (même valeurs que la carte
+   * des 96 départements, mais environ cinq fois plus vite) ; null tant que les villes ne sont pas choisies.
+   */
+  const zoneRequete = useMemo(() => {
+    if (!france) return `&dep=${dep}`;
+    if (listeVilles?.dep !== dep) return null;
+    const codes = [...new Set(villes.map((v) => listeVilles.villes.find((w) => w.nom === v)?.dep).filter((c): c is string => !!c))].sort();
+    return codes.length > 0 ? `&deps=${codes.join(',')}` : null;
+  }, [france, dep, listeVilles, villes]);
+  const cle = `${modele}|${jours.join(',')}|${dep}|${zoneRequete}`;
   // Jours entre aujourd'hui et le dernier jour de la vidéo : seuls les modèles qui vont jusque-là sont proposés (la moyenne va aussi loin que le CEP).
   const echeanceDimanche = Math.round((Date.parse(`${jours[jours.length - 1]}T12:00:00Z`) - Date.parse(`${aujourdhui}T12:00:00Z`)) / 86_400_000);
   const modelesProposes = useMemo(
@@ -1035,7 +1045,7 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
     setListeVilles(null);
     const lire = (url: string) =>
       fetch(url, { signal: controleur.signal }).then((r) => (r.ok ? (r.json() as Promise<{ points: PointCarte[] }>) : Promise.reject(new Error('Villes du département indisponibles'))));
-    const enListe = (points: PointCarte[]): VilleListe[] => points.filter((p) => p.lat != null && p.lon != null).map((p) => ({ nom: p.nom, lat: p.lat as number, lon: p.lon as number, altitude: p.altitude }));
+    const enListe = (points: PointCarte[]): VilleListe[] => points.filter((p) => p.lat != null && p.lon != null).map((p) => ({ nom: p.nom, lat: p.lat as number, lon: p.lon as number, altitude: p.altitude, ...(dep === FRANCE ? { dep: p.code } : {}) }));
     // Villes de relief (communes de montagne, 1 000 m ou plus ; à défaut 500 m) : facultatives, une erreur ne bloque pas le reste.
     const reliefsDe = async (): Promise<{ reliefs: VilleListe[]; altRelief: number }> => {
       if (dep === FRANCE) return { reliefs: [], altRelief: 1000 };
@@ -1071,14 +1081,14 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   }, [modelesProposes, modele]);
 
   useEffect(() => {
-    if (donnees?.cle === cle) return;
+    if (zoneRequete === null || donnees?.cle === cle) return;
     const controleur = new AbortController();
     setErreur(null);
     Promise.all(
       jours.map((date) =>
         fetch(`/api/carte-meteo/previsions/?modele=${modele === 'moyenne' ? 'moyenne&toutes=1' : modele}&date=${date}${zoneRequete}`, { signal: controleur.signal }).then(async (r) => {
           if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
-          return versVilles(((await r.json()) as { points: PointCarte[] }).points, dep === FRANCE);
+          return ((await r.json()) as { points: PointCarte[] }).points;
         })
       )
     )
@@ -1089,15 +1099,15 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
 
   // Tendance : les jours qui suivent la vidéo, toujours en moyenne des modèles (qui va jusqu'à J+10). Si elle échoue, la vidéo se fait sans cet écran.
   const joursTendance = useMemo(() => Array.from({ length: NB_JOURS_TENDANCE }, (_, i) => ajouterJours(jours[jours.length - 1], i + 1)), [jours]);
-  const cleTendance = `${joursTendance.join(',')}|${dep}`;
+  const cleTendance = `${joursTendance.join(',')}|${dep}|${zoneRequete}`;
   useEffect(() => {
-    if (donneesTendance?.cle === cleTendance) return;
+    if (zoneRequete === null || donneesTendance?.cle === cleTendance) return;
     const controleur = new AbortController();
     Promise.all(
       joursTendance.map((date) =>
         fetch(`/api/carte-meteo/previsions/?modele=moyenne&toutes=1&date=${date}${zoneRequete}`, { signal: controleur.signal }).then(async (r) => {
           if (!r.ok) throw new Error('Tendance indisponible');
-          return versVilles(((await r.json()) as { points: PointCarte[] }).points, dep === FRANCE);
+          return ((await r.json()) as { points: PointCarte[] }).points;
         })
       )
     )
