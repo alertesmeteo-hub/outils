@@ -151,6 +151,8 @@ export const LARGEUR_FRANCE = 960;
 export const ZONE_FRANCE: Zone = { gauche: 0, haut: 72, droite: LARGEUR_FRANCE, bas: HAUTEUR_CARTE - 30 };
 /** Largeur des pavés « Moyenne » (voir .cmap-moyenne dans globals.css : 162 px + bordures). */
 const LARGEUR_MOYENNES = 128;
+/** Carte de France : les moyennes Nord et Sud sont à droite, décalées de ce nombre de pixels vers la gauche. */
+const DECALAGE_MOYENNES = 80;
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
 export const MASQUES_FRANCE = new Set(['92', '93', '94']);
 
@@ -515,7 +517,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [paletteOuvertePour, setPaletteOuvertePour] = useState<string | null>(null);
   const [pictosSelectionnes, setPictosSelectionnes] = useState<Set<string>>(new Set());
   const [modeMultiple, setModeMultiple] = useState(false);
-  const [pied, setPied] = useState('www.alertes-meteo.com');
+  const [pied, setPied] = useState('alertes-meteo.com');
   const [deplacerMers, setDeplacerMers] = useState(false);
   const [resetMers, setResetMers] = useState(0);
   const [afficherFleuves, setAfficherFleuves] = useState(true);
@@ -1135,7 +1137,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // Le logo, la date et les moyennes sont des obstacles (positions de la mise en page, voir globals.css).
     const em = 22 * echelleMarqueurs;
     const logoDroite = 29 + Math.max(205, hauteurLogo);
-    const moyennesGauche = largeurCarte - 29 - LARGEUR_MOYENNES;
+    const moyennesGauche = largeurCarte - 29 - LARGEUR_MOYENNES - DECALAGE_MOYENNES;
     const obstacles: Rect[] = [
       enFrance ? { x: largeurCarte - 28 - largeurLogo, y: 21, w: largeurLogo, h: hauteurLogo + 1 } : { x: 29, y: HAUTEUR_CARTE - 21 - hauteurLogo - 1, w: logoDroite - 29, h: hauteurLogo + 1 },
       enFrance ? { x: xTitreFrance, y: 6, w: 410, h: 67 } : { x: largeurCarte - 28 - 460, y: 6, w: 460, h: 67 },
@@ -1672,7 +1674,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       echelleVent={tailleVent / 100}
       couleurTitre={zone === 'dep:66' && !theme ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
-      moyennesGauche={enFrance ? largeurCarte - 29 - LARGEUR_MOYENNES : undefined}
+      moyennesGauche={enFrance ? largeurCarte - 29 - LARGEUR_MOYENNES - DECALAGE_MOYENNES : undefined}
       onModifierMoyenne={(id, v) => saisieAcceptee(v, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne(id)]: v }))}
       paletteOuvertePour={paletteOuvertePour}
       pictosSelectionnes={enExport ? undefined : pictosSelectionnes}

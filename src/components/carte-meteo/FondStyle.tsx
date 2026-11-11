@@ -307,10 +307,10 @@ export function BandesCoin({ largeur, hauteur }: { largeur: number; hauteur: num
 }
 
 /** « Mer Méditerranée » et deux vagues, centrés sur le point donné (pixels écran). Avec `contour`, un liseré sombre aide la lecture sur photos. */
-function EtiquetteMer({ mer, couleur, contour = false, atlantique = false }: { mer: { x: number; y: number }; couleur: string; contour?: boolean; atlantique?: boolean }) {
+function EtiquetteMer({ mer, couleur, contour = false, atlantique = false, echelle = 1 }: { mer: { x: number; y: number }; couleur: string; contour?: boolean; atlantique?: boolean; echelle?: number }) {
   const halo = contour ? { stroke: 'rgba(5,25,60,0.85)', strokeWidth: 4, paintOrder: 'stroke' as const, strokeLinejoin: 'round' as const } : {};
   return (
-    <g fill={couleur} fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight={700} fontSize={16} textAnchor="middle">
+    <g fill={couleur} fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight={700} fontSize={16} textAnchor="middle" transform={echelle !== 1 ? `translate(${mer.x} ${mer.y}) scale(${echelle}) translate(${-mer.x} ${-mer.y})` : undefined}>
       <text x={mer.x} y={mer.y - 12} {...halo}>{atlantique ? 'Océan' : 'Mer'}</text>
       <text x={mer.x} y={mer.y + 12} {...halo}>{atlantique ? 'Atlantique' : 'Méditerranée'}</text>
       {contour && <path d={`M ${mer.x - 34} ${mer.y + 30} q 11 -9 22 0 t 22 0 t 22 0 M ${mer.x - 34} ${mer.y + 40} q 11 -9 22 0 t 22 0 t 22 0`} fill="none" stroke="rgba(5,25,60,0.85)" strokeWidth={5.4} strokeLinecap="round" />}
@@ -320,7 +320,7 @@ function EtiquetteMer({ mer, couleur, contour = false, atlantique = false }: { m
 }
 
 /** Nom de la mer seul, sur une carte à fond photo (sans style de fond). */
-export function DecorMer({ largeur, hauteur, mer, atlantique = false, deplacable = false, couleur = '#ffffff' }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null; atlantique?: boolean; deplacable?: boolean; couleur?: string }) {
+export function DecorMer({ largeur, hauteur, mer, atlantique = false, deplacable = false, couleur = '#ffffff', echelle = 1 }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null; atlantique?: boolean; deplacable?: boolean; couleur?: string; echelle?: number }) {
   const [decalage, setDecalage] = useState({ x: 0, y: 0 });
   const glissement = useRef<{ x: number; y: number; dx: number; dy: number; facteur: number } | null>(null);
   if (!mer) return null;
@@ -350,7 +350,7 @@ export function DecorMer({ largeur, hauteur, mer, atlantique = false, deplacable
         onClick={(e) => { if (deplacable) e.stopPropagation(); }}
       >
         {deplacable && <rect x={mer.x - 72} y={mer.y - 28} width={144} height={78} rx={8} fill="rgba(255,255,255,0.12)" stroke="#fff" strokeDasharray="4 3" />}
-        <EtiquetteMer mer={mer} couleur={couleur} contour atlantique={atlantique} />
+        <EtiquetteMer mer={mer} couleur={couleur} contour atlantique={atlantique} echelle={echelle} />
       </g>
     </svg>
   );

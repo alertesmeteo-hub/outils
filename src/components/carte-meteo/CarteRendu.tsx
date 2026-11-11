@@ -681,8 +681,8 @@ export default function CarteRendu({
         {/* Habillage catalan, carte locale : bandes de la senyera en haut à gauche (la date est à droite). */}
         {habillage === 'catalan' && logoEnBas && !styleFond && !theme && <BandesCoin largeur={largeur} hauteur={HAUTEUR_CARTE} />}
 
-        {etiquetteMer && !theme && <DecorMer key={`med-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible ? { ...merVisible, x: Math.max(75, merVisible.x - 25) } : null} deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
-        {atlantiqueVisible && <DecorMer key={`atl-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={{ ...atlantiqueVisible, x: Math.max(75, atlantiqueVisible.x - 40) }} atlantique deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
+        {etiquetteMer && !theme && <DecorMer key={`med-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible ? { ...merVisible, x: Math.max(75, merVisible.x - 25), ...(logoEnBas ? {} : { y: Math.min(HAUTEUR_CARTE - 70, merVisible.y + 110) }) } : null} echelle={logoEnBas ? 1 : 0.85} deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
+        {atlantiqueVisible && <DecorMer key={`atl-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={{ ...atlantiqueVisible, x: Math.max(75, atlantiqueVisible.x - 90) }} atlantique deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
 
         {logoUrl && (
           <img
@@ -701,7 +701,7 @@ export default function CarteRendu({
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
         </div>
 
-        {pied && <div className="cmap-pied" style={etiquetteMer ? { left: 29, right: 'auto', textAlign: 'left', color: '#000', textShadow: '0 0 3px #fff, 0 0 3px #fff' } : undefined}>{etiquetteMer && pied.toLowerCase() === 'www.alertes-meteo.com' ? <>www.<span style={{ color: '#da121a' }}>A</span>lertes-meteo.com</> : pied}</div>}
+        {pied && <div className="cmap-pied" style={etiquetteMer ? { left: 29, right: 'auto', textAlign: 'left', color: '#000', textShadow: '0 0 3px #fff, 0 0 3px #fff' } : undefined}>{etiquetteMer && /^(www\.)?alertes-meteo\.com$/i.test(pied) ? <><span style={{ color: '#da121a' }}>A</span>lertes-meteo.com</> : pied}</div>}
 
         <div className="cmap-moyennes" style={moyennesGauche != null ? { left: moyennesGauche } : undefined}>
           {moyennes.map((m) => (
