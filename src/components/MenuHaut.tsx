@@ -58,6 +58,7 @@ const RUBRIQUES: Rubrique[] = [
       { href: '/classements/', libelle: 'Classements' },
     ],
   },
+  { titre: 'TikTok', pages: ['/outils/carte-meteo/video/'].map(lien) },
   { titre: 'Record', pages: ['/outils/records-temperature/', '/outils/nuits-tropicales/'].map(lien) },
 ];
 
