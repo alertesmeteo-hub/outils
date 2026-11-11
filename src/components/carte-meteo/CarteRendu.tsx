@@ -56,6 +56,8 @@ export function TuileFond({ t, couche }: { t: Tuile; couche: Couche }) {
 
 export const LARGEUR_CARTE = 1280;
 export const HAUTEUR_CARTE = 720;
+/** Carte de France : noms des mers à leur place fixe (pixels d'une carte de 960 × 720) : Atlantique à gauche dans l'océan, Méditerranée en bas sous le Languedoc. */
+const MER_FRANCE = { atlantique: { x: 88, y: 417 }, mediterranee: { x: 632, y: 644 } };
 
 export interface Contour {
   code: string;
@@ -681,8 +683,8 @@ export default function CarteRendu({
         {/* Habillage catalan, carte locale : bandes de la senyera en haut à gauche (la date est à droite). */}
         {habillage === 'catalan' && logoEnBas && !styleFond && !theme && <BandesCoin largeur={largeur} hauteur={HAUTEUR_CARTE} />}
 
-        {etiquetteMer && !theme && <DecorMer key={`med-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible ? { ...merVisible, x: Math.max(75, merVisible.x - 25), ...(logoEnBas ? {} : { y: Math.min(HAUTEUR_CARTE - 70, merVisible.y + 110) }) } : null} echelle={logoEnBas ? 1 : 0.85} deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
-        {atlantiqueVisible && <DecorMer key={`atl-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={{ ...atlantiqueVisible, x: Math.max(75, atlantiqueVisible.x - 90) }} atlantique deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
+        {etiquetteMer && !theme && <DecorMer key={`med-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={moyennesGauche != null ? MER_FRANCE.mediterranee : merVisible ? { ...merVisible, x: Math.max(75, merVisible.x - 25), ...(logoEnBas ? {} : { y: Math.min(HAUTEUR_CARTE - 70, merVisible.y + 110) }) } : null} echelle={logoEnBas ? 1 : 0.85} deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
+        {(atlantiqueVisible || moyennesGauche != null) && etiquetteMer && !theme && <DecorMer key={`atl-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={moyennesGauche != null ? MER_FRANCE.atlantique : { ...atlantiqueVisible!, x: Math.max(75, atlantiqueVisible!.x - 90) }} atlantique deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
 
         {logoUrl && (
           <img

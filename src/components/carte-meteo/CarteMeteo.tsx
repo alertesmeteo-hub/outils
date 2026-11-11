@@ -152,7 +152,7 @@ export const ZONE_FRANCE: Zone = { gauche: 0, haut: 72, droite: LARGEUR_FRANCE, 
 /** Largeur des pavés « Moyenne » (voir .cmap-moyenne dans globals.css : 162 px + bordures). */
 const LARGEUR_MOYENNES = 128;
 /** Carte de France : les moyennes Nord et Sud sont à droite, décalées de ce nombre de pixels vers la gauche. */
-const DECALAGE_MOYENNES = 80;
+const DECALAGE_MOYENNES = 50;
 /** En vue « France entière », les départements de la petite couronne se superposent à Paris : on ne garde que Paris. */
 export const MASQUES_FRANCE = new Set(['92', '93', '94']);
 
