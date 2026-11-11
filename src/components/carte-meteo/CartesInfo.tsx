@@ -187,6 +187,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
   /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
   const [tailleValeurs, setTailleValeurs] = useState(uneCarte ? 160 : 100);
+  /** Grosseur de la police du tableau (classement) : 100 = taille habituelle. */
+  const [tailleTableau, setTailleTableau] = useState(100);
   const [sansTableau, setSansTableau] = useState(false);
   /** Cartes de risque : afficher les chiffres (km/h, mm, °C) à la place des niveaux (faible, modéré…). */
   const [chiffres, setChiffres] = useState(false);
@@ -206,6 +208,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   );
   const [zonageFin, setZonageFin] = useState(false);
   const echelleValeurs = tailleValeurs / 100;
+  const echelleTableau = tailleTableau / 100;
   const [horizon, setHorizon] = useState<Horizon>(2050);
   const [altitudeMax, setAltitudeMax] = useState(ALTITUDE_MAX_DEFAUT);
   /** Thème affiché (« tous » : toutes les cartes de la catégorie, rangées par thème). */
@@ -1024,6 +1027,16 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               <option value="sans">Sans tableau</option>
             </select>
           </label>
+          <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-1' : ''} ${sansTableau ? 'opacity-50' : ''}`}>
+            <span className={legende}>{uneCarte ? 'Police tableau' : 'Grosseur de la police du tableau'}</span>
+            <select value={tailleTableau} disabled={sansTableau} onChange={(e) => setTailleTableau(Number(e.target.value))} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Taille du tableau du classement (« Les plus arrosés »…)">
+              {[80, 100, 125, 150, 175, 200].map((n) => (
+                <option key={n} value={n}>
+                  {n === 100 ? '100 % (normale)' : `${n} %`}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-1' : ''}`}>
             <span className={legende}>{uneCarte ? 'Police' : 'Grosseur de la police des valeurs'}</span>
             <select value={tailleValeurs} onChange={(e) => setTailleValeurs(Number(e.target.value))} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Petite : plus de valeurs sur la carte ; grande : plus lisible">
@@ -1175,7 +1188,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                         </p>
                       ) : (
                         <CarteInfo
-                          zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs}
+                          zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                           theme={theme}
                           zone={zone}
                           points={pointsPrevision[theme.id]}
@@ -1220,7 +1233,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                       )
                     ) : mode === 'prevision' ? (
                       <CarteInfo
-                          zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs}
+                          zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                         theme={(theme as ThemePrevision).run && sousTitreRun ? { ...theme, titre: theme.titre.replace('À LA FIN DU RUN', `AU ${sousTitreRun.fin}`) } : theme}
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
@@ -1245,10 +1258,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                         contexte={(theme as ThemePrevision).montagne ? `${contextePrevision}, communes de montagne (point du modèle à ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} m ou plus)` : contextePrevision}
                       />
                     ) : mode === 'bilan' ? (
-                      <CarteInfo  sansTableau={sansTableau} echelleValeurs={echelleValeurs} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
+                      <CarteInfo  sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
                     ) : (
                       <CarteInfo
-                           sansTableau={sansTableau} echelleValeurs={echelleValeurs}
+                           sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                         theme={theme}
                         zone={zone}
                         points={climat[theme.id]?.points ?? []}

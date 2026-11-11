@@ -64,7 +64,7 @@ const RUBRIQUES: Rubrique[] = [
     ],
   },
   {
-    titre: 'TikTok',
+    titre: 'Vidéo',
     pages: ['/outils/carte-meteo/video/', '/outils/carte-meteo/video/?format=facebook&zone=66', '/outils/carte-meteo/video/?format=facebook&zone=FR', '/outils/carte-meteo/video/?zone=66&special=montagne', '/outils/carte-meteo/video/?zone=66&special=ete', '/outils/carte-meteo/carte-alerte/'].map(lien),
   },
   {
