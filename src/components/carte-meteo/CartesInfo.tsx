@@ -166,6 +166,20 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [region, setRegion] = useState(REGIONS_FR[0]);
   const [departement, setDepartement] = useState(departementInitial ?? '66');
   const [modele, setModele] = useState<ModeleMeteo>('arome');
+  /** Heure du passage (run) du modèle choisi, en UTC (« 12z ») : affichée dans le sous-titre des cartes de prévision. */
+  const [runModele, setRunModele] = useState<{ modele: ModeleMeteo; z: string } | null>(null);
+  useEffect(() => {
+    if (modele === 'moyenne') return;
+    let actif = true;
+    fetch(`/api/carte-meteo/run/?modele=${modele}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ z?: string | null }>) : Promise.reject()))
+      .then((j) => actif && j.z && setRunModele({ modele, z: j.z }))
+      .catch(() => {});
+    return () => {
+      actif = false;
+    };
+  }, [modele]);
+  const runCarte = runModele && runModele.modele === modele ? { modele: (MODELES.find((m) => m.id === modele)?.libelle ?? modele).toUpperCase(), z: runModele.z } : undefined;
   useEffect(() => {
     if (modele === 'harmonie2km' && !(niveau === 'departement' && departement === '66')) setModele('arome');
   }, [modele, niveau, departement]);
@@ -214,7 +228,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   }, [alertesDemandees]);
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
-  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', seuilPluie: uneCarte ? 10 : 0, seuils: uneCarte ? { mm: 10, 'km/h': 60 } : undefined, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
+  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', heureRun: uneCarte, dateElaboration: uneCarte, seuilPluie: uneCarte ? 10 : 0, seuils: uneCarte ? { mm: 10, 'km/h': 60 } : undefined, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
   const regler = (changement: Partial<AffichageCarte>) => setAffichage((a) => ({ ...a, ...changement }));
   const [filtreGroupe, setFiltreGroupe] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
@@ -1210,6 +1224,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                         theme={(theme as ThemePrevision).run && sousTitreRun ? { ...theme, titre: theme.titre.replace('À LA FIN DU RUN', `AU ${sousTitreRun.fin}`) } : theme}
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
+                        run={(theme as ThemePrevision).cumulJours ? undefined : runCarte}
                         sousTitre={
                           ((theme as ThemePrevision).fenetreHeures
                             ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!)
@@ -1344,6 +1359,14 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={!!affichage.reperes} onChange={(e) => regler({ reperes: e.target.checked })} />
                 🧭 Flèches et noms des villes
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!affichage.heureRun} onChange={(e) => regler({ heureRun: e.target.checked })} />
+                🕛 Heure du run (ex. AROME (12z))
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!affichage.dateElaboration} onChange={(e) => regler({ dateElaboration: e.target.checked })} />
+                📅 « Carte élaborée le » en bas à droite
               </label>
               <label className="text-sm font-medium">
                 <span className={legende}>🔤 Police des valeurs</span>

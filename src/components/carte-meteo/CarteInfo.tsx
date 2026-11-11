@@ -48,6 +48,10 @@ export interface AffichageCarte {
   policeValeurs?: PoliceValeurs;
   /** Taille des noms de villes (1 = normale). */
   tailleNoms?: number;
+  /** Heure du run du modèle dans le sous-titre : « AROME (12z) ». */
+  heureRun?: boolean;
+  /** « Carte élaborée le : JJ/MM/AAAA » en bas à droite. */
+  dateElaboration?: boolean;
 }
 export const AffichageContexte = createContext<AffichageCarte | null>(null);
 
@@ -85,6 +89,8 @@ interface Props {
   points: PointInfo[];
   /** Ligne sous le titre (date du jour prévu, période du bilan). */
   sousTitre: string;
+  /** Modèle et heure de son passage (UTC, « 12z »), pour l'option « heure du run ». */
+  run?: { modele: string; z: string };
   logoId: string;
   /** Début du nom du fichier exporté. */
   prefixeFichier: string;
@@ -149,7 +155,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -198,7 +204,16 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     setRetires(new Set());
   }, [points]);
   const titre = titreSaisi ?? theme.titre;
-  const sousTitreAffiche = sousTitreSaisi ?? sousTitre;
+  // Heure du run : « AROME (12z) » à la place du nom du modèle quand le sous-titre le contient, sinon ajouté à la fin.
+  const sousTitreAvecRun = (() => {
+    if (!affichage?.heureRun || !run) return sousTitre;
+    const nomRun = `${run.modele} (${run.z})`;
+    const i = sousTitre.toUpperCase().indexOf(run.modele);
+    return i >= 0 ? `${sousTitre.slice(0, i)}${nomRun}${sousTitre.slice(i + run.modele.length)}` : `${sousTitre} · ${nomRun}`;
+  })();
+  const sousTitreAffiche = sousTitreSaisi ?? sousTitreAvecRun;
+  /** Date d'élaboration de la carte (Paris), en bas à droite. */
+  const dateElaboree = new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
   const titreTop = titreTopSaisi ?? theme.titreTop;
   const pointsCorriges = useMemo(
     () => points.filter((p) => !retires.has(p.code)).map((p) => (corrections[p.code] != null ? { ...p, valeur: corrections[p.code] } : p)),
@@ -460,6 +475,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
     const obstacles: Rect[] = [
       rectTitre,
       { x: largeur / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 },
+      ...(affichage?.dateElaboration ? [{ x: largeur - 330, y: HAUTEUR_CARTE - 34, w: 320, h: 34 }] : []),
       rectLegende,
       ...(hauteurTop ? [rectTop] : []),
       ...(hauteurSeuils ? [rectSeuils] : []),
@@ -598,6 +614,11 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
         remplissages={cellules ? undefined : remplissages}
         cellules={cellules}
       >
+        {affichage?.dateElaboration && (
+          <div style={{ position: 'absolute', right: 14, bottom: 10, zIndex: 6, color: '#fff', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: 14, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,0.7)' }}>
+            Carte élaborée le : {dateElaboree}
+          </div>
+        )}
         {avecReperes && (
           <svg className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 3 }} width={largeur} height={HAUTEUR_CARTE} aria-hidden>
             <defs>

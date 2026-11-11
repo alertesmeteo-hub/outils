@@ -134,7 +134,7 @@ async function recuperer(url: string, delaiMs: number): Promise<Response> {
 }
 
 /** Passage du modèle en cours (run_time de l'index) ; en cas d'échec on garde le dernier connu. */
-async function passageCourant(modele: ModeleSource): Promise<string | null> {
+export async function passageCourant(modele: ModeleSource): Promise<string | null> {
   const connu = indexCourant.get(modele);
   if (connu && Date.now() - connu.t < VALIDITE_INDEX_MS) return connu.runTime;
   try {
