@@ -33,7 +33,6 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
       { href: '/outils/carte-meteo/bilan-mois/', libelle: 'Bilan du mois' },
       { href: '/outils/carte-meteo/video/', libelle: '🎬 Vidéo TikTok du week-end' },
       { href: '/outils/carte-meteo/video/?format=facebook&zone=66', libelle: '📘 Vidéo Facebook : Pyrénées-Orientales' },
-      { href: '/outils/carte-meteo/video/?format=facebook&zone=66&vue=carte', libelle: '🗺️ Carte météo du jour : Pyrénées-Orientales (Facebook)' },
       { href: '/outils/carte-meteo/video/?zone=66&special=montagne', libelle: '🏔️ Vidéo spéciale montagne : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/video/?zone=66&special=ete', libelle: '🏖️ Vidéo spéciale été : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/carte-alerte/', libelle: '🚨 Carte alerte TikTok / Facebook' },

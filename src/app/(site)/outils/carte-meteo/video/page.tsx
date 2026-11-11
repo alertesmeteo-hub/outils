@@ -11,15 +11,15 @@ export const metadata: Metadata = {
   alternates: { canonical: '/outils/carte-meteo/video/' },
 };
 
-export default async function PageVideoWeekEnd({ searchParams }: { searchParams: Promise<{ format?: string; zone?: string; special?: string; vue?: string }> }) {
+export default async function PageVideoWeekEnd({ searchParams }: { searchParams: Promise<{ format?: string; zone?: string; special?: string }> }) {
   // ?format=facebook&zone=FR : ouvre la vidéo au format voulu (liens du menu), pour un département (66…) ou la France (FR).
-  const { format, zone, special, vue } = await searchParams;
+  const { format, zone, special } = await searchParams;
   return (
     <>
       <h1 className="text-3xl font-extrabold">Vidéo météo : quel temps ce week-end, aujourd&apos;hui ou demain ?</h1>
       <p className="mt-2 max-w-3xl text-muted">Choisissez le week-end ou un jour (J, J+1, J+2…), un département ou la France, 3 ou 4 villes et le format (TikTok, Facebook, carré, YouTube) : pictos animés, maxi, mini, rafales, pluie, puis un récapitulatif.</p>
       <div className="mt-6">
-        <VideoWeekEnd key={`${format}|${zone}|${special}|${vue}`} aujourdhui={aujourdhuiParis()} formatInitial={format} zoneInitiale={zone} specialInitial={special} vueInitiale={vue} />
+        <VideoWeekEnd key={`${format}|${zone}|${special}`} aujourdhui={aujourdhuiParis()} formatInitial={format} zoneInitiale={zone} specialInitial={special} />
       </div>
     </>
   );

@@ -41,7 +41,6 @@ const RUBRIQUES: Rubrique[] = [
       lien('/outils/carte-meteo/bilan-mois/'),
       lien('/outils/carte-meteo/video/'),
       lien('/outils/carte-meteo/video/?format=facebook&zone=66'),
-      lien('/outils/carte-meteo/video/?format=facebook&zone=66&vue=carte'),
       lien('/outils/carte-meteo/video/?zone=66&special=montagne'),
       lien('/outils/carte-meteo/video/?zone=66&special=ete'),
       lien('/outils/carte-meteo/carte-alerte/'),
@@ -66,7 +65,7 @@ const RUBRIQUES: Rubrique[] = [
   },
   {
     titre: 'TikTok',
-    pages: ['/outils/carte-meteo/video/', '/outils/carte-meteo/video/?format=facebook&zone=66', '/outils/carte-meteo/video/?format=facebook&zone=FR', '/outils/carte-meteo/video/?format=facebook&zone=66&vue=carte', '/outils/carte-meteo/video/?zone=66&special=montagne', '/outils/carte-meteo/video/?zone=66&special=ete', '/outils/carte-meteo/carte-alerte/'].map(lien),
+    pages: ['/outils/carte-meteo/video/', '/outils/carte-meteo/video/?format=facebook&zone=66', '/outils/carte-meteo/video/?format=facebook&zone=FR', '/outils/carte-meteo/video/?zone=66&special=montagne', '/outils/carte-meteo/video/?zone=66&special=ete', '/outils/carte-meteo/carte-alerte/'].map(lien),
   },
   {
     titre: 'Liens',

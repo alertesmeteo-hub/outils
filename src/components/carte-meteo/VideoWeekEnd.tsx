@@ -983,7 +983,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm w-full';
 const legende = 'mb-1 block text-xs font-bold uppercase tracking-wide text-primary';
 
-export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, specialInitial, vueInitiale }: { aujourdhui: string; formatInitial?: string; zoneInitiale?: string; specialInitial?: string; vueInitiale?: string }) {
+export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, specialInitial }: { aujourdhui: string; formatInitial?: string; zoneInitiale?: string; specialInitial?: string }) {
   const [modele, setModele] = useState<ModeleMeteo>('moyenne');
   const [dep, setDep] = useState(zoneInitiale === FRANCE || (zoneInitiale && CODES_DEPARTEMENTS.includes(zoneInitiale)) ? zoneInitiale : '66');
   const [listeVilles, setListeVilles] = useState<{ dep: string; villes: VilleListe[]; reliefs: VilleListe[]; altRelief: number } | null>(null);
@@ -1005,10 +1005,8 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   const [t, setT] = useState(0);
   const [lecture, setLecture] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Aperçu et export : la vidéo, ou la même chose en carte (image fixe).
   // Écran carte dans la vidéo (villes placées sur la carte du département) : par défaut, oui.
   const [avecCarte, setAvecCarte] = useState(true);
-  const [apercu, setApercu] = useState<'video' | 'carte'>(vueInitiale === 'carte' ? 'carte' : 'video');
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   const [prets, setPrets] = useState(0);
 
@@ -1186,12 +1184,9 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   useEffect(() => {
     const c = canvasRef.current;
     const ctx = c?.getContext('2d');
-    if (ctx && contexte) {
-      if (apercu === 'carte') dessinerCarte(ctx, contexte);
-      else dessiner(ctx, Math.min(t, total - 0.01), contexte);
-    }
+    if (ctx && contexte) dessiner(ctx, Math.min(t, total - 0.01), contexte);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, semaine, logo, prets, villes.join('|'), format, apercu, positions]);
+  }, [t, semaine, logo, prets, villes.join('|'), format, positions]);
 
   useEffect(() => {
     if (!lecture) return;
@@ -1211,31 +1206,6 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lecture, total]);
-
-  /** Télécharge la carte en image (PNG ou JPG), au format choisi. */
-  async function exporterCarte(type: 'png' | 'jpg') {
-    if (!contexte) return;
-    await chargerGeoFond();
-    const cv = document.createElement('canvas');
-    cv.width = format.l;
-    cv.height = format.h;
-    const ctx = cv.getContext('2d');
-    if (!ctx) return;
-    dessinerCarte(ctx, contexte);
-    cv.toBlob(
-      (blob) => {
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        const lien = document.createElement('a');
-        lien.href = url;
-        lien.download = `carte-meteo-${special === 'auto' ? '' : `${special}-`}${dep}-${format.id}-${jours[0]}.${type}`;
-        lien.click();
-        setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      },
-      type === 'png' ? 'image/png' : 'image/jpeg',
-      0.95
-    );
-  }
 
   const exporter = useCallback(async () => {
     if (!contexte) return;
@@ -1533,14 +1503,6 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
         <button type="button" onClick={exporter} disabled={!contexte || !!etat} className="btn-primary rounded-lg px-4 py-3 font-semibold disabled:opacity-60">
           {etat ?? '🎬 Créer la vidéo (MP4)'}
         </button>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => exporterCarte('png')} disabled={!contexte} className="flex-1 rounded-lg border border-red-600 bg-red-600 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
-            🗺️ Carte PNG
-          </button>
-          <button type="button" onClick={() => exporterCarte('jpg')} disabled={!contexte} className="flex-1 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm font-semibold disabled:opacity-60">
-            🗺️ Carte JPG
-          </button>
-        </div>
         <p className="text-xs text-muted">
           Format {format.l} × {format.h}, {Math.round(total)} secondes : titre, une image par ville, récapitulatif{tendance ? ', tendance des prochains jours' : ''}. Le MP4 s&apos;enregistre dans le navigateur (Chrome, Edge) ; ailleurs, un WebM.
         </p>
@@ -1551,15 +1513,8 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
         )}
       </div>
       <div className="flex flex-col items-center gap-3">
-        <div className="flex gap-2" role="group" aria-label="Aperçu">
-          {([['video', '🎬 Vidéo'], ['carte', '🗺️ Carte']] as const).map(([id, libelle]) => (
-            <button key={id} type="button" onClick={() => { setApercu(id); setLecture(false); }} aria-pressed={apercu === id} className={`rounded-lg border px-4 py-1.5 text-sm font-medium ${apercu === id ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>
-              {libelle}
-            </button>
-          ))}
-        </div>
         <canvas ref={canvasRef} width={format.l} height={format.h} style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }} className="h-auto w-full rounded-2xl border border-border bg-[#0b2a5b] shadow-lg" aria-label="Aperçu de la vidéo" />
-        <div className={`flex w-full items-center gap-3 ${apercu === 'carte' ? 'hidden' : ''}`} style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
+        <div className="flex w-full items-center gap-3" style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
           <button type="button" onClick={() => setLecture((v) => !v)} disabled={!contexte} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
             {lecture ? '⏸ Pause' : '▶ Lecture'}
           </button>
