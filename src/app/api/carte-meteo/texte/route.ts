@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { lireDemandeTexte } from '@/lib/carte-meteo/texte-ia';
+import { cleDe, ErreurIA, fournisseurIA, texteAutreFournisseur } from '@/lib/carte-meteo/ia-fournisseurs';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,8 @@ const FORMATS = {
  * Corps : voir `DemandeTexte` (src/lib/carte-meteo/texte-ia.ts) ; réponse : { texte }.
  */
 export async function POST(req: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const fournisseur = fournisseurIA();
+  if (!process.env[cleDe(fournisseur)]) {
     return NextResponse.json({ erreur: 'Le texte IA n’est pas encore activé sur ce serveur.' }, { status: 503 });
   }
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
@@ -59,6 +61,17 @@ export async function POST(req: Request) {
   if (!demande) return NextResponse.json({ erreur: 'Demande invalide.' }, { status: 400 });
 
   compteur.n++;
+  const invite = `${FORMATS[demande.format]}\n\nDonnées de la carte (JSON) :\n${JSON.stringify(demande.carte, null, 1)}`;
+  // Autre fournisseur que Claude (IA_FOURNISSEUR = openai, mistral ou gemini).
+  if (fournisseur !== 'anthropic') {
+    try {
+      return NextResponse.json({ texte: await texteAutreFournisseur(fournisseur, SYSTEME, invite) });
+    } catch (erreur) {
+      if (erreur instanceof ErreurIA) return NextResponse.json({ erreur: erreur.message }, { status: erreur.statut });
+      console.error('Texte IA', erreur);
+      return NextResponse.json({ erreur: 'Service IA momentanément indisponible.' }, { status: 503 });
+    }
+  }
   try {
     const client = new Anthropic();
     const reponse = await client.beta.messages.create({
@@ -73,7 +86,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'user',
-          content: `${FORMATS[demande.format]}\n\nDonnées de la carte (JSON) :\n${JSON.stringify(demande.carte, null, 1)}`,
+          content: invite,
         },
       ],
     });
