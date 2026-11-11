@@ -65,7 +65,7 @@ const libelleMoisCourt = (m: string) => {
 /** « DU MAR. 3 NOV. 18 H AU MER. 4 NOV. 18 H » : fenêtre de N heures qui commence maintenant (heure de Paris, arrondie à l'heure). */
 const fenetreDepuisMaintenant = (heures: number) => {
   const fmt = (ms: number) =>
-    new Date(ms).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', timeZone: 'Europe/Paris' }).replace(':00', '').replace(/\s+/g, ' ').toUpperCase();
+    new Date(ms).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', timeZone: 'Europe/Paris' }).replace(':00', '').replace(/\s+/g, ' ').replace(/\s*h$/i, '').toUpperCase(); // le « h » est ajouté plus bas (certains navigateurs l'ajoutent déjà)
   const debut = Math.round(Date.now() / 3_600_000) * 3_600_000;
   return `DU ${fmt(debut)} H AU ${fmt(debut + heures * 3_600_000)} H`;
 };
