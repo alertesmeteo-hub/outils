@@ -339,6 +339,14 @@ export function rafaleJusquaFinDuRun(brute: Serie): { valeur: number | null; dir
   return finRun != null && finRun > maintenant ? rafaleEntre(serie, maintenant, finRun) : { valeur: null, direction: null };
 }
 
+/** Pluie cumulée (mm) de maintenant à la fin du run, pour une série brute (carte de France : maximum du département). */
+export function pluieJusquaFinDuRun(serie: Serie): number | null {
+  const echeances = serie.t.map((t) => Date.parse(t)).filter((t) => Number.isFinite(t));
+  const finRun = echeances.length ? Math.max(...echeances) : null;
+  const maintenant = Date.now();
+  return finRun != null && finRun > maintenant ? cumulEntre(serie, maintenant, finRun).valeur : null;
+}
+
 /** Cumuls de pluie et rafales les plus fortes sur 3, 5, 10 et 16 jours à partir de minuit (Paris) de `dateISO`. */
 function cumulsPluie(
   serie: Serie,

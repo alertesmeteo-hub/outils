@@ -6,7 +6,7 @@ import { COORDS_DEPARTEMENTS } from './departements-coords';
 import { DEPARTEMENTS_FR } from './departements-fr';
 import { ALTITUDE_MAX_VILLE_FRANCE, VILLES_FRANCE } from './villes-france';
 import { pictoDepuisPrevision } from './pictos';
-import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pointDepuisSerie, rafaleJusquaFinDuRun, type ModeleMeteo, type ModeleSource, type PointCarte, type Serie } from './previsions-modeles';
+import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pluieJusquaFinDuRun, pointDepuisSerie, rafaleJusquaFinDuRun, type ModeleMeteo, type ModeleSource, type PointCarte, type Serie } from './previsions-modeles';
 
 /**
  * Prévisions de la carte météo : les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (branche `data`),
@@ -460,6 +460,9 @@ export async function chargerPrevisionsCarteJours(
         point.rafaleRun = plusForte.valeur;
         point.directionRafaleRun = plusForte.direction;
       }
+      // Pluie jusqu'à la fin du run : le cumul le plus élevé du département.
+      const cumuls = [r.value.chef, ...r.value.villes.map((v) => v.serie)].map(pluieJusquaFinDuRun).filter((v): v is number => v != null);
+      if (cumuls.length) point.pluieRun = Math.max(...cumuls);
       if (finPeriode ? aValeursPeriode(point) : point.tempApresMidi != null || (!apresMidiSeulement && point.maxi != null)) (sortie[date] as PointCarte[]).push(point);
     }
   });
