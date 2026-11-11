@@ -339,7 +339,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
   const largeurTop0 = Math.max(
     LARGEUR_ENCADRE,
     // Nom en entier (jamais coupé), valeur en Impact 15 px et unité : marge pour que « 81 km/h » reste dans le cadre.
-    ...top.map((p) => Math.round(40 + Math.min(32, p.nom.length) * 9.5 + (enDepartement || theme.maille ? 0 : 30) + texteInfo(theme, p.valeur).length * 10 + (uniteVisible ? 48 : 0)))
+    ...top.map((p) => Math.round(40 + Math.min(32, p.nom.length) * 7.4 + (enDepartement || theme.maille ? 0 : 30) + texteInfo(theme, p.valeur).length * 10 + (uniteVisible ? 48 : 0)))
   );
   // Titre de l'encadré sur deux lignes s'il dépasse la largeur (≈ 9 px par lettre en 16 px condensé).
   const hauteurTop0 = top.length && !(theme.sansTop || sansTableau) ? 38 + top.length * 24 + (titreTop.length * 9 > largeurTop0 - 18 ? 18 : 0) : 0;

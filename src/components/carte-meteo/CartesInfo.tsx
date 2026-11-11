@@ -484,7 +484,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
     if (!pts.length) return null;
     const fin = new Date(Math.max(...pts.map((p) => Date.parse(p.finRun as string))));
     const jour = fin.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
-    const heure = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(fin);
+    const heure = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(fin).replace(/\D/g, ''); // chiffres seuls : le format français ajoute déjà « h »
     return { fin: `${jour} à ${heure} h`.toUpperCase(), modele: infosModele(modele, previsions?.modeles).libelle };
   }, [previsions, cle, modele]);
 
