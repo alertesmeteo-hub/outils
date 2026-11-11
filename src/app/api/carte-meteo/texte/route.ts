@@ -27,8 +27,8 @@ Ce qui fait ce style : une première phrase qui donne le temps du jour (ciel, ve
 Secteurs : le nom d'un lieu peut être suivi, entre parenthèses, de son secteur (« côte », « terres » ou « reliefs »), parfois précédé du ciel. Regroupe alors les températures par secteur (« de 17 à 22°C dans les terres, environ 21°C sur la côte, 11 à 16°C sur les reliefs ») en donnant l'écart entre la plus basse et la plus haute valeur du secteur, ou une valeur unique s'il n'y a qu'une ville. N'écris un secteur que s'il apparaît dans les données, et ne cite pas les villes si le secteur suffit.`;
 
 const FORMATS = {
-  court: "Format réseaux sociaux : 2 phrases (3 au plus), 40 à 70 mots, dans le style de l'exemple : un emoji de temps en tête de la première phrase et un autre à la fin. Pas de hashtag.",
-  long: 'Format article : 2 paragraphes, 150 à 220 mots, sans emoji ni hashtag.',
+  court: "Format réseaux sociaux : 5 à 7 phrases, 110 à 160 mots, dans le style de l'exemple : un emoji de temps en tête de la première phrase et un autre à la fin. Développe : le temps général, puis les valeurs les plus hautes et les plus basses avec leurs lieux, les contrastes entre secteurs (nord/sud, côte/terres/reliefs) quand les données le permettent, et ce qu'il faut en retenir. Pas de hashtag.",
+  long: 'Format article : 3 à 4 paragraphes, 300 à 420 mots, sans emoji ni hashtag. Détaille les valeurs et leurs lieux, compare les secteurs, situe les chiffres (extrêmes, moyenne) et termine par ce qu’il faut retenir.',
 } as const;
 
 /**

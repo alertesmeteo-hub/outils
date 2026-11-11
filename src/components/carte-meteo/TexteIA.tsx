@@ -125,7 +125,7 @@ export function useTexteIA(construire: () => CarteTexte | null, zone: { x: numbe
       <textarea
         value={texte}
         onChange={(e) => setTexte(e.target.value)}
-        rows={format === 'long' ? 8 : 4}
+        rows={format === 'long' ? 14 : 7}
         placeholder={enCours ? 'Rédaction en cours…' : 'Le texte apparaîtra ici ; il reste modifiable.'}
         className="mt-2 w-full rounded-lg border border-border bg-surface p-2 text-sm"
       />
