@@ -45,6 +45,7 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
       { href: '/outils/carte-meteo-info/', libelle: 'Cartes infos' },
       { href: '/outils/carte-meteo-info/?cartes=europe', libelle: 'Europe : isobares' },
       { href: '/outils/previsions-saisonnieres/', libelle: 'Prévisions saisonnières' },
+      { href: '/outils/tendance-9-mois-france/', libelle: 'Tendance à 9 mois : France' },
       { href: '/outils/carte-meteo/animations/', libelle: 'Animations GIF / MP4' },
     ],
   },

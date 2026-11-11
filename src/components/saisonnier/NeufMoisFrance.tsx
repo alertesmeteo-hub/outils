@@ -48,7 +48,7 @@ function Carte({ e, variable, traces, clip }: { e: EcheanceFrance; variable: Var
           if (v === null || (e.etiquettes && !e.etiquettes.includes(`${c[0]}-${c[1]}`))) return null;
           const p = projeterFrance(c[0], c[1]);
           return (
-            <text key={`v${c[0]}-${c[1]}`} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" fontSize={9} fontWeight={700} fill="#111" stroke="#fff" strokeWidth={2.5} paintOrder="stroke">
+            <text key={`v${c[0]}-${c[1]}`} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" fontSize={14} fontWeight={800} fill="#111" stroke="#fff" strokeWidth={3.5} paintOrder="stroke">
               {variable === 't' ? fmtT(v).replace(' °C', '°') : fmtP(v).replace(' %', '%')}
             </text>
           );
@@ -63,7 +63,7 @@ function Carte({ e, variable, traces, clip }: { e: EcheanceFrance; variable: Var
 
 const bouton = (actif: boolean) => `rounded-full border px-4 py-1.5 text-sm font-semibold ${actif ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`;
 
-export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }: { donnees: SaisonnierFrance; traces: { code: string; d: string }[]; avecSemaines?: boolean }) {
+export default function NeufMoisFrance({ donnees, traces, avecSemaines = false, colonnes = 3 }: { donnees: SaisonnierFrance; traces: { code: string; d: string }[]; avecSemaines?: boolean; /** Cartes par ligne (2 = cartes plus grandes, chiffres plus lisibles). */ colonnes?: 2 | 3 }) {
   const id = useId().replace(/:/g, '');
   const [variable, setVariable] = useState<Variable>('t');
   const [pas, setPas] = useState<'hebdo' | 'mensuel'>(avecSemaines && donnees.hebdo.length ? 'hebdo' : 'mensuel');
@@ -141,7 +141,7 @@ export default function NeufMoisFrance({ donnees, traces, avecSemaines = false }
             <span className="block text-xs font-normal opacity-80">Modèle CFSv2 (NOAA), run du {run} · www.alertes-meteo.com</span>
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={`grid gap-3 sm:grid-cols-2 ${colonnes === 3 ? 'lg:grid-cols-3' : ''}`}>
           {echeances.map((e) => (
             <Carte key={e.cle} e={e} variable={variable} traces={traces} clip={`clip-fr-${id}-${e.cle}`} />
           ))}
