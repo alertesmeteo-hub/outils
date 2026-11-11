@@ -523,7 +523,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, logoId, pref
           >
             {edition ? 'Terminer' : 'Modifier'}
           </button>
-          <button type="button" onClick={exporter} disabled={enExport || contoursDep.length === 0} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
+          <button type="button" onClick={exporter} disabled={enExport || contoursDep.length === 0} className="rounded-lg border border-red-600 bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
             {enExport ? 'Export…' : 'Exporter en JPG'}
           </button>
         </div>

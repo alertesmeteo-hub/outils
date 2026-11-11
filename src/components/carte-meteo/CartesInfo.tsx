@@ -16,6 +16,7 @@ import {
   THEMES_BILAN,
   THEMES_CLIMAT,
   THEMES_PREVISION,
+  THEMES_PREVISION_CHOIX,
   parGroupe,
   type ClimatCommune,
   type ClimatDepartements,
@@ -181,13 +182,13 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const [dureeRisque, setDureeRisque] = useState<'jour' | 'periode' | '24h'>('periode');
   const themesPrevision = useMemo<ThemePrevision[]>(
     () =>
-      THEMES_PREVISION.map((t) => {
+      (uneCarte ? THEMES_PREVISION_CHOIX : THEMES_PREVISION).map((t) => {
         let r: ThemePrevision = chiffres && t.brut ? { ...t, ...t.brut, texteValeur: undefined, neutresVisibles: true } : t;
         // Relief : les cartes de risque lisent les communes d'altitude (requête « montagne » avec l'altitude minimale choisie).
         if (reliefAlt > 0 && t.groupe === 'Risques') r = { ...r, montagne: true };
         return r;
       }),
-    [chiffres, reliefAlt]
+    [chiffres, reliefAlt, uneCarte]
   );
   const [zonageFin, setZonageFin] = useState(false);
   const echelleValeurs = tailleValeurs / 100;
@@ -536,6 +537,13 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const groupes = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT && g.groupe !== GROUPE_JOURNEE && g.groupe !== GROUPE_OBS && g.groupe !== GROUPE_PLUIE_DIRECT);
   const tousThemes = groupes.flatMap((g) => g.themes);
   const carteEffective = uneCarte ? tousThemes.find((t) => t.id === carteChoisie) ?? tousThemes[0] : undefined;
+  // Carte « jusqu'à la fin du run » d'un seul modèle : le modèle correspondant est sélectionné d'office.
+  const modeleImpose = (carteEffective as ThemePrevision | undefined)?.modeleImpose;
+  useEffect(() => {
+    if (!modeleImpose) return;
+    setModele(modeleImpose);
+    setJour((j) => Math.min(j, echeanceDe(modeleImpose)));
+  }, [modeleImpose]);
   const groupesAffiches = uneCarte
     ? groupes.map((g) => ({ ...g, themes: g.themes.filter((t) => t.id === carteEffective?.id) })).filter((g) => g.themes.length > 0)
     : groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
@@ -762,6 +770,8 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                           setModele(m.id);
                           setJour((j) => Math.min(j, echeanceDe(m.id)));
                           setErreur(null);
+                          // Changer de modèle quitte la carte d'un seul modèle : retour à la carte « fin du run » habituelle.
+                          if (carteEffective && (carteEffective as ThemePrevision).modeleImpose) setCarteChoisie(carteEffective.id.replace(/-(arome|arpege|harmonie)$/, ''));
                         }}
                         className="mr-1.5"
                       />

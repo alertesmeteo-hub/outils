@@ -66,6 +66,8 @@ export interface ThemePrevision extends ThemeInfo {
   periode?: boolean;
   /** De maintenant (création de la carte) à la fin du run du modèle (AROME 48 h, Harmonie 60 h…). */
   run?: boolean;
+  /** Variante « jusqu'à la fin du run » d'un seul modèle (page « Une carte au choix ») : le choisir sélectionne ce modèle. */
+  modeleImpose?: 'arome' | 'arpege' | 'harmonie';
   /** Fenêtre glissante : pluie des N prochaines heures à partir de maintenant (et non d'un jour entier). */
   fenetreHeures?: number;
   /** Carte mixte : pluie (mm) en plaine et neige fraîche (cm) sur les communes de montagne (lues à part, ?montagne=1). */
@@ -543,6 +545,19 @@ const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => 
   };
 })();
 export const THEMES_PREVISION: ThemePrevision[] = THEMES_PREVISION_BASE.map((t) => (BRUT_RISQUE[t.id] ? { ...t, brut: BRUT_RISQUE[t.id] } : t));
+
+/** Modèles proposés en variante des cartes « jusqu'à la fin du run » : chacun avec sa propre durée de série. */
+const MODELES_RUN = [
+  { id: 'arome', libelle: 'AROME', portee: '48 h' },
+  { id: 'arpege', libelle: 'ARPEGE', portee: 'environ 102 h' },
+  { id: 'harmonie', libelle: 'Harmonie', portee: '60 h' },
+] as const;
+/** Cartes de la page « Une carte au choix » : les cartes « jusqu'à la fin du run » existent aussi pour AROME, ARPEGE et Harmonie seuls. */
+export const THEMES_PREVISION_CHOIX: ThemePrevision[] = THEMES_PREVISION.flatMap((t) =>
+  t.run
+    ? [t, ...MODELES_RUN.map((m): ThemePrevision => ({ ...t, id: `${t.id}-${m.id}`, court: `${t.court.replace(/ \(.*\)$/, '')} : ${m.libelle} seul (${m.portee})`, modeleImpose: m.id }))]
+    : [t]
+);
 
 /** Cartes de bilan (observations des stations Météo-France, mêmes fenêtres que les classements). */
 export const THEMES_BILAN: ThemeBilan[] = [
