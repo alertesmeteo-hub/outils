@@ -29,7 +29,6 @@ const RUBRIQUES: Rubrique[] = [
       '/outils/carte-meteo/tendances/',
       '/outils/carte-meteo/tendances-par-theme/',
       '/outils/carte-meteo-info/',
-      '/outils/carte-meteo-info/?cartes=europe',
       '/outils/previsions-saisonnieres/',
     ].map(lien),
   },
@@ -43,14 +42,14 @@ const RUBRIQUES: Rubrique[] = [
       lien('/outils/carte-meteo/video/'),
     ],
   },
-  {
-    titre: 'Tableau',
-    pages: ['/outils/releves-en-direct/', '/outils/observations-en-direct/', '/outils/temperatures-en-direct/', '/outils/records-temperature/', '/outils/nuits-tropicales/'].map(lien),
-  },
+  { titre: 'Tableau', pages: ['/outils/releves-en-direct/'].map(lien) },
   {
     titre: 'Animations',
     pages: ['/outils/carte-meteo/animations/', '/outils/animation-releves/', '/outils/pyrenees-orientales/#animation'].map(lien),
   },
+  { titre: 'Europe', pages: ['/outils/carte-meteo-info/?cartes=europe'].map(lien) },
+  { titre: 'Obs', pages: ['/outils/observations-en-direct/', '/outils/temperatures-en-direct/'].map(lien) },
+  { titre: 'Record', pages: ['/outils/records-temperature/', '/outils/nuits-tropicales/'].map(lien) },
 ];
 
 /** Menu horizontal en haut de toutes les pages : une entrée par rubrique, qui déroule ses pages (survol ou clic). « ALERTES » en rouge. */
