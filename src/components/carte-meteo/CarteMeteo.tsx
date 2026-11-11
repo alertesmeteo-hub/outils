@@ -399,7 +399,7 @@ export function libelleJour(dateISO: string): string {
     .toUpperCase();
 }
 
-export const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { harmonie2km: 'arome', arome: 'harmonie', harmonie: 'cep', arpege: 'cep' };
+export const SECOURS: Partial<Record<ModeleMeteo, ModeleMeteo>> = { harmonie2km: 'arome', arome: 'harmonie', harmonie: 'cep', arpege: 'cep', aromeifs: 'cep', arpege025: 'cep', icon: 'cep', ukmo: 'cep', aifs: 'cep' };
 export const NOM_ECHEANCE = (n: number) => (n === 0 ? "Aujourd'hui" : n === 1 ? 'Demain' : `J+${n}`);
 
 /** Libellé d'échéance à écrire SUR une carte : jamais « demain », on met le jour de la semaine (« Lundi »). */

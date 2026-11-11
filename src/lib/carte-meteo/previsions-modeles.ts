@@ -8,9 +8,14 @@ import { temperaturePlausible, ventPlausible } from './limites';
  *   - harmonie : HARMONIE-AROME du KNMI (Pays-Bas), pas horaire, 60 h ;
  *   - arpege : ARPEGE Europe 0,1° de Météo-France, pas horaire, ~102 h (jusqu'à J+3 complet) ;
  *   - cep : CEP, modèle du Centre européen (ECMWF IFS), pas de 3 h, 15 jours ;
- *   - gfs : GFS de la NOAA, pas de 3 h, 15 jours.
+ *   - gfs : GFS de la NOAA, pas de 3 h, 15 jours ;
+ *   - aromeifs : AROME-IFS 2,5 km de Météo-France, pas horaire, 51 h ;
+ *   - arpege025 : ARPEGE global 0,25° de Météo-France, ~102 h ;
+ *   - icon : ICON global 13 km du DWD, pas horaire puis 3 h, 7 jours ;
+ *   - ukmo : UKMO global 10 km du Met Office, 7 jours ;
+ *   - aifs : AIFS (ECMWF, intelligence artificielle), pas de 6 h, 15 jours (sans rafales).
  */
-export type ModeleMeteo = 'moyenne' | 'arome' | 'harmonie2km' | 'harmonie' | 'arpege' | 'cep' | 'gfs';
+export type ModeleMeteo = 'moyenne' | 'arome' | 'aromeifs' | 'harmonie2km' | 'harmonie' | 'arpege' | 'arpege025' | 'icon' | 'ukmo' | 'cep' | 'aifs' | 'gfs';
 /** Modèles qui ont leurs propres fichiers de prévision (tous sauf la moyenne). */
 export type ModeleSource = Exclude<ModeleMeteo, 'moyenne'>;
 /** Modèles moyennés par « Moyenne des modèles » (Harmonie 2 km seulement là où il est publié). */
@@ -26,6 +31,12 @@ export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string; d
   { id: 'arpege', libelle: 'ARPEGE', fournisseur: 'Météo-France' },
   { id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' },
   { id: 'gfs', libelle: 'GFS', fournisseur: 'NOAA' },
+  // Autres modèles de l'application (app.alertes-meteo.com), publiés par les mêmes pipelines.
+  { id: 'aromeifs', libelle: 'AROME-IFS 2,5 km', fournisseur: 'Météo-France' },
+  { id: 'arpege025', libelle: 'ARPEGE 0,25°', fournisseur: 'Météo-France' },
+  { id: 'icon', libelle: 'ICON global', fournisseur: 'DWD' },
+  { id: 'ukmo', libelle: 'UKMO', fournisseur: 'Met Office' },
+  { id: 'aifs', libelle: 'AIFS (IA)', fournisseur: 'ECMWF' },
 ];
 
 export const estModele = (v: string | null): v is ModeleMeteo => MODELES.some((m) => m.id === v);
@@ -45,7 +56,7 @@ export const modeleParDefautJ0 = (dep: string | null): ModeleMeteo => (modeleDis
  * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. Les modèles à 48-60 h ne couvrent pas
  * l'après-midi de J+2 ; le CEP et GFS vont jusqu'à 15 jours (J+15 n'a des données que selon l'heure du passage).
  */
-export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, harmonie2km: 1, harmonie: 1, arpege: 3, cep: 15, gfs: 15 };
+export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, aromeifs: 1, harmonie2km: 1, harmonie: 1, arpege: 3, arpege025: 3, icon: 6, ukmo: 6, cep: 15, aifs: 14, gfs: 15 };
 
 /** Un point par département métropolitain (ou par ville), avec les valeurs de l'après-midi (12 h-18 h) et de la journée. */
 export interface PointCarte {

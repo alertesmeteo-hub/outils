@@ -25,6 +25,11 @@ const BASES: Record<ModeleSource, string> = {
   arpege: 'https://raw.githubusercontent.com/alertesmeteo-hub/arpege-meteo-france/data',
   cep: 'https://raw.githubusercontent.com/alertesmeteo-hub/cep/data',
   gfs: 'https://raw.githubusercontent.com/alertesmeteo-hub/gfs/data',
+  aromeifs: 'https://raw.githubusercontent.com/alertesmeteo-hub/AROME-IFS-2.5-km/data',
+  arpege025: 'https://raw.githubusercontent.com/alertesmeteo-hub/ARPEGE-0.25/data',
+  icon: 'https://raw.githubusercontent.com/alertesmeteo-hub/ICON-GLOBAL-13-km/data',
+  ukmo: 'https://raw.githubusercontent.com/alertesmeteo-hub/UKMO-GLOBAL-10-km/data',
+  aifs: 'https://raw.githubusercontent.com/alertesmeteo-hub/aifs/data',
 };
 const LIBELLES: Record<ModeleSource, string> = {
   arome: 'AROME 0,01° (Météo-France)',
@@ -33,6 +38,11 @@ const LIBELLES: Record<ModeleSource, string> = {
   arpege: 'ARPEGE Europe 0,1° (Météo-France)',
   cep: 'CEP (ECMWF IFS)',
   gfs: 'GFS (NOAA)',
+  aromeifs: 'AROME-IFS 2,5 km (Météo-France)',
+  arpege025: 'ARPEGE 0,25° (Météo-France)',
+  icon: 'ICON global 13 km (DWD)',
+  ukmo: 'UKMO global 10 km (Met Office)',
+  aifs: 'AIFS (ECMWF, IA)',
 };
 
 /** Villes retenues par département (les plus peuplées d'abord, puis celles qui comblent les zones vides). */
@@ -103,7 +113,7 @@ const enCours = new Map<string, Promise<Extrait>>();
 const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v20'; // v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v21'; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -162,6 +172,44 @@ const indice = (colonnes: string[], nom: string) => {
 const distance = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) =>
   Math.hypot((a.lon - b.lon) * Math.cos((a.lat * Math.PI) / 180), a.lat - b.lat);
 
+/**
+ * Série au pas de 6 h (AIFS) ramenée au pas de 3 h : aucune échéance ne tombe sinon entre 14 h et 18 h (13 h et 19 h à Paris).
+ * Température, nuages, vent : interpolation linéaire ; direction, orage, visibilité : valeur de l'échéance précédente ;
+ * pluie et neige (cumuls de chaque pas) : partagées à parts égales entre les deux demi-pas.
+ */
+function etalerPas(serie: Serie): Serie {
+  const ms = serie.t.map((t) => Date.parse(t));
+  const trou = ms.some((m, i) => i > 0 && m - ms[i - 1] > 4 * 3_600_000);
+  if (!trou) return serie;
+  const champs = Object.keys(serie).filter((k) => k !== 't') as (keyof Serie)[];
+  const sortie: Record<string, unknown[]> = { t: [] };
+  for (const k of champs) sortie[k] = [];
+  const lineaires = new Set(['temp', 'nuages', 'vent', 'nuagesHauts', 'nuagesBasMoyens']);
+  const cumuls = new Set(['pluie', 'neige']);
+  serie.t.forEach((t, i) => {
+    const gap = i > 0 ? ms[i] - ms[i - 1] : 0;
+    if (gap > 4 * 3_600_000) {
+      sortie.t.push(new Date(ms[i - 1] + gap / 2).toISOString().replace('.000Z', 'Z'));
+      for (const k of champs) {
+        const tab = serie[k] as (number | null)[];
+        const a = tab[i - 1];
+        const b = tab[i];
+        let v: number | null;
+        if (lineaires.has(k)) v = a != null && b != null ? Math.round(((a + b) / 2) * 10) / 10 : (b ?? a);
+        else if (cumuls.has(k)) v = b != null ? Math.round((b / 2) * 100) / 100 : null;
+        else v = a;
+        sortie[k].push(v);
+      }
+    }
+    sortie.t.push(t);
+    for (const k of champs) {
+      const tab = serie[k] as (number | null)[];
+      sortie[k].push(gap > 4 * 3_600_000 && cumuls.has(k) && tab[i] != null ? Math.round(((tab[i] as number) / 2) * 100) / 100 : tab[i]);
+    }
+  });
+  return sortie as unknown as Serie;
+}
+
 /** Séries d'un point du fichier (colonnes de `valeurs` : voir « columns.values »). */
 function serieDuPoint(fichier: FichierDepartement, c: Colonnes, pointId: number): Serie {
   const valeur = (etape: (number | null)[][], col: number) => {
@@ -169,7 +217,7 @@ function serieDuPoint(fichier: FichierDepartement, c: Colonnes, pointId: number)
     return typeof v === 'number' ? v : null;
   };
   const etapes = fichier.forecast;
-  return {
+  return etalerPas({
     t: etapes.map(([t]) => t),
     temp: etapes.map(([, v]) => valeur(v, c.temperature_c)),
     pluie: etapes.map(([, v]) => valeur(v, c.precipitation_mm)),
@@ -190,7 +238,7 @@ function serieDuPoint(fichier: FichierDepartement, c: Colonnes, pointId: number)
     orage: etapes.map(([, v]) => valeur(v, c.thunder_risk_code)),
     neige: etapes.map(([, v]) => valeur(v, c.snowfall_mm)),
     visibilite: etapes.map(([, v]) => valeur(v, c.visibility_km)),
-  };
+  });
 }
 
 /** `n` villes bien réparties : la plus peuplée d'abord, puis celle qui comble le mieux les zones vides. */
@@ -249,7 +297,8 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     cloud_cover_pct: indice(cols, 'cloud_cover_pct'),
     wind_direction_deg: indice(cols, 'wind_direction_deg'),
     wind_speed_kmh: indice(cols, 'wind_speed_kmh'),
-    wind_gust_kmh: indice(cols, 'wind_gust_kmh'),
+    // Absente d'AIFS : pas de rafales (valeurs nulles).
+    wind_gust_kmh: cols.indexOf('wind_gust_kmh'),
     // Absente d'ARPEGE : pas de visibilité (valeurs nulles, pas de brouillard déduit de la visibilité).
     visibility_km: cols.indexOf('visibility_km'),
     // Absente du HARMONIE DINI du DMI : pas de risque d'orage (valeurs nulles).
