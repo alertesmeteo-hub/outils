@@ -148,10 +148,17 @@ async function depuisIconEu(f: FichierIconEu, dep: string): Promise<FichierDepar
   };
 }
 
-const memoire = new Map<string, Extrait>();
-/** Lectures en cours : plusieurs requêtes simultanées pour le même département n'ouvrent qu'un seul téléchargement. */
-const enCours = new Map<string, Promise<Extrait>>();
-const indexCourant = new Map<ModeleSource, { t: number; runTime: string }>();
+/**
+ * Caches en mémoire, partagés via globalThis : Next compile le préchauffage (instrumentation.ts) et les routes de l'API dans des
+ * paquets séparés, donc ce module peut exister en deux exemplaires ; sans partage, le préchauffage remplirait une copie inutilisée.
+ */
+const caches = ((globalThis as { __cacheCarteMeteo?: unknown }).__cacheCarteMeteo ??= {
+  memoire: new Map<string, Extrait>(),
+  /** Lectures en cours : plusieurs requêtes simultanées pour le même département n'ouvrent qu'un seul téléchargement. */
+  enCours: new Map<string, Promise<Extrait>>(),
+  indexCourant: new Map<ModeleSource, { t: number; runTime: string }>(),
+}) as { memoire: Map<string, Extrait>; enCours: Map<string, Promise<Extrait>>; indexCourant: Map<ModeleSource, { t: number; runTime: string }> };
+const { memoire, enCours, indexCourant } = caches;
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
 const VERSION_CACHE = 'v21'; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
@@ -500,6 +507,17 @@ async function lireExtraitDepartement(modele: ModeleSource, dep: string): Promis
     if (repli) return repli;
     throw e;
   }
+}
+
+/**
+ * Préchauffe le cache d'un modèle : charge en mémoire (et sur disque) les 96 départements du passage courant, sans rien calculer.
+ * Appelé en tâche de fond (prechauffage.ts) pour que le premier visiteur d'un nouveau passage n'attende pas les téléchargements.
+ * Retourne le nombre de départements chargés ; les échecs seront retentés à la demande, comme d'habitude.
+ */
+export async function prechaufferModele(modele: ModeleSource): Promise<number> {
+  // Moins de lectures simultanées que pour une requête de visiteur : le serveur est petit et partagé.
+  const resultats = await enParallele(CODES_DEPARTEMENTS, 3, (dep) => extraitDepartement(modele, dep));
+  return resultats.filter((r) => r.status === 'fulfilled').length;
 }
 
 async function enParallele<T, R>(liste: T[], limite: number, tache: (x: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
