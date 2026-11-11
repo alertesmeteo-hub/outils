@@ -516,6 +516,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [pictosSelectionnes, setPictosSelectionnes] = useState<Set<string>>(new Set());
   const [modeMultiple, setModeMultiple] = useState(false);
   const [pied, setPied] = useState('www.alertes-meteo.com');
+  const [deplacerMers, setDeplacerMers] = useState(false);
+  const [resetMers, setResetMers] = useState(0);
   const [afficherFleuves, setAfficherFleuves] = useState(true);
   /** Densité choisie dans le menu ; null = par défaut selon la zone (voir densiteFleuves). */
   const [densiteChoisie, setDensiteFleuves] = useState<DensiteFleuves | null>(null);
@@ -1138,7 +1140,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       enFrance ? { x: largeurCarte - 28 - largeurLogo, y: 21, w: largeurLogo, h: hauteurLogo + 1 } : { x: 29, y: HAUTEUR_CARTE - 21 - hauteurLogo - 1, w: logoDroite - 29, h: hauteurLogo + 1 },
       enFrance ? { x: xTitreFrance, y: 6, w: 410, h: 67 } : { x: largeurCarte - 28 - 460, y: 6, w: 460, h: 67 },
       ...(!enFrance && habillage === 'catalan' ? [{ x: 0, y: 0, w: 330, h: 135 }] : []),
-      ...(pied ? [{ x: largeurCarte / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
+      ...(pied ? [{ x: 29, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : []),
     ];
     const elements = bruts.map((m, i) => {
@@ -1575,6 +1577,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Taille des pictos, bien visible au-dessus de la carte (même réglage que « Taille des icônes » du menu). */
   const barreTaillePictos = (
     <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold">
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={deplacerMers} onChange={(e) => setDeplacerMers(e.target.checked)} />
+        Déplacer les noms des mers
+      </label>
+      {deplacerMers && <button type="button" className="rounded-md border border-border px-2 py-1" onClick={() => setResetMers((n) => n + 1)}>Réinitialiser les positions</button>}
       <span>Taille des pictos : {tailleIcones} %</span>
       <button type="button" onClick={() => setTailleIcones((t) => Math.max(40, t - 10))} className="rounded-md border border-border px-3 py-1 text-base leading-none" aria-label="Réduire les pictos">
         −
@@ -1651,6 +1658,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       titreADroite={!enFrance}
       logoEnBas={!enFrance}
       etiquetteMer
+      deplacerMers={deplacerMers && !enExport}
+      resetMers={resetMers}
       logoDroite={enFrance ? largeurCarte - 28 : null}
       grosPictos={enDepartement}
       carteLocale={!enFrance}

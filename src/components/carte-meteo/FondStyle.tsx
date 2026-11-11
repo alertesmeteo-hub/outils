@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { MONDE_PX, versMonde, type Vue } from '@/lib/carte-meteo/projection-france';
 import { STYLES_FOND, type Peinture, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 
@@ -320,11 +320,38 @@ function EtiquetteMer({ mer, couleur, contour = false, atlantique = false }: { m
 }
 
 /** Nom de la mer seul, sur une carte à fond photo (sans style de fond). */
-export function DecorMer({ largeur, hauteur, mer, atlantique = false }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null; atlantique?: boolean }) {
+export function DecorMer({ largeur, hauteur, mer, atlantique = false, deplacable = false, couleur = '#ffffff' }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null; atlantique?: boolean; deplacable?: boolean; couleur?: string }) {
+  const [decalage, setDecalage] = useState({ x: 0, y: 0 });
+  const glissement = useRef<{ x: number; y: number; dx: number; dy: number; facteur: number } | null>(null);
   if (!mer) return null;
   return (
     <svg className="cmap-decor" viewBox={`0 0 ${largeur} ${hauteur}`} width={largeur} height={hauteur} aria-hidden>
-      <EtiquetteMer mer={mer} couleur="#ffffff" contour atlantique={atlantique} />
+      <g
+        style={{ pointerEvents: deplacable ? 'all' : 'none', cursor: deplacable ? 'grab' : undefined, touchAction: 'none' }}
+        transform={`translate(${decalage.x} ${decalage.y})`}
+        onPointerDown={(e) => {
+          if (!deplacable) return;
+          e.stopPropagation(); e.preventDefault();
+          e.currentTarget.setPointerCapture(e.pointerId);
+          const rect = e.currentTarget.ownerSVGElement!.getBoundingClientRect();
+          glissement.current = { x: e.clientX, y: e.clientY, dx: decalage.x, dy: decalage.y, facteur: largeur / rect.width };
+        }}
+        onPointerMove={(e) => {
+          const g = glissement.current;
+          if (!g) return;
+          e.stopPropagation();
+          setDecalage({
+            x: Math.max(75 - mer.x, Math.min(largeur - 75 - mer.x, g.dx + (e.clientX - g.x) * g.facteur)),
+            y: Math.max(30 - mer.y, Math.min(hauteur - 55 - mer.y, g.dy + (e.clientY - g.y) * g.facteur)),
+          });
+        }}
+        onPointerUp={(e) => { if (glissement.current) { e.stopPropagation(); glissement.current = null; e.currentTarget.releasePointerCapture(e.pointerId); } }}
+        onPointerCancel={() => { glissement.current = null; }}
+        onClick={(e) => { if (deplacable) e.stopPropagation(); }}
+      >
+        {deplacable && <rect x={mer.x - 72} y={mer.y - 28} width={144} height={78} rx={8} fill="rgba(255,255,255,0.12)" stroke="#fff" strokeDasharray="4 3" />}
+        <EtiquetteMer mer={mer} couleur={couleur} contour atlantique={atlantique} />
+      </g>
     </svg>
   );
 }

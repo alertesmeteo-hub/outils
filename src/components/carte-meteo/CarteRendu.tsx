@@ -239,6 +239,8 @@ interface Props {
   logoEnBas?: boolean;
   /** Écrit « Mer Méditerranée » dans la mer visible quand la carte n'a pas de style de fond. */
   etiquetteMer?: boolean;
+  deplacerMers?: boolean;
+  resetMers?: number;
   /** Pictos plus grands (vue département). */
   grosPictos?: boolean;
   /** Carte de région ou de département : températures +15 % et pictos +5 % (voir `.cmap-local` dans globals.css). */
@@ -455,6 +457,8 @@ export default function CarteRendu({
   titreGauche,
   logoEnBas = false,
   etiquetteMer = false,
+  deplacerMers = false,
+  resetMers = 0,
   grosPictos = false,
   carteLocale = false,
   styleCapture = false,
@@ -672,13 +676,13 @@ export default function CarteRendu({
           </g>
         </svg>
         {theme && <DecorTheme theme={theme} largeur={largeur} hauteur={HAUTEUR_CARTE} />}
-        {styleFond && !theme && <DecorStyle style={styleFond} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} bandes={!sansBandes} />}
+        {styleFond && !theme && <DecorStyle style={styleFond} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={etiquetteMer ? null : merVisible} bandes={!sansBandes} />}
 
         {/* Habillage catalan, carte locale : bandes de la senyera en haut à gauche (la date est à droite). */}
         {habillage === 'catalan' && logoEnBas && !styleFond && !theme && <BandesCoin largeur={largeur} hauteur={HAUTEUR_CARTE} />}
 
-        {nomMer && <DecorMer largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} />}
-        {atlantiqueVisible && <DecorMer largeur={largeur} hauteur={HAUTEUR_CARTE} mer={atlantiqueVisible} atlantique />}
+        {etiquetteMer && !theme && <DecorMer key={`med-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible ? { ...merVisible, x: Math.max(75, merVisible.x - 25) } : null} deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
+        {atlantiqueVisible && <DecorMer key={`atl-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={{ ...atlantiqueVisible, x: Math.max(75, atlantiqueVisible.x - 40) }} atlantique deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
 
         {logoUrl && (
           <img
@@ -697,7 +701,7 @@ export default function CarteRendu({
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
         </div>
 
-        {pied && <div className="cmap-pied">{pied}</div>}
+        {pied && <div className="cmap-pied" style={etiquetteMer ? { left: 29, right: 'auto', textAlign: 'left', color: '#000', textShadow: '0 0 3px #fff, 0 0 3px #fff' } : undefined}>{etiquetteMer && pied.toLowerCase() === 'www.alertes-meteo.com' ? <>www.<span style={{ color: '#da121a' }}>A</span>lertes-meteo.com</> : pied}</div>}
 
         <div className="cmap-moyennes" style={moyennesGauche != null ? { left: moyennesGauche } : undefined}>
           {moyennes.map((m) => (
