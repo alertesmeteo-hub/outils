@@ -306,6 +306,21 @@ function blocsDe(c: Carte, th: Theme): Bloc[] {
 }
 
 const champ = 'w-full rounded-lg border border-border bg-surface p-1.5 text-sm';
+
+/** Liste déroulante des villes de la zone : le choix remplit le champ de texte, qui reste modifiable à la main. */
+function ListeVilles({ villes, onChoix }: { villes: string[]; onChoix: (v: string) => void }) {
+  if (villes.length === 0) return null;
+  return (
+    <select value="" onChange={(e) => e.target.value && onChoix(e.target.value)} className={`${champ} mb-1`} aria-label="Choisir une ville de la zone">
+      <option value="">▼ Choisir une ville ({villes.length})</option>
+      {villes.map((v) => (
+        <option key={v} value={v}>
+          {v}
+        </option>
+      ))}
+    </select>
+  );
+}
 const legende = 'mb-1 block text-xs font-bold uppercase tracking-wide text-primary';
 
 export default function CarteAlerte() {
@@ -333,6 +348,21 @@ export default function CarteAlerte() {
   const regler = (p: Partial<Carte>) => setC((x) => ({ ...x, ...p }));
 
   const [codeDep, setCodeDep] = useState('66');
+  // Villes de la zone (liste à faire défiler pour choisir le lieu) : les principales communes du département et celles de montagne ; en France, les chefs-lieux.
+  const [villes, setVilles] = useState<string[]>([]);
+  useEffect(() => {
+    const controleur = new AbortController();
+    const lire = (url: string) =>
+      fetch(url, { signal: controleur.signal })
+        .then((r) => (r.ok ? (r.json() as Promise<{ points: { nom: string; ville?: string }[] }>) : { points: [] }))
+        .then((j) => j.points.map((p) => (codeDep === 'FR' ? p.ville ?? p.nom : p.nom)))
+        .catch(() => [] as string[]);
+    const base = '/api/carte-meteo/previsions/?modele=arome';
+    Promise.all(codeDep === 'FR' ? [lire(base)] : [lire(`${base}&dep=${codeDep}`), lire(`${base}&montagne=1&deps=${codeDep}&alt=500`)]).then((listes) => {
+      if (!controleur.signal.aborted) setVilles([...new Set(listes.flat())].sort((a, b) => a.localeCompare(b, 'fr')));
+    });
+    return () => controleur.abort();
+  }, [codeDep]);
   const changerZone = (code: string) => {
     setCodeDep(code);
     const nom = code === 'FR' ? 'France' : DEPARTEMENTS_FR[code] ?? code;
@@ -390,6 +420,7 @@ export default function CarteAlerte() {
           <>
             <label className="text-sm font-medium">
               <span className={legende}>🏙️ Ville</span>
+              <ListeVilles villes={villes} onChoix={(v) => regler({ recordVille: v })} />
               <input value={c.recordVille} onChange={(e) => regler({ recordVille: e.target.value })} className={champ} />
             </label>
             <label className="text-sm font-medium">
@@ -411,6 +442,7 @@ export default function CarteAlerte() {
             </label>
             <label className="text-sm font-medium">
               <span className={legende}>🏙️ Lieu</span>
+              <ListeVilles villes={villes} onChoix={(v) => regler({ alerteVille: v })} />
               <input value={c.alerteVille} onChange={(e) => regler({ alerteVille: e.target.value })} className={champ} />
             </label>
             <label className="text-sm font-medium">

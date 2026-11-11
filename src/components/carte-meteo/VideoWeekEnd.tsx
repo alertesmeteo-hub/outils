@@ -88,10 +88,11 @@ const saisonDe = (iso: string): Saison => {
   const m = Number(iso.slice(5, 7));
   return m >= 6 && m <= 9 ? 'ete' : m >= 11 || m <= 3 ? 'hiver' : 'neutre';
 };
+const distanceKm = (a: VilleListe, b: VilleListe) => Math.hypot((a.lon - b.lon) * Math.cos((a.lat * Math.PI) / 180), a.lat - b.lat) * 111;
 const estCotiere = (v: VilleListe, cote: SecteurCote | null) => !!cote && distanceCoteKm(v.lat, v.lon, cote) <= SEUIL_COTE_KM;
 
 /**
- * Villes de la vidéo d'un jour (identiques toute la journée, différentes d'un jour à l'autre). Dans les Pyrénées-Orientales, Perpignan est toujours là.
+ * Villes de la vidéo d'un jour (identiques toute la journée, différentes d'un jour à l'autre). Dans les Pyrénées-Orientales, Perpignan est toujours là, avec toujours une ville du bord de mer.
  * Les places restantes vont, en été (juin à septembre), aux villes du bord de mer d'abord et, en hiver (novembre à mars), aux villes de montagne d'abord ;
  * le reste, ou entre-saison : grandes villes (les 12 plus peuplées, coupées en deux moitiés fixes, jours pairs d'un côté, impairs de l'autre, donc deux jours
  * de suite ne partagent pas de ville) et une ville de relief. Vidéo spéciale « montagne » : villes de relief seulement ; « été » : villes du bord de mer seulement.
@@ -126,6 +127,11 @@ function choisirVilles(dep: string, liste: VilleListe[], montagnes: VilleListe[]
   }
   const perpignan = dep === '66' ? liste.find((v) => v.nom === 'Perpignan') : undefined;
   if (perpignan) noms.push(perpignan.nom);
+  // Toujours une ville du bord de mer en plus de Perpignan ; à défaut de côte connue, une ville des environs (20 km au plus).
+  if (perpignan && saisonDe(jour) !== 'ete') {
+    const proches = cotieres.length > 0 ? cotieres : liste.filter((v) => distanceKm(perpignan, v) <= 20);
+    completer(proches, 1);
+  }
   const saison = dep === FRANCE ? 'neutre' : saisonDe(jour);
   const reste = () => NB_VILLES - noms.length;
   if (saison === 'ete') completer(cotieres, reste());
@@ -337,6 +343,8 @@ interface Contexte {
   /** Code du département : le fond de carte du début zoome dessus. */
   codeDep?: string;
   /** Tendance des jours suivant la vidéo (absente si les prévisions ne sont pas disponibles : l'écran est alors omis). */
+  /** Position (latitude, longitude) des villes, pour la carte. */
+  positions?: Record<string, { lat: number; lon: number } | undefined>;
   tendance?: { jours: string[]; villes: Record<string, JourVille[]>; /** Ville montrée : la première de la vidéo dont la tendance est connue (les villes de relief n'ont pas de prévision au-delà d'AROME). */ ville: string } | null;
 }
 
@@ -659,7 +667,8 @@ function cheminAnneaux(ctx: CanvasRenderingContext2D, anneaux: Anneau[], X: (lon
  * Fond du début (accroche et intro) : carte météo bleue (mer claire, terres bleues cernées d'un trait sombre, départements),
  * zoom de la France entière vers le département choisi. `t` : secondes depuis le début ; `duree` : durée du zoom.
  */
-function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, codeDep: string) {
+function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, codeDep: string, cadrage = false): { X: (lon: number) => number; Y: (lat: number) => number } | null {
+  let projection: { X: (lon: number) => number; Y: (lat: number) => number } | null = null;
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
   const mer = ctx.createLinearGradient(0, 0, 0, H);
@@ -678,12 +687,13 @@ function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, code
     const s0 = H / 11;
     const dLat = trouve ? Math.max(lat1 - lat0, 0.3) : 11;
     const dLon = trouve ? Math.max(lon1 - lon0, 0.3) : 14;
-    const s1 = trouve ? Math.min(H / (dLat * 2.6), W / (dLon * k * 1.8)) : s0;
+    const s1 = trouve ? Math.min(H / (dLat * (cadrage ? 1.9 : 2.6)), W / (dLon * k * (cadrage ? 1.3 : 1.8))) : s0;
     const s = s0 * Math.pow(s1 / s0, e);
     const lonC = 2.5 + ((trouve ? lon0 + dLon / 2 : 2.5) - 2.5) * e;
     const latC = 46.6 + ((trouve ? lat0 + dLat / 2 : 46.6) - 46.6) * e;
     const X = (lon: number) => W / 2 + (lon - lonC) * k * s;
     const Y = (lat: number) => H / 2 - (lat - latC) * s;
+    projection = { X, Y };
     cheminAnneaux(ctx, geoFond.terres, X, Y);
     ctx.fillStyle = '#2c61bb';
     ctx.fill();
@@ -717,6 +727,112 @@ function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, code
   voile.addColorStop(1, 'rgba(6,24,60,0.38)');
   ctx.fillStyle = voile;
   ctx.fillRect(0, 0, W, H);
+  return projection;
+}
+
+/**
+ * Carte du département (ou de la France) : le fond cartographique de l'ouverture de la vidéo, avec chaque ville de la vidéo à sa place
+ * (nom, picto, maxi et mini ; un rang par jour pour le week-end), sous le titre « Quel temps … ? ». Image fixe, mêmes formats que la vidéo.
+ */
+function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte) {
+  const { semaine, villes, logo, departement, textes } = c;
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const proj = fondCarte(ctx, 99, 1, c.codeDep ?? '', true);
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center';
+  texteAjuste(ctx, departement.toUpperCase(), W / 2, 92 * u, 60 * u, POLICE, W * 0.9, '#ffe27a');
+  texteAjuste(ctx, `${textes.intro[0]} ${textes.periode ?? textes.intro[1]}`, W / 2, 190 * u, 100 * u, POLICE, W * 0.94);
+  texteAjuste(ctx, textes.sous, W / 2, 250 * u, 42 * u, TEXTE, W * 0.92, '#dcecff');
+
+  const n = semaine.jours.length;
+  const lh = (n === 1 ? 124 : 70) * u;
+  const entete = (n === 1 ? 58 : 48) * u;
+  const bw = (n === 1 ? 330 : 370) * u;
+  const bh = entete + n * lh + 10 * u;
+  const haut = 275 * u;
+  const bas = H - 230 * u - bh;
+  const bornes = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+  // Une bulle par ville, au-dessus de sa position ; les bulles qui se chevauchent sont écartées à la verticale.
+  const bulles = villes.flatMap((nom) => {
+    const pos = c.positions?.[nom];
+    const pt = pos && proj ? { x: proj.X(pos.lon), y: proj.Y(pos.lat) } : null;
+    return pt ? [{ nom, px: pt.x, py: pt.y, x: bornes(pt.x - bw / 2, 16 * u, W - bw - 16 * u), y: bornes(pt.y - bh - 26 * u, haut, bas) }] : [];
+  });
+  for (let tour = 0; tour < 200; tour++) {
+    let bouge = false;
+    for (let a = 0; a < bulles.length; a++) {
+      for (let b = a + 1; b < bulles.length; b++) {
+        const dx = bulles[a].x - bulles[b].x;
+        const dy = bulles[a].y - bulles[b].y;
+        const ox = bw + 12 * u - Math.abs(dx);
+        const oy = bh + 12 * u - Math.abs(dy);
+        if (ox > 0 && oy > 0) {
+          // Écart minimal : sur l'axe où le chevauchement est le plus faible (bulles groupées en montagne : elles s'étalent aussi à l'horizontale).
+          if (ox < oy) {
+            const sens = dx === 0 ? (a < b ? 1 : -1) : Math.sign(dx);
+            bulles[a].x = bornes(bulles[a].x + (sens * (ox / 2 + 1)), 16 * u, W - bw - 16 * u);
+            bulles[b].x = bornes(bulles[b].x - (sens * (ox / 2 + 1)), 16 * u, W - bw - 16 * u);
+          } else {
+            const sens = dy === 0 ? (a < b ? 1 : -1) : Math.sign(dy);
+            bulles[a].y = bornes(bulles[a].y + (sens * (oy / 2 + 1)), haut, bas);
+            bulles[b].y = bornes(bulles[b].y - (sens * (oy / 2 + 1)), haut, bas);
+          }
+          bouge = true;
+        }
+      }
+    }
+    if (!bouge) break;
+  }
+  // Traits et points d'abord, bulles ensuite (elles passent par-dessus).
+  for (const b of bulles) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3 * u;
+    ctx.beginPath();
+    ctx.moveTo(b.px, b.py);
+    ctx.lineTo(b.x + bw / 2, b.y + bh);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(b.px, b.py, 9 * u, 0, Math.PI * 2);
+    ctx.fillStyle = ROUGE_CATALAN;
+    ctx.fill();
+    ctx.lineWidth = 3.5 * u;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+  }
+  for (const b of bulles) {
+    ctx.fillStyle = 'rgba(8,30,70,0.86)';
+    rectArrondi(ctx, b.x, b.y, bw, bh, 28 * u);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 2.5 * u;
+    ctx.stroke();
+    ctx.textAlign = 'center';
+    texteAjuste(ctx, b.nom.replace('-la-Preste', '').toUpperCase(), b.x + bw / 2, b.y + (n === 1 ? 42 : 36) * u, (n === 1 ? 34 : 30) * u, POLICE, bw - 28 * u, '#ffe27a');
+    const jours = semaine.villes[b.nom] ?? [];
+    jours.slice(0, n).forEach((j, k) => {
+      const y0 = b.y + entete - 4 * u + k * lh;
+      const ps = lh - 10 * u;
+      ctx.textAlign = 'left';
+      let x = b.x + 16 * u;
+      if (n > 1) {
+        ctx.fillStyle = '#fff';
+        ctx.font = `${26 * u}px ${POLICE}`;
+        ctx.fillText(courtJour(semaine.jours[k]), x, y0 + lh / 2 + 9 * u);
+        x += 64 * u;
+      }
+      if (j.picto) dessinerPicto(ctx, j.picto, x, y0 + 4 * u, ps, 0, k * 1.7);
+      x += ps + 8 * u;
+      ctx.fillStyle = '#ff9d6b';
+      ctx.font = `${(n === 1 ? 74 : 44) * u}px ${POLICE}`;
+      ctx.fillText(degre(j.maxi), x, y0 + lh / 2 + (n === 1 ? 6 : 4) * u);
+      ctx.fillStyle = '#9ad8ff';
+      ctx.font = `${(n === 1 ? 46 : 30) * u}px ${POLICE}`;
+      ctx.fillText(degre(j.mini), x, y0 + lh / 2 + (n === 1 ? 52 : 30) * u);
+    });
+  }
+  ctx.textAlign = 'center';
+  pied(ctx, logo);
 }
 
 /** Dessine l'image de la vidéo à l'instant `t` (secondes), aux dimensions du canevas. */
@@ -848,7 +964,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm w-full';
 const legende = 'mb-1 block text-xs font-bold uppercase tracking-wide text-primary';
 
-export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, specialInitial }: { aujourdhui: string; formatInitial?: string; zoneInitiale?: string; specialInitial?: string }) {
+export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, specialInitial, vueInitiale }: { aujourdhui: string; formatInitial?: string; zoneInitiale?: string; specialInitial?: string; vueInitiale?: string }) {
   const [modele, setModele] = useState<ModeleMeteo>('moyenne');
   const [dep, setDep] = useState(zoneInitiale === FRANCE || (zoneInitiale && CODES_DEPARTEMENTS.includes(zoneInitiale)) ? zoneInitiale : '66');
   const [listeVilles, setListeVilles] = useState<{ dep: string; villes: VilleListe[]; reliefs: VilleListe[]; altRelief: number } | null>(null);
@@ -870,11 +986,16 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   const [t, setT] = useState(0);
   const [lecture, setLecture] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Aperçu et export : la vidéo, ou la même chose en carte (image fixe).
+  const [apercu, setApercu] = useState<'video' | 'carte'>(vueInitiale === 'carte' ? 'carte' : 'video');
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   const [prets, setPrets] = useState(0);
 
   const format = FORMATS.find((f) => f.id === formatId)!;
   const jours = useMemo<string[]>(() => (mode === 'weekend' ? weekEnd(aujourdhui) : [ajouterJours(aujourdhui, ecart)]), [aujourdhui, mode, ecart]);
+  // Villes de relief : chaque modèle publie sa propre liste de communes de montagne ; on prend celle du modèle qui couvre le dernier jour de la vidéo (AROME, puis ARPEGE, puis CEP).
+  const modeleRelief: 'arome' | 'arpege' | 'cep' = jours[jours.length - 1] <= ajouterJours(aujourdhui, ECHEANCE_MAX.arome) ? 'arome' : jours[jours.length - 1] <= ajouterJours(aujourdhui, ECHEANCE_MAX.arpege) ? 'arpege' : 'cep';
+  const dateListeRelief = modeleRelief === 'arome' ? aujourdhui : jours[jours.length - 1];
   const france = dep === FRANCE;
   const nomDepartement = france ? 'France' : DEPARTEMENTS_FR[dep] ?? dep;
   /** Paramètre de zone des requêtes de prévisions : un département, ou rien pour la France (un point par département, nommé d'après son chef-lieu). */
@@ -900,7 +1021,7 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
     const reliefsDe = async (): Promise<{ reliefs: VilleListe[]; altRelief: number }> => {
       if (dep === FRANCE) return { reliefs: [], altRelief: 1000 };
       for (const alt of [1000, 500]) {
-        const r = await lire(`/api/carte-meteo/previsions/?modele=arome&montagne=1&deps=${dep}&alt=${alt}&date=${aujourdhui}`).then((j) => enListe(j.points)).catch(() => [] as VilleListe[]);
+        const r = await lire(`/api/carte-meteo/previsions/?modele=${modeleRelief}&montagne=1&deps=${dep}&alt=${alt}&date=${dateListeRelief}`).then((j) => enListe(j.points)).catch(() => [] as VilleListe[]);
         if (r.length > 0) return { reliefs: r, altRelief: alt };
       }
       return { reliefs: [], altRelief: 1000 };
@@ -922,7 +1043,8 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
       })
       .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
     return () => controleur.abort();
-  }, [dep, aujourdhui]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dep, aujourdhui, modeleRelief]);
 
   // Le modèle choisi doit couvrir le week-end : sinon, retour à la moyenne.
   useEffect(() => {
@@ -967,14 +1089,14 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
 
   // Prévisions des villes de relief pour les jours de la vidéo et de la tendance (AROME, puis le CEP au-delà de sa portée ; la moyenne des modèles n'existe pas en montagne).
   const [reliefsParDate, setReliefsParDate] = useState<{ cle: string; parDate: Record<string, PointCarte[]> } | null>(null);
-  const cleReliefs = `${[...jours, ...joursTendance].join(',')}|${dep}`;
+  const cleReliefs = `${[...jours, ...joursTendance].join(",")}|${dep}|${modeleRelief}`;
   useEffect(() => {
     if (!listeVilles || listeVilles.dep !== dep || listeVilles.reliefs.length === 0) return;
     const controleur = new AbortController();
     const dates = [...jours, ...joursTendance];
     Promise.all(
       dates.map((date) =>
-        fetch(`/api/carte-meteo/previsions/?modele=${date <= ajouterJours(aujourdhui, ECHEANCE_MAX.arome) ? 'arome' : 'cep'}&montagne=1&deps=${dep}&alt=${listeVilles.altRelief}&date=${date}`, { signal: controleur.signal })
+        fetch(`/api/carte-meteo/previsions/?modele=${date <= ajouterJours(aujourdhui, ECHEANCE_MAX[modeleRelief]) ? modeleRelief : 'cep'}&montagne=1&deps=${dep}&alt=${listeVilles.altRelief}&date=${date}`, { signal: controleur.signal })
           .then((r) => (r.ok ? (r.json() as Promise<{ points: PointCarte[] }>) : { points: [] as PointCarte[] }))
           .then((j) => j.points)
           .catch(() => [] as PointCarte[])
@@ -1033,14 +1155,21 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   const avecHook = format.id === 'hook';
   const total = dureeTotale(villes.length, avecHook, !!tendance);
   const textes = useMemo(() => textesVideo(mode, jours, ecart, france ? 'auto' : special), [mode, jours, ecart, special, france]);
-  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, tendance, codeDep: dep } : null;
+  const positions = useMemo(() => {
+    const parNom = new Map((listeVilles?.dep === dep ? [...listeVilles.villes, ...listeVilles.reliefs] : []).map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
+    return Object.fromEntries(villes.map((v) => [v, parNom.get(v)]));
+  }, [listeVilles, dep, villes]);
+  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, tendance, codeDep: dep, positions } : null;
 
   useEffect(() => {
     const c = canvasRef.current;
     const ctx = c?.getContext('2d');
-    if (ctx && contexte) dessiner(ctx, Math.min(t, total - 0.01), contexte);
+    if (ctx && contexte) {
+      if (apercu === 'carte') dessinerCarte(ctx, contexte);
+      else dessiner(ctx, Math.min(t, total - 0.01), contexte);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, semaine, logo, prets, villes.join('|'), format]);
+  }, [t, semaine, logo, prets, villes.join('|'), format, apercu, positions]);
 
   useEffect(() => {
     if (!lecture) return;
@@ -1060,6 +1189,31 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lecture, total]);
+
+  /** Télécharge la carte en image (PNG ou JPG), au format choisi. */
+  async function exporterCarte(type: 'png' | 'jpg') {
+    if (!contexte) return;
+    await chargerGeoFond();
+    const cv = document.createElement('canvas');
+    cv.width = format.l;
+    cv.height = format.h;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+    dessinerCarte(ctx, contexte);
+    cv.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const lien = document.createElement('a');
+        lien.href = url;
+        lien.download = `carte-meteo-${special === 'auto' ? '' : `${special}-`}${dep}-${format.id}-${jours[0]}.${type}`;
+        lien.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      },
+      type === 'png' ? 'image/png' : 'image/jpeg',
+      0.95
+    );
+  }
 
   const exporter = useCallback(async () => {
     if (!contexte) return;
@@ -1353,6 +1507,14 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
         <button type="button" onClick={exporter} disabled={!contexte || !!etat} className="btn-primary rounded-lg px-4 py-3 font-semibold disabled:opacity-60">
           {etat ?? '🎬 Créer la vidéo (MP4)'}
         </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => exporterCarte('png')} disabled={!contexte} className="flex-1 rounded-lg border border-red-600 bg-red-600 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+            🗺️ Carte PNG
+          </button>
+          <button type="button" onClick={() => exporterCarte('jpg')} disabled={!contexte} className="flex-1 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm font-semibold disabled:opacity-60">
+            🗺️ Carte JPG
+          </button>
+        </div>
         <p className="text-xs text-muted">
           Format {format.l} × {format.h}, {Math.round(total)} secondes : titre, une image par ville, récapitulatif{tendance ? ', tendance des prochains jours' : ''}. Le MP4 s&apos;enregistre dans le navigateur (Chrome, Edge) ; ailleurs, un WebM.
         </p>
@@ -1363,8 +1525,15 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
         )}
       </div>
       <div className="flex flex-col items-center gap-3">
+        <div className="flex gap-2" role="group" aria-label="Aperçu">
+          {([['video', '🎬 Vidéo'], ['carte', '🗺️ Carte']] as const).map(([id, libelle]) => (
+            <button key={id} type="button" onClick={() => { setApercu(id); setLecture(false); }} aria-pressed={apercu === id} className={`rounded-lg border px-4 py-1.5 text-sm font-medium ${apercu === id ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>
+              {libelle}
+            </button>
+          ))}
+        </div>
         <canvas ref={canvasRef} width={format.l} height={format.h} style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }} className="h-auto w-full rounded-2xl border border-border bg-[#0b2a5b] shadow-lg" aria-label="Aperçu de la vidéo" />
-        <div className="flex w-full items-center gap-3" style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
+        <div className={`flex w-full items-center gap-3 ${apercu === 'carte' ? 'hidden' : ''}`} style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
           <button type="button" onClick={() => setLecture((v) => !v)} disabled={!contexte} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium disabled:opacity-60">
             {lecture ? '⏸ Pause' : '▶ Lecture'}
           </button>
