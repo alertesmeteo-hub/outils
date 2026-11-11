@@ -33,6 +33,12 @@ const VILLES = [
   { nom: 'Perpignan', cherche: 'PERPIGNAN' },
 ];
 const DEPARTEMENT = '66';
+/** Bilan de la France : villes montrées sur la carte (la valeur est celle de la station la plus proche qui a des relevés). */
+const VILLES_FRANCE = [
+  { nom: 'Paris', lat: 48.85, lon: 2.35 },
+  { nom: 'Marseille', lat: 43.3, lon: 5.37 },
+];
+const moyenneDe = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Fond de carte : le département seul, pour qu'il remplisse le cadre. */
 const CODES_CARTE = [DEPARTEMENT];
 
@@ -99,7 +105,9 @@ const sansTiret = (nom: string) => normaliser(nom).toUpperCase().replace(/[^A-Z]
 
 const signe = (v: number, decimales: number, suffixe: string) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(decimales)}${suffixe}`;
 
-export default function BilanMoisPlanche() {
+/** Planche du bilan du mois : Perpignan (Pyrénées-Orientales) ou, avec `zone="france"`, la France métropolitaine (moyenne des stations Météo-France). */
+export default function BilanMoisPlanche({ zone = '66' }: { zone?: '66' | 'france' }) {
+  const france = zone === 'france';
   const [bilans, setBilans] = useState<ReponseBilans | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [mois, setMois] = useState<string | null>(null);
@@ -107,11 +115,12 @@ export default function BilanMoisPlanche() {
   const [histo, setHisto] = useState<ReponseHistorique | null>(null);
   const [moisHisto, setMoisHisto] = useState<string | null>(null);
   useEffect(() => {
+    if (france) return;
     fetch('/api/carte-meteo/bilan-historique/')
       .then((r) => (r.ok ? (r.json() as Promise<ReponseHistorique>) : Promise.reject()))
       .then(setHisto)
       .catch(() => {});
-  }, []);
+  }, [france]);
   const [type, setType] = useState<Affichage>('tous');
   const [logoId, setLogoId] = useState('alertesmeteo');
   const [format, setFormat] = useState<FormatPlanche>('paysage');
@@ -121,6 +130,8 @@ export default function BilanMoisPlanche() {
   const colonne = useRef<HTMLDivElement>(null);
   const planche = useRef<HTMLDivElement>(null);
   const contours = useContours(FICHIERS_CONTOURS.departements);
+  /** Départements du fond de carte : le 66 seul, ou toute la France métropolitaine. */
+  const codesCarte = useMemo(() => (france ? contours.filter((c) => !c.code.startsWith('97')).map((c) => c.code) : CODES_CARTE), [france, contours]);
 
   useEffect(() => {
     let actif = true;
@@ -152,10 +163,12 @@ export default function BilanMoisPlanche() {
   /** Station de chaque ville et valeur d'une carte du mois. */
   const lire = useMemo(() => {
     if (!bilans) return null;
-    const stations = VILLES.map((v) => {
-      const i = bilans.stations.findIndex((s) => s[2] === DEPARTEMENT && sansTiret(s[1]).includes(v.cherche));
-      return { ...v, i, station: i >= 0 ? bilans.stations[i] : null };
-    });
+    const stations = france
+      ? VILLES_FRANCE.map((v) => ({ nom: v.nom, cherche: '', i: -1, station: [v.nom, v.nom, '', v.lat, v.lon, null] as ReponseBilans['stations'][number] | null }))
+      : VILLES.map((v) => {
+          const i = bilans.stations.findIndex((s) => s[2] === DEPARTEMENT && sansTiret(s[1]).includes(v.cherche));
+          return { ...v, i, station: i >= 0 ? bilans.stations[i] : null };
+        });
     const valeurArchive = (carte: string, i: number) => bilans.cartes[carte]?.valeurs.find(([k]) => k === i)?.[1] ?? null;
     // Mois ancien : valeurs de la station de Perpignan lues dans la base mensuelle ; écarts calculés sur les normales 1991-2020.
     const h = moisHisto ? histo?.mois[moisHisto] : null;
@@ -180,7 +193,7 @@ export default function BilanMoisPlanche() {
       }
     };
     return { stations, valeur };
-  }, [bilans, histo, moisHisto]);
+  }, [bilans, histo, moisHisto, france]);
 
   const lignes: Ligne[] = useMemo(() => {
     if (!lire) return [];
@@ -202,6 +215,49 @@ export default function BilanMoisPlanche() {
       if (m == null || e == null) return null;
       return { nom, type: t, mesure: m, ecart: e, normale: 1 + e / 100 > 0.01 ? m / (1 + e / 100) : null };
     };
+    if (france && bilans) {
+      // Moyenne des stations qui ont tous les relevés du bilan (mesure, normale reconstituée, écart) ; villes : station la plus proche.
+      const cle = (c: string) => new Map(bilans.cartes[c]?.valeurs ?? []);
+      const parStation = (t: 'temp' | 'pluie' | 'soleil') => {
+        const [a, b, c, d] = t === 'temp' ? ['txm-mois', 'tnm-mois', 'ntx-mois', 'ntn-mois'].map(cle) : t === 'pluie' ? ['rr-mois', 'nrr-mois'].map(cle) : ['insol-mois', 'ninsol-mois'].map(cle);
+        const sortie: { i: number; mesure: number; normale: number; ecart: number }[] = [];
+        for (const [i, v1] of a) {
+          if (t === 'temp') {
+            const [tn, ntx, ntn] = [b.get(i), c?.get(i), d?.get(i)];
+            if (tn == null || ntx == null || ntn == null) continue;
+            const mesure = (v1 + tn) / 2;
+            const ecart = (ntx + ntn) / 2;
+            sortie.push({ i, mesure, ecart, normale: mesure - ecart });
+          } else {
+            const e = b.get(i);
+            if (e == null || 1 + e / 100 <= 0.01) continue;
+            sortie.push({ i, mesure: v1, ecart: e, normale: v1 / (1 + e / 100) });
+          }
+        }
+        return sortie;
+      };
+      const ligneFrance = (t: 'temp' | 'pluie' | 'soleil', nom: string, ville?: { lat: number; lon: number }): Ligne | null => {
+        const st = parStation(t);
+        if (st.length === 0) return null;
+        if (ville) {
+          const k = Math.cos((ville.lat * Math.PI) / 180);
+          const proche = st.reduce((m, x) => {
+            const sx = bilans.stations[x.i];
+            const d = Math.hypot(sx[3] - ville.lat, (sx[4] - ville.lon) * k);
+            return d < m.d ? { d, x } : m;
+          }, { d: Infinity, x: st[0] }).x;
+          return { nom, type: t, mesure: proche.mesure, normale: proche.normale, ecart: proche.ecart };
+        }
+        const mesure = moyenneDe(st.map((x) => x.mesure));
+        const normale = moyenneDe(st.map((x) => x.normale));
+        return { nom, type: t, mesure, normale, ecart: t === 'temp' ? moyenneDe(st.map((x) => x.ecart)) : normale > 0 ? (mesure / normale - 1) * 100 : 0 };
+      };
+      if (type === 'tous') return (['temp', 'pluie', 'soleil'] as const).map((t) => ligneFrance(t, TITRES_LIGNE[t])).filter((l): l is Ligne => l != null);
+      if (type === 'temp' || type === 'pluie' || type === 'soleil') {
+        return [ligneFrance(type, 'France'), ...VILLES_FRANCE.map((v) => ligneFrance(type, v.nom, v))].filter((l): l is Ligne => l != null);
+      }
+      return [];
+    }
     if (type === 'tous') {
       const s = lire.stations.find((x) => x.i >= 0);
       if (!s) return [];
@@ -209,7 +265,7 @@ export default function BilanMoisPlanche() {
     }
     if (type === 'records' || type === 'annee') return [];
     return lire.stations.flatMap((s) => (s.i < 0 ? [] : [ligneDe(s.nom, s.i, type as Type)])).filter((l): l is Ligne => l != null);
-  }, [lire, type]);
+  }, [lire, type, france, bilans]);
 
   /** Données du texte automatique : mesures du mois aux stations, et écarts à la normale. */
   const donneesTexte = (): CarteTexte | null => {
@@ -224,8 +280,8 @@ export default function BilanMoisPlanche() {
       type: 'Bilan du mois aux stations',
       titre: `Bilan de ${moisAffiche}`,
       periode: moisAffiche,
-      zone: 'Pyrénées-Orientales',
-      source: 'Relevés des stations Météo-France',
+      zone: france ? 'France métropolitaine' : 'Pyrénées-Orientales',
+      source: france ? 'Moyenne des relevés des stations Météo-France' : 'Relevés des stations Météo-France',
       rubriques: [
         { nom: type === 'tous' ? 'Valeurs du mois' : nomMesure[t0], unite: type === 'tous' ? '' : unite(t0), sens: 'plus hautes', classement: m.map((l) => ({ lieu: l.nom, valeur: l.mesure })) },
         { nom: type === 'chaud' || type === 'froid' ? 'Écart au record du mois' : 'Écart à la normale', unite: type === 'tous' ? '' : uniteEcart(t0), ecart: true, sens: 'plus hautes', preposition: 'pour', classement: e.map((l) => ({ lieu: l.nom, valeur: l.ecart })) },
@@ -300,10 +356,10 @@ export default function BilanMoisPlanche() {
   const CARTE = vertical ? { gauche: 40, haut: 215, droite: LARGEUR - 40, bas: hautLignes - 16 } : { gauche: 30, haut: 40, droite: 570, bas: HAUTEUR - 110 };
 
   const vue = useMemo(() => {
-    const boite = unirBoites(contours.filter((c) => CODES_CARTE.includes(c.code)).map((c) => c.boite));
+    const boite = unirBoites(contours.filter((c) => codesCarte.includes(c.code)).map((c) => c.boite));
     return boite ? ajusterVue(boite, CARTE, 0.02) : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contours, CARTE.gauche, CARTE.haut, CARTE.droite, CARTE.bas]);
+  }, [contours, codesCarte, CARTE.gauche, CARTE.haut, CARTE.droite, CARTE.bas]);
 
   const style = FONDS[type === 'tous' ? 'temp' : type === 'records' || type === 'annee' ? 'chaud' : type];
   const decimales = type === 'temp' ? 1 : 1;
@@ -314,7 +370,7 @@ export default function BilanMoisPlanche() {
     if (!planche.current) return;
     setEnExport(true);
     try {
-      await exporterEnJpg(planche.current, `bilan-${type === 'annee' ? 'records-12-mois' : type === 'records' ? 'records-du-mois' : type === 'tous' ? 'complet' : type === 'temp' ? 'temperatures' : type === 'pluie' ? 'pluviometrie' : 'ensoleillement'}-${moisAffiche}-pyrenees-orientales${format === 'paysage' ? '' : `-${format}`}`, LARGEUR, HAUTEUR);
+      await exporterEnJpg(planche.current, `bilan-${type === 'annee' ? 'records-12-mois' : type === 'records' ? 'records-du-mois' : type === 'tous' ? 'complet' : type === 'temp' ? 'temperatures' : type === 'pluie' ? 'pluviometrie' : 'ensoleillement'}-${moisAffiche}-${france ? 'france' : 'pyrenees-orientales'}${format === 'paysage' ? '' : `-${format}`}`, LARGEUR, HAUTEUR);
     } catch (e) {
       console.error('Export du bilan en JPG', e);
       setErreur("L'export a échoué. Réessayez dans un instant.");
@@ -332,7 +388,7 @@ export default function BilanMoisPlanche() {
         <fieldset>
           <legend className="mb-1 text-sm font-medium">Bilan</legend>
           <div className="flex flex-wrap gap-2">
-            {([['tous', '📊 Les trois'], ['records', '🏆 Records du mois'], ['annee', '📅 Records des 12 mois'], ['temp', '🌡️ Températures'], ['pluie', '🌧️ Pluviométrie'], ['soleil', '☀️ Ensoleillement']] as [Affichage, string][]).map(([id, l]) => (
+            {([['tous', '📊 Les trois'], ['records', '🏆 Records du mois'], ['annee', '📅 Records des 12 mois'], ['temp', '🌡️ Températures'], ['pluie', '🌧️ Pluviométrie'], ['soleil', '☀️ Ensoleillement']] as [Affichage, string][]).filter(([id]) => !france || (id !== 'records' && id !== 'annee')).map(([id, l]) => (
               <button key={id} type="button" aria-pressed={type === id} className={bouton(type === id)} onClick={() => setType(id)}>
                 {l}
               </button>
@@ -370,7 +426,7 @@ export default function BilanMoisPlanche() {
                 </option>
               ))}
             </optgroup>
-            {histo && (
+            {!france && histo && (
               <optgroup label="Anciens mois (Perpignan, Météo-France)">
                 {Object.keys(histo.mois)
                   .filter((m) => !bilans?.mois?.disponibles.includes(m) && histo.mois[m].tx != null)
@@ -407,7 +463,7 @@ export default function BilanMoisPlanche() {
           {erreur}
         </p>
       )}
-      {bilans && !avecDonnees && <p className="mt-3 text-sm text-muted">Aucune des trois stations n&apos;a de valeur pour ce bilan et ce mois.</p>}
+      {bilans && !avecDonnees && <p className="mt-3 text-sm text-muted">{france ? 'Pas assez de relevés pour ce bilan et ce mois.' : 'Aucune des trois stations n’a de valeur pour ce bilan et ce mois.'}</p>}
 
       <div ref={colonne} className="mt-4 min-w-0">
         <div style={{ height: HAUTEUR * facteur }}>
@@ -418,16 +474,16 @@ export default function BilanMoisPlanche() {
               {vue && (
                 <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
                   {contours
-                    .filter((c) => CODES_CARTE.includes(c.code))
+                    .filter((c) => codesCarte.includes(c.code))
                     .sort((a, b) => Number(a.code === DEPARTEMENT) - Number(b.code === DEPARTEMENT))
                     .map((c) => (
                       <path
                         key={c.code}
                         d={c.d}
-                        fill={c.code === DEPARTEMENT ? style.carte : 'rgba(255,255,255,0.2)'}
-                        stroke={c.code === DEPARTEMENT ? 'rgba(120,10,16,0.8)' : 'rgba(255,255,255,0.4)'}
-                        strokeWidth={1 / vue.echelle}
-                        style={c.code === DEPARTEMENT ? { filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' } : undefined}
+                        fill={france || c.code === DEPARTEMENT ? style.carte : 'rgba(255,255,255,0.2)'}
+                        stroke={france || c.code === DEPARTEMENT ? 'rgba(120,10,16,0.8)' : 'rgba(255,255,255,0.4)'}
+                        strokeWidth={(france ? 0.5 : 1) / vue.echelle}
+                        style={!france && c.code === DEPARTEMENT ? { filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' } : undefined}
                       />
                     ))}
                 </g>
@@ -453,7 +509,7 @@ export default function BilanMoisPlanche() {
                 {type === 'tous' ? 'BILAN DU MOIS' : type === 'annee' ? 'RECORDS DES 12 MOIS' : style.titre}{prete && type !== 'annee' ? ` - ${libelleMois(moisAffiche).toUpperCase()}` : ''}
               </div>
               <div style={{ height: 3, background: '#fff', width: 270, marginLeft: vertical ? 'auto' : 'auto', marginRight: vertical ? 'auto' : undefined, marginTop: 14 }} />
-              <div style={{ fontSize: 20, textAlign: vertical ? 'center' : 'right', opacity: 0.85, marginTop: 8 }}>{type === 'annee' ? 'Perpignan · records de chaque mois (Météo-France)' : type === 'records' ? 'Perpignan · comparé aux records du même mois (Météo-France)' : `Pyrénées-Orientales${periode ? ` · ${periode}` : ''}`}</div>
+              <div style={{ fontSize: 20, textAlign: vertical ? 'center' : 'right', opacity: 0.85, marginTop: 8 }}>{type === 'annee' ? 'Perpignan · records de chaque mois (Météo-France)' : type === 'records' ? 'Perpignan · comparé aux records du même mois (Météo-France)' : `${france ? 'France métropolitaine · moyenne des stations' : 'Pyrénées-Orientales'}${periode ? ` · ${periode}` : ''}`}</div>
             </div>
 
             {type === 'records' && (

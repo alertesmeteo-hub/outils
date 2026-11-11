@@ -29,7 +29,7 @@ const RUBRIQUES: Rubrique[] = [
       '/outils/carte-meteo/tendances/',
       '/outils/carte-meteo/tendances-par-theme/',
       '/outils/carte-meteo-info/',
-      '/outils/previsions-saisonnieres/',
+      '/outils/previsions-saisonnieres/', '/outils/tendance-9-mois-france/',
     ].map(lien),
   },
   { titre: 'Alertes', rouge: true, pages: ['/outils/carte-meteo-info/?cartes=alertes'].map(lien) },
@@ -52,7 +52,8 @@ const RUBRIQUES: Rubrique[] = [
   {
     titre: 'Bilan',
     pages: [
-      { href: '/outils/carte-meteo-info/?cartes=bilan-mois', libelle: 'Bilan du mois : France' },
+      { href: '/outils/carte-meteo/bilan-france/', libelle: 'Bilan du mois : France (planche)' },
+      { href: '/outils/carte-meteo-info/?cartes=bilan-mois', libelle: 'Bilan du mois : France (cartes)' },
       { href: '/outils/carte-meteo/bilan-mois/', libelle: 'Bilan du mois : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo-info/?cartes=bilan', libelle: 'Bilans des stations (cartes)' },
       { href: '/classements/', libelle: 'Classements' },
