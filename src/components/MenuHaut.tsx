@@ -49,6 +49,14 @@ const RUBRIQUES: Rubrique[] = [
   },
   { titre: 'Europe', pages: ['/outils/carte-meteo-info/?cartes=europe'].map(lien) },
   { titre: 'Obs', pages: ['/outils/observations-en-direct/', '/outils/temperatures-en-direct/'].map(lien) },
+  {
+    titre: 'Bilan',
+    pages: [
+      lien('/outils/carte-meteo/bilan-mois/'),
+      { href: '/outils/carte-meteo-info/?cartes=bilan', libelle: 'Bilans des stations (cartes)' },
+      { href: '/classements/', libelle: 'Classements' },
+    ],
+  },
   { titre: 'Record', pages: ['/outils/records-temperature/', '/outils/nuits-tropicales/'].map(lien) },
 ];
 
