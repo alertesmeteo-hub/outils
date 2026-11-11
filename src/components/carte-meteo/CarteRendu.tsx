@@ -511,6 +511,7 @@ export default function CarteRendu({
   const nomMer = etiquetteMer && !styleFond && !theme;
   const terresEurope = useTerres(styleFond != null || nomMer);
   const merVisible = useMemo(() => (styleFond || nomMer ? positionMer(terresEurope, vue, largeur, HAUTEUR_CARTE) : null), [styleFond, nomMer, terresEurope, vue, largeur]);
+  const atlantiqueVisible = useMemo(() => (etiquetteMer && !theme ? positionMer(terresEurope, vue, largeur, HAUTEUR_CARTE, 'atlantique') : null), [etiquetteMer, theme, terresEurope, vue, largeur]);
   const defStyle = styleFond ? STYLES_FOND[styleFond] : null;
   // Style de fond : territoire plein (contour du style), voisins en simple trait ; sinon les traits habituels.
   const traitSelectionStyle = defStyle ? { ...TRAIT_SELECTION, fill: defStyle.territoire, fillOpacity: 1, stroke: defStyle.contour, strokeOpacity: 1, strokeWidth: 1.6 } : null;
@@ -677,6 +678,7 @@ export default function CarteRendu({
         {habillage === 'catalan' && logoEnBas && !styleFond && !theme && <BandesCoin largeur={largeur} hauteur={HAUTEUR_CARTE} />}
 
         {nomMer && <DecorMer largeur={largeur} hauteur={HAUTEUR_CARTE} mer={merVisible} />}
+        {atlantiqueVisible && <DecorMer largeur={largeur} hauteur={HAUTEUR_CARTE} mer={atlantiqueVisible} atlantique />}
 
         {logoUrl && (
           <img

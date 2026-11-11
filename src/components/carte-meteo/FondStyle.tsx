@@ -199,7 +199,7 @@ function surTerre(anneaux: Anneau[], x: number, y: number): boolean {
 }
 
 /** Point de la mer Méditerranée (pixels écran) le mieux centré dans la partie visible de la mer ; nul s'il n'y en a pas assez. */
-export function positionMer(terres: Terres, vue: Vue, largeur: number, hauteur: number): { x: number; y: number } | null {
+export function positionMer(terres: Terres, vue: Vue, largeur: number, hauteur: number, bassin: 'mediterranee' | 'atlantique' = 'mediterranee'): { x: number; y: number } | null {
   if (!terres.anneaux.length) return null;
   const pas = 20;
   const colonnes = Math.floor(largeur / pas);
@@ -216,7 +216,9 @@ export function positionMer(terres: Terres, vue: Vue, largeur: number, hauteur: 
       const my = (j * pas + pas / 2 - vue.ty) / vue.echelle;
       const { lon, lat } = enLonLat(mx, my);
       // Méditerranée : ni golfe de Gascogne ni mer Noire.
-      if (lon < -5.3 || lon > 36 || lat < 30 || lat > 46 || (lat > 43.3 && lon < 3) || (lon > 27.5 && lat > 40.5)) continue;
+      if (bassin === 'atlantique') {
+        if (lon < -30 || lon > -1 || lat < 43.3 || lat > 48.5) continue;
+      } else if (lon < -5.3 || lon > 36 || lat < 30 || lat > 46 || (lat > 43.3 && lon < 3) || (lon > 27.5 && lat > 40.5)) continue;
       mer[j * colonnes + i] = !surTerre(proches, mx, my);
     }
   }
@@ -305,12 +307,12 @@ export function BandesCoin({ largeur, hauteur }: { largeur: number; hauteur: num
 }
 
 /** « Mer Méditerranée » et deux vagues, centrés sur le point donné (pixels écran). Avec `contour`, un liseré sombre aide la lecture sur photos. */
-function EtiquetteMer({ mer, couleur, contour = false }: { mer: { x: number; y: number }; couleur: string; contour?: boolean }) {
+function EtiquetteMer({ mer, couleur, contour = false, atlantique = false }: { mer: { x: number; y: number }; couleur: string; contour?: boolean; atlantique?: boolean }) {
   const halo = contour ? { stroke: 'rgba(5,25,60,0.85)', strokeWidth: 4, paintOrder: 'stroke' as const, strokeLinejoin: 'round' as const } : {};
   return (
-    <g fill={couleur} fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight={700} fontSize={22} textAnchor="middle">
-      <text x={mer.x} y={mer.y - 12} {...halo}>Mer</text>
-      <text x={mer.x} y={mer.y + 12} {...halo}>Méditerranée</text>
+    <g fill={couleur} fontFamily="Arial, Helvetica, sans-serif" fontStyle="italic" fontWeight={700} fontSize={16} textAnchor="middle">
+      <text x={mer.x} y={mer.y - 12} {...halo}>{atlantique ? 'Océan' : 'Mer'}</text>
+      <text x={mer.x} y={mer.y + 12} {...halo}>{atlantique ? 'Atlantique' : 'Méditerranée'}</text>
       {contour && <path d={`M ${mer.x - 34} ${mer.y + 30} q 11 -9 22 0 t 22 0 t 22 0 M ${mer.x - 34} ${mer.y + 40} q 11 -9 22 0 t 22 0 t 22 0`} fill="none" stroke="rgba(5,25,60,0.85)" strokeWidth={5.4} strokeLinecap="round" />}
       <path d={`M ${mer.x - 34} ${mer.y + 30} q 11 -9 22 0 t 22 0 t 22 0 M ${mer.x - 34} ${mer.y + 40} q 11 -9 22 0 t 22 0 t 22 0`} fill="none" stroke={couleur} strokeWidth={2.4} strokeLinecap="round" />
     </g>
@@ -318,11 +320,11 @@ function EtiquetteMer({ mer, couleur, contour = false }: { mer: { x: number; y: 
 }
 
 /** Nom de la mer seul, sur une carte à fond photo (sans style de fond). */
-export function DecorMer({ largeur, hauteur, mer }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null }) {
+export function DecorMer({ largeur, hauteur, mer, atlantique = false }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null; atlantique?: boolean }) {
   if (!mer) return null;
   return (
     <svg className="cmap-decor" viewBox={`0 0 ${largeur} ${hauteur}`} width={largeur} height={hauteur} aria-hidden>
-      <EtiquetteMer mer={mer} couleur="#ffffff" contour />
+      <EtiquetteMer mer={mer} couleur="#ffffff" contour atlantique={atlantique} />
     </svg>
   );
 }

@@ -1133,7 +1133,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     // Le logo, la date et les moyennes sont des obstacles (positions de la mise en page, voir globals.css).
     const em = 22 * echelleMarqueurs;
     const logoDroite = 29 + Math.max(205, hauteurLogo);
-    const moyennesGauche = 29;
+    const moyennesGauche = largeurCarte - 29 - LARGEUR_MOYENNES;
     const obstacles: Rect[] = [
       enFrance ? { x: largeurCarte - 28 - largeurLogo, y: 21, w: largeurLogo, h: hauteurLogo + 1 } : { x: 29, y: HAUTEUR_CARTE - 21 - hauteurLogo - 1, w: logoDroite - 29, h: hauteurLogo + 1 },
       enFrance ? { x: xTitreFrance, y: 6, w: 410, h: 67 } : { x: largeurCarte - 28 - 460, y: 6, w: 460, h: 67 },
@@ -1399,8 +1399,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const sel = points.filter((p) => filtre(coordsDe(p).lat));
       const principales = sel.map((p) => valeurPrincipale(p.code)).filter((v): v is number => v != null);
       const minis = sel.map((p) => nombre(editions[p.code]?.mini ?? '')).filter((v): v is number => v != null);
-      const auDemi = (v: number | null) => (v == null ? null : Math.round(v * 2) / 2);
-      return { valeur: auDemi(moyenne(principales)), mini: auDemi(moyenne(minis)) };
+      const entier = (v: number | null) => (v == null ? null : Math.round(v));
+      return { valeur: entier(moyenne(principales)), mini: entier(moyenne(minis)) };
     };
     return {
       nord: groupe((lat) => lat >= LATITUDE_SEUIL_NORD_SUD),
@@ -1413,7 +1413,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const cleMoyenne = (nom: string) => `${periode}|${zone}|${nom}`;
   const valeurMoyenne = (nom: 'nord' | 'sud' | 'zone') => {
     const manuelle = moyennesManuelles[cleMoyenne(nom)];
-    if (manuelle != null) return manuelle;
+    if (manuelle != null) {
+      const n = nombre(manuelle);
+      return n == null ? '—' : String(Math.round(n));
+    }
     const v = moyennesCalculees[nom].valeur;
     return v == null ? '—' : String(v);
   };
@@ -1660,6 +1663,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       echelleVent={tailleVent / 100}
       couleurTitre={zone === 'dep:66' && !theme ? COULEUR_TITRE_PO : undefined}
       moyennes={moyennes}
+      moyennesGauche={enFrance ? largeurCarte - 29 - LARGEUR_MOYENNES : undefined}
       onModifierMoyenne={(id, v) => saisieAcceptee(v, 'temperature') && setMoyennesManuelles((m) => ({ ...m, [cleMoyenne(id)]: v }))}
       paletteOuvertePour={paletteOuvertePour}
       pictosSelectionnes={enExport ? undefined : pictosSelectionnes}
