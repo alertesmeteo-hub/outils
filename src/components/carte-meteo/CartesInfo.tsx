@@ -1003,131 +1003,6 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
             </select>
           </label>
         </div>
-        {uneCarte && (
-          <details open className="rounded-xl border border-primary/30 bg-surface p-4">
-            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-primary">Affichage de la carte</summary>
-            <div className="mt-3 grid grid-cols-1 items-end gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="text-sm font-medium">
-                <span className={legende}>Thème de la carte</span>
-                <select value={affichage.theme ?? ''} onChange={(e) => regler({ theme: (e.target.value || null) as AffichageCarte['theme'] })} className={`${selectBarre} w-full`}>
-                  <option value="">Aucun (carte habituelle)</option>
-                  {THEMES_CARTE.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.libelle}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-medium">
-                <span className={legende}>Style de fond</span>
-                <select value={affichage.styleFond ?? ''} onChange={(e) => regler({ styleFond: estStyleFond(e.target.value) ? e.target.value : null })} className={`${selectBarre} w-full`}>
-                  <option value="">Aucun (fond de carte ci-dessous)</option>
-                  {ORDRE_STYLES_FOND.map((s) => (
-                    <option key={s} value={s}>
-                      {STYLES_FOND[s].libelle}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-medium">
-                <span className={legende}>Fond de carte</span>
-                <select value={affichage.fond ?? ''} onChange={(e) => regler({ fond: (e.target.value || null) as Couche | null })} className={`${selectBarre} w-full`}>
-                  <option value="">Automatique (relief ou photos IGN)</option>
-                  {(Object.keys(LIBELLES_COUCHES) as Couche[]).map((c) => (
-                    <option key={c} value={c}>
-                      {LIBELLES_COUCHES[c]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-medium">
-                <span className={legende}>Contours</span>
-                <select value={affichage.contours} onChange={(e) => regler({ contours: e.target.value as AffichageCarte['contours'] })} className={`${selectBarre} w-full`}>
-                  <option value="defaut">Habituels</option>
-                  <option value="aucun">Aucun</option>
-                  <option value="regions">Régions</option>
-                </select>
-              </label>
-              <label className="text-sm font-medium">
-                <span className={legende}>Fleuves</span>
-                <select value={affichage.fleuves ?? ''} onChange={(e) => regler({ fleuves: (e.target.value || null) as AffichageCarte['fleuves'] })} className={`${selectBarre} w-full`}>
-                  <option value="">Automatique selon la zone</option>
-                  <option value="aucun">Aucun</option>
-                  <option value="faible">Faible (4 grands fleuves)</option>
-                  <option value="moyen">Moyen (fleuves et rivières)</option>
-                  <option value="dense">Dense</option>
-                </select>
-              </label>
-              <label className="text-sm font-medium">
-                <span className={legende}>Pluie : valeurs à partir de</span>
-                <select value={affichage.seuils?.mm ?? affichage.seuilPluie ?? 0} onChange={(e) => regler({ seuilPluie: Number(e.target.value), seuils: { ...affichage.seuils, mm: Number(e.target.value) } })} className={`${selectBarre} w-full`}>
-                  <option value={0}>Toutes les valeurs</option>
-                  {[1, 2, 5, 10, 20, 30, 50, 100].map((mm) => (
-                    <option key={mm} value={mm}>
-                      {mm} mm et plus
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {(
-                [
-                  ['km/h', 'Vent et rafales : valeurs à partir de', [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140], ' km/h et plus'],
-                  ['cm', 'Neige : valeurs à partir de', [1, 2, 5, 10, 20, 30, 50], ' cm et plus'],
-                  ['niveau', 'Risques (niveaux) : à partir de', [1, 2, 3, 4], ''],
-                ] as const
-              ).map(([cle, titre, valeurs, suffixe]) => (
-                <label key={cle} className="text-sm font-medium">
-                  <span className={legende}>{titre}</span>
-                  <select value={affichage.seuils?.[cle] ?? 0} onChange={(e) => regler({ seuils: { ...affichage.seuils, [cle]: Number(e.target.value) } })} className={`${selectBarre} w-full`}>
-                    <option value={0}>Toutes les valeurs</option>
-                    {valeurs.map((v) => (
-                      <option key={v} value={v}>
-                        {cle === 'niveau' ? ['', 'Faible et plus', 'Modéré et plus', 'Fort et plus', 'Sévère'][v] : `${v}${suffixe}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={!!affichage.reperes} onChange={(e) => regler({ reperes: e.target.checked })} />
-                Flèches et noms des villes
-              </label>
-              <label className="text-sm font-medium">
-                <span className={legende}>Police des valeurs</span>
-                <select value={affichage.policeValeurs ?? 'condensee'} onChange={(e) => regler({ policeValeurs: e.target.value as PoliceValeurs })} className={`${selectBarre} w-full`}>
-                  <option value="impact">Impact (très gras)</option>
-                  <option value="condensee">Condensée grasse (par défaut)</option>
-                  <option value="normale">Normale</option>
-                </select>
-              </label>
-              <label className="text-sm font-medium">
-                <span className={legende}>Taille des noms de villes</span>
-                <select value={affichage.tailleNoms ?? 1.2} onChange={(e) => regler({ tailleNoms: Number(e.target.value) })} className={`${selectBarre} w-full`}>
-                  {[0.8, 1, 1.2, 1.5, 1.8, 2.2].map((n) => (
-                    <option key={n} value={n}>
-                      {n === 1 ? 'Petits' : n === 1.2 ? 'Moyens (par défaut)' : n === 0.8 ? 'Très petits' : n === 1.5 ? 'Grands' : n === 1.8 ? 'Très grands' : 'Énormes'}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={affichage.relief} onChange={(e) => regler({ relief: e.target.checked })} />
-                Reliefs
-              </label>
-              <label className={`flex items-center gap-2 text-sm ${affichage.relief ? '' : 'opacity-50'}`}>
-                Opacité du relief
-                <input type="range" min={0} max={90} step={5} value={affichage.reliefPourcent} disabled={!affichage.relief} onChange={(e) => regler({ reliefPourcent: Number(e.target.value) })} aria-label="Opacité du relief" />
-                <span className="w-9 tabular-nums text-muted">{affichage.reliefPourcent} %</span>
-              </label>
-              <label className={`flex items-center gap-2 text-sm ${affichage.fleuves === 'aucun' ? 'opacity-50' : ''}`}>
-                Opacité des fleuves
-                <input type="range" min={10} max={100} step={5} value={affichage.opaciteFleuves} disabled={affichage.fleuves === 'aucun'} onChange={(e) => regler({ opaciteFleuves: Number(e.target.value) })} aria-label="Opacité des fleuves" />
-                <span className="w-10 tabular-nums text-muted">{affichage.opaciteFleuves} %</span>
-              </label>
-            </div>
-            <p className="mt-3 text-xs text-muted">Pictos, rafales, textes et icônes à poser : bouton « Carte avec pictos » en haut de la page.</p>
-          </details>
-        )}
         {!uneCarte && (
         <nav aria-label="Aller à une carte" className="flex flex-col gap-1.5 border-t border-border pt-3">
           {avecSynthese && (
@@ -1362,6 +1237,132 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
           ))}
         </>
       )}
+      {/* Réglages de l'affichage : sous la carte, pour les régler en la regardant. */}
+        {uneCarte && (
+          <details open className="mt-4 rounded-xl border border-primary/30 bg-surface p-4">
+            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-primary">Affichage de la carte</summary>
+            <div className="mt-3 grid grid-cols-1 items-end gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-sm font-medium">
+                <span className={legende}>Thème de la carte</span>
+                <select value={affichage.theme ?? ''} onChange={(e) => regler({ theme: (e.target.value || null) as AffichageCarte['theme'] })} className={`${selectBarre} w-full`}>
+                  <option value="">Aucun (carte habituelle)</option>
+                  {THEMES_CARTE.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.libelle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Style de fond</span>
+                <select value={affichage.styleFond ?? ''} onChange={(e) => regler({ styleFond: estStyleFond(e.target.value) ? e.target.value : null })} className={`${selectBarre} w-full`}>
+                  <option value="">Aucun (fond de carte ci-dessous)</option>
+                  {ORDRE_STYLES_FOND.map((s) => (
+                    <option key={s} value={s}>
+                      {STYLES_FOND[s].libelle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Fond de carte</span>
+                <select value={affichage.fond ?? ''} onChange={(e) => regler({ fond: (e.target.value || null) as Couche | null })} className={`${selectBarre} w-full`}>
+                  <option value="">Automatique (relief ou photos IGN)</option>
+                  {(Object.keys(LIBELLES_COUCHES) as Couche[]).map((c) => (
+                    <option key={c} value={c}>
+                      {LIBELLES_COUCHES[c]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Contours</span>
+                <select value={affichage.contours} onChange={(e) => regler({ contours: e.target.value as AffichageCarte['contours'] })} className={`${selectBarre} w-full`}>
+                  <option value="defaut">Habituels</option>
+                  <option value="aucun">Aucun</option>
+                  <option value="regions">Régions</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Fleuves</span>
+                <select value={affichage.fleuves ?? ''} onChange={(e) => regler({ fleuves: (e.target.value || null) as AffichageCarte['fleuves'] })} className={`${selectBarre} w-full`}>
+                  <option value="">Automatique selon la zone</option>
+                  <option value="aucun">Aucun</option>
+                  <option value="faible">Faible (4 grands fleuves)</option>
+                  <option value="moyen">Moyen (fleuves et rivières)</option>
+                  <option value="dense">Dense</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Pluie : valeurs à partir de</span>
+                <select value={affichage.seuils?.mm ?? affichage.seuilPluie ?? 0} onChange={(e) => regler({ seuilPluie: Number(e.target.value), seuils: { ...affichage.seuils, mm: Number(e.target.value) } })} className={`${selectBarre} w-full`}>
+                  <option value={0}>Toutes les valeurs</option>
+                  {[1, 2, 5, 10, 20, 30, 50, 100].map((mm) => (
+                    <option key={mm} value={mm}>
+                      {mm} mm et plus
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {(
+                [
+                  ['km/h', 'Vent et rafales : valeurs à partir de', [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140], ' km/h et plus'],
+                  ['cm', 'Neige : valeurs à partir de', [1, 2, 5, 10, 20, 30, 50], ' cm et plus'],
+                  ['niveau', 'Risques (niveaux) : à partir de', [1, 2, 3, 4], ''],
+                ] as const
+              ).map(([cle, titre, valeurs, suffixe]) => (
+                <label key={cle} className="text-sm font-medium">
+                  <span className={legende}>{titre}</span>
+                  <select value={affichage.seuils?.[cle] ?? 0} onChange={(e) => regler({ seuils: { ...affichage.seuils, [cle]: Number(e.target.value) } })} className={`${selectBarre} w-full`}>
+                    <option value={0}>Toutes les valeurs</option>
+                    {valeurs.map((v) => (
+                      <option key={v} value={v}>
+                        {cle === 'niveau' ? ['', 'Faible et plus', 'Modéré et plus', 'Fort et plus', 'Sévère'][v] : `${v}${suffixe}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!affichage.reperes} onChange={(e) => regler({ reperes: e.target.checked })} />
+                Flèches et noms des villes
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Police des valeurs</span>
+                <select value={affichage.policeValeurs ?? 'condensee'} onChange={(e) => regler({ policeValeurs: e.target.value as PoliceValeurs })} className={`${selectBarre} w-full`}>
+                  <option value="impact">Impact (très gras)</option>
+                  <option value="condensee">Condensée grasse (par défaut)</option>
+                  <option value="normale">Normale</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Taille des noms de villes</span>
+                <select value={affichage.tailleNoms ?? 1.2} onChange={(e) => regler({ tailleNoms: Number(e.target.value) })} className={`${selectBarre} w-full`}>
+                  {[0.8, 1, 1.2, 1.5, 1.8, 2.2].map((n) => (
+                    <option key={n} value={n}>
+                      {n === 1 ? 'Petits' : n === 1.2 ? 'Moyens (par défaut)' : n === 0.8 ? 'Très petits' : n === 1.5 ? 'Grands' : n === 1.8 ? 'Très grands' : 'Énormes'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={affichage.relief} onChange={(e) => regler({ relief: e.target.checked })} />
+                Reliefs
+              </label>
+              <label className={`flex items-center gap-2 text-sm ${affichage.relief ? '' : 'opacity-50'}`}>
+                Opacité du relief
+                <input type="range" min={0} max={90} step={5} value={affichage.reliefPourcent} disabled={!affichage.relief} onChange={(e) => regler({ reliefPourcent: Number(e.target.value) })} aria-label="Opacité du relief" />
+                <span className="w-9 tabular-nums text-muted">{affichage.reliefPourcent} %</span>
+              </label>
+              <label className={`flex items-center gap-2 text-sm ${affichage.fleuves === 'aucun' ? 'opacity-50' : ''}`}>
+                Opacité des fleuves
+                <input type="range" min={10} max={100} step={5} value={affichage.opaciteFleuves} disabled={affichage.fleuves === 'aucun'} onChange={(e) => regler({ opaciteFleuves: Number(e.target.value) })} aria-label="Opacité des fleuves" />
+                <span className="w-10 tabular-nums text-muted">{affichage.opaciteFleuves} %</span>
+              </label>
+            </div>
+            <p className="mt-3 text-xs text-muted">Pictos, rafales, textes et icônes à poser : bouton « Carte avec pictos » en haut de la page.</p>
+          </details>
+        )}
     </div>
     </AffichageContexte.Provider>
   );
