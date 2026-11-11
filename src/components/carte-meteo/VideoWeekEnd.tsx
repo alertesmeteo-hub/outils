@@ -331,7 +331,7 @@ interface Contexte {
   logo: HTMLImageElement | null;
   departement: string;
   /** Textes selon le mode : titre de l'intro (2 lignes), sous-titre, bandeau des villes, titre du récapitulatif. */
-  textes: { intro: [string, string]; sous: string; bandeau: string; recap: string; /** Période (« CE WEEK-END ? ») : reprise après l'accroche quand l'intro parle de montagne ou de côte. */ periode?: string; /** Fin de l'accroche (« CHEZ NOUS ? »). */ accroche?: string };
+  textes: { intro: [string, string]; sous: string; bandeau: string; recap: string; /** Période (« CE WEEK-END ? ») : reprise après l'accroche quand l'intro parle de montagne ou de côte. */ periode?: string; /** Fin de l'accroche (« CHEZ NOUS ? »). */ accroche?: string; /** Icônes de l'accroche : par défaut le temps (soleil, nuage, pluie, vent) ; flocons pour la vidéo montagne. */ icones?: 'flocons' };
   /** Format « TikTok Hook » : l'écran d'accroche précède l'intro. */
   hook?: boolean;
   /** Code du département : le fond de carte du début zoome dessus. */
@@ -499,9 +499,35 @@ function nuageCatalan(ctx: CanvasRenderingContext2D, x: number, y: number, k: nu
 }
 
 /** Icône n° `i` (0 soleil, 1 éclaircies, 2 pluie, 3 rafales) à l'instant `t`, dans un repère de 100 × 100 centré en (0, 0). */
-function iconeCatalane(ctx: CanvasRenderingContext2D, i: number, t: number) {
+function floconCatalan(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, t: number, rot: number) {
+  const bras = (c: number, s: number) => (u: number, v: number): [number, number] => [x + u * c - v * s, y + u * s + v * c];
+  traitCerne(ctx, () => {
+    ctx.beginPath();
+    for (let k = 0; k < 6; k++) {
+      const a = (k * Math.PI) / 3 + rot + t * 0.35;
+      const P = bras(Math.cos(a), Math.sin(a));
+      ctx.moveTo(...P(0, 0));
+      ctx.lineTo(...P(r, 0));
+      for (const f of [0.42, 0.7]) {
+        ctx.moveTo(...P(r * f, 0));
+        ctx.lineTo(...P(r * (f + 0.22), -r * 0.24));
+        ctx.moveTo(...P(r * f, 0));
+        ctx.lineTo(...P(r * (f + 0.22), r * 0.24));
+      }
+    }
+  }, JAUNE_CATALAN, ROUGE_CATALAN, 5);
+  forme(ctx, [{ c: [x, y, r * 0.17] }], ROUGE_CATALAN, JAUNE_CATALAN, 3);
+}
+
+function iconeCatalane(ctx: CanvasRenderingContext2D, i: number, t: number, flocons = false) {
   ctx.save();
-  if (i === 0) {
+  if (flocons) {
+    // Vidéo montagne : un gros flocon qui tourne, entouré de deux petits ; le sens de rotation alterne d'une icône à l'autre.
+    const sens = i % 2 === 0 ? 1 : -1;
+    floconCatalan(ctx, 0, 0, 40, sens * t, i);
+    floconCatalan(ctx, -34 + Math.sin(t * 1.7 + i) * 3, -34, 13, -sens * t * 1.6, i + 1);
+    floconCatalan(ctx, 36, 30 + Math.cos(t * 1.4 + i) * 3, 11, sens * t * 1.9, i + 2);
+  } else if (i === 0) {
     soleilCatalan(ctx, 0, 0, 24, t);
   } else if (i === 1) {
     soleilCatalan(ctx, -15, -15, 17, t);
@@ -538,7 +564,7 @@ function iconeCatalane(ctx: CanvasRenderingContext2D, i: number, t: number) {
 }
 
 /** Écran d'accroche : « QUEL TEMPS » en jaune, « CHEZ NOUS ? » en rouge, qui claque (zoom arrière) à l'ouverture. */
-function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null, accroche = 'CHEZ NOUS ?') {
+function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null, accroche = 'CHEZ NOUS ?', flocons = false) {
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
   const bas = H - 250 * u;
@@ -575,7 +601,7 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
     ctx.shadowColor = 'rgba(0,20,60,0.45)';
     ctx.shadowBlur = 24 * u;
     ctx.shadowOffsetY = 8 * u;
-    iconeCatalane(ctx, i, t + i * 0.7);
+    iconeCatalane(ctx, i, t + i * 0.7, flocons);
     ctx.restore();
   }
   pied(ctx, logo);
@@ -587,7 +613,7 @@ function textesVideo(mode: Mode, jours: string[], ecart: number, special: Specia
   if (special === 'auto') return base;
   const lieu = special === 'montagne' ? 'EN MONTAGNE ?' : 'SUR LA CÔTE ?';
   const etiquette = special === 'montagne' ? 'MONTAGNE' : 'CÔTE';
-  return { intro: ['QUEL TEMPS', lieu], sous: base.sous, bandeau: `${etiquette} · ${base.bandeau}`, recap: `${base.recap} · ${etiquette}`, periode: base.intro[1], accroche: lieu };
+  return { intro: ['QUEL TEMPS', lieu], sous: base.sous, bandeau: `${etiquette} · ${base.bandeau}`, recap: `${base.recap} · ${etiquette}`, periode: base.intro[1], accroche: lieu, ...(special === 'montagne' ? { icones: 'flocons' as const } : {}) };
 }
 
 function textesDeBase(mode: Mode, jours: string[], ecart: number): Contexte['textes'] {
@@ -706,7 +732,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   else fond(ctx);
   if (c.hook) {
     if (t < DUREE_HOOK) {
-      dessinerHook(ctx, t, logo, textes.accroche);
+      dessinerHook(ctx, t, logo, textes.accroche, textes.icones === 'flocons');
       return;
     }
     t -= DUREE_HOOK;

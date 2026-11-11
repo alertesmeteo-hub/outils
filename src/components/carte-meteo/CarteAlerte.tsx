@@ -10,6 +10,9 @@ import { CODES_DEPARTEMENTS } from '@/lib/carte-meteo/previsions-modeles';
  * Météo-France jaune, orange ou rouge.
  */
 
+/** Nom en bas des cartes par défaut (modifiable dans le formulaire). */
+const NOM_PAGE = 'www.alertes-meteo.com';
+
 const POLICE = "Roboto, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
 
 const FORMATS = [
@@ -310,7 +313,7 @@ export default function CarteAlerte() {
     modele: 'annonce',
     fond: 'orange',
     departement: DEPARTEMENTS_FR['66'] ?? 'Pyrénées-Orientales',
-    nomPage: 'Météo Pays Catalan',
+    nomPage: NOM_PAGE,
     drapeau: true,
     recordVille: 'Perpignan',
     recordLigne: 'Record Mensuel de 1936 battu',
@@ -333,7 +336,7 @@ export default function CarteAlerte() {
   const changerZone = (code: string) => {
     setCodeDep(code);
     const nom = code === 'FR' ? 'France' : DEPARTEMENTS_FR[code] ?? code;
-    regler({ departement: nom, nomPage: code === '66' ? 'Météo Pays Catalan' : 'AlertesMétéo.com', drapeau: code === '66' });
+    regler({ departement: nom, nomPage: NOM_PAGE, drapeau: code === '66' });
   };
   const changerNiveau = (niveau: Niveau) => regler({ niveau, fond: niveau === 'jaune' ? 'jaune' : niveau === 'rouge' ? 'rouge' : 'orange' });
 
