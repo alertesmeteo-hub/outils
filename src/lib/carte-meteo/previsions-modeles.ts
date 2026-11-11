@@ -13,9 +13,11 @@ import { temperaturePlausible, ventPlausible } from './limites';
  *   - arpege025 : ARPEGE global 0,25° de Météo-France, ~102 h ;
  *   - icon : ICON global 13 km du DWD, pas horaire puis 3 h, 7 jours ;
  *   - ukmo : UKMO global 10 km du Met Office, 7 jours ;
- *   - aifs : AIFS (ECMWF, intelligence artificielle), pas de 6 h, 15 jours (sans rafales).
+ *   - aifs : AIFS (ECMWF, intelligence artificielle), pas de 6 h, 15 jours (sans rafales) ;
+ *   - iconeu : ICON-EU 7 km du DWD, pas horaire, 5 jours (sans direction du vent ni neige) ;
+ *   - wrf : WRF-ARW 12 km de MeteoGalicia, pas horaire, ~4 jours, Pyrénées-Orientales seulement.
  */
-export type ModeleMeteo = 'moyenne' | 'arome' | 'aromeifs' | 'harmonie2km' | 'harmonie' | 'arpege' | 'arpege025' | 'icon' | 'ukmo' | 'cep' | 'aifs' | 'gfs';
+export type ModeleMeteo = 'moyenne' | 'arome' | 'aromeifs' | 'harmonie2km' | 'harmonie' | 'arpege' | 'arpege025' | 'icon' | 'ukmo' | 'iconeu' | 'wrf' | 'cep' | 'aifs' | 'gfs';
 /** Modèles qui ont leurs propres fichiers de prévision (tous sauf la moyenne). */
 export type ModeleSource = Exclude<ModeleMeteo, 'moyenne'>;
 /** Modèles moyennés par « Moyenne des modèles » (Harmonie 2 km seulement là où il est publié). */
@@ -37,6 +39,9 @@ export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string; d
   { id: 'icon', libelle: 'ICON global', fournisseur: 'DWD' },
   { id: 'ukmo', libelle: 'UKMO', fournisseur: 'Met Office' },
   { id: 'aifs', libelle: 'AIFS (IA)', fournisseur: 'ECMWF' },
+  { id: 'iconeu', libelle: 'ICON-EU', fournisseur: 'DWD' },
+  // WRF 12 km de MeteoGalicia, publié pour les Pyrénées-Orientales seulement (dépôt WRF-MeteoGalicia-12-km).
+  { id: 'wrf', libelle: 'WRF MeteoGalicia', fournisseur: 'MeteoGalicia', departements: ['66'] },
 ];
 
 export const estModele = (v: string | null): v is ModeleMeteo => MODELES.some((m) => m.id === v);
@@ -56,7 +61,7 @@ export const modeleParDefautJ0 = (dep: string | null): ModeleMeteo => (modeleDis
  * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. Les modèles à 48-60 h ne couvrent pas
  * l'après-midi de J+2 ; le CEP et GFS vont jusqu'à 15 jours (J+15 n'a des données que selon l'heure du passage).
  */
-export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, aromeifs: 1, harmonie2km: 1, harmonie: 1, arpege: 3, arpege025: 3, icon: 6, ukmo: 6, cep: 15, aifs: 14, gfs: 15 };
+export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, aromeifs: 1, harmonie2km: 1, harmonie: 1, arpege: 3, arpege025: 3, icon: 6, ukmo: 6, iconeu: 4, wrf: 3, cep: 15, aifs: 14, gfs: 15 };
 
 /** Un point par département métropolitain (ou par ville), avec les valeurs de l'après-midi (12 h-18 h) et de la journée. */
 export interface PointCarte {

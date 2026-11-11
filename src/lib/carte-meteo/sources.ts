@@ -30,6 +30,8 @@ const BASES: Record<ModeleSource, string> = {
   icon: 'https://raw.githubusercontent.com/alertesmeteo-hub/ICON-GLOBAL-13-km/data',
   ukmo: 'https://raw.githubusercontent.com/alertesmeteo-hub/UKMO-GLOBAL-10-km/data',
   aifs: 'https://raw.githubusercontent.com/alertesmeteo-hub/aifs/data',
+  iconeu: 'https://raw.githubusercontent.com/alertesmeteo-hub/ICON-EU-7-km/data',
+  wrf: 'https://raw.githubusercontent.com/alertesmeteo-hub/WRF-MeteoGalicia-12-km/data',
 };
 const LIBELLES: Record<ModeleSource, string> = {
   arome: 'AROME 0,01° (Météo-France)',
@@ -43,6 +45,8 @@ const LIBELLES: Record<ModeleSource, string> = {
   icon: 'ICON global 13 km (DWD)',
   ukmo: 'UKMO global 10 km (Met Office)',
   aifs: 'AIFS (ECMWF, IA)',
+  iconeu: 'ICON-EU 7 km (DWD)',
+  wrf: 'WRF-ARW 12 km (MeteoGalicia)',
 };
 
 /** Villes retenues par département (les plus peuplées d'abord, puis celles qui comblent les zones vides). */
@@ -107,6 +111,43 @@ interface FichierDepartement {
   forecast: [string, (number | null)[][]][];
 }
 
+/**
+ * Fichier départemental d'ICON-EU : un autre format que les modèles de Météo-France (instants en secondes, valeurs rangées par commune,
+ * cinq colonnes seulement, ni population ni altitude).
+ */
+interface FichierIconEu {
+  time: number[];
+  columns: string[];
+  communes: Record<string, { name: string; latitude: number; longitude: number; values: (number | null)[][] }>;
+}
+
+/** Population et altitude des communes d'un département (celles du fichier AROME, mêmes codes INSEE), gardées en mémoire. */
+const referencesCommunes = new Map<string, Promise<Map<string, { population: number; altitude: number }>>>();
+function referenceCommunes(dep: string): Promise<Map<string, { population: number; altitude: number }>> {
+  const connue = referencesCommunes.get(dep);
+  if (connue) return connue;
+  const lecture = (async () => {
+    const f = (await (await recuperer(`${BASES.arome}/departements/${dep}.json`, 60_000)).json()) as FichierDepartement;
+    return new Map(f.communes.map(([code, , , population, , , pointId]) => [code, { population, altitude: f.points?.[pointId]?.[3] ?? 0 }]));
+  })();
+  referencesCommunes.set(dep, lecture);
+  lecture.catch(() => referencesCommunes.delete(dep));
+  return lecture;
+}
+
+/** Fichier ICON-EU ramené au format commun (un point de grille par commune). */
+async function depuisIconEu(f: FichierIconEu, dep: string): Promise<FichierDepartement> {
+  const reference = await referenceCommunes(dep);
+  const codes = Object.keys(f.communes);
+  const noms: Record<string, string> = { temperature_2m: 'temperature_c', precipitation: 'precipitation_mm', wind_speed_10m: 'wind_speed_kmh', wind_gusts_10m: 'wind_gust_kmh', cloud_cover: 'cloud_cover_pct' };
+  return {
+    columns: { values: f.columns.map((c) => noms[c] ?? c) },
+    communes: codes.map((code, i) => [code, f.communes[code].name, [], reference.get(code)?.population ?? 0, f.communes[code].latitude, f.communes[code].longitude, i]),
+    points: codes.map((code, i) => [i, f.communes[code].latitude, f.communes[code].longitude, reference.get(code)?.altitude ?? 0]),
+    forecast: f.time.map((t, k) => [new Date(t * 1000).toISOString().replace('.000Z', 'Z'), codes.map((code) => f.communes[code].values[k] ?? [])]),
+  };
+}
+
 const memoire = new Map<string, Extrait>();
 /** Lectures en cours : plusieurs requêtes simultanées pour le même département n'ouvrent qu'un seul téléchargement. */
 const enCours = new Map<string, Promise<Extrait>>();
@@ -149,10 +190,12 @@ export async function passageCourant(modele: ModeleSource): Promise<string | nul
   if (connu && Date.now() - connu.t < VALIDITE_INDEX_MS) return connu.runTime;
   try {
     const reponse = await recuperer(`${BASES[modele]}/index.json`, 15_000);
-    const index = (await reponse.json()) as { model?: { run_time?: string }; generated_at?: string };
+    const index = (await reponse.json()) as { model?: { run_time?: string } | string; model_run?: string; generated_at?: string };
     // Version des données = passage du modèle + date de publication : les pipelines publient d'abord un passage tronqué
     // (ex. GFS sur 5 jours) puis le complètent sous le même run_time ; sans generated_at, le cache gardait la version tronquée.
-    const runTime = [index.model?.run_time, index.generated_at].filter(Boolean).join('|') || null;
+    // ICON-EU publie son passage dans `model_run` (et `model` est un simple nom).
+    const passage = typeof index.model === 'object' ? index.model?.run_time : index.model_run;
+    const runTime = [passage, index.generated_at].filter(Boolean).join('|') || null;
     if (runTime) {
       indexCourant.set(modele, { t: Date.now(), runTime });
       return runTime;
@@ -295,7 +338,8 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     temperature_c: indice(cols, 'temperature_c'),
     precipitation_mm: indice(cols, 'precipitation_mm'),
     cloud_cover_pct: indice(cols, 'cloud_cover_pct'),
-    wind_direction_deg: indice(cols, 'wind_direction_deg'),
+    // Absente d'ICON-EU : pas de direction du vent.
+    wind_direction_deg: cols.indexOf('wind_direction_deg'),
     wind_speed_kmh: indice(cols, 'wind_speed_kmh'),
     // Absente d'AIFS : pas de rafales (valeurs nulles).
     wind_gust_kmh: cols.indexOf('wind_gust_kmh'),
@@ -306,7 +350,8 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     cloud_low_pct: cols.indexOf('cloud_low_pct'),
     cloud_mid_pct: cols.indexOf('cloud_mid_pct'),
     cloud_high_pct: cols.indexOf('cloud_high_pct'),
-    snowfall_mm: indice(cols, 'snowfall_mm'),
+    // Absente d'ICON-EU : pas de neige (valeurs nulles).
+    snowfall_mm: cols.indexOf('snowfall_mm'),
   };
   const communes = fichier.communes
     .filter((x) => typeof x[6] === 'number')
@@ -443,7 +488,9 @@ async function lireExtraitDepartement(modele: ModeleSource, dep: string): Promis
   }
   try {
     const reponse = await recuperer(`${BASES[modele]}/departements/${dep}.json`, 60_000);
-    const extrait = extraire(dep, (await reponse.json()) as FichierDepartement, runTime ?? new Date().toISOString());
+    const brut = (await reponse.json()) as FichierDepartement | FichierIconEu;
+    const fichier = 'time' in brut ? await depuisIconEu(brut, dep) : brut;
+    const extrait = extraire(dep, fichier, runTime ?? new Date().toISOString());
     memoire.set(cle, extrait);
     await ecrireDisque(cle, extrait);
     return extrait;

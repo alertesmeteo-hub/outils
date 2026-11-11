@@ -181,7 +181,9 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   }, [modele]);
   const runCarte = runModele && runModele.modele === modele ? { modele: (MODELES.find((m) => m.id === modele)?.libelle ?? modele).toUpperCase(), z: runModele.z } : undefined;
   useEffect(() => {
-    if (modele === 'harmonie2km' && !(niveau === 'departement' && departement === '66')) setModele('arome');
+    // Modèle publié pour certains départements seulement (Harmonie 2 km, WRF : Pyrénées-Orientales) : retour à AROME ailleurs.
+    const restreint = MODELES.find((m) => m.id === modele)?.departements;
+    if (restreint && !(niveau === 'departement' && restreint.includes(departement))) setModele('arome');
   }, [modele, niveau, departement]);
   const [jour, setJour] = useState(0);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
