@@ -22,6 +22,9 @@ export type ModeleMeteo = 'moyenne' | 'arome' | 'aromeifs' | 'harmonie2km' | 'ha
 export type ModeleSource = Exclude<ModeleMeteo, 'moyenne'>;
 /** Modèles moyennés par « Moyenne des modèles » (Harmonie 2 km et WRF seulement là où ils sont publiés). */
 // Les premiers (AROME, Harmonie…) servent de base : le vent et les identités de villes viennent du premier modèle disponible.
+// Carte de France : seulement les cinq modèles d'origine. Onze modèles sur les 96 départements saturent le serveur (plus de 2 minutes à froid,
+// plus de 700 Mo en mémoire) ; les départements et les régions, bien plus légers, utilisent toute la liste.
+export const MODELES_MOYENNE_FRANCE: ModeleSource[] = ['arome', 'harmonie', 'arpege', 'cep', 'gfs'];
 export const MODELES_MOYENNE: ModeleSource[] = ['arome', 'harmonie2km', 'harmonie', 'arpege', 'cep', 'gfs', 'aromeifs', 'arpege025', 'icon', 'ukmo', 'iconeu', 'wrf', 'aifs'];
 
 export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string; departements?: string[]; vueDepartement?: boolean }[] = [

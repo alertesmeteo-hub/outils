@@ -1,4 +1,4 @@
-import { aujourdhuiParis, ECHEANCE_MAX, MODELES_MOYENNE, modeleDisponible, type ModeleSource, type PointCarte } from './previsions-modeles';
+import { aujourdhuiParis, ECHEANCE_MAX, MODELES_MOYENNE, MODELES_MOYENNE_FRANCE, modeleDisponible, type ModeleSource, type PointCarte } from './previsions-modeles';
 import { chargerPrevisionsZones, chargerPrevisionsCarte, chargerPrevisionsMontagne, chargerPrevisionsVilles } from './sources';
 
 /**
@@ -11,9 +11,9 @@ import { chargerPrevisionsZones, chargerPrevisionsCarte, chargerPrevisionsMontag
 const jours = (de: string, a: string) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${de}T12:00:00Z`)) / 86_400_000);
 
 /** Modèles qui couvrent le jour (ou la période jusqu'à `fin`) dans la zone. */
-export function modelesDeLaMoyenne(dateISO: string, dep: string | null, fin?: string): ModeleSource[] {
+export function modelesDeLaMoyenne(dateISO: string, dep: string | null, fin?: string, france = false): ModeleSource[] {
   const echeance = jours(aujourdhuiParis(), fin ?? dateISO);
-  return MODELES_MOYENNE.filter((m) => modeleDisponible(m, dep) && ECHEANCE_MAX[m] >= echeance);
+  return (france ? MODELES_MOYENNE_FRANCE : MODELES_MOYENNE).filter((m) => modeleDisponible(m, dep) && ECHEANCE_MAX[m] >= echeance);
 }
 
 const arrondi = (v: number, decimales: number) => Math.round(v * 10 ** decimales) / 10 ** decimales;
@@ -86,7 +86,7 @@ async function moyenneDe<P extends PointCarte>(modeles: ModeleSource[], charger:
 
 /** France (un point par département). */
 export const moyenneCarte = (dateISO: string, fin?: string) =>
-  moyenneDe(modelesDeLaMoyenne(dateISO, null, fin), (m) => chargerPrevisionsCarte(m, dateISO, fin));
+  moyenneDe(modelesDeLaMoyenne(dateISO, null, fin, true), (m) => chargerPrevisionsCarte(m, dateISO, fin));
 
 /** Villes d'un ou de plusieurs départements (région) ; chaque point garde son département. */
 export const moyenneVilles = (dateISO: string, deps: string[], fin?: string) =>
@@ -97,8 +97,8 @@ export const moyenneVilles = (dateISO: string, deps: string[], fin?: string) =>
 
 /** Points de montagne (1 000 m et plus). */
 export const moyenneMontagne = (dateISO: string, deps: string[] | null, fin?: string) =>
-  moyenneDe(modelesDeLaMoyenne(dateISO, deps?.length === 1 ? deps[0] : null, fin), (m) => chargerPrevisionsMontagne(m, dateISO, deps, fin));
+  moyenneDe(modelesDeLaMoyenne(dateISO, deps?.length === 1 ? deps[0] : null, fin, deps === null), (m) => chargerPrevisionsMontagne(m, dateISO, deps, fin));
 
 /** Moyenne par commune (code INSEE), jamais par numéro arbitraire de zone. */
 export const moyenneZones = (date: string, fin?: string) =>
-  moyenneDe(modelesDeLaMoyenne(date, null, fin), (m) => chargerPrevisionsZones(m, date, fin));
+  moyenneDe(modelesDeLaMoyenne(date, null, fin, true), (m) => chargerPrevisionsZones(m, date, fin));
