@@ -79,6 +79,28 @@ const rubrique = (themes: ThemeInfo[], id: string, libelle: string, icone: strin
 });
 /** Filtre « Thème » : la synthèse se range sous ce titre, en tête de page. */
 const ESSENTIEL = 'L’essentiel';
+/** Petite icône devant le titre de chaque thème de cartes (puces, listes, menus et titres de section). */
+const ICONES_GROUPE: Record<string, string> = {
+  'L’essentiel': '⭐',
+  'Températures': '🌡️',
+  'Pluie': '🌧️',
+  'Vent': '💨',
+  'Risques': '⚠️',
+  'Orages et neige': '⛈️',
+  'Soleil et neige': '🌨️',
+  'Montagne': '🏔️',
+  'Ciel et brouillard': '☁️',
+  'Chaleur': '🔥',
+  'Sécheresse et incendies': '🏜️',
+  'Pluies extrêmes': '🌊',
+  'Écarts à la normale': '📊',
+  'Il y a un an': '🕰️',
+  'Bilan du mois': '📅',
+  'Températures en direct': '🌡️',
+  'Maxi et mini de la journée': '↕️',
+  'Observations en direct': '📡',
+  'Pluie en direct': '☔',
+};
 
 /** Altitude maximale des stations retenues dans les bilans (0 = toutes). */
 const ALTITUDES_MAX = [0, 500, 1000, 1500, 2000];
@@ -526,7 +548,10 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   };
   const resultatsRecherche = uneCarte ? tousThemes.filter((t) => !(t.groupe === GROUPE_RISQUES && /-(periode|24h)$/.test(t.id)) && (!filtreGroupe || t.groupe === filtreGroupe) && normaliser(`${t.titre} ${t.court} ${t.groupe}`).includes(normaliser(recherche))) : [];
   /** Nom affiché d'un groupe : le bilan du mois porte le nom du mois choisi (« Octobre 2026 »). */
-  const nomGroupe = (groupe: string) => (groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe);
+  const nomGroupe = (groupe: string) => {
+    const nom = groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe;
+    return ICONES_GROUPE[groupe] ? `${ICONES_GROUPE[groupe]} ${nom}` : nom;
+  };
   const avecSynthese = !uneCarte && mode !== 'climat' && (groupeChoisi === 'tous' || groupeChoisi === ESSENTIEL);
   const chargement =
     mode === 'prevision'
