@@ -59,6 +59,22 @@ const RUBRIQUES: Rubrique[] = [
     ],
   },
   { titre: 'TikTok', pages: ['/outils/carte-meteo/video/'].map(lien) },
+  {
+    titre: 'Liens',
+    pages: [
+      { href: 'https://vigilance-meteo.alertes-meteo.com/', libelle: '🚨 Vigilance météo' },
+      { href: 'https://air-vigilance.alertes-meteo.com/', libelle: '🌫️ Air et vigilance pollution' },
+      { href: 'https://carte-pollen.alertes-meteo.com/', libelle: '🌼 Carte des pollens' },
+      { href: 'https://carte-crues.alertes-meteo.com/', libelle: '🌊 Carte des crues' },
+      { href: 'https://secheresse.alertes-meteo.com/', libelle: '🏜️ Sécheresse' },
+      { href: 'https://feux-de-foret.alertes-meteo.com/', libelle: '🔥 Feux de forêt' },
+      { href: 'https://evenements-majeurs.alertes-meteo.com/', libelle: '⚡ Événements majeurs' },
+      { href: 'https://changement-climatique.alertes-meteo.com/', libelle: '🌍 Changement climatique' },
+      { href: 'https://outre-mers.alertes-meteo.com/', libelle: '🌴 Outre-mer' },
+      { href: 'https://alertes-meteo.systeme.io/meteodujour', libelle: '✉️ Météo du jour par mail' },
+      { href: 'https://dicton-du-jour.alertes-meteo.com/', libelle: '📜 Dicton du jour' },
+    ],
+  },
   { titre: 'Record', pages: ['/outils/records-temperature/', '/outils/nuits-tropicales/'].map(lien) },
 ];
 
@@ -116,9 +132,15 @@ export default function MenuHaut() {
                   {g.favoris && pages.length === 0 && <li className="px-3 py-2 text-muted">Aucun favori : cliquez sur ☆ dans le menu de gauche.</li>}
                   {pages.map((x) => (
                     <li key={x.href}>
-                      <Link href={x.href} className={`block rounded-md px-3 py-2 hover:bg-bg ${g.rouge ? 'text-red-600' : ''}`}>
-                        {x.libelle}
-                      </Link>
+                      {x.href.startsWith('http') ? (
+                        <a href={x.href} target="_blank" rel="noopener noreferrer" className="block rounded-md px-3 py-2 hover:bg-bg">
+                          {x.libelle} <span aria-hidden className="text-xs opacity-60">↗</span>
+                        </a>
+                      ) : (
+                        <Link href={x.href} className={`block rounded-md px-3 py-2 hover:bg-bg ${g.rouge ? 'text-red-600' : ''}`}>
+                          {x.libelle}
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>
