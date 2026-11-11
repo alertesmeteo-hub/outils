@@ -6,7 +6,7 @@ import ThemeToggle from './ThemeToggle';
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface">
       <div className="mx-auto flex h-11 max-w-[1700px] items-center gap-4 px-4">
         <Link href="/" className="flex shrink-0 items-center gap-2 text-[15px] font-extrabold">
           <span aria-hidden className="grid h-7 w-7 place-items-center rounded-md bg-[#e00020] text-sm text-white">☁</span>
