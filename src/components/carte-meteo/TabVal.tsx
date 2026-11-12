@@ -72,7 +72,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
   const [lieu, setLieu] = useState('Pyrénées-Orientales');
   const [styleId, setStyleId] = useState(STYLES_TABLEAU[0].id);
   const [logoId, setLogoId] = useState('pays-catalan-hd');
-  const [avecRang, setAvecRang] = useState(true);
+  const [avecRang, setAvecRang] = useState(false);
   const [source, setSource] = useState('');
   const [titreSaisi, setTitreSaisi] = useState<string | null>(null);
   const [sousTitreSaisi, setSousTitreSaisi] = useState<string | null>(null);
