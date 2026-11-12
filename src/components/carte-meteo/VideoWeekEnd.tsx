@@ -11,7 +11,7 @@ import { chargerPictoAnime, dessinerPictoAnime, type PictoAnime } from '@/lib/ca
 import { ICONES_ALERTES } from '@/lib/carte-meteo/icones-alertes';
 import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import { SEUIL_COTE_KM, chargerCote, distanceCoteKm, secteurDe } from '@/lib/carte-meteo/secteurs';
-import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, canEncodeVideo } from 'mediabunny';
+import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, canEncodeAudio, canEncodeVideo } from 'mediabunny';
 
 /** Tracé de la côte, tel que le rend `chargerCote`. */
 type SecteurCote = Awaited<ReturnType<typeof chargerCote>>;
@@ -443,6 +443,8 @@ interface Contexte {
   legendes?: string[];
   /** Texte parlé (mots) : sous-titres automatiques mot à mot en bas de l'écran. */
   soustitres?: string[];
+  /** Durée de la voix de synthèse (s) : les sous-titres se calent dessus (après 0,3 s de silence) ; sinon ils sont répartis sur toute la vidéo. */
+  voixDuree?: number;
   alerte?: DonneesAlerte;
   tendance12?: DonneesTendance;
 }
@@ -961,6 +963,14 @@ function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte, local?: numbe
 const ROUGE_ALERTE = '#e0191b';
 const VIOLET_ALERTE = '#33217f';
 const ROSE_LEGENDE = '#ff2d55';
+/** Silence avant le début de la voix de synthèse (s). */
+const VOIX_SILENCE = 0.3;
+const VOIX_CHOIX = [
+  ['denise', 'Denise (femme)'],
+  ['henri', 'Henri (homme)'],
+  ['vivienne', 'Vivienne (femme, expressive)'],
+  ['remy', 'Rémy (homme, expressif)'],
+] as const;
 
 /**
  * Bandeau de texte « flash météo » : rectangle plein aux coins arrondis, texte en majuscules centré sur une ou plusieurs lignes, réduit jusqu'à tenir
@@ -1554,15 +1564,27 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   else if (c.genre === 'tendance' && c.tendance12) dessinerTendance12(ctx, t, c, c.tendance12);
   else dessinerPrevisions(ctx, t, c);
   if (c.legendes && c.legendes.length > 0) dessinerLegendes(ctx, t, dureeVideo(c), c.legendes);
-  if (c.soustitres && c.soustitres.length > 0) dessinerSousTitres(ctx, t, dureeVideo(c), c.soustitres);
+  if (c.soustitres && c.soustitres.length > 0) dessinerSousTitres(ctx, t, dureeVideo(c), c.soustitres, c.voixDuree);
 }
 
 /** Sous-titres automatiques : le texte parlé défile mot à mot en bas de l'écran (groupes de 4 mots), le mot dit est en jaune, gros, avec contour noir. Mots répartis régulièrement sur la durée de la vidéo. */
-function dessinerSousTitres(ctx: CanvasRenderingContext2D, t: number, total: number, mots: string[]) {
+function dessinerSousTitres(ctx: CanvasRenderingContext2D, t: number, total: number, mots: string[], voixDuree?: number) {
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
-  const rythme = total / mots.length;
-  const actuel = Math.min(mots.length - 1, Math.max(0, Math.floor(t / rythme)));
+  // Début de chaque mot : au prorata de sa longueur (plus une pause après la ponctuation) sur la durée de la voix, ou de la vidéo.
+  const debutVoix = voixDuree ? VOIX_SILENCE : 0;
+  const dureeMots = voixDuree ? voixDuree - 0.1 : total;
+  const poids = mots.map((m) => m.replace(/[.,;:!?…]/g, '').length + 1 + (/[.!?…]$/.test(m) ? 3 : /[,;:]$/.test(m) ? 1.5 : 0));
+  const somme = poids.reduce((s, p) => s + p, 0);
+  const departs: number[] = [];
+  let cumul = 0;
+  for (const p of poids) {
+    departs.push(debutVoix + (cumul / somme) * dureeMots);
+    cumul += p;
+  }
+  if (voixDuree && (t < debutVoix || t > debutVoix + dureeMots + 0.8)) return;
+  let actuel = 0;
+  while (actuel + 1 < mots.length && t >= departs[actuel + 1]) actuel++;
   const taille = 4;
   const debut = Math.floor(actuel / taille) * taille;
   const groupe = mots.slice(debut, debut + taille);
@@ -1588,7 +1610,7 @@ function dessinerSousTitres(ctx: CanvasRenderingContext2D, t: number, total: num
     const texte = m.toUpperCase();
     const lm = ctx.measureText(texte).width;
     const dit = debut + k === actuel;
-    const pop = dit ? 1 + 0.12 * sortie((t - (debut + k) * rythme) / 0.12) : 1;
+    const pop = dit ? 1 + 0.12 * sortie((t - departs[debut + k]) / 0.12) : 1;
     ctx.save();
     ctx.translate(x + lm / 2, y);
     ctx.scale(pop, pop);
@@ -1759,6 +1781,12 @@ export default function VideoWeekEnd({
   // Textes libres qui apparaissent en gros dans la vidéo : un par ligne, un mot entre *étoiles* est mis en rose.
   const [legendesTexte, setLegendesTexte] = useState('');
   const [soustitresTexte, setSoustitresTexte] = useState('');
+  // Voix de synthèse (Azure) : générée à la demande à partir du texte des sous-titres, puis mixée dans le MP4.
+  const [voixId, setVoixId] = useState<(typeof VOIX_CHOIX)[number][0]>('denise');
+  const [voixVitesse, setVoixVitesse] = useState(1);
+  const [voix, setVoix] = useState<{ buffer: AudioBuffer; url: string; texte: string } | null>(null);
+  const [voixEnCours, setVoixEnCours] = useState(false);
+  const [voixErreur, setVoixErreur] = useState<string | null>(null);
   // Vidéo d'alerte : niveau, types, jour, et textes saisis à la main (absents : textes automatiques).
   const [niveauAlerte, setNiveauAlerte] = useState<NiveauAlerte>('orange');
   const [typesAlerte, setTypesAlerte] = useState<string[]>(['vent']);
@@ -2040,8 +2068,33 @@ export default function VideoWeekEnd({
   const textes = useMemo(() => textesVideo(mode, jours, ecart, france ? 'auto' : special, france), [mode, jours, ecart, special, france]);
   const legendes = legendesTexte.split('\n').map((l) => l.trim()).filter(Boolean);
   const soustitres = soustitresTexte.split(/\s+/).filter(Boolean);
+  // La voix générée ne vaut que pour le texte avec lequel elle a été faite.
+  const voixValide = voix && voix.texte === soustitres.join(' ') ? voix : null;
+  const voixDuree = voixValide ? voixValide.buffer.duration + VOIX_SILENCE : undefined;
+  async function genererVoix() {
+    setVoixErreur(null);
+    setVoixEnCours(true);
+    try {
+      const texte = soustitres.join(' ');
+      const rep = await fetch('/api/carte-meteo/voix/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texte, voix: voixId, vitesse: voixVitesse }) });
+      if (!rep.ok) throw new Error(((await rep.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'La voix n’a pas pu être générée.');
+      const octets = await rep.arrayBuffer();
+      const url = URL.createObjectURL(new Blob([octets], { type: 'audio/wav' }));
+      const contexteAudio = new AudioContext();
+      const buffer = await contexteAudio.decodeAudioData(octets.slice(0));
+      void contexteAudio.close();
+      setVoix((ancienne) => {
+        if (ancienne) URL.revokeObjectURL(ancienne.url);
+        return { buffer, url, texte };
+      });
+    } catch (e) {
+      setVoixErreur((e as Error).message);
+    } finally {
+      setVoixEnCours(false);
+    }
+  }
   /** Contexte des vidéos sans prévisions de villes (alerte, tendance) : aucune ville ni semaine. */
-  const base = { semaine: { jours: [], villes: {} } as Semaine, villes: [] as string[], textes: { intro: ['', ''], sous: '', bandeau: '', recap: '' } as Contexte['textes'], logo, departement: nomDepartement, codeDep: dep, abonne, legendes, soustitres };
+  const base = { semaine: { jours: [], villes: {} } as Semaine, villes: [] as string[], textes: { intro: ['', ''], sous: '', bandeau: '', recap: '' } as Contexte['textes'], logo, departement: nomDepartement, codeDep: dep, abonne, legendes, soustitres, voixDuree };
   const contexte: Contexte | null =
     genre === 'alerte'
       ? { ...base, genre, alerte: { entete: saisies.entete ?? autoAlerte.entete, titre: saisies.titre ?? autoAlerte.titre, periode: saisies.periode ?? autoAlerte.periode, detail: saisies.detail ?? '', types: pictosAlerte, carte: carteAlerte } }
@@ -2050,7 +2103,7 @@ export default function VideoWeekEnd({
           ? { ...base, genre, tendance12 }
           : null
         : semaine && villes.length >= 1
-          ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions, genre, abonne, legendes, soustitres }
+          ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions, genre, abonne, legendes, soustitres, voixDuree }
           : null;
   const total = contexte ? dureeVideo(contexte) : 0;
 
@@ -2112,7 +2165,21 @@ export default function VideoWeekEnd({
         const sortie = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target: new BufferTarget() });
         const source = new CanvasSource(c, { codec: 'avc', bitrate: 8_000_000, keyFrameInterval: 1 });
         sortie.addVideoTrack(source, { frameRate: FPS });
+        // Voix de synthèse : piste audio AAC, décalée du petit silence du début (si le navigateur ne sait pas encoder l'AAC, la vidéo reste muette).
+        let sourceAudio: AudioBufferSource | null = null;
+        if (voixValide && (await canEncodeAudio('aac').catch(() => false))) {
+          sourceAudio = new AudioBufferSource({ codec: 'aac', bitrate: 128_000 });
+          sortie.addAudioTrack(sourceAudio);
+        }
         await sortie.start();
+        if (sourceAudio && voixValide) {
+          const brut = voixValide.buffer;
+          const decalage = Math.round(VOIX_SILENCE * brut.sampleRate);
+          const calee = new AudioBuffer({ length: decalage + brut.length, numberOfChannels: brut.numberOfChannels, sampleRate: brut.sampleRate });
+          for (let k = 0; k < brut.numberOfChannels; k++) calee.copyToChannel(brut.getChannelData(k), k, decalage);
+          await sourceAudio.add(calee);
+          sourceAudio.close();
+        }
         const nb = Math.round(total * FPS);
         for (let i = 0; i < nb; i++) {
           dessiner(ctx, i / FPS, contexte);
@@ -2159,7 +2226,7 @@ export default function VideoWeekEnd({
     } finally {
       setEtat(null);
     }
-  }, [contexte, total, jours, dep, format]);
+  }, [contexte, total, jours, dep, format, voixValide]);
 
   // Texte d'accompagnement (légende du post) rédigé par l'IA à partir des mêmes données que la vidéo.
   const [texteIA, setTexteIA] = useState('');
@@ -2492,12 +2559,46 @@ export default function VideoWeekEnd({
             placeholder={'Collez le texte que vous dites à voix haute : il défile mot à mot en bas de l\'écran, le mot dit en jaune, réparti sur toute la vidéo.'}
             className={selectBarre}
           />
-          {soustitres.length > 0 && total > 0 && (
+          {soustitres.length > 0 && total > 0 && !voixValide && (
             <span className="block text-xs text-muted">
               {soustitres.length} mots sur {Math.round(total)} s, soit {(soustitres.length / total).toFixed(1).replace('.', ',')} mot/s (une voix naturelle : 2 à 3 mots/s).
             </span>
           )}
         </label>
+        {soustitres.length > 0 && (
+          <div className="grid gap-2 rounded-lg border border-border p-3 text-sm">
+            <span className="font-medium">🎙️ Voix de synthèse (Azure) pour ce texte</span>
+            <div className="grid grid-cols-2 gap-2">
+              <select value={voixId} onChange={(e) => setVoixId(e.target.value as typeof voixId)} className={selectBarre} aria-label="Voix">
+                {VOIX_CHOIX.map(([id, nom]) => (
+                  <option key={id} value={id}>
+                    {nom}
+                  </option>
+                ))}
+              </select>
+              <select value={voixVitesse} onChange={(e) => setVoixVitesse(Number(e.target.value))} className={selectBarre} aria-label="Vitesse de la voix">
+                <option value={0.9}>Lente</option>
+                <option value={1}>Normale</option>
+                <option value={1.1}>Rapide</option>
+                <option value={1.2}>Très rapide</option>
+              </select>
+            </div>
+            <button type="button" onClick={genererVoix} disabled={voixEnCours} className="rounded-lg border border-border bg-surface px-3 py-2 font-medium hover:border-primary disabled:opacity-60">
+              {voixEnCours ? 'Génération de la voix…' : voixValide ? '🔄 Régénérer la voix' : '🎙️ Générer la voix'}
+            </button>
+            {voixErreur && <span className="text-xs text-red-600">{voixErreur}</span>}
+            {voixValide && (
+              <>
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <audio controls src={voixValide.url} className="w-full" />
+                <span className="text-xs text-muted">
+                  Voix de {voixValide.buffer.duration.toFixed(1).replace('.', ',')} s : les sous-titres sont calés dessus et la voix est ajoutée au MP4.
+                  {voixValide.buffer.duration + VOIX_SILENCE > total && ' Attention : elle dépasse la durée de la vidéo, elle sera coupée.'}
+                </span>
+              </>
+            )}
+          </div>
+        )}
         <label className="text-sm font-medium">
           <span className={legende}>Logo</span>
           <select value={logoId} onChange={(e) => setLogoId(e.target.value)} className={selectBarre}>
