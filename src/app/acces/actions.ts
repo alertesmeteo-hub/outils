@@ -38,10 +38,14 @@ export async function connexion(formData: FormData) {
  * - notification ntfy (ACCES_ALERTE_URL, ex. https://ntfy.sh/un-sujet-difficile-a-deviner).
  */
 async function alerterConnexion(identifiant: string) {
+  console.log('Alerte connexion : connexion réussie, envoi de l’alerte');
   const cleMail = process.env.RESEND_API_KEY;
   const destinataire = process.env.ACCES_ALERTE_EMAIL;
   const ntfy = process.env.ACCES_ALERTE_URL;
-  if (!(cleMail && destinataire) && !ntfy) return;
+  if (!(cleMail && destinataire) && !ntfy) {
+    console.warn('Alerte connexion : aucune alerte configurée (RESEND_API_KEY, ACCES_ALERTE_EMAIL ou ACCES_ALERTE_URL absents du .env)');
+    return;
+  }
   const h = await headers();
   const ua = (h.get('user-agent') ?? '').replace(/[\r\n]+/g, ' ').slice(0, 160);
   const quand = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' });
@@ -56,7 +60,8 @@ async function alerterConnexion(identifiant: string) {
         signal: AbortSignal.timeout(6000),
       }).then(async (r) => {
         if (!r.ok) console.error('Alerte connexion (Resend)', r.status, (await r.text().catch(() => '')).slice(0, 200));
-      }),
+        else console.log('Alerte connexion : mail envoyé');
+      }).catch((e) => console.error('Alerte connexion (Resend) : échec réseau', e)),
     );
   }
   if (ntfy) {
