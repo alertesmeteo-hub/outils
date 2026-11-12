@@ -6,3 +6,6 @@ node_modules
 data/acces-demandes.jsonl
 next-env.d.ts
 .cache
+
+.claude/biais/
+.claude/launch.json
