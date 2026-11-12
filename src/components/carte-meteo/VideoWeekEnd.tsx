@@ -441,6 +441,8 @@ interface Contexte {
   abonne?: boolean;
   /** Textes libres qui apparaissent en gros au fil de la vidéo (un mot entre *étoiles* est mis en couleur). */
   legendes?: string[];
+  /** Texte parlé (mots) : sous-titres automatiques mot à mot en bas de l'écran. */
+  soustitres?: string[];
   alerte?: DonneesAlerte;
   tendance12?: DonneesTendance;
 }
@@ -1552,6 +1554,50 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   else if (c.genre === 'tendance' && c.tendance12) dessinerTendance12(ctx, t, c, c.tendance12);
   else dessinerPrevisions(ctx, t, c);
   if (c.legendes && c.legendes.length > 0) dessinerLegendes(ctx, t, dureeVideo(c), c.legendes);
+  if (c.soustitres && c.soustitres.length > 0) dessinerSousTitres(ctx, t, dureeVideo(c), c.soustitres);
+}
+
+/** Sous-titres automatiques : le texte parlé défile mot à mot en bas de l'écran (groupes de 4 mots), le mot dit est en jaune, gros, avec contour noir. Mots répartis régulièrement sur la durée de la vidéo. */
+function dessinerSousTitres(ctx: CanvasRenderingContext2D, t: number, total: number, mots: string[]) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const rythme = total / mots.length;
+  const actuel = Math.min(mots.length - 1, Math.max(0, Math.floor(t / rythme)));
+  const taille = 4;
+  const debut = Math.floor(actuel / taille) * taille;
+  const groupe = mots.slice(debut, debut + taille);
+  let px = 84 * u;
+  const largeurMax = W * 0.9;
+  const espaceDe = (p: number) => {
+    ctx.font = `${p}px ${POLICE}`;
+    return ctx.measureText(' ').width;
+  };
+  const largeurDe = (p: number) => {
+    ctx.font = `${p}px ${POLICE}`;
+    return groupe.reduce((s, m) => s + ctx.measureText(m.toUpperCase()).width, 0) + espaceDe(p) * (groupe.length - 1);
+  };
+  while (px > 30 * u && largeurDe(px) > largeurMax) px -= 3 * u;
+  ctx.save();
+  ctx.font = `${px}px ${POLICE}`;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  const espace = ctx.measureText(' ').width;
+  let x = (W - largeurDe(px)) / 2;
+  const y = H * 0.8;
+  groupe.forEach((m, k) => {
+    const texte = m.toUpperCase();
+    const lm = ctx.measureText(texte).width;
+    const dit = debut + k === actuel;
+    const pop = dit ? 1 + 0.12 * sortie((t - (debut + k) * rythme) / 0.12) : 1;
+    ctx.save();
+    ctx.translate(x + lm / 2, y);
+    ctx.scale(pop, pop);
+    ctx.textAlign = 'center';
+    texteContour(ctx, texte, 0, 0, px, dit ? '#ffe600' : '#fff');
+    ctx.restore();
+    x += lm + espace;
+  });
+  ctx.restore();
 }
 
 /** Dessine l'image de la vidéo de prévisions (jour ou week-end) à l'instant `t` (secondes), aux dimensions du canevas. */
@@ -1712,6 +1758,7 @@ export default function VideoWeekEnd({
   const [abonne, setAbonne] = useState(abonneInitial ? abonneInitial === '1' : typeInitial === 'alerte');
   // Textes libres qui apparaissent en gros dans la vidéo : un par ligne, un mot entre *étoiles* est mis en rose.
   const [legendesTexte, setLegendesTexte] = useState('');
+  const [soustitresTexte, setSoustitresTexte] = useState('');
   // Vidéo d'alerte : niveau, types, jour, et textes saisis à la main (absents : textes automatiques).
   const [niveauAlerte, setNiveauAlerte] = useState<NiveauAlerte>('orange');
   const [typesAlerte, setTypesAlerte] = useState<string[]>(['vent']);
@@ -1992,8 +2039,9 @@ export default function VideoWeekEnd({
   const carteDansVideo = avecCarte && villes.some((v) => positions[v]);
   const textes = useMemo(() => textesVideo(mode, jours, ecart, france ? 'auto' : special, france), [mode, jours, ecart, special, france]);
   const legendes = legendesTexte.split('\n').map((l) => l.trim()).filter(Boolean);
+  const soustitres = soustitresTexte.split(/\s+/).filter(Boolean);
   /** Contexte des vidéos sans prévisions de villes (alerte, tendance) : aucune ville ni semaine. */
-  const base = { semaine: { jours: [], villes: {} } as Semaine, villes: [] as string[], textes: { intro: ['', ''], sous: '', bandeau: '', recap: '' } as Contexte['textes'], logo, departement: nomDepartement, codeDep: dep, abonne, legendes };
+  const base = { semaine: { jours: [], villes: {} } as Semaine, villes: [] as string[], textes: { intro: ['', ''], sous: '', bandeau: '', recap: '' } as Contexte['textes'], logo, departement: nomDepartement, codeDep: dep, abonne, legendes, soustitres };
   const contexte: Contexte | null =
     genre === 'alerte'
       ? { ...base, genre, alerte: { entete: saisies.entete ?? autoAlerte.entete, titre: saisies.titre ?? autoAlerte.titre, periode: saisies.periode ?? autoAlerte.periode, detail: saisies.detail ?? '', types: pictosAlerte, carte: carteAlerte } }
@@ -2002,7 +2050,7 @@ export default function VideoWeekEnd({
           ? { ...base, genre, tendance12 }
           : null
         : semaine && villes.length >= 1
-          ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions, genre, abonne, legendes }
+          ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions, genre, abonne, legendes, soustitres }
           : null;
   const total = contexte ? dureeVideo(contexte) : 0;
 
@@ -2434,6 +2482,21 @@ export default function VideoWeekEnd({
             placeholder={'Un texte par ligne, répartis sur la vidéo.\nUn mot entre *étoiles* est en rose :\nON DÉMARRE *PAR CE*'}
             className={selectBarre}
           />
+        </label>
+        <label className="text-sm font-medium">
+          <span className={legende}>Sous-titres automatiques (facultatif)</span>
+          <textarea
+            value={soustitresTexte}
+            onChange={(e) => setSoustitresTexte(e.target.value)}
+            rows={3}
+            placeholder={'Collez le texte que vous dites à voix haute : il défile mot à mot en bas de l\'écran, le mot dit en jaune, réparti sur toute la vidéo.'}
+            className={selectBarre}
+          />
+          {soustitres.length > 0 && total > 0 && (
+            <span className="block text-xs text-muted">
+              {soustitres.length} mots sur {Math.round(total)} s, soit {(soustitres.length / total).toFixed(1).replace('.', ',')} mot/s (une voix naturelle : 2 à 3 mots/s).
+            </span>
+          )}
         </label>
         <label className="text-sm font-medium">
           <span className={legende}>Logo</span>
