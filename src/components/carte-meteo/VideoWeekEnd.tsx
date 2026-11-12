@@ -2119,6 +2119,19 @@ export default function VideoWeekEnd({
     if (!lecture) return;
     const debut = performance.now() - t * 1000;
     let id = 0;
+    // La voix de synthèse est jouée avec l'aperçu (elle ne démarre qu'après le petit silence du début).
+    let voixLue: HTMLAudioElement | null = null;
+    let minuteurVoix = 0;
+    if (voixValide) {
+      const audio = new Audio(voixValide.url);
+      voixLue = audio;
+      if (t >= VOIX_SILENCE) {
+        audio.currentTime = t - VOIX_SILENCE;
+        void audio.play().catch(() => {});
+      } else {
+        minuteurVoix = window.setTimeout(() => void audio.play().catch(() => {}), (VOIX_SILENCE - t) * 1000);
+      }
+    }
     const boucle = () => {
       const s = (performance.now() - debut) / 1000;
       if (s >= total) {
@@ -2130,7 +2143,11 @@ export default function VideoWeekEnd({
       id = requestAnimationFrame(boucle);
     };
     id = requestAnimationFrame(boucle);
-    return () => cancelAnimationFrame(id);
+    return () => {
+      cancelAnimationFrame(id);
+      clearTimeout(minuteurVoix);
+      voixLue?.pause();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lecture, total]);
 
@@ -2159,6 +2176,9 @@ export default function VideoWeekEnd({
         setTimeout(() => URL.revokeObjectURL(url), 10_000);
       };
 
+      // Avertissement affiché après l'export si la vidéo sort sans voix alors qu'on en attendait une.
+      let avertissement: string | null = soustitres.length > 0 && !voixValide ? 'Vidéo exportée SANS voix : clique d’abord sur « Générer la voix » (à refaire si tu modifies le texte).' : null;
+
       // Voie principale : encodage image par image en H.264 (30 i/s constantes, durée et images clés exactes, moov en tête).
       // C'est le seul MP4 que TikTok lit sans caler ; l'enregistrement en temps réel du navigateur donne un MP4 fragmenté à cadence variable.
       if (await canEncodeVideo('avc', { width: format.l, height: format.h, bitrate: 8_000_000 }).catch(() => false)) {
@@ -2170,6 +2190,8 @@ export default function VideoWeekEnd({
         if (voixValide && (await canEncodeAudio('aac').catch(() => false))) {
           sourceAudio = new AudioBufferSource({ codec: 'aac', bitrate: 128_000 });
           sortie.addAudioTrack(sourceAudio);
+        } else if (voixValide) {
+          avertissement = 'Ce navigateur ne sait pas ajouter le son (encodage AAC) : vidéo exportée SANS voix. Essaie avec Chrome ou Edge à jour.';
         }
         await sortie.start();
         if (sourceAudio && voixValide) {
@@ -2192,6 +2214,7 @@ export default function VideoWeekEnd({
         source.close();
         await sortie.finalize();
         telecharger(new Blob([sortie.target.buffer!], { type: 'video/mp4' }), 'mp4');
+        if (avertissement) setErreur(avertissement);
         return;
       }
 
@@ -2226,7 +2249,7 @@ export default function VideoWeekEnd({
     } finally {
       setEtat(null);
     }
-  }, [contexte, total, jours, dep, format, voixValide]);
+  }, [contexte, total, jours, dep, format, voixValide, soustitres.length]);
 
   // Texte d'accompagnement (légende du post) rédigé par l'IA à partir des mêmes données que la vidéo.
   const [texteIA, setTexteIA] = useState('');
@@ -2593,7 +2616,7 @@ export default function VideoWeekEnd({
                 {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                 <audio controls src={voixValide.url} className="w-full" />
                 <span className="text-xs text-muted">
-                  Voix de {voixValide.buffer.duration.toFixed(1).replace('.', ',')} s : les sous-titres sont calés dessus et la voix est ajoutée au MP4.
+                  Voix de {voixValide.buffer.duration.toFixed(1).replace('.', ',')} s : les sous-titres sont calés dessus, elle est jouée avec l’aperçu (bouton Lecture) et ajoutée au MP4.
                   {voixValide.buffer.duration + VOIX_SILENCE > total && ' Attention : elle dépasse la durée de la vidéo, elle sera coupée.'}
                 </span>
               </>
