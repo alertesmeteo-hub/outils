@@ -1008,10 +1008,10 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   specialRef.current = special;
   const [cote, setCote] = useState<SecteurCote | null>(null);
   const [logoId, setLogoId] = useState('pays-catalan-hd');
-  // Par défaut : format « TikTok Hook » et vidéo du lendemain (J+1).
+  // Par défaut : format « TikTok Hook » et vidéo d'aujourd'hui (J).
   const [formatId, setFormatId] = useState<FormatId>(FORMATS.find((f) => f.id === formatInitial)?.id ?? 'hook');
   const [mode, setMode] = useState<Mode>('jour');
-  const [ecart, setEcart] = useState(1);
+  const [ecart, setEcart] = useState(0);
   const [donnees, setDonnees] = useState<{ cle: string; points: PointCarte[][] } | null>(null);
   const [donneesTendance, setDonneesTendance] = useState<{ cle: string; points: PointCarte[][] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
