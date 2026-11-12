@@ -28,7 +28,30 @@ export async function connexion(formData: FormData) {
     path: '/',
     maxAge: DUREE_COOKIE_S,
   });
+  await alerterConnexion(String(formData.get('identifiant') ?? ''));
   redirect(suite);
+}
+
+/**
+ * Alerte à chaque connexion réussie, si ACCES_ALERTE_URL est défini (ex. https://ntfy.sh/un-sujet-difficile-a-deviner).
+ * Avec ACCES_ALERTE_EMAIL, ntfy envoie aussi la notification par mail à cette adresse. Un échec n'empêche jamais la connexion.
+ */
+async function alerterConnexion(identifiant: string) {
+  const alerte = process.env.ACCES_ALERTE_URL;
+  if (!alerte) return;
+  const h = await headers();
+  const ua = (h.get('user-agent') ?? '').replace(/[\r\n]+/g, ' ').slice(0, 160);
+  const quand = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' });
+  const entetes: Record<string, string> = { Title: 'Connexion au site outils', Tags: 'key' };
+  if (process.env.ACCES_ALERTE_EMAIL) entetes.Email = process.env.ACCES_ALERTE_EMAIL;
+  try {
+    await fetch(alerte, {
+      method: 'POST',
+      headers: entetes,
+      body: `Connexion réussie le ${quand}\nIdentifiant : ${nettoyer(identifiant, 60) || '(aucun)'}\nAdresse IP : ${await adresseIp()}\nNavigateur : ${ua}`,
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch {}
 }
 
 const nettoyer = (v: FormDataEntryValue | null, max: number) => String(v ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, max);
