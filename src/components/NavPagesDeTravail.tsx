@@ -35,8 +35,15 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
       { href: '/outils/carte-meteo/video/?format=facebook&zone=66', libelle: '📘 Vidéo Facebook : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/video/?zone=66&special=montagne', libelle: '🏔️ Vidéo spéciale montagne : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/video/?zone=66&special=ete', libelle: '🏖️ Vidéo spéciale été : Pyrénées-Orientales' },
+      { href: '/outils/carte-meteo/video/?zone=66&abonne=1', libelle: '🔔 Vidéo TikTok + Abonnez-vous : Pyrénées-Orientales' },
+      { href: '/outils/carte-meteo/video/?zone=66&type=alerte', libelle: '⚠️ Vidéo TikTok alertes orange : Pyrénées-Orientales' },
+      { href: '/outils/carte-meteo/video/?zone=66&type=tendance', libelle: '📈 Vidéo TikTok tendance : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/carte-alerte/', libelle: '🚨 Carte alerte TikTok / Facebook' },
     ],
+  },
+  {
+    titre: 'Tab Val',
+    pages: [{ href: '/outils/tab-val/', libelle: '📋 Tab Val : tableau à partir d’une liste de valeurs' }],
   },
   {
     titre: 'Cartes et prévisions',

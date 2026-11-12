@@ -14,6 +14,8 @@ interface Rubrique {
   rouge?: boolean;
   /** Rubrique « Favoris » : ses liens sont ceux étoilés dans le menu de gauche. */
   favoris?: boolean;
+  /** Rubrique sans sous-menu : le titre est un lien direct vers cette page. */
+  href?: string;
   pages: { href: string; libelle: string }[];
 }
 
@@ -43,6 +45,9 @@ const RUBRIQUES: Rubrique[] = [
       lien('/outils/carte-meteo/video/?format=facebook&zone=66'),
       lien('/outils/carte-meteo/video/?zone=66&special=montagne'),
       lien('/outils/carte-meteo/video/?zone=66&special=ete'),
+      lien('/outils/carte-meteo/video/?zone=66&abonne=1'),
+      lien('/outils/carte-meteo/video/?zone=66&type=alerte'),
+      lien('/outils/carte-meteo/video/?zone=66&type=tendance'),
       lien('/outils/carte-meteo/carte-alerte/'),
     ],
   },
@@ -65,8 +70,19 @@ const RUBRIQUES: Rubrique[] = [
   },
   {
     titre: 'Vidéo',
-    pages: ['/outils/carte-meteo/video/', '/outils/carte-meteo/video/?format=facebook&zone=66', '/outils/carte-meteo/video/?format=facebook&zone=FR', '/outils/carte-meteo/video/?zone=66&special=montagne', '/outils/carte-meteo/video/?zone=66&special=ete', '/outils/carte-meteo/carte-alerte/'].map(lien),
+    pages: [
+      '/outils/carte-meteo/video/',
+      '/outils/carte-meteo/video/?format=facebook&zone=66',
+      '/outils/carte-meteo/video/?format=facebook&zone=FR',
+      '/outils/carte-meteo/video/?zone=66&special=montagne',
+      '/outils/carte-meteo/video/?zone=66&special=ete',
+      '/outils/carte-meteo/video/?zone=66&abonne=1',
+      '/outils/carte-meteo/video/?zone=66&type=alerte',
+      '/outils/carte-meteo/video/?zone=66&type=tendance',
+      '/outils/carte-meteo/carte-alerte/',
+    ].map(lien),
   },
+  { titre: 'Tab Val', href: '/outils/tab-val/', pages: [] },
   {
     titre: 'Liens',
     pages: [
@@ -123,6 +139,16 @@ export default function MenuHaut() {
         {RUBRIQUES.map((g) => {
           const estOuvert = ouvert === g.titre;
           const pages = g.favoris ? favoris : g.pages;
+          // Rubrique sans sous-menu (« Tab Val ») : un lien direct.
+          if (g.href) {
+            return (
+              <li key={g.titre} className="relative">
+                <Link href={g.href} className={`flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 hover:bg-bg ${chemin === g.href ? 'bg-bg' : ''}`}>
+                  {g.titre}
+                </Link>
+              </li>
+            );
+          }
           return (
             <li key={g.titre} className="relative" onMouseEnter={() => { if (g.favoris) lireFavoris(); setOuvert(g.titre); }} onMouseLeave={() => setOuvert((o) => (o === g.titre ? null : o))}>
               <button
