@@ -216,6 +216,8 @@ interface DonneesAlerte {
   periode: string;
   detail: string;
   types: { libelle: string; picto: string | null }[];
+  /** Carte du département : rafales (si vent) et pluie (si pluie) des principales villes ; absente sans prévision. */
+  carte?: { codeDep: string; vent: boolean; pluie: boolean; points: { nom: string; lat: number; lon: number; rafale: number | null; pluie: number | null }[] };
 }
 /** Une prévision ponctuelle (maxi du jour) pour tracer la carte de température d'un département. */
 interface PointChamp {
@@ -245,6 +247,7 @@ const DUREE_ABONNE = 3;
 const DUREE_ALERTE_DEBUT = 4.4;
 const DUREE_ALERTE_TYPE = 2.2;
 const DUREE_ALERTE_FIN = 3.8;
+const DUREE_ALERTE_CARTE = 4.5;
 const DUREE_SEMAINES = 6;
 /** Durée des cartes de la tendance : titre, une carte toutes les 0,45 s, puis le temps de les lire. */
 const dureeCartesTendance = (n: number) => 0.6 + n * 0.45 + 2.6;
@@ -444,7 +447,7 @@ interface Contexte {
 
 /** Durée du contenu de la vidéo, sans l'écran final « Abonnez-vous ! » (celui des vidéos d'alerte en fait partie). */
 function dureeContenu(c: Contexte): number {
-  if (c.genre === 'alerte' && c.alerte) return DUREE_ALERTE_DEBUT + c.alerte.types.length * DUREE_ALERTE_TYPE + DUREE_ALERTE_FIN;
+  if (c.genre === 'alerte' && c.alerte) return DUREE_ALERTE_DEBUT + (c.alerte.carte ? DUREE_ALERTE_CARTE : 0) + c.alerte.types.length * DUREE_ALERTE_TYPE + DUREE_ALERTE_FIN;
   if (c.genre === 'tendance' && c.tendance12) return dureeCartesTendance(c.tendance12.jours.length) + (c.tendance12.semaines ? DUREE_SEMAINES : 0);
   return dureeTotale(c.villes.length, !!c.hook, !!c.tendance, !!c.carte);
 }
@@ -1127,7 +1130,8 @@ function dessinerAlerte(ctx: CanvasRenderingContext2D, t: number, c: Contexte, a
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
   const { logo } = c;
-  const fin = DUREE_ALERTE_DEBUT + a.types.length * DUREE_ALERTE_TYPE;
+  const dc = a.carte ? DUREE_ALERTE_CARTE : 0;
+  const fin = DUREE_ALERTE_DEBUT + dc + a.types.length * DUREE_ALERTE_TYPE;
   if (t >= fin) {
     ecranFinal(ctx, t - fin, t, logo, { haut: 'SUIVEZ LA SITUATION EN DIRECT', abonne: !!c.abonne, sombre: true });
     return;
@@ -1163,9 +1167,13 @@ function dessinerAlerte(ctx: CanvasRenderingContext2D, t: number, c: Contexte, a
     pied(ctx, logo);
     return;
   }
+  if (a.carte && t < DUREE_ALERTE_DEBUT + dc) {
+    dessinerCarteAlerte(ctx, t - DUREE_ALERTE_DEBUT, t, c, a, a.carte);
+    return;
+  }
   // Un type d'alerte à la fois : grand picto, son nom, le détail éventuel, rappel de la période.
-  const k = Math.min(a.types.length - 1, Math.floor((t - DUREE_ALERTE_DEBUT) / DUREE_ALERTE_TYPE));
-  const local = t - DUREE_ALERTE_DEBUT - k * DUREE_ALERTE_TYPE;
+  const k = Math.min(a.types.length - 1, Math.floor((t - DUREE_ALERTE_DEBUT - dc) / DUREE_ALERTE_TYPE));
+  const local = t - DUREE_ALERTE_DEBUT - dc - k * DUREE_ALERTE_TYPE;
   const ty = a.types[k];
   bandeau(ctx, a.entete, W / 2, 100 * u, W * 0.6, ROUGE_ALERTE, 100 * u, u, { lignesMax: 1 });
   const s = Math.min(W * 0.62, bas * 0.33);
@@ -1186,6 +1194,69 @@ function dessinerAlerte(ctx: CanvasRenderingContext2D, t: number, c: Contexte, a
   if (a.detail) bandeau(ctx, a.detail, W / 2, yl + hl + 28 * u, W * 0.92, VIOLET_ALERTE, 54 * u, u, { lignesMax: 3, apparition: (local - 0.5) / 0.4 });
   bandeau(ctx, a.periode, W / 2, bas - 170 * u, W * 0.94, VIOLET_ALERTE, 54 * u, u, { lignesMax: 2 });
   pied(ctx, logo);
+}
+
+/** Carte du département dans la vidéo d'alerte : contour orange, rafales (vent) et pluie (pluie) des principales villes, qui apparaissent une à une. */
+function dessinerCarteAlerte(ctx: CanvasRenderingContext2D, local: number, t: number, c: Contexte, a: DonneesAlerte, carte: NonNullable<DonneesAlerte['carte']>) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  fondAlerte(ctx, t);
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center';
+  const bas = H - 250 * u;
+  bandeau(ctx, a.entete, W / 2, 100 * u, W * 0.6, ROUGE_ALERTE, 100 * u, u, { lignesMax: 1 });
+  const titre = [carte.vent ? 'RAFALES' : '', carte.pluie ? 'PLUIE' : ''].filter(Boolean).join(' ET ');
+  const hT = bandeau(ctx, `${titre} PRÉVUES`, W / 2, 100 * u + 150 * u, W * 0.92, VIOLET_ALERTE, 70 * u, u, { lignesMax: 2, apparition: local / 0.4 });
+  const anneaux = geoFond?.depts[carte.codeDep] ?? [];
+  const x0 = 40 * u, y0 = 100 * u + 150 * u + hT + 30 * u, bw = W - 80 * u, bh = bas - y0 - 20 * u;
+  if (anneaux.length) {
+    let lon0 = 999, lon1 = -999, lat0 = 999, lat1 = -999;
+    for (const r of anneaux) for (const [lon, lat] of r) { lon0 = Math.min(lon0, lon); lon1 = Math.max(lon1, lon); lat0 = Math.min(lat0, lat); lat1 = Math.max(lat1, lat); }
+    const k = Math.cos(((lat0 + lat1) / 2) * (Math.PI / 180));
+    const s = Math.min(bw / ((lon1 - lon0) * k), bh / (lat1 - lat0));
+    const ox = x0 + (bw - (lon1 - lon0) * k * s) / 2, oy = y0 + (bh - (lat1 - lat0) * s) / 2;
+    const X = (lon: number) => ox + (lon - lon0) * k * s;
+    const Y = (lat: number) => oy + (lat1 - lat) * s;
+    cheminAnneaux(ctx, anneaux, X, Y);
+    ctx.fillStyle = 'rgba(255,140,0,0.28)';
+    ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 6 * u;
+    ctx.strokeStyle = '#ff9d1a';
+    ctx.stroke();
+    // Villes retenues : les plus concernées d'abord, sans chevauchement.
+    const poids = (p: (typeof carte.points)[number]) => (carte.vent ? p.rafale ?? 0 : 0) + (carte.pluie ? (p.pluie ?? 0) * 3 : 0);
+    const gardees: { p: (typeof carte.points)[number]; x: number; y: number }[] = [];
+    const bulle = Math.min(230 * u, bw * 0.3);
+    for (const p of [...carte.points].sort((m, n) => poids(n) - poids(m))) {
+      const x = X(p.lon), y = Y(p.lat);
+      if (gardees.length < 9 && gardees.every((g) => Math.hypot(g.x - x, g.y - y) > bulle * 0.9)) gardees.push({ p, x, y });
+    }
+    gardees.forEach(({ p, x, y }, i) => {
+      const pop = sortie((local - 0.5 - i * 0.3) / 0.35);
+      if (pop <= 0) return;
+      const lignes = [carte.vent && p.rafale != null ? `${p.rafale} km/h` : '', carte.pluie && p.pluie != null ? libellePluie(p.pluie) ?? '' : ''].filter(Boolean);
+      if (!lignes.length) return;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(pop, pop);
+      ctx.fillStyle = ROUGE_ALERTE;
+      ctx.beginPath();
+      ctx.arc(0, 0, 9 * u, 0, Math.PI * 2);
+      ctx.fill();
+      const h = (lignes.length * 48 + 52) * u;
+      ctx.fillStyle = 'rgba(8,20,45,0.9)';
+      rectArrondi(ctx, -bulle / 2, -h - 14 * u, bulle, h, 18 * u);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2.5 * u;
+      ctx.stroke();
+      texteAjuste(ctx, nomAffiche(p.nom).toUpperCase(), 0, -h - 14 * u + 34 * u, 28 * u, POLICE, bulle - 20 * u, '#ffe27a');
+      lignes.forEach((l, j) => texteAjuste(ctx, l, 0, -h - 14 * u + 34 * u + 8 * u + (j + 1) * 46 * u, 40 * u, POLICE, bulle - 20 * u, '#fff'));
+      ctx.restore();
+    });
+  }
+  pied(ctx, c.logo);
 }
 
 /** Température maximale → couleur : violet (gel) → bleu → cyan → vert → jaune → orange → rouge → magenta (canicule). */
@@ -1850,6 +1921,28 @@ export default function VideoWeekEnd({
     return () => controleur.abort();
   }, [genre, france, cleCartes, donneesCartes?.cle, joursCartes, dep]);
 
+  // Vidéo d'alerte : prévisions du jour de l'alerte pour la carte du département (rafales si vent, pluie si pluie).
+  const [donneesAlerteCarte, setDonneesAlerteCarte] = useState<{ cle: string; points: PointCarte[] } | null>(null);
+  const cleAlerteCarte = `${dateAlerte}|${dep}`;
+  useEffect(() => {
+    if (genre !== 'alerte' || france || donneesAlerteCarte?.cle === cleAlerteCarte) return;
+    const controleur = new AbortController();
+    fetch(`/api/carte-meteo/previsions/?modele=moyenne&toutes=1&date=${dateAlerte}&dep=${dep}`, { signal: controleur.signal })
+      .then((r) => (r.ok ? (r.json() as Promise<{ points: PointCarte[] }>) : Promise.reject(new Error('Prévisions indisponibles'))))
+      .then((j) => setDonneesAlerteCarte({ cle: cleAlerteCarte, points: j.points }))
+      .catch(() => {});
+    return () => controleur.abort();
+  }, [genre, france, cleAlerteCarte, donneesAlerteCarte?.cle, dateAlerte, dep]);
+  const carteAlerte: DonneesAlerte['carte'] =
+    donneesAlerteCarte?.cle === cleAlerteCarte && (typesAlerte.includes('vent') || typesAlerte.includes('pluie'))
+      ? {
+          codeDep: dep,
+          vent: typesAlerte.includes('vent'),
+          pluie: typesAlerte.includes('pluie'),
+          points: donneesAlerteCarte.points.flatMap((p) => (p.lat != null && p.lon != null ? [{ nom: p.nom, lat: p.lat, lon: p.lon, rafale: arrondi5(p.rafaleJournee), pluie: p.pluieJournee ?? null }] : [])),
+        }
+      : undefined;
+
   // Images des pictos et logo, chargées avant de dessiner.
   useEffect(() => {
     const fichiers = new Set<string>();
@@ -1903,7 +1996,7 @@ export default function VideoWeekEnd({
   const base = { semaine: { jours: [], villes: {} } as Semaine, villes: [] as string[], textes: { intro: ['', ''], sous: '', bandeau: '', recap: '' } as Contexte['textes'], logo, departement: nomDepartement, codeDep: dep, abonne, legendes };
   const contexte: Contexte | null =
     genre === 'alerte'
-      ? { ...base, genre, alerte: { entete: saisies.entete ?? autoAlerte.entete, titre: saisies.titre ?? autoAlerte.titre, periode: saisies.periode ?? autoAlerte.periode, detail: saisies.detail ?? '', types: pictosAlerte } }
+      ? { ...base, genre, alerte: { entete: saisies.entete ?? autoAlerte.entete, titre: saisies.titre ?? autoAlerte.titre, periode: saisies.periode ?? autoAlerte.periode, detail: saisies.detail ?? '', types: pictosAlerte, carte: carteAlerte } }
       : genre === 'tendance'
         ? tendance12
           ? { ...base, genre, tendance12 }
