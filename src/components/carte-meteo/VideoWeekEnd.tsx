@@ -2565,7 +2565,7 @@ export default function VideoWeekEnd({
             </span>
           )}
         </label>
-        {soustitres.length > 0 && (
+        {(
           <div className="grid gap-2 rounded-lg border border-border p-3 text-sm">
             <span className="font-medium">🎙️ Voix de synthèse (Azure) pour ce texte</span>
             <div className="grid grid-cols-2 gap-2">
@@ -2583,9 +2583,10 @@ export default function VideoWeekEnd({
                 <option value={1.2}>Très rapide</option>
               </select>
             </div>
-            <button type="button" onClick={genererVoix} disabled={voixEnCours} className="rounded-lg border border-border bg-surface px-3 py-2 font-medium hover:border-primary disabled:opacity-60">
+            <button type="button" onClick={genererVoix} disabled={voixEnCours || soustitres.length === 0} className="rounded-lg border border-border bg-surface px-3 py-2 font-medium hover:border-primary disabled:opacity-60">
               {voixEnCours ? 'Génération de la voix…' : voixValide ? '🔄 Régénérer la voix' : '🎙️ Générer la voix'}
             </button>
+            {soustitres.length === 0 && <span className="text-xs text-muted">Écris ou colle d’abord le texte à dire dans « Sous-titres automatiques » ci-dessus.</span>}
             {voixErreur && <span className="text-xs text-red-600">{voixErreur}</span>}
             {voixValide && (
               <>
