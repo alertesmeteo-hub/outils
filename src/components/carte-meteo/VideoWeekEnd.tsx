@@ -185,6 +185,70 @@ type Mode = 'weekend' | 'jour';
 /** Écart maximal proposé pour la vidéo d'un jour (J+n). */
 const JOUR_MAX = 7;
 
+/** Genre de vidéo : prévisions d'un jour ou du week-end (par défaut), alerte (bandeaux rouges, pictos de vigilance) ou tendance (12 jours en cartes, puis 4 semaines). */
+type Genre = 'previsions' | 'alerte' | 'tendance';
+const GENRES: { id: Genre; libelle: string }[] = [
+  { id: 'previsions', libelle: '🌦️ Prévisions' },
+  { id: 'alerte', libelle: '⚠️ Alertes' },
+  { id: 'tendance', libelle: '📈 Tendance' },
+];
+/** Types d'alerte (vigilance Météo-France) : l'identifiant sert au picto « vigilance-<id>-<niveau> ». */
+const TYPES_ALERTE: { id: string; libelle: string }[] = [
+  { id: 'vent', libelle: 'Vent violent' },
+  { id: 'pluie', libelle: 'Pluie-inondation' },
+  { id: 'orages', libelle: 'Orages' },
+  { id: 'grele', libelle: 'Grêle' },
+  { id: 'neige', libelle: 'Neige-verglas' },
+  { id: 'canicule', libelle: 'Canicule' },
+  { id: 'froid', libelle: 'Grand froid' },
+  { id: 'avalanches', libelle: 'Avalanches' },
+  { id: 'vagues', libelle: 'Vagues-submersion' },
+  { id: 'crues', libelle: 'Crues' },
+  { id: 'feux', libelle: 'Feux de forêt' },
+  { id: 'secheresse', libelle: 'Sécheresse' },
+];
+type NiveauAlerte = 'jaune' | 'orange' | 'rouge';
+
+/** Vidéo d'alerte : textes des bandeaux (saisis ou automatiques) et types d'alerte avec leur picto de vigilance. */
+interface DonneesAlerte {
+  entete: string;
+  titre: string;
+  periode: string;
+  detail: string;
+  types: { libelle: string; picto: string | null }[];
+}
+/** Une prévision ponctuelle (maxi du jour) pour tracer la carte de température d'un département. */
+interface PointChamp {
+  lat: number;
+  lon: number;
+  v: number;
+}
+/** Tendance à 4 semaines (CFSv2) : écart à la normale de la température (°C) et de la pluie (%), semaine par semaine. */
+interface Semaine4 {
+  titre: string;
+  sousTitre: string;
+  t: number | null;
+  pluie: number | null;
+}
+/** Vidéo « tendance » : une carte de température par jour (12 jours), puis la tendance à 4 semaines. */
+interface DonneesTendance {
+  jours: string[];
+  valeurs: PointChamp[][];
+  /** Cartes de température déjà dessinées (une par jour), null si le jour n'a pas de prévision. */
+  cartes: (HTMLCanvasElement | null)[];
+  semaines: Semaine4[] | null;
+}
+/** Nombre de jours en cartes dans la vidéo « tendance ». */
+const NB_JOURS_CARTES = 12;
+
+const DUREE_ABONNE = 3;
+const DUREE_ALERTE_DEBUT = 4.4;
+const DUREE_ALERTE_TYPE = 2.2;
+const DUREE_ALERTE_FIN = 3.8;
+const DUREE_SEMAINES = 6;
+/** Durée des cartes de la tendance : titre, une carte toutes les 0,45 s, puis le temps de les lire. */
+const dureeCartesTendance = (n: number) => 0.6 + n * 0.45 + 2.6;
+
 const NOMS_JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 const NOMS_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const jourDeSemaine = (iso: string) => new Date(`${iso}T12:00:00Z`).getUTCDay();
@@ -200,16 +264,21 @@ function weekEnd(aujourdhui: string): [string, string] {
 }
 
 const arrondi = (v: number | null | undefined) => (v == null ? null : Math.round(v));
+/** Rafales de 5 en 5 km/h, toujours (jamais « 47 km/h » : « 45 km/h »). */
+const arrondi5 = (v: number | null | undefined) => (v == null ? null : Math.round(v / 5) * 5);
 const degre = (v: number | null) => (v == null ? '–' : `${v}°`);
 
-/** Sous 0,5 mm, la pluie est ignorée (ni quantité, ni picto de pluie). */
+/** Sous 0,5 mm, la pluie ne fait pas le picto de pluie (ni les textes de la légende du post). */
 const SEUIL_PLUIE = 0.5;
 const pluieRetenue = (mm: number | null | undefined) => (mm != null && mm >= SEUIL_PLUIE ? mm : 0);
+/** Cumul de pluie tel qu'écrit dans la vidéo : « < 1 mm » de 0,1 à 1 mm, « < 5 mm » de 1 à 5 mm, la valeur au-delà ; rien sous 0,1 mm. */
+const libellePluie = (mm: number | null | undefined): string | null =>
+  mm == null || mm < 0.1 ? null : mm < 1 ? '< 1 mm' : mm < 5 ? '< 5 mm' : `${(Math.round(mm * 10) / 10).toLocaleString('fr-FR')} mm`;
 
 function versJour(p: PointCarte | undefined, jeu: JeuAlertes = 'alertes'): JourVille {
   if (!p) return { maxi: null, mini: null, rafale: null, pluie: null, picto: null };
   const picto = pictoDepuisPrevision({ code: p.codeJournee ?? null, nuages: p.nuagesJournee ?? null, pluie: p.pluieJournee == null ? null : pluieRetenue(p.pluieJournee), temperature: p.maxi ?? null, voile: p.voileJournee }, 'alertes') as string;
-  return { maxi: arrondi(p.maxi), mini: arrondi(p.mini), rafale: arrondi(p.rafaleJournee), pluie: pluieRetenue(p.pluieJournee), picto: cheminPictoImage(selonJeu(picto, jeu)) ?? null };
+  return { maxi: arrondi(p.maxi), mini: arrondi(p.mini), rafale: arrondi5(p.rafaleJournee), pluie: p.pluieJournee == null ? 0 : Math.round(p.pluieJournee * 10) / 10, picto: cheminPictoImage(selonJeu(picto, jeu)) ?? null };
 }
 
 const cacheImages = new Map<string, Promise<HTMLImageElement>>();
@@ -331,8 +400,9 @@ function carteJour(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.fillStyle = '#fff';
   ctx.font = `600 44px ${TEXTE}`;
   const infos: { icone: string; texte: string }[] = [];
-  // Jamais en dessous de 0,5 mm : une quantité plus faible n'est pas affichée.
-  if (j.pluie != null && j.pluie >= 0.5) infos.push({ icone: ICONE_PLUIE, texte: `${(Math.round(j.pluie * 10) / 10).toLocaleString('fr-FR')} mm` });
+  // Pluie : « < 1 mm » (0,1 à 1 mm), « < 5 mm » (1 à 5 mm), sinon la valeur ; rafales de 5 en 5 (voir versJour).
+  const textePluie = libellePluie(j.pluie);
+  if (textePluie) infos.push({ icone: ICONE_PLUIE, texte: textePluie });
   if (j.rafale != null && j.rafale >= 30) infos.push({ icone: ICONE_VENT, texte: `${j.rafale} km/h` });
   if (infos.length === 0) ctx.fillText('Pas de pluie, vent faible', 44, 530);
   let xi = 44;
@@ -362,7 +432,24 @@ interface Contexte {
   /** Position (latitude, longitude) des villes, pour la carte. */
   positions?: Record<string, { lat: number; lon: number } | undefined>;
   tendance?: { jours: string[]; villes: Record<string, JourVille[]>; /** Ville montrée : la première de la vidéo dont la tendance est connue (les villes de relief n'ont pas de prévision au-delà d'AROME). */ ville: string } | null;
+  /** Genre de la vidéo (par défaut : prévisions). */
+  genre?: Genre;
+  /** Écran final « Abonnez-vous ! ». */
+  abonne?: boolean;
+  /** Textes libres qui apparaissent en gros au fil de la vidéo (un mot entre *étoiles* est mis en couleur). */
+  legendes?: string[];
+  alerte?: DonneesAlerte;
+  tendance12?: DonneesTendance;
 }
+
+/** Durée du contenu de la vidéo, sans l'écran final « Abonnez-vous ! » (celui des vidéos d'alerte en fait partie). */
+function dureeContenu(c: Contexte): number {
+  if (c.genre === 'alerte' && c.alerte) return DUREE_ALERTE_DEBUT + c.alerte.types.length * DUREE_ALERTE_TYPE + DUREE_ALERTE_FIN;
+  if (c.genre === 'tendance' && c.tendance12) return dureeCartesTendance(c.tendance12.jours.length) + (c.tendance12.semaines ? DUREE_SEMAINES : 0);
+  return dureeTotale(c.villes.length, !!c.hook, !!c.tendance, !!c.carte);
+}
+/** Durée totale : le contenu, puis l'écran « Abonnez-vous ! » si l'option est cochée (dans l'alerte, il est déjà dans la dernière scène). */
+const dureeVideo = (c: Contexte): number => dureeContenu(c) + (c.abonne && c.genre !== 'alerte' ? DUREE_ABONNE : 0);
 
 /** Écran « carte » après l'intro : les villes apparaissent une à une sur la carte, puis la carte reste affichée. */
 const dureeCarte = (n: number) => 1 + 0.55 * n + 3.2;
@@ -864,8 +951,540 @@ function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte, local?: numbe
   pied(ctx, logo);
 }
 
-/** Dessine l'image de la vidéo à l'instant `t` (secondes), aux dimensions du canevas. */
+// ── Vidéos d'alerte et de tendance : bandeaux « flash météo », écran « Abonnez-vous ! », textes qui apparaissent ───────────────────
+
+const ROUGE_ALERTE = '#e0191b';
+const VIOLET_ALERTE = '#33217f';
+const ROSE_LEGENDE = '#ff2d55';
+
+/**
+ * Bandeau de texte « flash météo » : rectangle plein aux coins arrondis, texte en majuscules centré sur une ou plusieurs lignes, réduit jusqu'à tenir
+ * dans `lignesMax` lignes. `apparition` (0 → 1) : entrée avec un petit rebond. Centré en `cx` ; retourne la hauteur du bandeau.
+ */
+function bandeau(
+  ctx: CanvasRenderingContext2D,
+  texte: string,
+  cx: number,
+  y: number,
+  largeur: number,
+  couleurFond: string,
+  taille: number,
+  u: number,
+  opts: { couleurTexte?: string; lignesMax?: number; apparition?: number; rayon?: number; police?: string } = {}
+): number {
+  const { couleurTexte = '#fff', lignesMax = 3, apparition = 1, rayon = 26, police = POLICE } = opts;
+  if (!texte.trim()) return 0;
+  const utile = largeur - 60 * u;
+  const decouper = (px: number): string[] => {
+    ctx.font = `${px}px ${police}`;
+    const lignes: string[] = [];
+    let courante = '';
+    for (const mot of texte.split(/\s+/).filter(Boolean)) {
+      const essai = courante ? `${courante} ${mot}` : mot;
+      if (courante && ctx.measureText(essai).width > utile) {
+        lignes.push(courante);
+        courante = mot;
+      } else courante = essai;
+    }
+    if (courante) lignes.push(courante);
+    return lignes;
+  };
+  let px = taille;
+  let lignes = decouper(px);
+  while ((lignes.length > lignesMax || lignes.some((l) => ctx.measureText(l).width > utile)) && px > 22 * u) {
+    px -= 2 * u;
+    lignes = decouper(px);
+  }
+  const hl = px * 1.1;
+  const h = lignes.length * hl + 34 * u;
+  const a = sortie(apparition);
+  if (a > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a * 1.5);
+    const echelle = 0.75 + 0.25 * a + 0.05 * Math.sin(Math.min(1, apparition) * Math.PI);
+    ctx.translate(cx, y + h / 2);
+    ctx.scale(echelle, echelle);
+    ctx.translate(-cx, -(y + h / 2));
+    ctx.fillStyle = couleurFond;
+    rectArrondi(ctx, cx - largeur / 2, y, largeur, h, rayon * u);
+    ctx.fill();
+    ctx.fillStyle = couleurTexte;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = `${px}px ${police}`;
+    lignes.forEach((l, i) => ctx.fillText(l, cx, y + 17 * u + i * hl + px * 0.86));
+    ctx.restore();
+  }
+  return h;
+}
+
+/** Texte à gros contour (légendes qui apparaissent, valeurs sur les cartes) ; l'alignement est celui du contexte. */
+function texteContour(ctx: CanvasRenderingContext2D, texte: string, x: number, y: number, taille: number, couleur: string, contour = '#000') {
+  ctx.font = `${taille}px ${POLICE}`;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = taille * 0.16;
+  ctx.strokeStyle = contour;
+  ctx.strokeText(texte, x, y);
+  ctx.fillStyle = couleur;
+  ctx.fillText(texte, x, y);
+}
+
+/** Cloche jaune qui sonne (elle se balance), centrée en (cx, cy), de hauteur `s`. */
+function cloche(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, t: number) {
+  ctx.save();
+  ctx.translate(cx, cy - s * 0.5);
+  ctx.rotate(Math.sin(t * 10) * 0.3);
+  ctx.beginPath();
+  ctx.moveTo(-0.52 * s, 0.86 * s);
+  ctx.bezierCurveTo(-0.38 * s, 0.74 * s, -0.34 * s, 0.55 * s, -0.32 * s, 0.38 * s);
+  ctx.bezierCurveTo(-0.28 * s, 0.14 * s, -0.14 * s, 0.04 * s, 0, 0.04 * s);
+  ctx.bezierCurveTo(0.14 * s, 0.04 * s, 0.28 * s, 0.14 * s, 0.32 * s, 0.38 * s);
+  ctx.bezierCurveTo(0.34 * s, 0.55 * s, 0.38 * s, 0.74 * s, 0.52 * s, 0.86 * s);
+  ctx.closePath();
+  ctx.fillStyle = '#ffd400';
+  ctx.fill();
+  ctx.lineWidth = s * 0.05;
+  ctx.strokeStyle = '#fff';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  for (const [x, y, r] of [[Math.sin(t * 10 + 1) * 0.06, 0.95, 0.09], [0, 0.02, 0.06]]) {
+    ctx.beginPath();
+    ctx.arc(x * s, y * s, r * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Fond des vidéos d'alerte : ciel d'orage gris sombre, nuages qui dérivent, liseré rouge qui pulse. */
+function fondAlerte(ctx: CanvasRenderingContext2D, t: number) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#5a646d');
+  g.addColorStop(0.5, '#39424a');
+  g.addColorStop(1, '#1e252b');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  [[0.2, 0.15, 460, 0], [0.82, 0.38, 400, 2], [0.3, 0.72, 500, 4]].forEach(([x, y, r, ph]) => {
+    const cx = x * W + Math.sin(t * 0.35 + ph) * 70 * u;
+    const cy = y * H + Math.cos(t * 0.25 + ph) * 40 * u;
+    const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * u);
+    rg.addColorStop(0, 'rgba(205,215,225,0.24)');
+    rg.addColorStop(1, 'rgba(205,215,225,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, W, H);
+  });
+  const pulse = 0.5 + 0.5 * Math.sin(t * 4);
+  ctx.strokeStyle = `rgba(224,25,27,${0.3 + 0.45 * pulse})`;
+  ctx.lineWidth = 18 * u;
+  ctx.strokeRect(9 * u, 9 * u, W - 18 * u, H - 18 * u);
+}
+
+/** Dernier écran : « Suivez… » dans un bandeau rouge, puis (si demandé) la cloche qui sonne et « ABONNEZ-VOUS ! » qui pulse. */
+function ecranFinal(ctx: CanvasRenderingContext2D, local: number, t: number, logo: HTMLImageElement | null, opts: { haut: string; abonne: boolean; sombre: boolean }) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  if (opts.sombre) fondAlerte(ctx, t);
+  else fond(ctx);
+  const bas = H - 250 * u;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center';
+  if (!opts.abonne) {
+    bandeau(ctx, opts.haut, W / 2, bas * 0.36, W * 0.92, ROUGE_ALERTE, 130 * u, u, { lignesMax: 3, apparition: local / 0.5 });
+    pied(ctx, logo);
+    return;
+  }
+  const y1 = bas * 0.1;
+  const h1 = bandeau(ctx, opts.haut, W / 2, y1, W * 0.92, ROUGE_ALERTE, 120 * u, u, { lignesMax: 3, apparition: local / 0.5 });
+  const s = Math.min(W * 0.4, bas * 0.26);
+  const yCloche = y1 + h1 + 50 * u;
+  const pop = sortie((local - 0.3) / 0.4);
+  if (pop > 0) {
+    ctx.save();
+    ctx.globalAlpha = pop;
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 20 * u;
+    cloche(ctx, W / 2, yCloche + s / 2, s * pop, t);
+    ctx.restore();
+  }
+  const yBox = yCloche + s + 50 * u;
+  const pulse = 1 + 0.035 * Math.sin(local * 7);
+  ctx.save();
+  ctx.translate(W / 2, yBox + 110 * u);
+  ctx.scale(pulse, pulse);
+  ctx.translate(-W / 2, -(yBox + 110 * u));
+  bandeau(ctx, 'ABONNEZ-VOUS !', W / 2, yBox, W * 0.92, '#fff', 170 * u, u, { couleurTexte: ROUGE_ALERTE, lignesMax: 1, apparition: (local - 0.6) / 0.4 });
+  ctx.restore();
+  pied(ctx, logo);
+}
+
+/**
+ * Vidéo d'alerte (style flash météo) : bandeaux rouges à texte blanc (en-tête, titre) et bandeau violet (période) qui arrivent l'un après l'autre sur un ciel d'orage,
+ * pictos de vigilance, puis un écran par type d'alerte, et « Suivez la situation en direct » (avec « Abonnez-vous ! » si demandé).
+ */
+function dessinerAlerte(ctx: CanvasRenderingContext2D, t: number, c: Contexte, a: DonneesAlerte) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const { logo } = c;
+  const fin = DUREE_ALERTE_DEBUT + a.types.length * DUREE_ALERTE_TYPE;
+  if (t >= fin) {
+    ecranFinal(ctx, t - fin, t, logo, { haut: 'SUIVEZ LA SITUATION EN DIRECT', abonne: !!c.abonne, sombre: true });
+    return;
+  }
+  fondAlerte(ctx, t);
+  const bas = H - 250 * u;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center';
+  if (t < DUREE_ALERTE_DEBUT) {
+    let y = 100 * u;
+    y += bandeau(ctx, a.entete, W / 2, y, W * 0.72, ROUGE_ALERTE, 130 * u, u, { lignesMax: 1, apparition: t / 0.5 }) + 34 * u;
+    y += bandeau(ctx, a.titre, W / 2, y, W * 0.94, ROUGE_ALERTE, 104 * u, u, { lignesMax: 5, apparition: (t - 0.5) / 0.5 }) + 34 * u;
+    y += bandeau(ctx, a.periode, W / 2, y, W * 0.94, VIOLET_ALERTE, 62 * u, u, { lignesMax: 2, apparition: (t - 1) / 0.5 }) + 46 * u;
+    const n = a.types.length;
+    const libre = bas - y - 10 * u;
+    if (n > 0 && libre > 80 * u) {
+      const gap = 30 * u;
+      const s = Math.min(420 * u, libre, (W * 0.94 - (n - 1) * gap) / n);
+      const x0 = W / 2 - (n * s + (n - 1) * gap) / 2;
+      a.types.forEach((ty, k) => {
+        const pop = sortie((t - 1.6 - k * 0.3) / 0.4);
+        if (pop <= 0 || !ty.picto) return;
+        ctx.save();
+        ctx.translate(x0 + k * (s + gap) + s / 2, y + libre / 2);
+        ctx.scale(pop, pop);
+        ctx.shadowColor = 'rgba(0,0,0,0.45)';
+        ctx.shadowBlur = 24 * u;
+        ctx.shadowOffsetY = 8 * u;
+        dessinerPicto(ctx, ty.picto, -s / 2, -s / 2, s, t, k);
+        ctx.restore();
+      });
+    }
+    pied(ctx, logo);
+    return;
+  }
+  // Un type d'alerte à la fois : grand picto, son nom, le détail éventuel, rappel de la période.
+  const k = Math.min(a.types.length - 1, Math.floor((t - DUREE_ALERTE_DEBUT) / DUREE_ALERTE_TYPE));
+  const local = t - DUREE_ALERTE_DEBUT - k * DUREE_ALERTE_TYPE;
+  const ty = a.types[k];
+  bandeau(ctx, a.entete, W / 2, 100 * u, W * 0.6, ROUGE_ALERTE, 100 * u, u, { lignesMax: 1 });
+  const s = Math.min(W * 0.62, bas * 0.33);
+  const py = 330 * u;
+  if (ty.picto) {
+    const pop = sortie(local / 0.45);
+    ctx.save();
+    ctx.translate(W / 2, py + s / 2);
+    ctx.scale(pop * (1 + 0.03 * Math.sin(local * 6)), pop * (1 + 0.03 * Math.sin(local * 6)));
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 30 * u;
+    ctx.shadowOffsetY = 10 * u;
+    dessinerPicto(ctx, ty.picto, -s / 2, -s / 2, s, t, k);
+    ctx.restore();
+  }
+  const yl = py + s + 40 * u;
+  const hl = bandeau(ctx, ty.libelle.toUpperCase(), W / 2, yl, W * 0.92, ROUGE_ALERTE, 120 * u, u, { lignesMax: 2, apparition: (local - 0.25) / 0.4 });
+  if (a.detail) bandeau(ctx, a.detail, W / 2, yl + hl + 28 * u, W * 0.92, VIOLET_ALERTE, 54 * u, u, { lignesMax: 3, apparition: (local - 0.5) / 0.4 });
+  bandeau(ctx, a.periode, W / 2, bas - 170 * u, W * 0.94, VIOLET_ALERTE, 54 * u, u, { lignesMax: 2 });
+  pied(ctx, logo);
+}
+
+/** Température maximale → couleur : violet (gel) → bleu → cyan → vert → jaune → orange → rouge → magenta (canicule). */
+const RAMPE_TX: [number, [number, number, number]][] = (
+  [[-5, '#7b3fb0'], [0, '#2f6fe0'], [6, '#2bc3dc'], [10, '#41c35a'], [14, '#f0e130'], [19, '#f5a21f'], [24, '#e5472b'], [30, '#b8135f'], [38, '#6d1b7b']] as [number, string][]
+).map(([v, h]): [number, [number, number, number]] => [v, [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]]);
+function couleurTx(v: number): [number, number, number] {
+  if (v <= RAMPE_TX[0][0]) return RAMPE_TX[0][1];
+  for (let i = 1; i < RAMPE_TX.length; i++) {
+    if (v <= RAMPE_TX[i][0]) {
+      const [v0, c0] = RAMPE_TX[i - 1];
+      const [v1, c1] = RAMPE_TX[i];
+      const f = (v - v0) / (v1 - v0);
+      return [c0[0] + (c1[0] - c0[0]) * f, c0[1] + (c1[1] - c0[1]) * f, c0[2] + (c1[2] - c0[2]) * f];
+    }
+  }
+  return RAMPE_TX[RAMPE_TX.length - 1][1];
+}
+
+/**
+ * Carte de température d'un département : champ continu (pondération par l'inverse de la distance aux points de prévision), colorié
+ * selon la rampe, découpé au contour du département. Image de 380 px au plus sur son grand côté ; null sans point ni contour.
+ */
+function champTemperature(points: PointChamp[], anneaux: Anneau[], px = 380): HTMLCanvasElement | null {
+  if (points.length === 0 || anneaux.length === 0) return null;
+  let lon0 = 999, lon1 = -999, lat0 = 999, lat1 = -999;
+  for (const a of anneaux) for (const [lon, lat] of a) { lon0 = Math.min(lon0, lon); lon1 = Math.max(lon1, lon); lat0 = Math.min(lat0, lat); lat1 = Math.max(lat1, lat); }
+  const k = Math.cos(((lat0 + lat1) / 2) * (Math.PI / 180));
+  const dx = (lon1 - lon0) * k;
+  const dy = lat1 - lat0;
+  const s = px / Math.max(dx, dy);
+  const w = Math.max(2, Math.ceil(dx * s));
+  const h = Math.max(2, Math.ceil(dy * s));
+  const champ = document.createElement('canvas');
+  champ.width = w;
+  champ.height = h;
+  const cc = champ.getContext('2d');
+  const sortieCanvas = document.createElement('canvas');
+  sortieCanvas.width = w;
+  sortieCanvas.height = h;
+  const o = sortieCanvas.getContext('2d');
+  if (!cc || !o) return null;
+  const pts = points.map((p) => ({ x: (p.lon - lon0) * k * s, y: (lat1 - p.lat) * s, v: p.v }));
+  const img = cc.createImageData(w, h);
+  const pas = 2;
+  for (let y = 0; y < h; y += pas) {
+    for (let x = 0; x < w; x += pas) {
+      let sw = 0;
+      let sv = 0;
+      for (const p of pts) {
+        const poids = 1 / ((p.x - x) ** 2 + (p.y - y) ** 2 + 40) ** 1.2;
+        sw += poids;
+        sv += poids * p.v;
+      }
+      const [r, g, b] = couleurTx(sv / sw);
+      for (let j = 0; j < pas && y + j < h; j++) {
+        for (let i = 0; i < pas && x + i < w; i++) {
+          const o4 = ((y + j) * w + x + i) * 4;
+          img.data[o4] = r;
+          img.data[o4 + 1] = g;
+          img.data[o4 + 2] = b;
+          img.data[o4 + 3] = 255;
+        }
+      }
+    }
+  }
+  cc.putImageData(img, 0, 0);
+  const tracer = () => {
+    o.beginPath();
+    for (const a of anneaux) {
+      a.forEach(([lon, lat], i) => (i === 0 ? o.moveTo((lon - lon0) * k * s, (lat1 - lat) * s) : o.lineTo((lon - lon0) * k * s, (lat1 - lat) * s)));
+      o.closePath();
+    }
+  };
+  o.save();
+  tracer();
+  o.clip();
+  o.drawImage(champ, 0, 0);
+  o.restore();
+  tracer();
+  o.lineJoin = 'round';
+  o.lineWidth = 2.4;
+  o.strokeStyle = '#13233f';
+  o.stroke();
+  return sortieCanvas;
+}
+
+const MOIS_COURT = (iso: string) => `${Number(iso.slice(8, 10))} ${NOMS_MOIS[Number(iso.slice(5, 7)) - 1].toUpperCase()}`;
+
+/** Les 12 jours en cartes : titre en bloc rouge, légende des couleurs, une carte de température par jour (bandeau violet de date), qui arrivent une à une. */
+function dessinerCartesTendance(ctx: CanvasRenderingContext2D, t: number, c: Contexte, d: DonneesTendance) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const vertical = empile(W, H);
+  const n = d.jours.length;
+  const fin = d.jours[n - 1];
+  const titre = `ÉVOLUTION DES TEMPÉRATURES MAXIMALES EN ${c.departement.toUpperCase()} DU ${MOIS_COURT(d.jours[0])} AU ${NOMS_JOURS[jourDeSemaine(fin)].toUpperCase()} ${MOIS_COURT(fin)} ${fin.slice(0, 4)}`;
+  const largTitre = W * (vertical ? 0.56 : 0.5);
+  const hTitre = bandeau(ctx, titre, largTitre / 2, 0, largTitre, ROUGE_ALERTE, 64 * u, u, { lignesMax: 6, rayon: 0, apparition: t / 0.4 });
+  // Légende : barre de couleurs de la rampe, repères de 10 en 10 °C.
+  const xl = largTitre + 30 * u;
+  const wl = W - xl - 30 * u;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#fff';
+  ctx.font = `700 ${32 * u}px ${TEXTE}`;
+  ctx.fillText('Température maximale', xl, 58 * u);
+  ctx.fillText('Tx (24 h) °C', xl, 98 * u);
+  const [v0, v1] = [RAMPE_TX[0][0], RAMPE_TX[RAMPE_TX.length - 1][0]];
+  const barre = ctx.createLinearGradient(xl, 0, xl + wl, 0);
+  for (const [v, [r, g, b]] of RAMPE_TX) barre.addColorStop((v - v0) / (v1 - v0), `rgb(${r},${g},${b})`);
+  ctx.fillStyle = barre;
+  rectArrondi(ctx, xl, 120 * u, wl, 34 * u, 17 * u);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = `700 ${28 * u}px ${TEXTE}`;
+  ctx.textAlign = 'center';
+  for (const v of [0, 10, 20, 30]) ctx.fillText(String(v), xl + ((v - v0) / (v1 - v0)) * wl, 196 * u);
+  // Grille des cartes.
+  const cols = vertical ? 3 : 4;
+  const rows = Math.ceil(n / cols);
+  const haut = Math.max(hTitre, 220 * u) + 24 * u;
+  const bas = H - 250 * u;
+  const gx = 18 * u;
+  const gy = 14 * u;
+  const cw = (W - gx * (cols + 1)) / cols;
+  const ch = (bas - haut - (rows - 1) * gy) / rows;
+  d.jours.forEach((iso, i) => {
+    const a = sortie((t - 0.6 - i * 0.45) / 0.4);
+    if (a <= 0) return;
+    const x = gx + (i % cols) * (cw + gx);
+    const y = haut + Math.floor(i / cols) * (ch + gy);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(x + cw / 2, y + ch / 2);
+    ctx.scale(0.9 + 0.1 * a, 0.9 + 0.1 * a);
+    ctx.translate(-(x + cw / 2), -(y + ch / 2));
+    const hl = Math.min(46 * u, ch * 0.16);
+    ctx.fillStyle = VIOLET_ALERTE;
+    rectArrondi(ctx, x, y, cw, hl, 12 * u);
+    ctx.fill();
+    ctx.textAlign = 'center';
+    texteAjuste(ctx, `${NOMS_JOURS[jourDeSemaine(iso)].toUpperCase()} ${MOIS_COURT(iso)} ${iso.slice(0, 4)}`, x + cw / 2, y + hl * 0.76, hl * 0.66, POLICE, cw - 16 * u);
+    const carte = d.cartes[i];
+    const rh = ch - hl - 6 * u;
+    if (carte) {
+      const e = Math.min(cw / carte.width, rh / carte.height);
+      ctx.drawImage(carte, x + (cw - carte.width * e) / 2, y + hl + 6 * u + (rh - carte.height * e) / 2, carte.width * e, carte.height * e);
+      const maxi = Math.max(...d.valeurs[i].map((p) => p.v));
+      ctx.textAlign = 'right';
+      texteContour(ctx, `${Math.round(maxi)}°`, x + cw - 10 * u, y + ch - 10 * u, Math.min(70 * u, rh * 0.3), '#fff');
+    } else {
+      texteAjuste(ctx, 'Pas de prévision', x + cw / 2, y + hl + rh / 2, 30 * u, TEXTE, cw - 20 * u, '#dcecff');
+    }
+    ctx.restore();
+  });
+}
+
+/** « +1,2 » / « −0,8 » : écart signé, virgule décimale. */
+const ecartSigne = (v: number, decimales: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(decimales).replace('.', ',')}`;
+const libelleEcartTemperature = (v: number) => (Math.abs(v) < 0.5 ? 'PROCHE DE LA NORMALE' : v >= 1.5 ? 'NETTEMENT PLUS DOUX' : v > 0 ? 'PLUS DOUX QUE LA NORMALE' : v <= -1.5 ? 'NETTEMENT PLUS FRAIS' : 'PLUS FRAIS QUE LA NORMALE');
+const libelleEcartPluie = (p: number) => (Math.abs(p) < 15 ? 'PLUIE PROCHE DE LA NORMALE' : p >= 40 ? 'NETTEMENT PLUS ARROSÉ' : p > 0 ? 'PLUS ARROSÉ' : p <= -40 ? 'NETTEMENT PLUS SEC' : 'PLUS SEC');
+const ICONE_CHAUD = cheminPictoImage('am:thermometre-chaud') ?? '';
+const ICONE_FROID = cheminPictoImage('am:thermometre-froid') ?? '';
+const ICONE_PLUVIO = cheminPictoImage('am:pluviometre') ?? '';
+
+/** Tendance à 4 semaines : une ligne par semaine (dates, écart de température, écart de pluie à la normale). */
+function ecranSemaines(ctx: CanvasRenderingContext2D, local: number, t: number, c: Contexte, d: DonneesTendance) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const bas = H - 250 * u;
+  const semaines = d.semaines ?? [];
+  const hT = bandeau(ctx, 'TENDANCE À 4 SEMAINES', W / 2, 0, W, ROUGE_ALERTE, 104 * u, u, { lignesMax: 2, rayon: 0, apparition: local / 0.4 });
+  const hP = bandeau(ctx, c.departement.toUpperCase(), W / 2, hT + 24 * u, W * 0.8, VIOLET_ALERTE, 66 * u, u, { lignesMax: 1, apparition: (local - 0.2) / 0.4 });
+  const haut = hT + hP + 70 * u;
+  const gap = 22 * u;
+  const hc = (bas - 20 * u - haut - (semaines.length - 1) * gap) / Math.max(1, semaines.length);
+  semaines.forEach((s, k) => {
+    const a = sortie((local - 0.5 - k * 0.35) / 0.45);
+    if (a <= 0) return;
+    const y = haut + k * (hc + gap);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate((1 - a) * 120 * u, 0);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 3;
+    rectArrondi(ctx, 40 * u, y, W - 80 * u, hc, 30 * u);
+    ctx.fill();
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    texteAjuste(ctx, s.titre.toUpperCase(), 70 * u, y + hc * 0.46, Math.min(58 * u, hc * 0.34), POLICE, W * 0.21, '#ffe27a');
+    texteAjuste(ctx, s.sousTitre, 70 * u, y + hc * 0.74, Math.min(32 * u, hc * 0.2), TEXTE, W * 0.21, '#dcecff');
+    // Deux colonnes : température (icône, écart, commentaire) puis pluie ; la valeur prend la place restante à droite de l'icône.
+    const colonne = (x: number, largeur: number, icone: string, valeur: string, libelle: string, couleur: string) => {
+      const s2 = Math.min(hc * 0.5, W * 0.085);
+      const img = imageDe.get(icone);
+      if (img) ctx.drawImage(img, x, y + hc * 0.1, s2, s2);
+      texteAjuste(ctx, valeur, x + s2 + 14 * u, y + hc * 0.1 + s2 * 0.82, Math.min(88 * u, hc * 0.4), POLICE, largeur - s2 - 14 * u, couleur);
+      texteAjuste(ctx, libelle, x, y + hc * 0.86, Math.min(30 * u, hc * 0.19), TEXTE, largeur, '#fff');
+    };
+    if (s.t != null) colonne(W * 0.3, W * 0.34, s.t >= 0 ? ICONE_CHAUD : ICONE_FROID, `${ecartSigne(s.t, 1)} °C`, libelleEcartTemperature(s.t), s.t >= 0.5 ? '#ff9d6b' : s.t <= -0.5 ? '#9ad8ff' : '#fff');
+    if (s.pluie != null) colonne(W * 0.66, W * 0.28, ICONE_PLUVIO, `${ecartSigne(Math.round(s.pluie), 0)} %`, libelleEcartPluie(s.pluie), s.pluie >= 15 ? '#7fd1ff' : s.pluie <= -15 ? '#ffd27a' : '#fff');
+    ctx.restore();
+  });
+  pied(ctx, c.logo);
+}
+
+/** Vidéo « tendance » : les cartes de température des 12 jours, puis la tendance à 4 semaines (pour les départements qui en ont une). */
+function dessinerTendance12(ctx: CanvasRenderingContext2D, t: number, c: Contexte, d: DonneesTendance) {
+  const dc = dureeCartesTendance(d.jours.length);
+  fond(ctx);
+  if (t < dc || !d.semaines) {
+    dessinerCartesTendance(ctx, t, c, d);
+    pied(ctx, c.logo);
+    return;
+  }
+  ecranSemaines(ctx, t - dc, t, c, d);
+}
+
+/** Textes qui apparaissent en gros au fil de la vidéo (un par ligne saisie, répartis sur sa durée) : mots un à un, contour noir, `*mot*` en rose. */
+function dessinerLegendes(ctx: CanvasRenderingContext2D, t: number, total: number, lignes: string[]) {
+  const { width: W, height: H } = ctx.canvas;
+  const u = unite(W, H);
+  const duree = total / lignes.length;
+  const i = Math.min(lignes.length - 1, Math.floor(t / duree));
+  const local = t - i * duree;
+  const mots: { mot: string; couleur: string }[] = [];
+  for (const morceau of lignes[i].split(/(\*[^*]+\*)/)) {
+    const colore = morceau.length > 2 && morceau.startsWith('*') && morceau.endsWith('*');
+    for (const mot of (colore ? morceau.slice(1, -1) : morceau).split(/\s+/).filter(Boolean)) mots.push({ mot: mot.toUpperCase(), couleur: colore ? ROSE_LEGENDE : '#fff' });
+  }
+  if (mots.length === 0) return;
+  // Mise en lignes : la taille baisse jusqu'à ce que le texte tienne dans 80 % de la largeur, sur trois lignes au plus.
+  let px = 118 * u;
+  let rangs: { mot: string; couleur: string }[][] = [];
+  const largeurMax = W * 0.86;
+  for (; px > 40 * u; px -= 4 * u) {
+    ctx.font = `${px}px ${POLICE}`;
+    rangs = [[]];
+    let courante = 0;
+    const espace = ctx.measureText(' ').width;
+    for (const m of mots) {
+      const l = ctx.measureText(m.mot).width;
+      if (courante > 0 && courante + espace + l > largeurMax) {
+        rangs.push([]);
+        courante = 0;
+      }
+      rangs[rangs.length - 1].push(m);
+      courante += (courante > 0 ? espace : 0) + l;
+    }
+    if (rangs.length <= 3) break;
+  }
+  const alpha = Math.min(1, local / 0.15, (duree - local) / 0.2);
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  ctx.font = `${px}px ${POLICE}`;
+  const espace = ctx.measureText(' ').width;
+  const hl = px * 1.18;
+  const y0 = H * 0.55 - (rangs.length * hl) / 2 + px * 0.9;
+  let rang = 0;
+  rangs.forEach((ligne, r) => {
+    const largeur = ligne.reduce((s, m) => s + ctx.measureText(m.mot).width, 0) + espace * (ligne.length - 1);
+    let x = (W - largeur) / 2;
+    for (const m of ligne) {
+      const pop = sortie((local - 0.1 - rang * 0.12) / 0.2);
+      if (pop > 0) {
+        const lm = ctx.measureText(m.mot).width;
+        ctx.save();
+        ctx.translate(x + lm / 2, y0 + r * hl - px * 0.35);
+        ctx.scale(0.8 + 0.2 * pop, 0.8 + 0.2 * pop);
+        ctx.globalAlpha = alpha * pop;
+        ctx.textAlign = 'center';
+        texteContour(ctx, m.mot, 0, px * 0.35, px, m.couleur);
+        ctx.restore();
+      }
+      x += ctx.measureText(m.mot).width + espace;
+      rang++;
+    }
+  });
+  ctx.restore();
+}
+
+/** Image de la vidéo à l'instant `t` (secondes), aux dimensions du canevas : selon le genre, puis l'écran « Abonnez-vous ! » et les textes qui apparaissent. */
 function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
+  const contenu = dureeContenu(c);
+  if (c.abonne && c.genre !== 'alerte' && t >= contenu) ecranFinal(ctx, t - contenu, t, c.logo, { haut: 'SUIVEZ LA MÉTÉO EN DIRECT', abonne: true, sombre: false });
+  else if (c.genre === 'alerte' && c.alerte) dessinerAlerte(ctx, t, c, c.alerte);
+  else if (c.genre === 'tendance' && c.tendance12) dessinerTendance12(ctx, t, c, c.tendance12);
+  else dessinerPrevisions(ctx, t, c);
+  if (c.legendes && c.legendes.length > 0) dessinerLegendes(ctx, t, dureeVideo(c), c.legendes);
+}
+
+/** Dessine l'image de la vidéo de prévisions (jour ou week-end) à l'instant `t` (secondes), aux dimensions du canevas. */
+function dessinerPrevisions(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   const { semaine, villes, logo, departement, textes } = c;
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
@@ -997,7 +1616,36 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm w-full';
 const legende = 'mb-1 block text-xs font-bold uppercase tracking-wide text-primary';
 
-export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, specialInitial }: { aujourdhui: string; formatInitial?: string; zoneInitiale?: string; specialInitial?: string }) {
+export default function VideoWeekEnd({
+  aujourdhui,
+  formatInitial,
+  zoneInitiale,
+  specialInitial,
+  typeInitial,
+  abonneInitial,
+  saisonnier = null,
+}: {
+  aujourdhui: string;
+  formatInitial?: string;
+  zoneInitiale?: string;
+  specialInitial?: string;
+  /** Genre ouvert d'office : « alerte » ou « tendance » (sinon les prévisions). */
+  typeInitial?: string;
+  /** « 1 » : écran final « Abonnez-vous ! » coché d'office. */
+  abonneInitial?: string;
+  /** Tendance à 4 semaines (CFSv2) des Pyrénées-Orientales, lue côté serveur. */
+  saisonnier?: { semaines: Semaine4[] } | null;
+}) {
+  const [genre, setGenre] = useState<Genre>(typeInitial === 'alerte' || typeInitial === 'tendance' ? typeInitial : 'previsions');
+  // Écran final « Abonnez-vous ! » : option pour toutes les vidéos, cochée d'office dans l'alerte.
+  const [abonne, setAbonne] = useState(abonneInitial ? abonneInitial === '1' : typeInitial === 'alerte');
+  // Textes libres qui apparaissent en gros dans la vidéo : un par ligne, un mot entre *étoiles* est mis en rose.
+  const [legendesTexte, setLegendesTexte] = useState('');
+  // Vidéo d'alerte : niveau, types, jour, et textes saisis à la main (absents : textes automatiques).
+  const [niveauAlerte, setNiveauAlerte] = useState<NiveauAlerte>('orange');
+  const [typesAlerte, setTypesAlerte] = useState<string[]>(['vent']);
+  const [ecartAlerte, setEcartAlerte] = useState(0);
+  const [saisies, setSaisies] = useState<{ entete?: string; titre?: string; periode?: string; detail?: string }>({});
   const [modele, setModele] = useState<ModeleMeteo>('moyenne');
   const [dep, setDep] = useState(zoneInitiale === FRANCE || (zoneInitiale && CODES_DEPARTEMENTS.includes(zoneInitiale)) ? zoneInitiale : '66');
   const [listeVilles, setListeVilles] = useState<{ dep: string; villes: VilleListe[]; reliefs: VilleListe[]; altRelief: number } | null>(null);
@@ -1024,7 +1672,8 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
   const [prets, setPrets] = useState(0);
 
-  const format = FORMATS.find((f) => f.id === formatId)!;
+  // L'accroche « Quel temps chez nous ? » n'existe que pour les prévisions : alerte et tendance prennent alors le format TikTok simple.
+  const format = FORMATS.find((f) => f.id === (genre !== 'previsions' && formatId === 'hook' ? 'tiktok' : formatId))!;
   const jours = useMemo<string[]>(() => (mode === 'weekend' ? weekEnd(aujourdhui) : [ajouterJours(aujourdhui, ecart)]), [aujourdhui, mode, ecart]);
   // Villes de relief : chaque modèle publie sa propre liste de communes de montagne ; on prend celle du modèle qui couvre le dernier jour de la vidéo (AROME, puis ARPEGE, puis CEP).
   const modeleRelief: 'arome' | 'arpege' | 'cep' = jours[jours.length - 1] <= ajouterJours(aujourdhui, ECHEANCE_MAX.arome) ? 'arome' : jours[jours.length - 1] <= ajouterJours(aujourdhui, ECHEANCE_MAX.arpege) ? 'arpege' : 'cep';
@@ -1093,7 +1742,7 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
   }, [modelesProposes, modele]);
 
   useEffect(() => {
-    if (zoneRequete === null || donnees?.cle === cle) return;
+    if (genre !== 'previsions' || zoneRequete === null || donnees?.cle === cle) return;
     const controleur = new AbortController();
     setErreur(null);
     Promise.all(
@@ -1107,13 +1756,13 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
       .then((points) => setDonnees({ cle, points }))
       .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
     return () => controleur.abort();
-  }, [cle, donnees?.cle, jours, modele, dep, zoneRequete]);
+  }, [genre, cle, donnees?.cle, jours, modele, dep, zoneRequete]);
 
   // Tendance : les jours qui suivent la vidéo, toujours en moyenne des modèles (qui va jusqu'à J+10). Si elle échoue, la vidéo se fait sans cet écran.
   const joursTendance = useMemo(() => Array.from({ length: NB_JOURS_TENDANCE }, (_, i) => ajouterJours(jours[jours.length - 1], i + 1)), [jours]);
   const cleTendance = `${joursTendance.join(',')}|${dep}|${zoneRequete}`;
   useEffect(() => {
-    if (zoneRequete === null || donneesTendance?.cle === cleTendance) return;
+    if (genre !== 'previsions' || zoneRequete === null || donneesTendance?.cle === cleTendance) return;
     const controleur = new AbortController();
     Promise.all(
       joursTendance.map((date) =>
@@ -1126,13 +1775,13 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
       .then((points) => setDonneesTendance({ cle: cleTendance, points }))
       .catch(() => {});
     return () => controleur.abort();
-  }, [cleTendance, donneesTendance?.cle, joursTendance, dep, zoneRequete]);
+  }, [genre, cleTendance, donneesTendance?.cle, joursTendance, dep, zoneRequete]);
 
   // Prévisions des villes de relief pour les jours de la vidéo et de la tendance (AROME, puis le CEP au-delà de sa portée ; la moyenne des modèles n'existe pas en montagne).
   const [reliefsParDate, setReliefsParDate] = useState<{ cle: string; parDate: Record<string, PointCarte[]> } | null>(null);
   const cleReliefs = `${[...jours, ...joursTendance].join(",")}|${dep}|${modeleRelief}`;
   useEffect(() => {
-    if (!listeVilles || listeVilles.dep !== dep || listeVilles.reliefs.length === 0) return;
+    if (genre !== 'previsions' || !listeVilles || listeVilles.dep !== dep || listeVilles.reliefs.length === 0) return;
     const controleur = new AbortController();
     const dates = [...jours, ...joursTendance];
     Promise.all(
@@ -1144,7 +1793,7 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
       )
     ).then((listes) => !controleur.signal.aborted && setReliefsParDate({ cle: cleReliefs, parDate: Object.fromEntries(dates.map((d, i) => [d, listes[i]])) }));
     return () => controleur.abort();
-  }, [listeVilles, dep, jours, joursTendance, cleReliefs]);
+  }, [genre, listeVilles, dep, jours, joursTendance, cleReliefs]);
   const pointsReliefs = (date: string): PointCarte[] => (reliefsParDate?.cle === cleReliefs ? reliefsParDate.parDate[date] ?? [] : []);
 
   const toutesLesVilles = useMemo(
@@ -1168,14 +1817,53 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [donneesTendance, cleTendance, joursTendance, toutesLesVilles, reliefsParDate, jeuAlertes, villes]);
 
+  // ── Vidéo d'alerte : textes (saisis, sinon automatiques) et pictos de vigilance des types choisis ──────────────────────────
+  const dateAlerte = ajouterJours(aujourdhui, ecartAlerte);
+  const typesChoisis = TYPES_ALERTE.filter((x) => typesAlerte.includes(x.id));
+  const adjectifNiveau = niveauAlerte === 'orange' ? 'ORANGE' : `${niveauAlerte.toUpperCase()}${typesChoisis.length > 1 ? 'S' : ''}`;
+  const autoAlerte = {
+    entete: 'ATTENTION',
+    titre: `ALERTE${typesChoisis.length > 1 ? 'S' : ''} ${adjectifNiveau}${typesChoisis.length ? ` : ${typesChoisis.map((x) => x.libelle.toUpperCase()).join(' ET ')}` : ''} — ${nomDepartement.toUpperCase()}`,
+    periode: `${ecartAlerte === 0 ? "POUR AUJOURD'HUI : " : 'POUR LE '}${libelleJour(dateAlerte)} ${dateAlerte.slice(0, 4)}`,
+  };
+  const pictosAlerte = typesChoisis.map((x) => ({ libelle: x.libelle, picto: cheminPictoImage(`am:vigilance-${x.id}-${niveauAlerte}`) ?? null }));
+  const clePictosAlerte = pictosAlerte.map((p) => p.picto ?? '').join('|');
+
+  // ── Vidéo « tendance » : prévision de température (moyenne des modèles) des 12 jours, pour tracer une carte par jour ────────
+  const joursCartes = useMemo(() => Array.from({ length: NB_JOURS_CARTES }, (_, i) => ajouterJours(aujourdhui, i)), [aujourdhui]);
+  const cleCartes = `${joursCartes.join(',')}|${dep}`;
+  const [donneesCartes, setDonneesCartes] = useState<{ cle: string; valeurs: PointChamp[][] } | null>(null);
+  useEffect(() => {
+    if (genre !== 'tendance' || france || donneesCartes?.cle === cleCartes) return;
+    const controleur = new AbortController();
+    setErreur(null);
+    Promise.all(
+      joursCartes.map((date) =>
+        fetch(`/api/carte-meteo/previsions/?modele=moyenne&toutes=1&date=${date}&dep=${dep}`, { signal: controleur.signal }).then(async (r) => {
+          if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
+          return ((await r.json()) as { points: PointCarte[] }).points;
+        })
+      )
+    )
+      .then((listes) => setDonneesCartes({ cle: cleCartes, valeurs: listes.map((pts) => pts.flatMap((p) => (p.lat != null && p.lon != null && p.maxi != null ? [{ lat: p.lat, lon: p.lon, v: p.maxi }] : []))) }))
+      .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
+    return () => controleur.abort();
+  }, [genre, france, cleCartes, donneesCartes?.cle, joursCartes, dep]);
+
   // Images des pictos et logo, chargées avant de dessiner.
   useEffect(() => {
-    if (!semaine) return;
     const fichiers = new Set<string>();
-    for (const v of villes) for (const j of semaine.villes[v] ?? []) if (j.picto) fichiers.add(j.picto);
-    if (tendance) for (const j of tendance.villes[tendance.ville] ?? []) if (j.picto) fichiers.add(j.picto);
-    if (ICONE_PLUIE) fichiers.add(ICONE_PLUIE);
-    if (ICONE_VENT) fichiers.add(ICONE_VENT);
+    if (genre === 'previsions') {
+      if (!semaine) return;
+      for (const v of villes) for (const j of semaine.villes[v] ?? []) if (j.picto) fichiers.add(j.picto);
+      if (tendance) for (const j of tendance.villes[tendance.ville] ?? []) if (j.picto) fichiers.add(j.picto);
+      if (ICONE_PLUIE) fichiers.add(ICONE_PLUIE);
+      if (ICONE_VENT) fichiers.add(ICONE_VENT);
+    } else if (genre === 'alerte') {
+      for (const p of pictosAlerte) if (p.picto) fichiers.add(p.picto);
+    } else {
+      for (const f of [ICONE_CHAUD, ICONE_FROID, ICONE_PLUVIO]) if (f) fichiers.add(f);
+    }
     let vivant = true;
     Promise.all(
       [...fichiers].map((f) =>
@@ -1191,7 +1879,17 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
       vivant = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [semaine, villes, logoId, format.id, tendance]);
+  }, [genre, semaine, villes, logoId, format.id, tendance, clePictosAlerte]);
+
+  // Cartes de température des 12 jours, tracées une fois le fond cartographique (contours des départements) chargé.
+  const cartesTendance = useMemo(() => {
+    if (genre !== 'tendance' || !donneesCartes || donneesCartes.cle !== cleCartes || !geoFond) return null;
+    const anneaux = geoFond.depts[dep] ?? [];
+    return donneesCartes.valeurs.map((pts) => champTemperature(pts, anneaux));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genre, donneesCartes, cleCartes, dep, prets]);
+  const tendance12: DonneesTendance | null =
+    cartesTendance && donneesCartes ? { jours: joursCartes, valeurs: donneesCartes.valeurs, cartes: cartesTendance, semaines: dep === '66' ? saisonnier?.semaines ?? null : null } : null;
 
   const avecHook = format.id === 'hook';
   const positions = useMemo(() => {
@@ -1199,16 +1897,29 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
     return Object.fromEntries(villes.map((v) => [v, parNom.get(v)]));
   }, [listeVilles, dep, villes]);
   const carteDansVideo = avecCarte && villes.some((v) => positions[v]);
-  const total = dureeTotale(villes.length, avecHook, !!tendance, carteDansVideo);
   const textes = useMemo(() => textesVideo(mode, jours, ecart, france ? 'auto' : special, france), [mode, jours, ecart, special, france]);
-  const contexte: Contexte | null = semaine && villes.length >= 1 ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions } : null;
+  const legendes = legendesTexte.split('\n').map((l) => l.trim()).filter(Boolean);
+  /** Contexte des vidéos sans prévisions de villes (alerte, tendance) : aucune ville ni semaine. */
+  const base = { semaine: { jours: [], villes: {} } as Semaine, villes: [] as string[], textes: { intro: ['', ''], sous: '', bandeau: '', recap: '' } as Contexte['textes'], logo, departement: nomDepartement, codeDep: dep, abonne, legendes };
+  const contexte: Contexte | null =
+    genre === 'alerte'
+      ? { ...base, genre, alerte: { entete: saisies.entete ?? autoAlerte.entete, titre: saisies.titre ?? autoAlerte.titre, periode: saisies.periode ?? autoAlerte.periode, detail: saisies.detail ?? '', types: pictosAlerte } }
+      : genre === 'tendance'
+        ? tendance12
+          ? { ...base, genre, tendance12 }
+          : null
+        : semaine && villes.length >= 1
+          ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions, genre, abonne, legendes }
+          : null;
+  const total = contexte ? dureeVideo(contexte) : 0;
 
+  // Aperçu : redessiné à chaque rendu (position de lecture, textes, données, format).
   useEffect(() => {
     const c = canvasRef.current;
     const ctx = c?.getContext('2d');
     if (ctx && contexte) dessiner(ctx, Math.min(t, total - 0.01), contexte);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, semaine, logo, prets, villes.join('|'), format, positions]);
+  }, [t, contexte]);
 
   useEffect(() => {
     if (!lecture) return;
@@ -1239,7 +1950,12 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
       c.width = format.l;
       c.height = format.h;
       const ctx = c.getContext('2d')!;
-      const nomFichier = (ext: string) => `meteo-${special === 'auto' ? '' : `${special}-`}${mode === 'weekend' ? 'weekend' : 'jour'}-${dep}-${format.id}-${jours[0]}.${ext}`;
+      const nomFichier = (ext: string) =>
+        genre === 'alerte'
+          ? `alerte-${niveauAlerte}-${dep}-${format.id}-${dateAlerte}.${ext}`
+          : genre === 'tendance'
+            ? `tendance-${dep}-${format.id}-${aujourdhui}.${ext}`
+            : `meteo-${special === 'auto' ? '' : `${special}-`}${mode === 'weekend' ? 'weekend' : 'jour'}-${dep}-${format.id}-${jours[0]}.${ext}`;
       const telecharger = (blob: Blob, ext: string) => {
         const url = URL.createObjectURL(blob);
         const lien = document.createElement('a');
@@ -1344,7 +2060,8 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
       return val < 0 ? [] : [{ lieu: secteur(v) ? `${v} (${secteur(v)})` : v, departement: france ? undefined : dep, valeur: val }];
     }));
     ajouter('Cumul de pluie (mm)', 'mm', 'plus hautes', villes.flatMap((v) => {
-      const val = Math.max(...jours.map((_, d) => semaine.villes[v]?.[d]?.pluie ?? -1));
+      // Comme avant : sous 0,5 mm, la pluie compte pour zéro dans la légende du post.
+      const val = Math.max(...jours.map((_, d) => (semaine.villes[v]?.[d]?.pluie == null ? -1 : pluieRetenue(semaine.villes[v][d].pluie))));
       return val < 0 ? [] : [{ lieu: secteur(v) ? `${v} (${secteur(v)})` : v, departement: france ? undefined : dep, valeur: val }];
     }));
     if (tendance) {
@@ -1399,9 +2116,35 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
 
   const changerVille = (k: number, nom: string) => setChoix((liste) => liste.map((v, i) => (i === k ? nom : v)));
 
+  function choisirGenre(g: Genre) {
+    setGenre(g);
+    setLecture(false);
+    setT(0);
+    setErreur(null);
+    // L'alerte se termine par « Abonnez-vous ! » ; alerte et tendance se font pour un département, pas pour la France entière.
+    if (g === 'alerte') setAbonne(true);
+    if (g !== 'previsions' && dep === FRANCE) {
+      setDonnees(null);
+      setChoix([]);
+      setDep('66');
+    }
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
       <div className="flex flex-col gap-4 rounded-2xl border-2 border-primary/30 bg-primary/5 p-5">
+        <div className="text-sm font-medium">
+          <span className={legende}>Vidéo</span>
+          <div className="flex flex-wrap gap-2">
+            {GENRES.map((g) => (
+              <button key={g.id} type="button" onClick={() => choisirGenre(g.id)} aria-pressed={genre === g.id} className={`flex-1 whitespace-nowrap rounded-lg border px-2 py-1.5 text-sm ${genre === g.id ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>
+                {g.libelle}
+              </button>
+            ))}
+          </div>
+        </div>
+        {genre === 'previsions' && (
+        <>
         <div className="text-sm font-medium">
           <span className={legende}>Prévision</span>
           <div className="flex gap-2">
@@ -1436,10 +2179,12 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
             </>
           )}
         </p>
+        </>
+        )}
         <label className="text-sm font-medium">
           <span className={legende}>Zone</span>
           <select value={dep} onChange={(e) => { setDonnees(null); setChoix([]); setDep(e.target.value); }} className={selectBarre}>
-            <option value={FRANCE}>🇫🇷 France (grandes villes)</option>
+            {genre === 'previsions' && <option value={FRANCE}>🇫🇷 France (grandes villes)</option>}
             {CODES_DEPARTEMENTS.map((c) => (
               <option key={c} value={c}>
                 {c} — {DEPARTEMENTS_FR[c]}
@@ -1447,6 +2192,8 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
             ))}
           </select>
         </label>
+        {genre === 'previsions' && (
+        <>
         <label className="text-sm font-medium">
           <span className={legende}>Modèle</span>
           <select value={modele} onChange={(e) => setModele(e.target.value as ModeleMeteo)} className={selectBarre}>
@@ -1458,7 +2205,7 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
           </select>
         </label>
         <label className="text-sm font-medium">
-          <span className={legende}>Type de vidéo</span>
+          <span className={legende}>Variante des prévisions</span>
           <select
             value={special}
             disabled={france}
@@ -1498,19 +2245,102 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
             </select>
           </label>
         ))}
+        </>
+        )}
+        {genre === 'alerte' && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-sm font-medium">
+                <span className={legende}>Niveau</span>
+                <select value={niveauAlerte} onChange={(e) => setNiveauAlerte(e.target.value as NiveauAlerte)} className={selectBarre}>
+                  <option value="orange">🟠 Orange</option>
+                  <option value="rouge">🔴 Rouge</option>
+                  <option value="jaune">🟡 Jaune</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>Jour</span>
+                <select value={ecartAlerte} onChange={(e) => setEcartAlerte(Number(e.target.value))} className={selectBarre}>
+                  {Array.from({ length: 4 }, (_, n) => (
+                    <option key={n} value={n}>
+                      {n === 0 ? "Aujourd'hui" : libelleJour(ajouterJours(aujourdhui, n)).toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <fieldset>
+              <legend className={legende}>Type d&apos;alerte (un ou plusieurs)</legend>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                {TYPES_ALERTE.map((x) => (
+                  <label key={x.id} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={typesAlerte.includes(x.id)} onChange={(e) => setTypesAlerte((l) => (e.target.checked ? [...l, x.id] : l.filter((i) => i !== x.id)))} />
+                    {x.libelle}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <label className="text-sm font-medium">
+              <span className={legende}>Bandeau du haut</span>
+              <input type="text" value={saisies.entete ?? autoAlerte.entete} onChange={(e) => setSaisies((s) => ({ ...s, entete: e.target.value }))} className={selectBarre} />
+            </label>
+            <label className="text-sm font-medium">
+              <span className={legende}>Grand bandeau rouge (titre)</span>
+              <textarea value={saisies.titre ?? autoAlerte.titre} onChange={(e) => setSaisies((s) => ({ ...s, titre: e.target.value }))} rows={3} className={selectBarre} />
+            </label>
+            <label className="text-sm font-medium">
+              <span className={legende}>Bandeau violet (période)</span>
+              <input type="text" value={saisies.periode ?? autoAlerte.periode} onChange={(e) => setSaisies((s) => ({ ...s, periode: e.target.value }))} className={selectBarre} />
+            </label>
+            <label className="text-sm font-medium">
+              <span className={legende}>Précision sous chaque type (facultative)</span>
+              <input type="text" value={saisies.detail ?? ''} onChange={(e) => setSaisies((s) => ({ ...s, detail: e.target.value }))} placeholder="ex. Rafales jusqu'à 120 km/h" className={selectBarre} />
+            </label>
+            {Object.keys(saisies).length > 0 && (
+              <button type="button" onClick={() => setSaisies({})} className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium">
+                ↺ Revenir aux textes automatiques
+              </button>
+            )}
+          </>
+        )}
+        {genre === 'tendance' && (
+          <p className="text-xs text-muted">
+            Une carte de température par jour (12 jours, moyenne des modèles) avec la légende des couleurs, puis
+            {dep === '66' ? ' la tendance à 4 semaines (écart à la normale de la température et de la pluie, modèle saisonnier CFSv2).' : ' (la tendance à 4 semaines n’existe que pour les Pyrénées-Orientales).'}
+          </p>
+        )}
         <label className="text-sm font-medium">
           <span className={legende}>Format de la vidéo</span>
-          <select value={formatId} onChange={(e) => setFormatId(e.target.value as FormatId)} className={selectBarre}>
-            {FORMATS.map((f) => (
+          <select value={format.id} onChange={(e) => setFormatId(e.target.value as FormatId)} className={selectBarre}>
+            {FORMATS.filter((f) => genre === 'previsions' || f.id !== 'hook').map((f) => (
               <option key={f.id} value={f.id}>
                 {f.libelle}
               </option>
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={avecCarte} onChange={(e) => setAvecCarte(e.target.checked)} />
-          🗺️ Écran carte dans la vidéo (toutes les villes sur la carte)
+        {genre === 'previsions' && (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={avecCarte} onChange={(e) => setAvecCarte(e.target.checked)} />
+            🗺️ Écran carte dans la vidéo (toutes les villes sur la carte)
+          </label>
+        )}
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" checked={abonne} onChange={(e) => setAbonne(e.target.checked)} className="mt-1" />
+          <span>
+            🔔 Écran « Abonnez-vous ! »
+            <span className="block text-xs text-muted">Cloche qui sonne et « ABONNEZ-VOUS ! » en fin de vidéo.</span>
+          </span>
+        </label>
+        <label className="text-sm font-medium">
+          <span className={legende}>Textes qui apparaissent (facultatif)</span>
+          <textarea
+            value={legendesTexte}
+            onChange={(e) => setLegendesTexte(e.target.value)}
+            rows={3}
+            placeholder={'Un texte par ligne, répartis sur la vidéo.\nUn mot entre *étoiles* est en rose :\nON DÉMARRE *PAR CE*'}
+            className={selectBarre}
+          />
         </label>
         <label className="text-sm font-medium">
           <span className={legende}>Logo</span>
@@ -1526,7 +2356,13 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
           {etat ?? '🎬 Créer la vidéo (MP4)'}
         </button>
         <p className="text-xs text-muted">
-          Format {format.l} × {format.h}, {Math.round(total)} secondes : titre, une image par ville, récapitulatif{tendance ? ', tendance des prochains jours' : ''}. Le MP4 s&apos;enregistre dans le navigateur (Chrome, Edge) ; ailleurs, un WebM.
+          Format {format.l} × {format.h}, {Math.round(total)} secondes :{' '}
+          {genre === 'alerte'
+            ? 'bandeaux, pictos de vigilance, un écran par type d’alerte, suivez la situation en direct'
+            : genre === 'tendance'
+              ? `une carte de température par jour${tendance12?.semaines ? ', tendance à 4 semaines' : ''}`
+              : `titre, une image par ville, récapitulatif${tendance ? ', tendance des prochains jours' : ''}`}
+          {abonne ? ', « Abonnez-vous ! »' : ''}. Le MP4 s&apos;enregistre dans le navigateur (Chrome, Edge) ; ailleurs, un WebM.
         </p>
         {erreur && (
           <p role="alert" className="text-sm text-danger">
@@ -1543,6 +2379,7 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
           <input type="range" min={0} max={total} step={0.05} value={Math.min(t, total)} onChange={(e) => { setLecture(false); setT(Number(e.target.value)); }} className="flex-1" aria-label="Position dans la vidéo" />
           <span className="w-14 text-right text-xs tabular-nums text-muted">{Math.round(t * 10) / 10} s</span>
         </div>
+        {genre === 'previsions' && (
         <div className="flex w-full flex-col gap-2" style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
           <button type="button" onClick={genererTexte} disabled={!contexte || texteEnCours} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium disabled:opacity-60">
             {texteEnCours ? '✍️ Rédaction du texte…' : texteIA ? '✍️ Régénérer le texte du post' : '✍️ Générer le texte du post'}
@@ -1561,7 +2398,8 @@ export default function VideoWeekEnd({ aujourdhui, formatInitial, zoneInitiale, 
             </p>
           )}
         </div>
-        {!contexte && !erreur && <p className="text-sm text-muted">Chargement des villes et des prévisions…</p>}
+        )}
+        {!contexte && !erreur && <p className="text-sm text-muted">{genre === 'tendance' ? 'Chargement des prévisions des 12 jours…' : 'Chargement des villes et des prévisions…'}</p>}
       </div>
     </div>
   );
