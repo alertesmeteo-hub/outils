@@ -970,6 +970,10 @@ const VOIX_CHOIX = [
   ['henri', 'Henri (homme)'],
   ['vivienne', 'Vivienne (femme, expressive)'],
   ['remy', 'Rémy (homme, expressif)'],
+  ['eloise', 'Éloïse (femme, jeune)'],
+  ['brigitte', 'Brigitte (femme, posée)'],
+  ['alain', 'Alain (homme, posé)'],
+  ['jerome', 'Jérôme (homme)'],
 ] as const;
 
 /**
@@ -1511,7 +1515,7 @@ function dessinerLegendes(ctx: CanvasRenderingContext2D, t: number, total: numbe
     ctx.font = `${px}px ${POLICE}`;
     rangs = [[]];
     let courante = 0;
-    const espace = ctx.measureText(' ').width;
+    const espace = Math.max(ctx.measureText(' ').width, px * 0.3);
     for (const m of mots) {
       const l = ctx.measureText(m.mot).width;
       if (courante > 0 && courante + espace + l > largeurMax) {
@@ -1530,7 +1534,7 @@ function dessinerLegendes(ctx: CanvasRenderingContext2D, t: number, total: numbe
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
   ctx.font = `${px}px ${POLICE}`;
-  const espace = ctx.measureText(' ').width;
+  const espace = Math.max(ctx.measureText(' ').width, px * 0.3);
   const hl = px * 1.18;
   const y0 = H * 0.55 - (rangs.length * hl) / 2 + px * 0.9;
   let rang = 0;
@@ -1590,9 +1594,10 @@ function dessinerSousTitres(ctx: CanvasRenderingContext2D, t: number, total: num
   const groupe = mots.slice(debut, debut + taille);
   let px = 84 * u;
   const largeurMax = W * 0.9;
+  // Espace entre deux mots : celui d'Impact est étroit, le contour noir (0,16 × taille) et le mot en jaune qui grossit le mangeraient.
   const espaceDe = (p: number) => {
     ctx.font = `${p}px ${POLICE}`;
-    return ctx.measureText(' ').width;
+    return Math.max(ctx.measureText(' ').width, p * 0.34);
   };
   const largeurDe = (p: number) => {
     ctx.font = `${p}px ${POLICE}`;
@@ -1603,14 +1608,15 @@ function dessinerSousTitres(ctx: CanvasRenderingContext2D, t: number, total: num
   ctx.font = `${px}px ${POLICE}`;
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
-  const espace = ctx.measureText(' ').width;
+  const espace = espaceDe(px);
+  ctx.font = `${px}px ${POLICE}`;
   let x = (W - largeurDe(px)) / 2;
   const y = H * 0.8;
   groupe.forEach((m, k) => {
     const texte = m.toUpperCase();
     const lm = ctx.measureText(texte).width;
     const dit = debut + k === actuel;
-    const pop = dit ? 1 + 0.12 * sortie((t - departs[debut + k]) / 0.12) : 1;
+    const pop = dit ? 1 + 0.06 * sortie((t - departs[debut + k]) / 0.12) : 1;
     ctx.save();
     ctx.translate(x + lm / 2, y);
     ctx.scale(pop, pop);

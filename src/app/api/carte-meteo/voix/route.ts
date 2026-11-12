@@ -11,6 +11,10 @@ const VOIX_AZURE = {
   henri: 'fr-FR-HenriNeural',
   vivienne: 'fr-FR-VivienneMultilingualNeural',
   remy: 'fr-FR-RemyMultilingualNeural',
+  eloise: 'fr-FR-EloiseNeural',
+  brigitte: 'fr-FR-BrigitteNeural',
+  alain: 'fr-FR-AlainNeural',
+  jerome: 'fr-FR-JeromeNeural',
 } as const;
 
 const MAX_CARACTERES = 1500;
@@ -22,7 +26,7 @@ const echapper = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').r
 
 /**
  * POST /api/carte-meteo/voix/ : voix de synthèse (Azure Speech) pour la vidéo.
- * Corps : { texte, voix?: 'denise' | 'henri' | 'vivienne' | 'remy', vitesse?: 0.8 à 1.3 } ; réponse : audio WAV 24 kHz mono.
+ * Corps : { texte, voix?: 'denise' | 'henri' | 'vivienne' | 'remy' | 'eloise' | 'brigitte' | 'alain' | 'jerome', vitesse?: 0.8 à 1.3 } ; réponse : audio WAV 24 kHz mono.
  * Variables du serveur : AZURE_SPEECH_KEY et AZURE_SPEECH_REGION (vides = fonction désactivée).
  */
 export async function POST(req: Request) {

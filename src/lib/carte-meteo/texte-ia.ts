@@ -83,3 +83,15 @@ export function statsDe(valeurs: number[]): RubriqueTexte['stats'] {
     moyenne: Math.round((valeurs.reduce((a, b) => a + b, 0) / valeurs.length) * 10) / 10,
   };
 }
+
+/**
+ * Filet de sécurité sur le texte rédigé : aucune virgule décimale devant une unité (« 7,7 mm » devient « 8 mm », « 20,5°C » devient « 21°C »).
+ * Une quantité de pluie ou de neige non nulle ne tombe jamais à 0 (« 0,4 mm » devient « 1 mm »).
+ */
+export function sansDecimales(texte: string): string {
+  return texte.replace(/(\d+)[,.](\d+)(\s*)(mm|cm|°C|°|km\/h|m\/s|hPa|%)/g, (_m, entier: string, decimales: string, espace: string, unite: string) => {
+    const valeur = Number(`${entier}.${decimales}`);
+    const arrondi = Math.round(valeur);
+    return `${arrondi === 0 && valeur > 0 && (unite === 'mm' || unite === 'cm') ? 1 : arrondi}${espace}${unite}`;
+  });
+}

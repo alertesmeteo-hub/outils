@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
-import { lireDemandeTexte } from '@/lib/carte-meteo/texte-ia';
+import { lireDemandeTexte, sansDecimales } from '@/lib/carte-meteo/texte-ia';
 import { cleDe, ErreurIA, fournisseurIA, texteAutreFournisseur } from '@/lib/carte-meteo/ia-fournisseurs';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +15,7 @@ const SYSTEME = `Tu es le rédacteur météo du site alertes-meteo.com. On te do
 Règles :
 - Français, ton clair et vivant, sans emphase ni sensationnalisme ; vocabulaire de météorologue accessible au grand public.
 - N'utilise que les chiffres et les lieux fournis : n'invente aucune valeur, aucun lieu, aucune cause ni aucune tendance qui ne découle pas des données. Arrondis comme dans les données, sauf pour les précipitations (voir la règle suivante).
-- Cumuls de pluie (mm) : jamais de décimale ni de valeur exacte. Arrondis toujours à 5 mm près (5, 10, 15, 20, 25 mm…), et à 10 mm près au-delà de 50 mm (60, 70, 80 mm…), ou donne une fourchette entre deux paliers (« entre 10 et 15 mm », « entre 20 et 30 mm », « entre 50 et 70 mm »). Écris « environ 10 mm » ou « autour de 15 mm » plutôt que « 10,1 mm » ou « 12,6 mm ». Sous 1 mm, n'écris jamais la valeur (ni 0,4 ni 0,5 ni 0,7 mm, ni « 0.5 ») : écris « moins d'un mm ». Entre 1 et 5 mm, arrondis à l'entier (1, 2, 3, 4 mm) ou écris « quelques mm ». Même règle pour les cumuls de neige en cm. Les températures et les vents gardent leurs valeurs entières.
+- Aucune virgule décimale dans les nombres, jamais : arrondis toujours à l'entier le plus proche (7,7 mm s'écrit « 8 mm », 20,5 °C s'écrit « 21 °C », 12,4 km/h s'écrit « 12 km/h »). Cumuls de pluie (mm) : valeur entière, par exemple « ne dépassant pas les 8 mm à Corsavy ». Sous 1 mm, n'écris jamais la valeur (ni 0,4 ni 0,5 ni 0,7 mm, ni « 0.5 ») : écris « moins d'un mm ». Même règle pour les cumuls de neige en cm. Les températures et les vents gardent leurs valeurs entières.
 - N'écris jamais « demain » ni « après-demain » : désigne toujours le jour par son nom (« lundi », « mardi »…) ou par sa date.
 - Mentionne la zone, la date ou la période, les valeurs extrêmes et leurs lieux, et ce qu'il faut en retenir.
 - Pour une projection climatique, rappelle qu'il s'agit d'une moyenne projetée (trajectoire de référence TRACC de Météo-France), pas d'une prévision.
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   // Autre fournisseur que Claude (IA_FOURNISSEUR = openai, mistral ou gemini).
   if (fournisseur !== 'anthropic') {
     try {
-      return NextResponse.json({ texte: await texteAutreFournisseur(fournisseur, SYSTEME, invite) });
+      return NextResponse.json({ texte: sansDecimales(await texteAutreFournisseur(fournisseur, SYSTEME, invite)) });
     } catch (erreur) {
       if (erreur instanceof ErreurIA) return NextResponse.json({ erreur: erreur.message }, { status: erreur.statut });
       console.error('Texte IA', erreur);
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
       .join('\n')
       .trim();
     if (!texte) return NextResponse.json({ erreur: 'Réponse vide. Réessayez.' }, { status: 502 });
-    return NextResponse.json({ texte });
+    return NextResponse.json({ texte: sansDecimales(texte) });
   } catch (erreur) {
     if (erreur instanceof Anthropic.RateLimitError) {
       return NextResponse.json({ erreur: 'Service IA saturé. Réessayez dans un instant.' }, { status: 429 });
