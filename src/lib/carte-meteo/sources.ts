@@ -161,7 +161,7 @@ const caches = ((globalThis as { __cacheCarteMeteo?: unknown }).__cacheCarteMete
 const { memoire, enCours, indexCourant } = caches;
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v21'; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v22'; // v22 : après-midi = 15 h à 18 h, température moyenne ; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */

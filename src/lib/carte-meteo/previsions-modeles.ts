@@ -67,7 +67,7 @@ export const modeleParDefautJ0 = (dep: string | null): ModeleMeteo => (modeleDis
  */
 export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, aromeifs: 1, harmonie2km: 1, harmonie: 1, arpege: 3, arpege025: 3, icon: 6, ukmo: 6, iconeu: 4, wrf: 3, cep: 15, aifs: 14, gfs: 15 };
 
-/** Un point par département métropolitain (ou par ville), avec les valeurs de l'après-midi (12 h-18 h) et de la journée. */
+/** Un point par département métropolitain (ou par ville), avec les valeurs de l'après-midi (15 h-18 h) et de la journée. */
 export interface PointCarte {
   code: string;
   nom: string;
@@ -106,7 +106,7 @@ export interface PointCarte {
   ventJournee: number | null;
   codeApresMidi: number | null;
   codeJournee: number | null;
-  /** Nébulosité moyenne (%) et cumul de précipitations (mm) : de 12 h à 18 h, puis sur la journée (7 h-20 h pour le ciel). */
+  /** Nébulosité moyenne (%) et cumul de précipitations (mm) : de 15 h à 18 h, puis sur la journée (7 h-20 h pour le ciel). */
   nuagesApresMidi: number | null;
   pluieApresMidi: number | null;
   nuagesJournee: number | null;
@@ -473,9 +473,9 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
   // qui donnait la valeur de 11 h, presque celle de l'après-midi (18° à Perpignan un matin à 9°). Sans heure du petit matin
   // dans la série (prévision du jour lancée après 9 h), pas de valeur plutôt qu'une valeur de fin de matinée.
   const debutMatin = jour.filter((l) => l.heure >= 6 && l.heure <= 9 && serie.temp[l.i] != null).sort((a, b) => Math.abs(a.heure - 8) - Math.abs(b.heure - 8) || a.heure - b.heure);
-  const apresMidi = jour.filter((l) => l.heure >= 12 && l.heure <= 17).map((l) => l.i);
-  // Température de l'après-midi : le maximum entre 14 h et 18 h (heure de Paris).
-  const chaleurApresMidi = jour.filter((l) => l.heure >= 14 && l.heure <= 18).map((l) => l.i);
+  const apresMidi = jour.filter((l) => l.heure >= 15 && l.heure <= 18).map((l) => l.i);
+  // Après-midi : 15 h à 18 h (heure de Paris), moyenne des échéances pour la température, le ciel et la pluie.
+  const chaleurApresMidi = apresMidi;
   const ciel = jour.filter((l) => l.heure >= 7 && l.heure <= 20).map((l) => l.i);
   // Soirée : 18 h à 22 h (température de 21 h). Nuit : de 22 h à 6 h le lendemain matin.
   const soiree = jour.filter((l) => l.heure >= 18 && l.heure <= 21).map((l) => l.i);
@@ -496,7 +496,7 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
     codeMatin: codePeriode(serie, matin),
     nuagesMatin: arrondi(moyenne(matin.map((i) => serie.nuages[i]))),
     pluieMatin: arrondi(somme(matin.map((i) => serie.pluie[i])), 1),
-    tempApresMidi: arrondi(maximum(chaleurApresMidi.map((i) => serie.temp[i])), 1),
+    tempApresMidi: arrondi(moyenne(chaleurApresMidi.map((i) => serie.temp[i])), 1),
     rafaleApresMidi: arrondi(maximum(apresMidi.map((i) => serie.rafale[i]))),
     rafaleJournee: arrondi(maximum(toute.map((i) => serie.rafale[i]))),
     directionRafaleApresMidi: directionRafaleMax(serie, apresMidi),
