@@ -58,8 +58,19 @@ export interface AffichageCarte {
   dateElaboration?: boolean;
   /** Ajoute l'heure à « Carte élaborée le » (décochée par défaut). */
   heureElaboration?: boolean;
+  /** Carte figée : instant (ISO) où elle l'a été ; « Carte élaborée le » indique alors cet instant et non l'heure de l'ouverture de la page. */
+  elaboreeLe?: string;
 }
 export const AffichageContexte = createContext<AffichageCarte | null>(null);
+
+/** Retouches faites à la main sur une carte (valeurs corrigées ou retirées, titres réécrits) : gardées avec la carte figée. */
+export interface RetouchesCarte {
+  corrections: Record<string, number>;
+  retires: string[];
+  titre: string | null;
+  sousTitre: string | null;
+  titreTop: string | null;
+}
 
 export type PoliceValeurs = 'impact' | 'condensee' | 'normale';
 const FAMILLES_VALEURS: Record<PoliceValeurs, { fam: string; poids: number }> = {
@@ -143,6 +154,10 @@ interface Props {
   onPictoMove?: (code: string, dx: number, dy: number) => void;
   /** Part du nombre maximal de valeurs affichées (1 = tout ce qui tient ; 0,22 = l'essentiel). */
   partValeurs?: number;
+  /** Carte figée rouverte : retouches à rétablir à l'ouverture (lues une seule fois). */
+  retouchesInitiales?: RetouchesCarte;
+  /** Appelé à chaque retouche (et quand elles sont remises à zéro), pour que la page puisse les garder avec la carte figée. */
+  onRetouches?: (retouches: RetouchesCarte) => void;
 }
 
 /** Taille (em de la pastille) du picto posé au-dessus d'une valeur. */
@@ -161,7 +176,7 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -209,6 +224,26 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
     setCorrections({});
     setRetires(new Set());
   }, [points]);
+  // Carte figée rouverte : retouches rétablies une seule fois, à l'ouverture (après la remise à zéro ci-dessus, déclarée avant).
+  useEffect(() => {
+    if (!retouchesInitiales) return;
+    setCorrections(retouchesInitiales.corrections);
+    setRetires(new Set(retouchesInitiales.retires));
+    setTitreSaisi(retouchesInitiales.titre);
+    setSousTitreSaisi(retouchesInitiales.sousTitre);
+    setTitreTopSaisi(retouchesInitiales.titreTop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // La page garde les retouches (carte figée) : elle est prévenue à chaque changement, pas à l'ouverture.
+  const retouchesSignalees = useRef(false);
+  useEffect(() => {
+    if (!retouchesSignalees.current) {
+      retouchesSignalees.current = true;
+      return;
+    }
+    onRetouches?.({ corrections, retires: [...retires], titre: titreSaisi, sousTitre: sousTitreSaisi, titreTop: titreTopSaisi });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [corrections, retires, titreSaisi, sousTitreSaisi, titreTopSaisi]);
   const titre = titreSaisi ?? theme.titre;
   // Heure du run : « AROME (12z) » à la place du nom du modèle quand le sous-titre le contient, sinon ajouté à la fin.
   const sousTitreAvecRun = (() => {
@@ -219,7 +254,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
   })();
   const sousTitreAffiche = sousTitreSaisi ?? sousTitreAvecRun;
   /** Date d'élaboration de la carte (Paris), en bas à droite. */
-  const maintenant = new Date();
+  const maintenant = affichage?.elaboreeLe ? new Date(affichage.elaboreeLe) : new Date();
   const dateElaboree =
     maintenant.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' }) +
     (affichage?.heureElaboration ? ` à ${maintenant.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }).replace(':', 'h')}` : '');

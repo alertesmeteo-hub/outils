@@ -26,7 +26,7 @@ import {
   type ThemeInfo,
   type ThemePrevision,
 } from '@/lib/carte-meteo/cartes-info';
-import CarteInfo, { AffichageContexte, type AffichageCarte, type PoliceValeurs, type PointInfo } from './CarteInfo';
+import CarteInfo, { AffichageContexte, type AffichageCarte, type PoliceValeurs, type PointInfo, type RetouchesCarte } from './CarteInfo';
 import { THEMES_CARTE } from '@/lib/carte-meteo/pictos';
 import { LIBELLES_COUCHES, type Couche } from '@/lib/carte-meteo/tuiles';
 import { ORDRE_STYLES_FOND, STYLES_FOND, estStyleFond } from '@/lib/carte-meteo/styles-fond';
@@ -63,11 +63,14 @@ const libelleMoisCourt = (m: string) => {
   return nom.charAt(0).toUpperCase() + nom.slice(1);
 };
 
-/** « DU MAR. 3 NOV. 18 H AU MER. 4 NOV. 18 H » : fenêtre de N heures qui commence maintenant (heure de Paris, arrondie à l'heure). */
-const fenetreDepuisMaintenant = (heures: number) => {
+/** Carte figée de la page « Une carte au choix » : sauvegardée dans le navigateur (une seule carte figée à la fois). */
+const CLE_CARTE_FIGEE = 'carte-au-choix-figee-v1';
+
+/** « DU MAR. 3 NOV. 18 H AU MER. 4 NOV. 18 H » : fenêtre de N heures qui commence maintenant (heure de Paris, arrondie à l'heure) ; `depuis` : instant de départ (carte figée). */
+const fenetreDepuisMaintenant = (heures: number, depuis = Date.now()) => {
   const fmt = (ms: number) =>
     new Date(ms).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', timeZone: 'Europe/Paris' }).replace(':00', '').replace(/\s+/g, ' ').replace(/\s*h$/i, '').toUpperCase(); // le « h » est ajouté plus bas (certains navigateurs l'ajoutent déjà)
-  const debut = Math.round(Date.now() / 3_600_000) * 3_600_000;
+  const debut = Math.round(depuis / 3_600_000) * 3_600_000;
   return `DU ${fmt(debut)} H AU ${fmt(debut + heures * 3_600_000)} H`;
 };
 
@@ -129,9 +132,21 @@ const dateParis = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 
 const legendeBarre = 'mb-1 block text-sm font-medium';
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
-export default function CartesInfo({ aujourdhui, modeInitial, departementInitial, uneCarte = false }: { aujourdhui: string; /** Une seule carte à la fois, choisie par une recherche sur les thèmes (page « Une carte au choix »). */ uneCarte?: boolean; /** Catégorie ouverte d'office (?cartes=europe…). */ modeInitial?: string; /** Département affiché d'office (page dédiée). */ departementInitial?: string }) {
+export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial, departementInitial, uneCarte = false }: { aujourdhui: string; /** Une seule carte à la fois, choisie par une recherche sur les thèmes (page « Une carte au choix »). */ uneCarte?: boolean; /** Catégorie ouverte d'office (?cartes=europe…). */ modeInitial?: string; /** Département affiché d'office (page dédiée). */ departementInitial?: string }) {
   const id = useId();
   const nom = (base: string) => `${base}-${id}`;
+  /** Jour de référence (« aujourd'hui ») : celui du serveur, ou celui où la carte figée a été faite (jours, périodes et cumuls en partent). */
+  const [aujourdhui, setAujourdhui] = useState(aujourdhuiServeur);
+  // Carte figée (page « Une carte au choix ») : prévisions, réglages et retouches gardés dans le navigateur, plus aucun rechargement.
+  const [figee, setFigee] = useState(false);
+  const [figeeLe, setFigeeLe] = useState<string | null>(null);
+  const [erreurFiger, setErreurFiger] = useState<string | null>(null);
+  /** La sauvegarde a été lue (ou n'existe pas) : les prévisions ne se chargent qu'ensuite, pour ne pas recharger ce qui était figé. */
+  const [restaure, setRestaure] = useState(!uneCarte);
+  const bloque = figee || !restaure;
+  /** Retouches à la main de la carte affichée (suivies en direct) et celles rétablies à la réouverture d'une carte figée. */
+  const [retouchesCartes, setRetouchesCartes] = useState<Record<string, RetouchesCarte>>({});
+  const [retouchesRetablies, setRetouchesRetablies] = useState<Record<string, RetouchesCarte> | null>(null);
   const modeDemande = MODES.find(([m]) => m === modeInitial)?.[0];
   const [mode, setMode] = useState<Mode>(modeDemande ?? 'prevision');
   // Lien du menu suivi depuis cette même page : la catégorie demandée s'ouvre.
@@ -169,7 +184,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   /** Heure du passage (run) du modèle choisi, en UTC (« 12z ») : affichée dans le sous-titre des cartes de prévision. */
   const [runModele, setRunModele] = useState<{ modele: ModeleMeteo; z: string } | null>(null);
   useEffect(() => {
-    if (modele === 'moyenne') return;
+    if (modele === 'moyenne' || bloque) return;
     let actif = true;
     fetch(`/api/carte-meteo/run/?modele=${modele}`)
       .then((r) => (r.ok ? (r.json() as Promise<{ z?: string | null }>) : Promise.reject()))
@@ -178,7 +193,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
     return () => {
       actif = false;
     };
-  }, [modele]);
+  }, [modele, bloque]);
   const runCarte = runModele && runModele.modele === modele ? { modele: (MODELES.find((m) => m.id === modele)?.libelle ?? modele).toUpperCase(), z: runModele.z } : undefined;
   useEffect(() => {
     // Modèle publié pour certains départements seulement (Harmonie 2 km, WRF : Pyrénées-Orientales) : retour à AROME ailleurs.
@@ -284,7 +299,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
     logoChoisi ?? (niveau === 'france' ? 'aucun' : logoParDefaut(codesDeLaZone(zone)).id === 'aucun' ? 'alertesmeteo' : logoParDefaut(codesDeLaZone(zone)).id);
 
   useEffect(() => {
-    if (mode !== 'prevision' || previsions?.cle === cle || erreur) return;
+    if (bloque || mode !== 'prevision' || previsions?.cle === cle || erreur) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${dateISO}${requeteZone}`, { signal: controleur.signal })
       .then(async (r) => {
@@ -300,12 +315,12 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
         else setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
-  }, [mode, cle, previsions?.cle, erreur, modele, dateISO, requeteZone]);
+  }, [bloque, mode, cle, previsions?.cle, erreur, modele, dateISO, requeteZone]);
 
   // Cumuls de pluie sur 5, 10 et 16 jours : toujours à partir d'aujourd'hui, avec le CEP (ou GFS), quel que soit le jour choisi.
   const groupesAvecCumul = mode === 'prevision' && (groupeChoisi === 'tous' || THEMES_PREVISION.some((t) => t.cumulJours && t.groupe === groupeChoisi));
   useEffect(() => {
-    if (!groupesAvecCumul || cumuls?.cle === cleCumul || erreurCumuls) return;
+    if (bloque || !groupesAvecCumul || cumuls?.cle === cleCumul || erreurCumuls) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modeleCumul)}&date=${aujourdhui}${requeteZone}`, { signal: controleur.signal })
       .then(async (r) => {
@@ -315,12 +330,12 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
       .then((json) => setCumuls({ cle: cleCumul, modele: modeleCumul, points: json.points }))
       .catch((e: Error) => e.name !== 'AbortError' && setErreurCumuls(e.message.endsWith('.') ? e.message : `${e.message}.`));
     return () => controleur.abort();
-  }, [groupesAvecCumul, cleCumul, cumuls?.cle, erreurCumuls, modeleCumul, aujourdhui, requeteZone]);
+  }, [bloque, groupesAvecCumul, cleCumul, cumuls?.cle, erreurCumuls, modeleCumul, aujourdhui, requeteZone]);
 
   // Pluie sur une période choisie (« du … au … ») : modèle choisi, requête à part (?fin=).
   const groupesAvecPeriode = mode === 'prevision' && (groupeChoisi === 'tous' || THEMES_PREVISION.some((t) => t.periode && t.groupe === groupeChoisi));
   useEffect(() => {
-    if (!groupesAvecPeriode || pluiePeriode?.cle === clePeriode || erreurPeriode) return;
+    if (bloque || !groupesAvecPeriode || pluiePeriode?.cle === clePeriode || erreurPeriode) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${debutPeriodeISO}&fin=${finPeriodeISO}${requeteZone}`, { signal: controleur.signal })
       .then(async (r) => {
@@ -330,13 +345,13 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
       .then((json) => setPluiePeriode({ cle: clePeriode, points: json.points }))
       .catch((e: Error) => !controleur.signal.aborted && setErreurPeriode({ cle: clePeriode, message: e.message.endsWith('.') ? e.message : `${e.message}.` }));
     return () => controleur.abort();
-  }, [groupesAvecPeriode, clePeriode, pluiePeriode?.cle, erreurPeriode, modele, debutPeriodeISO, finPeriodeISO, requeteZone]);
+  }, [bloque, groupesAvecPeriode, clePeriode, pluiePeriode?.cle, erreurPeriode, modele, debutPeriodeISO, finPeriodeISO, requeteZone]);
 
   // Neige en montagne sur une période : points de montagne et période choisie, requête à part.
   const groupesAvecMontagnePeriode =
     mode === 'prevision' && (groupeChoisi === 'tous' || themesPrevision.some((t) => t.montagne && t.periode && t.groupe === groupeChoisi));
   useEffect(() => {
-    if (!groupesAvecMontagnePeriode || montagnePeriode?.cle === cleMontagnePeriode || erreurMontagnePeriode) return;
+    if (bloque || !groupesAvecMontagnePeriode || montagnePeriode?.cle === cleMontagnePeriode || erreurMontagnePeriode) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${debutPeriodeISO}&fin=${finPeriodeISO}${requeteZone}&montagne=1${reliefAlt ? `&alt=${reliefAlt}` : ''}`, { signal: controleur.signal })
       .then(async (r) => {
@@ -346,12 +361,12 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
       .then((json) => setMontagnePeriode({ cle: cleMontagnePeriode, points: json.points }))
       .catch((e: Error) => !controleur.signal.aborted && setErreurMontagnePeriode({ cle: cleMontagnePeriode, message: e.message.endsWith('.') ? e.message : `${e.message}.` }));
     return () => controleur.abort();
-  }, [groupesAvecMontagnePeriode, cleMontagnePeriode, montagnePeriode?.cle, erreurMontagnePeriode, modele, debutPeriodeISO, finPeriodeISO, requeteZone]);
+  }, [bloque, groupesAvecMontagnePeriode, cleMontagnePeriode, montagnePeriode?.cle, erreurMontagnePeriode, modele, debutPeriodeISO, finPeriodeISO, requeteZone]);
 
   // Cartes de montagne (neige, maxi) : communes au-dessus de 1 000 m, requête à part (les autres cartes utilisent des points de plaine).
   const groupesAvecMontagne = mode === 'prevision' && (groupeChoisi === 'tous' || themesPrevision.some((t) => (t.montagne || t.pluieEtNeige) && t.groupe === groupeChoisi));
   useEffect(() => {
-    if (!groupesAvecMontagne || montagne?.cle === cleMontagne || erreurMontagne) return;
+    if (bloque || !groupesAvecMontagne || montagne?.cle === cleMontagne || erreurMontagne) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${dateISO}${requeteZone}&montagne=1${reliefAlt ? `&alt=${reliefAlt}` : ''}`, { signal: controleur.signal })
       .then(async (r) => {
@@ -361,11 +376,11 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
       .then((json) => setMontagne({ cle: cleMontagne, points: json.points }))
       .catch((e: Error) => e.name !== 'AbortError' && setErreurMontagne(e.message.endsWith('.') ? e.message : `${e.message}.`));
     return () => controleur.abort();
-  }, [groupesAvecMontagne, cleMontagne, montagne?.cle, erreurMontagne, modele, dateISO, requeteZone]);
+  }, [bloque, groupesAvecMontagne, cleMontagne, montagne?.cle, erreurMontagne, modele, dateISO, requeteZone]);
 
   useEffect(() => {
     // Aussi en prévision pour aujourd'hui : la synthèse prend le mini relevé cette nuit (le modèle ne couvre plus la nuit).
-    if (!(mode === 'bilan' || (mode === 'prevision' && jour === 0)) || bilans || erreurBilans) return;
+    if (bloque || !(mode === 'bilan' || (mode === 'prevision' && jour === 0)) || bilans || erreurBilans) return;
     const controleur = new AbortController();
     fetch(`/api/carte-meteo/bilans/${moisBilan ? `?mois=${moisBilan}` : ''}`, { signal: controleur.signal })
       .then(async (r) => {
@@ -375,7 +390,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
       .then(setBilans)
       .catch((e: Error) => e.name !== 'AbortError' && setErreurBilans(e.message));
     return () => controleur.abort();
-  }, [mode, jour, bilans, erreurBilans, moisBilan]);
+  }, [bloque, mode, jour, bilans, erreurBilans, moisBilan]);
 
   // Réchauffement climatique : pluies DRIAS par département (France, région) et par commune (département).
   useEffect(() => {
@@ -592,6 +607,122 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   const erreurAffichee = mode === 'prevision' ? erreur : mode === 'bilan' ? erreurBilans : erreurClimat;
   const prefixe = `carte-${mode === 'prevision' ? `prevision-${dateISO}` : mode === 'bilan' ? 'bilan' : `climat-${horizon}`}-${normaliser(nomZone).replace(/ /g, '-')}`;
 
+  // ── Carte figée (page « Une carte au choix ») ─────────────────────────────────────────────────────────────────────────
+  // Réouverture : si une carte figée est sauvegardée, ses prévisions, réglages et retouches sont rétablis tels quels, sans rien recharger.
+  useEffect(() => {
+    if (!uneCarte) return;
+    try {
+      const brut = localStorage.getItem(CLE_CARTE_FIGEE);
+      const e = brut ? (JSON.parse(brut) as Record<string, unknown>) : null;
+      if (e && typeof e.aujourdhui === 'string') {
+        const prendre = <T,>(champ: string, appliquer: (valeur: T) => void) => {
+          if (champ in e) appliquer(e[champ] as T);
+        };
+        setAujourdhui(e.aujourdhui);
+        prendre<Mode>('mode', setMode);
+        prendre<Niveau>('niveau', setNiveau);
+        prendre<string>('region', setRegion);
+        prendre<string>('departement', setDepartement);
+        prendre<ModeleMeteo>('modele', setModele);
+        prendre<number>('jour', setJour);
+        prendre<string | null>('logoChoisi', setLogoChoisi);
+        prendre<number>('tailleValeurs', setTailleValeurs);
+        prendre<number>('tailleTableau', setTailleTableau);
+        prendre<boolean>('sansTableau', setSansTableau);
+        prendre<boolean>('chiffres', setChiffres);
+        prendre<0 | 300 | 500 | 1000 | 2000>('reliefAlt', setReliefAlt);
+        prendre<'jour' | 'periode' | '24h'>('dureeRisque', setDureeRisque);
+        prendre<boolean>('zonageFin', setZonageFin);
+        prendre<Horizon>('horizon', setHorizon);
+        prendre<number>('altitudeMax', setAltitudeMax);
+        prendre<string>('groupeChoisi', setGroupeChoisi);
+        prendre<string>('carteChoisie', setCarteChoisie);
+        prendre<string>('filtreGroupe', setFiltreGroupe);
+        prendre<AffichageCarte>('affichage', setAffichage);
+        prendre<{ debut: number; fin: number }>('periodePluie', setPeriodePluie);
+        prendre<string | null>('moisBilan', setMoisBilan);
+        prendre<{ modele: ModeleMeteo; z: string } | null>('runModele', setRunModele);
+        prendre<typeof previsions>('previsions', setPrevisions);
+        prendre<typeof cumuls>('cumuls', setCumuls);
+        prendre<typeof montagne>('montagne', setMontagne);
+        prendre<typeof pluiePeriode>('pluiePeriode', setPluiePeriode);
+        prendre<typeof montagnePeriode>('montagnePeriode', setMontagnePeriode);
+        prendre<ReponseBilans | null>('bilans', setBilans);
+        prendre<Record<string, RetouchesCarte>>('retouches', (r) => {
+          setRetouchesCartes(r);
+          setRetouchesRetablies(r);
+        });
+        setFigeeLe(typeof e.figeeLe === 'string' ? e.figeeLe : null);
+        setFigee(true);
+      }
+    } catch {
+      // Sauvegarde illisible ou stockage bloqué : carte normale.
+    }
+    setRestaure(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Tant que la carte est figée, tout ce qui la fait (données, réglages, retouches) est sauvegardé dans le navigateur, même page fermée.
+  useEffect(() => {
+    if (!uneCarte || !figee) return;
+    const minuteur = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          CLE_CARTE_FIGEE,
+          JSON.stringify({ aujourdhui, mode, niveau, region, departement, modele, jour, logoChoisi, tailleValeurs, tailleTableau, sansTableau, chiffres, reliefAlt, dureeRisque, zonageFin, horizon, altitudeMax, groupeChoisi, carteChoisie, filtreGroupe, affichage, periodePluie, moisBilan, runModele, previsions, cumuls, montagne, pluiePeriode, montagnePeriode, bilans: mode === 'bilan' ? bilans : null, retouches: retouchesCartes, figeeLe })
+        );
+        setErreurFiger(null);
+      } catch {
+        setErreurFiger('Sauvegarde impossible dans ce navigateur (navigation privée ou stockage plein) : la carte reste figée tant que la page est ouverte.');
+      }
+    }, 400);
+    return () => clearTimeout(minuteur);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [figee, aujourdhui, mode, niveau, region, departement, modele, jour, logoChoisi, tailleValeurs, tailleTableau, sansTableau, chiffres, reliefAlt, dureeRisque, zonageFin, horizon, altitudeMax, groupeChoisi, carteChoisie, filtreGroupe, affichage, periodePluie, moisBilan, runModele, previsions, cumuls, montagne, pluiePeriode, montagnePeriode, bilans, retouchesCartes, figeeLe]);
+  /** La carte affichée a toutes ses données : seule une carte complète peut être figée. */
+  const peutFiger = uneCarte && !chargement && !erreurAffichee && (mode !== 'prevision' || (!!carteEffective && !!pointsPrevision[carteEffective.id]));
+  /** Instant où la carte a été figée : « Carte élaborée le » et les fenêtres « depuis maintenant » le gardent au lieu de suivre l'horloge. */
+  const instantFige = figee && affichage.elaboreeLe ? Date.parse(affichage.elaboreeLe) : undefined;
+  function basculerFiger() {
+    if (figee) {
+      // Défiger : retour aux prévisions du jour, rechargées ; les retouches de la carte figée sont abandonnées.
+      setFigee(false);
+      setFigeeLe(null);
+      setErreurFiger(null);
+      try {
+        localStorage.removeItem(CLE_CARTE_FIGEE);
+      } catch {
+        // rien à effacer
+      }
+      setAujourdhui(aujourdhuiServeur);
+      setPrevisions(null);
+      setCumuls(null);
+      setMontagne(null);
+      setPluiePeriode(null);
+      setMontagnePeriode(null);
+      setBilans(null);
+      setErreur(null);
+      setErreurCumuls(null);
+      setErreurMontagne(null);
+      setErreurBilans(null);
+      setErreurPeriode(null);
+      setErreurMontagnePeriode(null);
+      setRetouchesCartes({});
+      setRetouchesRetablies(null);
+      regler({ elaboreeLe: undefined });
+    } else {
+      setFigee(true);
+      setFigeeLe(new Date().toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }));
+      regler({ elaboreeLe: new Date().toISOString() });
+      // Seules les retouches de la carte affichée sont gardées.
+      setRetouchesCartes((r) => (carteEffective && r[carteEffective.id] ? { [carteEffective.id]: r[carteEffective.id] } : {}));
+    }
+  }
+  /** Retouches à la main d'une carte (page « Une carte au choix ») : suivies pour la carte figée, et rétablies à sa réouverture. */
+  const retouchesDe = (themeId: string) =>
+    uneCarte
+      ? { retouchesInitiales: retouchesRetablies?.[themeId], onRetouches: (r: RetouchesCarte) => setRetouchesCartes((p) => ({ ...p, [themeId]: r })) }
+      : {};
+
   /** Mini de la nuit en cours (20 h → 8 h) ; en soirée, la fenêtre vient de s'ouvrir : celui de la nuit dernière. */
   const miniNuit = (libelle: string) =>
     (pointsBilan['tn-prov']?.length ?? 0) > 0
@@ -653,7 +784,39 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
   return (
     <AffichageContexte.Provider value={affichage}>
     <div>
-      <div className={uneCarte ? 'flex flex-col gap-2 rounded-2xl border-2 border-primary/30 bg-primary/5 p-3 shadow-sm' : 'flex flex-col gap-3 rounded-xl border border-border bg-surface p-4'}>
+      {uneCarte && (
+        <div className="mb-3">
+          {figee ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+              <span>
+                🔒 Carte figée{figeeLe ? ` le ${figeeLe}` : ''} : prévisions, réglages et retouches gardés, même en fermant la page. L&apos;affichage de la carte (en dessous) reste modifiable ; les valeurs aussi, directement sur la carte.
+              </span>
+              <button type="button" onClick={basculerFiger} className="rounded-lg border border-amber-500 bg-white px-3 py-1 font-medium">
+                🔓 Défiger la carte
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={basculerFiger}
+                disabled={!peutFiger}
+                className="rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium disabled:opacity-50"
+                title="Garde la carte telle quelle (prévisions, réglages et retouches), même après fermeture de la page"
+              >
+                🔒 Figer la carte
+              </button>
+              <span className="text-xs text-muted">La carte ne change plus, même si un nouveau passage des modèles arrive ou que la page est fermée.</span>
+            </div>
+          )}
+          {erreurFiger && (
+            <p role="alert" className="mt-2 text-sm text-danger">
+              {erreurFiger}
+            </p>
+          )}
+        </div>
+      )}
+      <div inert={figee || undefined} className={`${uneCarte ? 'flex flex-col gap-2 rounded-2xl border-2 border-primary/30 bg-primary/5 p-3 shadow-sm' : 'flex flex-col gap-3 rounded-xl border border-border bg-surface p-4'} ${figee ? 'opacity-50' : ''}`}>
         <div className={uneCarte ? 'grid grid-cols-1 items-start gap-x-4 gap-y-1.5 lg:grid-cols-12' : 'flex flex-wrap items-end gap-x-6 gap-y-3'}>
           <fieldset className={uneCarte ? 'lg:col-span-12' : undefined}>
             <legend className={legende}>Cartes</legend>
@@ -1191,6 +1354,7 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                       ) : (
                         <CarteInfo
                           zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
+                          {...retouchesDe(theme.id)}
                           theme={theme}
                           zone={zone}
                           points={pointsPrevision[theme.id]}
@@ -1236,13 +1400,14 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                     ) : mode === 'prevision' ? (
                       <CarteInfo
                           zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
+                        {...retouchesDe(theme.id)}
                         theme={(theme as ThemePrevision).run && sousTitreRun ? { ...theme, titre: theme.titre.replace('À LA FIN DU RUN', `AU ${sousTitreRun.fin}`) } : theme}
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
                         run={(theme as ThemePrevision).cumulJours ? undefined : runCarte}
                         sousTitre={
                           ((theme as ThemePrevision).fenetreHeures
-                            ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!)
+                            ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!, instantFige)
                             : (theme as ThemePrevision).run && sousTitreRun
                             ? sousTitreRun.modele
                             : (theme as ThemePrevision).periode
@@ -1260,10 +1425,11 @@ export default function CartesInfo({ aujourdhui, modeInitial, departementInitial
                         contexte={(theme as ThemePrevision).montagne ? `${contextePrevision}, communes de montagne (point du modèle à ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} m ou plus)` : contextePrevision}
                       />
                     ) : mode === 'bilan' ? (
-                      <CarteInfo  sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
+                      <CarteInfo  sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau} {...retouchesDe(theme.id)} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
                     ) : (
                       <CarteInfo
                            sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
+                        {...retouchesDe(theme.id)}
                         theme={theme}
                         zone={zone}
                         points={climat[theme.id]?.points ?? []}
