@@ -311,6 +311,7 @@ body {
 .cmap-palette-partout { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin: 0 2px 6px; cursor: pointer; }
 .cmap-picto-selectionne { outline: 3px solid #ffd21a; outline-offset: 2px; border-radius: 10px; }
 .cmap-palette-aide { font-size: 11px; color: #64748b; margin: 0 2px 6px; }
+.cmap-catalan .cmap-pied { left: auto; right: 14px; text-align: right; }
 .cmap-pied { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; z-index: 3; font-size: 21px; font-weight: 800; letter-spacing: 0.02em; color: #fff; text-shadow: 0 0 4px #000, 0 0 4px #000, 1px 1px 2px #000; pointer-events: none; }
 .cmap-titre-droite { left: auto; right: 28px; transform: none; text-align: right; }
 /* Carte de France : date et sous-titre en haut à gauche (position donnée par CarteRendu). */

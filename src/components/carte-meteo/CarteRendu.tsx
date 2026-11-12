@@ -719,7 +719,7 @@ export default function CarteRendu({
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
         </div>
 
-        {pied && <div className="cmap-pied" style={etiquetteMer ? { left: 29, right: 'auto', textAlign: 'left', color: '#000', textShadow: '0 0 3px #fff, 0 0 3px #fff' } : undefined}>{etiquetteMer && /^(www\.)?alertes-meteo\.com$/i.test(pied) ? <><span style={{ color: '#da121a' }}>A</span>lertes-meteo.com</> : pied}</div>}
+        {pied && <div className="cmap-pied" style={etiquetteMer ? { left: 'auto', right: 29, textAlign: 'right', color: '#000', textShadow: '0 0 3px #fff, 0 0 3px #fff' } : undefined}>{etiquetteMer && /^alertes-meteo\.com$/i.test(pied) ? <><span style={{ color: '#da121a' }}>A</span>lertes-meteo.com</> : pied}</div>}
 
         <div className="cmap-moyennes" style={moyennesGauche != null ? { left: moyennesGauche } : undefined}>
           {moyennes.map((m) => (

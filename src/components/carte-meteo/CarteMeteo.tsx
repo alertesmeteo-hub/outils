@@ -517,7 +517,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [paletteOuvertePour, setPaletteOuvertePour] = useState<string | null>(null);
   const [pictosSelectionnes, setPictosSelectionnes] = useState<Set<string>>(new Set());
   const [modeMultiple, setModeMultiple] = useState(false);
-  const [pied, setPied] = useState('alertes-meteo.com');
+  const [pied, setPied] = useState(habillage === 'catalan' ? 'www.alertes-meteo.com' : 'alertes-meteo.com');
+  /** Date (titre) à gauche de la carte, bien visible ; d'office sur la carte catalane. */
+  const [dateGauche, setDateGauche] = useState(habillage === 'catalan');
   const [deplacerMers, setDeplacerMers] = useState(false);
   const [resetMers, setResetMers] = useState(0);
   const [afficherFleuves, setAfficherFleuves] = useState(true);
@@ -1656,8 +1658,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       logoFondBlanc={logoFondBlanc}
       hauteurLogo={hauteurLogo}
       pied={pied}
-      titreGauche={enFrance ? xTitreFrance : undefined}
-      titreADroite={!enFrance}
+      titreGauche={enFrance ? xTitreFrance : dateGauche ? 14 : undefined}
+      titreADroite={!enFrance && !dateGauche}
       logoEnBas={!enFrance}
       etiquetteMer
       deplacerMers={deplacerMers && !enExport}
@@ -2387,8 +2389,12 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
               </label>
             </>
           )}
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={dateGauche} onChange={(e) => setDateGauche(e.target.checked)} />
+            Date à gauche, bien visible
+          </label>
           <label className={`${champLabel} mt-3`}>
-            Texte du bas (centré)
+            Texte du bas (à droite sur la carte catalane, sinon centré)
             <input type="text" value={pied} onChange={(e) => setPied(e.target.value)} className={champInput} />
           </label>
           <label className={`${champLabel} mt-3`}>

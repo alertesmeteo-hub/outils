@@ -60,7 +60,7 @@ export default async function PagePyreneesOrientales({ searchParams }: { searchP
         La carte avec pictos
       </h2>
       <div className="mt-6">
-        <CarteMeteo aujourdhui={aujourdhui} initial={null} reglages={{ niveau: 'departement', departement: DEPARTEMENT, jour: 1, modele: 'moyenne', densite: 'leger', periode: 'journee', tailleIcones: 110, jeuPictos: 'alertes-pro' }} habillage="catalan" />
+        <CarteMeteo aujourdhui={aujourdhui} initial={null} reglages={{ niveau: 'departement', departement: DEPARTEMENT, jour: 1, modele: 'moyenne', densite: 'leger', periode: 'apres-midi', tailleIcones: 110, jeuPictos: 'alertes-pro' }} habillage="catalan" />
       </div>
 
       <div id="planche" className="mt-12 scroll-mt-4">
