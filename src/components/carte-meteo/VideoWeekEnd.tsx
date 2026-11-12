@@ -1571,6 +1571,35 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   if (c.soustitres && c.soustitres.length > 0) dessinerSousTitres(ctx, t, dureeVideo(c), c.soustitres, c.voixDuree);
 }
 
+/**
+ * Piste son complète de la vidéo : voix de synthèse (après le petit silence du début) et musique de fond en boucle, volume réduit de moitié
+ * sous la voix, avec fondu d'entrée et de sortie. Rendue hors ligne en 48 kHz stéréo.
+ */
+async function melangerAudio(voix: AudioBuffer | null, musique: AudioBuffer | null, duree: number, volumeMusique: number): Promise<AudioBuffer> {
+  const SR = 48_000;
+  const ctx = new OfflineAudioContext(2, Math.ceil(duree * SR), SR);
+  if (musique) {
+    const source = ctx.createBufferSource();
+    source.buffer = musique;
+    source.loop = true;
+    const gain = ctx.createGain();
+    const niveau = volumeMusique * (voix ? 0.5 : 1);
+    gain.gain.setValueAtTime(0, 0);
+    gain.gain.linearRampToValueAtTime(niveau, Math.min(0.8, duree / 4));
+    gain.gain.setValueAtTime(niveau, Math.max(1, duree - 1.8));
+    gain.gain.linearRampToValueAtTime(0, duree);
+    source.connect(gain).connect(ctx.destination);
+    source.start(0);
+  }
+  if (voix) {
+    const source = ctx.createBufferSource();
+    source.buffer = voix;
+    source.connect(ctx.destination);
+    source.start(VOIX_SILENCE);
+  }
+  return ctx.startRendering();
+}
+
 /** Sous-titres automatiques : le texte parlé défile mot à mot en bas de l'écran (groupes de 4 mots), le mot dit est en jaune, gros, avec contour noir. Mots répartis régulièrement sur la durée de la vidéo. */
 function dessinerSousTitres(ctx: CanvasRenderingContext2D, t: number, total: number, mots: string[], voixDuree?: number) {
   const { width: W, height: H } = ctx.canvas;
@@ -1793,6 +1822,10 @@ export default function VideoWeekEnd({
   const [voix, setVoix] = useState<{ buffer: AudioBuffer; url: string; texte: string } | null>(null);
   const [voixEnCours, setVoixEnCours] = useState(false);
   const [voixErreur, setVoixErreur] = useState<string | null>(null);
+  // Musique de fond : fichier audio choisi par l'utilisateur, décodé dans le navigateur (rien n'est envoyé au serveur).
+  const [musique, setMusique] = useState<{ buffer: AudioBuffer; url: string; nom: string } | null>(null);
+  const [musiqueVolume, setMusiqueVolume] = useState(0.25);
+  const [musiqueErreur, setMusiqueErreur] = useState<string | null>(null);
   // Vidéo d'alerte : niveau, types, jour, et textes saisis à la main (absents : textes automatiques).
   const [niveauAlerte, setNiveauAlerte] = useState<NiveauAlerte>('orange');
   const [typesAlerte, setTypesAlerte] = useState<string[]>(['vent']);
@@ -2099,6 +2132,25 @@ export default function VideoWeekEnd({
       setVoixEnCours(false);
     }
   }
+  async function choisirMusique(fichier: File | undefined) {
+    setMusiqueErreur(null);
+    if (!fichier) return;
+    if (fichier.size > 40_000_000) {
+      setMusiqueErreur('Fichier trop lourd (40 Mo au plus).');
+      return;
+    }
+    try {
+      const contexteAudio = new AudioContext();
+      const buffer = await contexteAudio.decodeAudioData(await fichier.arrayBuffer());
+      void contexteAudio.close();
+      setMusique((ancienne) => {
+        if (ancienne) URL.revokeObjectURL(ancienne.url);
+        return { buffer, url: URL.createObjectURL(fichier), nom: fichier.name };
+      });
+    } catch {
+      setMusiqueErreur('Ce fichier audio n’a pas pu être lu (essaie un MP3, un M4A ou un WAV).');
+    }
+  }
   /** Contexte des vidéos sans prévisions de villes (alerte, tendance) : aucune ville ni semaine. */
   const base = { semaine: { jours: [], villes: {} } as Semaine, villes: [] as string[], textes: { intro: ['', ''], sous: '', bandeau: '', recap: '' } as Contexte['textes'], logo, departement: nomDepartement, codeDep: dep, abonne, legendes, soustitres, voixDuree };
   const contexte: Contexte | null =
@@ -2138,6 +2190,14 @@ export default function VideoWeekEnd({
         minuteurVoix = window.setTimeout(() => void audio.play().catch(() => {}), (VOIX_SILENCE - t) * 1000);
       }
     }
+    let musiqueLue: HTMLAudioElement | null = null;
+    if (musique) {
+      musiqueLue = new Audio(musique.url);
+      musiqueLue.loop = true;
+      musiqueLue.volume = Math.min(1, musiqueVolume * (voixValide ? 0.5 : 1));
+      musiqueLue.currentTime = t % Math.max(1, musique.buffer.duration);
+      void musiqueLue.play().catch(() => {});
+    }
     const boucle = () => {
       const s = (performance.now() - debut) / 1000;
       if (s >= total) {
@@ -2153,6 +2213,7 @@ export default function VideoWeekEnd({
       cancelAnimationFrame(id);
       clearTimeout(minuteurVoix);
       voixLue?.pause();
+      musiqueLue?.pause();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lecture, total]);
@@ -2193,19 +2254,15 @@ export default function VideoWeekEnd({
         sortie.addVideoTrack(source, { frameRate: FPS });
         // Voix de synthèse : piste audio AAC, décalée du petit silence du début (si le navigateur ne sait pas encoder l'AAC, la vidéo reste muette).
         let sourceAudio: AudioBufferSource | null = null;
-        if (voixValide && (await canEncodeAudio('aac').catch(() => false))) {
+        if ((voixValide || musique) && (await canEncodeAudio('aac').catch(() => false))) {
           sourceAudio = new AudioBufferSource({ codec: 'aac', bitrate: 128_000 });
           sortie.addAudioTrack(sourceAudio);
-        } else if (voixValide) {
-          avertissement = 'Ce navigateur ne sait pas ajouter le son (encodage AAC) : vidéo exportée SANS voix. Essaie avec Chrome ou Edge à jour.';
+        } else if (voixValide || musique) {
+          avertissement = 'Ce navigateur ne sait pas ajouter le son (encodage AAC) : vidéo exportée SANS son. Essaie avec Chrome ou Edge à jour.';
         }
         await sortie.start();
-        if (sourceAudio && voixValide) {
-          const brut = voixValide.buffer;
-          const decalage = Math.round(VOIX_SILENCE * brut.sampleRate);
-          const calee = new AudioBuffer({ length: decalage + brut.length, numberOfChannels: brut.numberOfChannels, sampleRate: brut.sampleRate });
-          for (let k = 0; k < brut.numberOfChannels; k++) calee.copyToChannel(brut.getChannelData(k), k, decalage);
-          await sourceAudio.add(calee);
+        if (sourceAudio) {
+          await sourceAudio.add(await melangerAudio(voixValide?.buffer ?? null, musique?.buffer ?? null, total, musiqueVolume));
           sourceAudio.close();
         }
         const nb = Math.round(total * FPS);
@@ -2255,7 +2312,7 @@ export default function VideoWeekEnd({
     } finally {
       setEtat(null);
     }
-  }, [contexte, total, jours, dep, format, voixValide, soustitres.length]);
+  }, [contexte, total, jours, dep, format, voixValide, musique, musiqueVolume, soustitres.length]);
 
   // Texte d'accompagnement (légende du post) rédigé par l'IA à partir des mêmes données que la vidéo.
   const [texteIA, setTexteIA] = useState('');
@@ -2629,6 +2686,27 @@ export default function VideoWeekEnd({
             )}
           </div>
         )}
+        <div className="grid gap-2 rounded-lg border border-border p-3 text-sm">
+          <span className="font-medium">🎵 Musique de fond (facultatif)</span>
+          <input type="file" accept="audio/*" onChange={(e) => void choisirMusique(e.target.files?.[0])} className="text-xs" aria-label="Fichier de musique" />
+          {musiqueErreur && <span className="text-xs text-red-600">{musiqueErreur}</span>}
+          {musique && (
+            <>
+              <span className="text-xs text-muted">
+                {musique.nom} ({Math.round(musique.buffer.duration)} s, en boucle si plus courte que la vidéo ; fondu au début et à la fin).
+              </span>
+              <label className="flex items-center gap-2 text-xs">
+                Volume
+                <input type="range" min={0.05} max={0.6} step={0.05} value={musiqueVolume} onChange={(e) => setMusiqueVolume(Number(e.target.value))} className="flex-1" aria-label="Volume de la musique" />
+                {Math.round(musiqueVolume * 100)} %
+              </label>
+              <button type="button" onClick={() => { URL.revokeObjectURL(musique.url); setMusique(null); }} className="justify-self-start rounded-lg border border-border px-2 py-1 text-xs hover:border-primary">
+                Retirer la musique
+              </button>
+            </>
+          )}
+          <span className="text-xs text-muted">Utilise une musique dont tu as les droits : TikTok et Facebook coupent ou bloquent les musiques protégées. Le volume est baissé de moitié sous la voix. Le fichier reste dans ton navigateur.</span>
+        </div>
         <label className="text-sm font-medium">
           <span className={legende}>Logo</span>
           <select value={logoId} onChange={(e) => setLogoId(e.target.value)} className={selectBarre}>
