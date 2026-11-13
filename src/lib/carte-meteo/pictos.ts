@@ -358,6 +358,11 @@ export interface EntreePicto {
 }
 
 const CODES_NEIGE = [71, 73, 75, 77, 85, 86];
+/**
+ * Le code météo d'une heure ne suffit pas : un code de neige (un seul pas de la série, le plus fort retenu sur la période) avec 10 °C de maximale
+ * donnait un picto de neige. Au-delà de 3 °C de température (maximale du jour, de la période…), le code de neige est ignoré.
+ */
+const codeNeigeVraisemblable = (code: number | null, temperature: number | null) => code != null && CODES_NEIGE.includes(code) && (temperature == null || temperature <= 3);
 
 /**
  * Picto d'une période d'après la nébulosité moyenne et les précipitations cumulées sur toute la période,
@@ -370,13 +375,13 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
   if (jeu === 'halloween' || jeu === 'noel' || jeu === 'paques') return enTheme(pictoDepuisPrevision(e, 'alertes'), jeu);
   const { code, nuages, pluie, temperature } = e;
   const images = jeu === 'images';
-  if (nuages == null && pluie == null) return pictoDepuisCodeMeteo(code, jeu);
+  if (nuages == null && pluie == null) return pictoDepuisCodeMeteo(code != null && CODES_NEIGE.includes(code) && !codeNeigeVraisemblable(code, temperature) ? null : code, jeu);
   if (jeu === 'alertes') {
     const mm = pluie ?? 0;
     const ciel = nuages ?? 50;
     if (code != null && code >= 95) return code >= 96 ? 'am:orage-grele' : mm >= 2 ? 'am:orage-pluie' : ciel < 75 ? 'am:averse-orageuse' : 'am:orage';
     const precipite = mm >= 0.3;
-    const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
+    const neige = codeNeigeVraisemblable(code, temperature) || (precipite && temperature != null && temperature <= 1.5);
     if (neige && precipite) return mm >= 3 ? 'am:forte-neige' : ciel < 75 ? 'am:averses-neige' : 'am:neige';
     if ((code === 45 || code === 48) && !precipite) return e.nuit ? 'am:nuit-brouillard' : 'am:brouillard';
     if (precipite) {
@@ -397,7 +402,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
     const ciel = nuages ?? 50;
     if (code != null && code >= 95) return code >= 96 ? 'mc:thunderstorms-hail' : mm >= 2 ? 'mc:thunderstorms-rain' : 'mc:thunderstorms-day';
     const precipite = mm >= 0.3;
-    const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
+    const neige = codeNeigeVraisemblable(code, temperature) || (precipite && temperature != null && temperature <= 1.5);
     if (neige && precipite) return mm >= 3 ? 'mc:extreme-snow' : ciel < 75 ? 'mc:partly-cloudy-day-snow' : 'mc:overcast-snow';
     if ((code === 45 || code === 48) && !precipite) return 'mc:fog';
     if (precipite) {
@@ -415,7 +420,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
 
   if (code != null && code >= 95) return images ? (code >= 96 ? 'img:26' : 'img:12') : '⛈️';
   const precipite = (pluie ?? 0) >= 0.3;
-  const neige = (code != null && CODES_NEIGE.includes(code)) || (precipite && temperature != null && temperature <= 1.5);
+  const neige = codeNeigeVraisemblable(code, temperature) || (precipite && temperature != null && temperature <= 1.5);
   if (neige && precipite) return images ? ((pluie ?? 0) >= 3 ? 'img:16' : 'img:13') : '🌨️';
   if ((code === 45 || code === 48) && !precipite) return images ? 'img:3' : '🌫️';
 
