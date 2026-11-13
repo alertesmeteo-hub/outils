@@ -27,13 +27,13 @@ export interface DefStyleFond {
 }
 
 export const STYLES_FOND: Record<StyleFond, DefStyleFond> = {
-  clair: { libelle: 'Fond clair', terre: '#edf1f5', mer: '#c5dfeb', territoire: '#8499b8', contour: '#ffffff', voisins: '#d3dce6', cote: '#aecbd9', senyera: false, texteMer: '#3a6a88' },
-  'bleu-nuit': { libelle: 'Fond bleu nuit', terre: '#0f2b47', mer: '#1b5273', territoire: '#6a89b0', contour: '#ffffff', voisins: '#2b4b6c', cote: '#2f6f93', senyera: false, texteMer: '#e6f2fa' },
-  creme: { libelle: 'Crème et senyera (territoire bleu-gris)', terre: ['#f9e6cc', '#f3d0a4'], mer: ['#9ccbe3', '#5aa3d0'], territoire: '#7b8cab', contour: '#ffffff', voisins: '#dcc3a0', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
-  'rouge-or': { libelle: 'Rouge et or (territoire crème)', terre: ['#f6b90f', '#9d1025'], mer: ['#2f6bc0', '#173f86'], territoire: '#f3d9a4', contour: '#ffffff', voisins: 'rgba(255,255,255,0.3)', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
+  clair: { libelle: 'Fond clair', terre: ['#f7f8fa', '#e9edf2'], mer: ['#d4e9f4', '#a9d0e6'], territoire: '#3d6cb0', contour: '#ffffff', voisins: '#c5cfdb', cote: '#8fbad3', senyera: false, texteMer: '#2f5f7f' },
+  'bleu-nuit': { libelle: 'Fond bleu nuit', terre: ['#12304f', '#0a1f36'], mer: ['#1c5f8a', '#0f3d62'], territoire: '#5b9bd5', contour: '#ffffff', voisins: '#38597b', cote: '#3b84b0', senyera: false, texteMer: '#e6f2fa' },
+  creme: { libelle: 'Crème et senyera (territoire bleu-gris)', terre: ['#fbefd9', '#f1d5a8'], mer: ['#a6d4ea', '#5aa7d6'], territoire: '#52689a', contour: '#ffffff', voisins: '#dcc3a0', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
+  'rouge-or': { libelle: 'Rouge et or (territoire crème)', terre: ['#f7c11c', '#a50f27'], mer: ['#2f6bc0', '#173f86'], territoire: '#fbeccb', contour: '#ffffff', voisins: 'rgba(255,255,255,0.35)', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
   parchemin: { libelle: 'Parchemin (mer bleue)', terre: ['#f4e8d2', '#eadcbf'], mer: ['#3b9de8', '#1d6fc2'], territoire: '#fbe3ae', contour: '#1a1a1a', voisins: '#c9b79a', cote: '#1a1a1a', senyera: true, texteMer: '#ffffff' },
-  'marine-creme': { libelle: 'Bleu marine (territoire crème)', terre: ['#0c2f7a', '#071b52'], mer: ['#2a93e0', '#1566b8'], territoire: '#fbe3ab', contour: '#ffffff', voisins: '#1d4aa0', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
-  'marine-bleu': { libelle: 'Bleu marine (territoire bleu)', terre: ['#0a3f94', '#061f5c'], mer: ['#2a93e0', '#1566b8'], territoire: '#0c58b5', contour: '#ffffff', voisins: '#6a8fd6', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
+  'marine-creme': { libelle: 'Bleu marine (territoire crème)', terre: ['#0e3485', '#071b52'], mer: ['#33a0ea', '#1566b8'], territoire: '#fdf0cc', contour: '#ffffff', voisins: '#2a58b0', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
+  'marine-bleu': { libelle: 'Bleu marine (territoire bleu)', terre: ['#0a3f94', '#061f5c'], mer: ['#33a0ea', '#1566b8'], territoire: '#3f86e0', contour: '#ffffff', voisins: '#6a8fd6', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
 };
 
 export const ORDRE_STYLES_FOND = Object.keys(STYLES_FOND) as StyleFond[];
