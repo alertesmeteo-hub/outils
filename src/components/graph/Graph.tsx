@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Cadre, { POLICE, type Chiffre } from '@/components/nuits-tropicales/Cadre';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
+import TexteSurCarte from '@/components/carte-meteo/TexteSurCarte';
+import { useTexteIA } from '@/components/carte-meteo/TexteIA';
+import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import type { DonneesGraph, JourGraph, ReponseGraph, ZoneGraph } from '@/lib/graph/types';
 
 /**
@@ -220,6 +223,23 @@ function Trace({ dessin, l, h }: { dessin: Dessin; l: number; h: number }) {
   );
 }
 
+/** Rubrique pour le texte (modèles de phrases ou IA) : les n valeurs extrêmes d'une liste de points nommés, et leurs statistiques. */
+function rubrique(nom: string, unite: string, points: { lieu: string; valeur: number | null }[], sens: 'plus hautes' | 'plus basses', options: { ecart?: boolean; n?: number } = {}): RubriqueTexte | null {
+  const valides = points.filter((p): p is { lieu: string; valeur: number } => p.valeur != null && Number.isFinite(p.valeur));
+  if (!valides.length) return null;
+  const tries = [...valides].sort((a, b) => (sens === 'plus hautes' ? b.valeur - a.valeur : a.valeur - b.valeur));
+  const valeurs = valides.map((p) => p.valeur);
+  return {
+    nom,
+    unite,
+    sens,
+    preposition: 'le',
+    ecart: options.ecart,
+    classement: tries.slice(0, options.n ?? 4).map((p) => ({ lieu: p.lieu, valeur: Math.round(p.valeur * 10) / 10 })),
+    stats: { nombre: valeurs.length, min: Math.min(...valeurs), max: Math.max(...valeurs), moyenne: valeurs.reduce((a, b) => a + b, 0) / valeurs.length },
+  };
+}
+
 const moyenne = (l: (number | null)[]) => {
   const v = l.filter((x): x is number => x != null);
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
@@ -233,6 +253,15 @@ export default function Graph() {
   const [periode, setPeriode] = useState<Periode>('90');
   const [message, setMessage] = useState<string | null>(null);
   const noeud = useRef<HTMLDivElement>(null);
+  const emplacementTexte = useRef<HTMLDivElement>(null);
+  // Image carrée (720 px) sur petit écran, comme le cadre ; le texte IA posé sur l'image suit sa largeur.
+  const [etroit, setEtroit] = useState(false);
+  useEffect(() => {
+    const mesurer = () => setEtroit(window.innerWidth < 800);
+    mesurer();
+    window.addEventListener('resize', mesurer);
+    return () => window.removeEventListener('resize', mesurer);
+  }, []);
 
   // Lecture des données ; tant que le premier calcul n'est pas fini (202), on redemande toutes les 5 s.
   useEffect(() => {
@@ -317,6 +346,7 @@ export default function Graph() {
       return pire;
     })();
     let dessin: Dessin;
+    let rubriques: (RubriqueTexte | null)[] = [];
     let chiffres: Chiffre[] = [];
     let titre = '';
     let sousTitre = '';
@@ -335,6 +365,12 @@ export default function Graph() {
       chiffres = [
         ...(moyTm != null ? [{ libelle: 'Moyenne', valeur: `${fr(moyTm)}°`, detail: moyN != null ? `normale ${fr(moyN)}°` : undefined, couleur: '#0b2e59' }] : []),
         ...(ecartMoy != null ? [{ libelle: 'Écart', valeur: `${signe(ecartMoy)}°`, detail: 'à la normale', couleur: ecartMoy >= 0 ? ROUGE : BLEU }] : []),
+      ];
+      const nomJour = (iso: string) => jourMois(iso);
+      rubriques = [
+        rubrique('Écart à la normale de la température moyenne (jours les plus chauds)', '°C', tm.map((p) => ({ lieu: nomJour(p.iso), valeur: p.v != null && p.n != null ? p.v - p.n : null })), 'plus hautes', { ecart: true }),
+        rubrique('Écart à la normale de la température moyenne (jours les plus froids)', '°C', tm.map((p) => ({ lieu: nomJour(p.iso), valeur: p.v != null && p.n != null ? p.v - p.n : null })), 'plus basses', { ecart: true, n: 3 }),
+        rubrique('Température moyenne', '°C', tm.map((p) => ({ lieu: nomJour(p.iso), valeur: p.v })), 'plus hautes', { n: 3 }),
       ];
       if (type === 'tm') {
         titre = zone === 'FR' ? 'Température moyenne en France' : `Température moyenne · ${nomZone}`;
@@ -377,6 +413,10 @@ export default function Graph() {
       const mn = moyenne(tn.map((p) => p.v));
       const nx = moyenne(jours.map((j) => normaleJour(z.normales.tx, j.d)));
       const nn = moyenne(jours.map((j) => normaleJour(z.normales.tn, j.d)));
+      rubriques = [
+        rubrique('Températures maximales', '°C', jours.map((j) => ({ lieu: jourMois(j.d), valeur: j.tx })), 'plus hautes'),
+        rubrique('Températures minimales', '°C', jours.map((j) => ({ lieu: jourMois(j.d), valeur: j.tn })), 'plus basses'),
+      ];
       titre = zone === 'FR' ? 'Maximales et minimales en France' : `Maximales et minimales · ${nomZone}`;
       dessin = {
         series: [
@@ -405,6 +445,10 @@ export default function Graph() {
         info: (_s, t, v) => `${MOIS[new Date(t).getUTCMonth()]} ${new Date(t).getUTCFullYear()} : ${signe(v)} °C`,
         legende: [{ couleur: ROUGE, libelle: 'Plus chaud que la normale' }, { couleur: BLEU, libelle: 'Plus froid' }],
       };
+      rubriques = [
+        rubrique('Écart mensuel à la normale (mois les plus chauds)', '°C', liste.map((x) => ({ lieu: `${MOIS[x.m]} ${x.annee}`, valeur: x.ecart })), 'plus hautes', { ecart: true }),
+        rubrique('Écart mensuel à la normale (mois les plus froids)', '°C', liste.map((x) => ({ lieu: `${MOIS[x.m]} ${x.annee}`, valeur: x.ecart })), 'plus basses', { ecart: true, n: 3 }),
+      ];
       const dernier = liste[liste.length - 1];
       if (dernier?.ecart != null) chiffres.push({ libelle: `${MOIS[dernier.m]} ${dernier.annee}`, valeur: `${signe(dernier.ecart)}°`, detail: 'à la normale', couleur: dernier.ecart >= 0 ? ROUGE : BLEU });
       const chauds = liste.filter((x) => (x.ecart ?? 0) > 0).length;
@@ -422,6 +466,10 @@ export default function Graph() {
         info: (_s, t, v) => `${jourMoisAnnee(isoDe(t))} : ${fr(v)} mm`,
         legende: [{ couleur: VERT_PLUIE, libelle: 'Pluie du jour (mm)' }],
       };
+      rubriques = [
+        rubrique('Pluie quotidienne (jours les plus arrosés)', 'mm', rr.map((p) => ({ lieu: jourMois(isoDe(p.t)), valeur: p.v })), 'plus hautes'),
+        rubrique('Cumul de pluie de la période par rapport à la normale', '%', [{ lieu: 'la période', valeur: normale > 0 ? (total / normale) * 100 : null }], 'plus hautes', { n: 1 }),
+      ];
       chiffres = [{ libelle: 'Cumul', valeur: `${Math.round(total)} mm`, detail: `normale ${Math.round(normale)} mm`, couleur: VERT_PLUIE }];
       if (normale > 0) chiffres.push({ libelle: 'Rapport', valeur: `${Math.round((total / normale) * 100)} %`, detail: 'de la normale', couleur: total >= normale ? '#0f766e' : '#b45309' });
     } else {
@@ -435,11 +483,25 @@ export default function Graph() {
         info: (s, t, v) => `${MOIS[new Date(t).getUTCMonth()]} ${new Date(t).getUTCFullYear()} : ${Math.round(v)} % de la normale${s === 'cent' ? '' : ''}`,
         legende: [{ couleur: VERT_PLUIE, libelle: 'Cumul du mois' }, { couleur: '#0f172a', libelle: 'Normale (100 %)', pointille: true }],
       };
+      rubriques = [
+        rubrique('Pluie mensuelle en pourcentage de la normale (mois les plus arrosés)', '%', liste.map((x) => ({ lieu: `${MOIS[x.m]} ${x.annee}`, valeur: x.pct })), 'plus hautes'),
+        rubrique('Pluie mensuelle en pourcentage de la normale (mois les plus secs)', '%', liste.map((x) => ({ lieu: `${MOIS[x.m]} ${x.annee}`, valeur: x.pct })), 'plus basses', { n: 3 }),
+      ];
       const dernier = liste[liste.length - 1];
       if (dernier?.pct != null) chiffres.push({ libelle: `${MOIS[dernier.m]} ${dernier.annee}`, valeur: `${Math.round(dernier.pct)} %`, detail: `${Math.round(dernier.pluie)} mm`, couleur: VERT_PLUIE });
     }
-    return { dessin, chiffres, titre, sousTitre, surtitre, trou };
+    const texte: CarteTexte = {
+      type: 'Graphique climatique (données quotidiennes de Météo-France)',
+      titre,
+      periode: sousTitre,
+      zone: zone === 'FR' ? 'France (indicateur thermique national estimé)' : nomZone,
+      source: 'Météo-France, normales 1991-2020',
+      rubriques: rubriques.filter((r): r is RubriqueTexte => r != null),
+    };
+    return { dessin, chiffres, titre, sousTitre, surtitre, trou, texte };
   }, [donnees, z, vue, type, zone, nomZone, mois]);
+
+  const ia = useTexteIA(() => (analyse && analyse.texte.rubriques.length ? analyse.texte : null), { x: 14, largeur: etroit ? 692 : 1252 });
 
   const exporter = async () => {
     if (!noeud.current) return;
@@ -512,6 +574,12 @@ export default function Graph() {
 
       {z && analyse ? (
         <div className="mt-4">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {ia.bouton}
+            <TexteSurCarte cible={noeud} donnees={() => (analyse.texte.rubriques.length ? analyse.texte : null)} enLigne emplacement={emplacementTexte} />
+          </div>
+          <div ref={emplacementTexte} />
+          {ia.panneau}
           <Cadre
             ref={noeud}
             surtitre={analyse.surtitre}
@@ -522,12 +590,15 @@ export default function Graph() {
             description={`${analyse.titre} : ${analyse.sousTitre}`}
           >
             {(d) => (
+              <>
               <svg width={d.largeur} height={d.hauteur} viewBox={`0 0 ${d.largeur} ${d.hauteur}`} style={{ position: 'absolute', left: 0, top: 0 }}>
                 <rect width={d.largeur} height={d.hauteur} fill="#ffffff" />
-                <g transform={`translate(12 ${d.compact ? 124 : 112})`}>
-                  <Trace dessin={analyse.dessin} l={d.largeur - 24} h={d.hauteur - (d.compact ? 124 : 112) - 30} />
+                <g transform={`translate(12 ${d.compact ? 168 : 112})`}>
+                  <Trace dessin={analyse.dessin} l={d.largeur - 24} h={d.hauteur - (d.compact ? 168 : 112) - 30} />
                 </g>
               </svg>
+              {ia.calque}
+              </>
             )}
           </Cadre>
           {analyse.trou && (
