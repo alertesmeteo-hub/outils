@@ -2,7 +2,7 @@
  * Styles de fond de la carte (option « Style de fond ») : fond uni ou dégradé, territoire coloré, mer toujours dessinée.
  * Les couleurs sont des attributs SVG (pas de CSS) pour passer dans l'export JPG.
  */
-export type StyleFond = 'bordeaux' | 'azur' | 'sauge' | 'ardoise' | 'sable' | 'lavande' | 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'parchemin' | 'marine-creme' | 'marine-bleu';
+export type StyleFond = 'bordeaux' | 'azur' | 'sauge' | 'ardoise' | 'sable' | 'lavande' | 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'rouge-or-doux' | 'rouge-or-or' | 'rouge-or-rouge' | 'rouge-or-inverse' | 'rouge-or-territoire-rouge' | 'rouge-or-senyera' | 'parchemin' | 'marine-creme' | 'marine-bleu';
 
 /** Une couleur, ou un dégradé en diagonale (haut gauche vers bas droit). */
 export type Peinture = string | [string, string];
@@ -39,7 +39,13 @@ export const STYLES_FOND: Record<StyleFond, DefStyleFond> = {
   clair: { libelle: 'Fond clair', terre: ['#f7f8fa', '#e9edf2'], mer: ['#d4e9f4', '#a9d0e6'], territoire: '#3d6cb0', contour: '#ffffff', voisins: '#c5cfdb', cote: '#8fbad3', senyera: false, texteMer: '#2f5f7f' },
   'bleu-nuit': { libelle: 'Fond bleu nuit', terre: ['#12304f', '#0a1f36'], mer: ['#1c5f8a', '#0f3d62'], territoire: '#5b9bd5', contour: '#ffffff', voisins: '#38597b', cote: '#3b84b0', senyera: false, texteMer: '#e6f2fa' },
   creme: { libelle: 'Crème et senyera (territoire bleu-gris)', terre: ['#fbefd9', '#f1d5a8'], mer: ['#a6d4ea', '#5aa7d6'], territoire: '#52689a', contour: '#ffffff', voisins: '#dcc3a0', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
-  'rouge-or': { libelle: 'Rouge et or (mer bleue, territoire crème)', terre: ['#b98a2e', '#7a1c2a'], mer: ['#2f6bc0', '#173f86'], territoire: '#fbeccb', contour: '#f6e3b0', voisins: 'rgba(246,227,176,0.30)', cote: '#e3b64f', senyera: true, texteMer: '#ffffff' },
+  'rouge-or': { libelle: 'Rouge et or 1 : classique (mer bleue, territoire crème)', terre: ['#b98a2e', '#7a1c2a'], mer: ['#2f6bc0', '#173f86'], territoire: '#fbeccb', contour: '#f6e3b0', voisins: 'rgba(246,227,176,0.30)', cote: '#e3b64f', senyera: true, texteMer: '#ffffff' },
+  'rouge-or-doux': { libelle: 'Rouge et or 2 : dégradé doux (mer bleue, territoire crème)', terre: ['#c49632', '#a8602c'], mer: ['#2f6bc0', '#173f86'], territoire: '#fbeccb', contour: '#fff3d6', voisins: 'rgba(255,243,214,0.35)', cote: '#fff3d6', senyera: false, texteMer: '#ffffff' },
+  'rouge-or-or': { libelle: 'Rouge et or 3 : or uni (territoire rouge)', terre: ['#d8a93c', '#c8962f'], mer: ['#2f6bc0', '#173f86'], territoire: '#b3202f', contour: '#fff3d6', voisins: 'rgba(120,80,10,0.30)', cote: '#fff3d6', senyera: false, texteMer: '#ffffff' },
+  'rouge-or-rouge': { libelle: 'Rouge et or 4 : rouge uni (territoire or pâle)', terre: ['#a82233', '#951d2d'], mer: ['#2f6bc0', '#173f86'], territoire: '#f6dd9a', contour: '#ffffff', voisins: 'rgba(255,255,255,0.30)', cote: '#ffffff', senyera: false, texteMer: '#ffffff' },
+  'rouge-or-inverse': { libelle: 'Rouge et or 5 : dégradé inversé rouge → or (territoire crème)', terre: ['#8f1f2d', '#c9993a'], mer: ['#2f6bc0', '#173f86'], territoire: '#fbeccb', contour: '#fff3d6', voisins: 'rgba(255,243,214,0.35)', cote: '#fff3d6', senyera: false, texteMer: '#ffffff' },
+  'rouge-or-territoire-rouge': { libelle: 'Rouge et or 6 : dégradé or → rouge (territoire rouge)', terre: ['#d6a53a', '#9c2432'], mer: ['#2f6bc0', '#173f86'], territoire: '#c4182c', contour: '#fff3d6', voisins: 'rgba(255,243,214,0.30)', cote: '#fff3d6', senyera: false, texteMer: '#ffffff' },
+  'rouge-or-senyera': { libelle: 'Rouge et or 7 : senyera (dégradé doux, territoire crème)', terre: ['#c49632', '#a8602c'], mer: ['#2f6bc0', '#173f86'], territoire: '#fbeccb', contour: '#fff3d6', voisins: 'rgba(255,243,214,0.35)', cote: '#fff3d6', senyera: true, texteMer: '#ffffff' },
   parchemin: { libelle: 'Parchemin (mer bleue)', terre: ['#f4e8d2', '#eadcbf'], mer: ['#3b9de8', '#1d6fc2'], territoire: '#fbe3ae', contour: '#1a1a1a', voisins: '#c9b79a', cote: '#1a1a1a', senyera: true, texteMer: '#ffffff' },
   'marine-creme': { libelle: 'Bleu marine (territoire crème)', terre: ['#0e3485', '#071b52'], mer: ['#33a0ea', '#1566b8'], territoire: '#fdf0cc', contour: '#ffffff', voisins: '#2a58b0', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
   'marine-bleu': { libelle: 'Bleu marine (territoire bleu)', terre: ['#0a3f94', '#061f5c'], mer: ['#33a0ea', '#1566b8'], territoire: '#3f86e0', contour: '#ffffff', voisins: '#6a8fd6', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },

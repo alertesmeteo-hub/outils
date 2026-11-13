@@ -441,7 +441,7 @@ interface Contexte {
   logo: HTMLImageElement | null;
   departement: string;
   /** Textes selon le mode : titre de l'intro (2 lignes), sous-titre, bandeau des villes, titre du récapitulatif. */
-  textes: { intro: [string, string]; sous: string; bandeau: string; recap: string; /** Période (« CE WEEK-END ? ») : reprise après l'accroche quand l'intro parle de montagne ou de côte. */ periode?: string; /** Fin de l'accroche (« CHEZ NOUS ? »). */ accroche?: string; /** Première ligne de l'accroche (« QUEL TEMPS » par défaut). */ ligneHaut?: string; /** Icônes de l'accroche : par défaut le temps (soleil, nuage, pluie, vent) ; flocons pour la vidéo montagne. */ icones?: 'flocons' | 'extremes' };
+  textes: { intro: [string, string]; sous: string; bandeau: string; recap: string; /** Période (« CE WEEK-END ? ») : reprise après l'accroche quand l'intro parle de montagne ou de côte. */ periode?: string; /** Fin de l'accroche (« CHEZ NOUS ? »). */ accroche?: string; /** Première ligne de l'accroche (« QUEL TEMPS » par défaut). */ ligneHaut?: string; /** Icônes de l'accroche : par défaut le temps (soleil, nuage, pluie, vent) ; flocons pour la vidéo montagne. */ icones?: string };
   /** Format « TikTok Hook » : l'écran d'accroche précède l'intro. */
   hook?: boolean;
   /** Écran carte (villes placées sur la carte du département) après l'intro. */
@@ -576,12 +576,15 @@ function texteHook(ctx: CanvasRenderingContext2D, texte: string, x: number, y: n
  * Icônes d'accroche dessinées aux couleurs catalanes (jaune et rouge), animées : soleil aux rayons qui tournent, nuage qui dérive,
  * pluie qui tombe, vent qui souffle. Repère de 100 × 100 centré en (0, 0) ; contour blanc pour ressortir sur la carte.
  */
-type Prim = { c: [number, number, number] } | { r: [number, number, number, number, number] } | { p: [number, number][] };
+type Prim = { c: [number, number, number] } | { r: [number, number, number, number, number] } | { p: [number, number][] } | { f: (ctx: CanvasRenderingContext2D) => void };
 
 function tracerPrim(ctx: CanvasRenderingContext2D, p: Prim) {
   if ('c' in p) {
     ctx.beginPath();
     ctx.arc(p.c[0], p.c[1], p.c[2], 0, Math.PI * 2);
+  } else if ('f' in p) {
+    ctx.beginPath();
+    p.f(ctx);
   } else if ('p' in p) {
     ctx.beginPath();
     p.p.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
@@ -713,6 +716,163 @@ function iconeExtreme(ctx: CanvasRenderingContext2D, i: number, t: number) {
   }
 }
 
+
+/** Étoile à 5 branches (polygone) centrée en (x, y). */
+function etoile(x: number, y: number, r: number, rot: number): [number, number][] {
+  return Array.from({ length: 10 }, (_, k) => {
+    const a = rot + (k * Math.PI) / 5 - Math.PI / 2;
+    const d = k % 2 ? r * 0.45 : r;
+    return [x + Math.cos(a) * d, y + Math.sin(a) * d] as [number, number];
+  });
+}
+
+/** Gouttes qui tombent sous un nuage (n gouttes réparties sur la largeur). */
+function gouttesQuiTombent(ctx: CanvasRenderingContext2D, t: number, y0: number, n = 3) {
+  for (let g = 0; g < n; g++) {
+    const cycle = (t * 0.95 + g * (1 / n)) % 1;
+    ctx.globalAlpha = Math.min(1, (1 - cycle) * 2.2);
+    forme(ctx, [{ r: [-26 + g * (52 / Math.max(1, n - 1)) - 4, y0 + cycle * 26, 8, 15, 4] }], JAUNE_CATALAN, ROUGE_CATALAN, 2.4);
+  }
+  ctx.globalAlpha = 1;
+}
+
+type NomIcone = 'soleil' | 'pluie' | 'eclair' | 'goutte' | 'lunettes' | 'parapluie' | 'tornade' | 'arc' | 'lune' | 'nuage-sourire' | 'thermometre' | 'flocon' | 'vent' | 'bonhomme';
+
+/** Les icônes de l'accroche (repère de 100 × 100 centré en 0, 0), animées à l'instant t. */
+function dessinerIcone(ctx: CanvasRenderingContext2D, nom: NomIcone, t: number) {
+  switch (nom) {
+    case 'soleil':
+      return soleilCatalan(ctx, 0, 0, 30, t);
+    case 'pluie':
+      return iconeCatalane(ctx, 2, t);
+    case 'eclair':
+    case 'lunettes':
+    case 'goutte':
+      return iconeExtreme(ctx, nom === 'eclair' ? 0 : nom === 'lunettes' ? 1 : 2, t);
+    case 'flocon':
+      return floconCatalan(ctx, 0, 0, 46, t, 0);
+    case 'vent':
+      return iconeCatalane(ctx, 3, t);
+    case 'parapluie': {
+      // Parapluie ouvert qui se balance, sous la pluie.
+      ctx.save();
+      ctx.rotate(Math.sin(t * 1.6) * 0.08);
+      const arc: [number, number][] = [];
+      for (let k = 0; k <= 14; k++) {
+        const a = Math.PI + (k * Math.PI) / 14;
+        arc.push([Math.cos(a) * 46, 2 + Math.sin(a) * 40]);
+      }
+      for (let k = 0; k < 3; k++) arc.push([46 - (k + 1) * (92 / 3) + 14, k % 2 ? 2 : 11]);
+      traitCerne(ctx, () => {
+        ctx.beginPath();
+        ctx.moveTo(0, 2);
+        ctx.lineTo(0, 38);
+        ctx.arc(-8, 38, 8, 0, Math.PI * 0.95);
+      }, JAUNE_CATALAN, ROUGE_CATALAN, 5);
+      forme(ctx, [{ p: arc }], ROUGE_CATALAN, JAUNE_CATALAN, 4);
+      ctx.restore();
+      for (let g = 0; g < 4; g++) {
+        const cycle = (t * 1.1 + g * 0.25) % 1;
+        ctx.globalAlpha = Math.min(1, (1 - cycle) * 2);
+        forme(ctx, [{ r: [-46 + g * 30 + cycle * 4, -50 + cycle * 40 + 18, 6, 12, 3] }], JAUNE_CATALAN, ROUGE_CATALAN, 2);
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+    case 'tornade': {
+      // Entonnoir de cinq bandes qui ondulent, avec des débris qui tournent autour.
+      const largeurs = [92, 74, 58, 42, 26];
+      largeurs.forEach((w, k) => {
+        const dx = Math.sin(t * 2.4 + k * 0.7) * (5 + k * 2);
+        forme(ctx, [{ r: [-w / 2 + dx, -48 + k * 19, w, 17, 8.5] }], k % 2 ? JAUNE_CATALAN : ROUGE_CATALAN, k % 2 ? ROUGE_CATALAN : JAUNE_CATALAN, 3.4);
+      });
+      for (let d = 0; d < 3; d++) {
+        const a = t * 3 + d * 2.1;
+        forme(ctx, [{ c: [Math.cos(a) * 44, -40 + Math.sin(a) * 6 + d * 3, 4.5] }], JAUNE_CATALAN, ROUGE_CATALAN, 2);
+      }
+      return;
+    }
+    case 'arc': {
+      // Arc-en-ciel de cinq bandes (jaune et rouge) posé sur deux petits nuages.
+      const couleurs = [ROUGE_CATALAN, JAUNE_CATALAN, ROUGE_CATALAN, JAUNE_CATALAN, ROUGE_CATALAN];
+      couleurs.forEach((c, n) => {
+        traitCerne(ctx, () => {
+          ctx.beginPath();
+          ctx.arc(0, 24, 42 - n * 7.5, Math.PI, Math.PI * 2);
+        }, c, c === ROUGE_CATALAN ? ROUGE_CATALAN : JAUNE_CATALAN, 6);
+      });
+      nuageCatalan(ctx, -36 + Math.sin(t * 1.2) * 2, 30, 0.55);
+      nuageCatalan(ctx, 36 + Math.sin(t * 1.2 + 2) * 2, 30, 0.55);
+      return;
+    }
+    case 'lune': {
+      // Croissant de lune et trois étoiles qui scintillent.
+      const croissant = (c: CanvasRenderingContext2D) => {
+        c.arc(0, 0, 34, (32 * Math.PI) / 180, (270 * Math.PI) / 180, false);
+        c.arc(18, -10, 30, (233 * Math.PI) / 180, (69 * Math.PI) / 180, true);
+        c.closePath();
+      };
+      ctx.save();
+      ctx.rotate(Math.sin(t * 0.9) * 0.06 - 0.3);
+      forme(ctx, [{ f: croissant }], JAUNE_CATALAN, ROUGE_CATALAN, 4);
+      ctx.restore();
+      ([[34, -34, 11, 0], [40, 10, 8, 1.7], [18, 40, 7, 3.1]] as const).forEach(([x, y, r, ph]) => {
+        const k = 0.75 + 0.25 * Math.sin(t * 3 + ph);
+        forme(ctx, [{ p: etoile(x, y, r * k, t * 0.4) }], JAUNE_CATALAN, ROUGE_CATALAN, 2.4);
+      });
+      return;
+    }
+    case 'nuage-sourire': {
+      // Gros nuage rouge qui sourit, avec des gouttes sous lui.
+      const y = -12 + Math.sin(t * 2) * 3;
+      nuageCatalan(ctx, 0, y, 1.25);
+      forme(ctx, [{ c: [-15, y - 2, 4.5] }, { c: [15, y - 2, 4.5] }], JAUNE_CATALAN, JAUNE_CATALAN, 0.5);
+      traitCerne(ctx, () => {
+        ctx.beginPath();
+        ctx.arc(0, y + 4, 12, 0.15 * Math.PI, 0.85 * Math.PI);
+      }, JAUNE_CATALAN, JAUNE_CATALAN, 3.4);
+      gouttesQuiTombent(ctx, t, 26, 3);
+      return;
+    }
+    case 'thermometre': {
+      // Thermomètre dont le mercure monte et descend, avec un petit soleil.
+      const niveau = 24 + 32 * (0.5 + 0.5 * Math.sin(t * 1.8));
+      soleilCatalan(ctx, 30, -34, 11, t);
+      forme(ctx, [{ r: [-24, -50, 24, 80, 12] }, { c: [-12, 32, 22] }], JAUNE_CATALAN, ROUGE_CATALAN, 4);
+      forme(ctx, [{ c: [-12, 32, 14] }, { r: [-17, 32 - niveau, 10, niveau, 5] }], ROUGE_CATALAN, ROUGE_CATALAN, 1);
+      return;
+    }
+    case 'bonhomme': {
+      // Bonhomme de neige coiffé d'un chapeau rouge, flocons qui tombent.
+      forme(ctx, [{ c: [0, 24, 25] }, { c: [0, -12, 18] }], '#ffffff', ROUGE_CATALAN, 4);
+      forme(ctx, [{ c: [-7, -16, 3.2] }, { c: [7, -16, 3.2] }], ROUGE_CATALAN, ROUGE_CATALAN, 0.5);
+      forme(ctx, [{ p: [[0, -11], [16, -8], [0, -6]] }], JAUNE_CATALAN, ROUGE_CATALAN, 2);
+      forme(ctx, [{ r: [-17, -34, 34, 7, 3.5] }, { r: [-10, -52, 20, 20, 4] }], ROUGE_CATALAN, JAUNE_CATALAN, 3);
+      for (let k = 0; k < 4; k++) {
+        const c = (t * 0.5 + k * 0.25) % 1;
+        ctx.globalAlpha = Math.min(1, (1 - c) * 2);
+        forme(ctx, [{ c: [-42 + k * 28 + Math.sin(t * 2 + k) * 4, -46 + c * 90, 3.6] }], '#ffffff', JAUNE_CATALAN, 1.6);
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+  }
+}
+
+/** Dix jeux d'icônes pour l'accroche : une icône au-dessus du texte, une dessous. */
+const JEUX_ICONES: { id: string; libelle: string; icones: [NomIcone, NomIcone] }[] = [
+  { id: 'temps', libelle: 'Le temps : soleil et pluie', icones: ['soleil', 'pluie'] },
+  { id: 'percutantes', libelle: '⚡ Percutantes : éclair et goutte', icones: ['eclair', 'goutte'] },
+  { id: 'cool', libelle: '😎 Cool : soleil à lunettes et parapluie', icones: ['lunettes', 'parapluie'] },
+  { id: 'colere', libelle: '🌪️ Colère du ciel : tornade et éclair', icones: ['tornade', 'eclair'] },
+  { id: 'arc', libelle: '🌈 Arc-en-ciel et soleil', icones: ['arc', 'soleil'] },
+  { id: 'nuit', libelle: '🌙 Nuit étoilée et nuage souriant', icones: ['lune', 'nuage-sourire'] },
+  { id: 'chaudfroid', libelle: '🌡️ Chaud et froid : thermomètre et flocon', icones: ['thermometre', 'flocon'] },
+  { id: 'vent', libelle: '💨 Coup de vent : vent et parapluie', icones: ['vent', 'parapluie'] },
+  { id: 'rigolo', libelle: '☁️ Nuage rigolo : nuage souriant et goutte', icones: ['nuage-sourire', 'goutte'] },
+  { id: 'hiver', libelle: '⛄ Hiver : flocon et bonhomme de neige', icones: ['flocon', 'bonhomme'] },
+];
+
 function iconeCatalane(ctx: CanvasRenderingContext2D, i: number, t: number, flocons = false) {
   ctx.save();
   if (flocons) {
@@ -758,7 +918,7 @@ function iconeCatalane(ctx: CanvasRenderingContext2D, i: number, t: number, floc
 }
 
 /** Écran d'accroche : « QUEL TEMPS » en jaune, « CHEZ NOUS ? » en rouge, qui claque (zoom arrière) à l'ouverture. */
-function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null, accroche = 'CHEZ NOUS ?', jeuIcones?: 'flocons' | 'extremes', ligneHaut = 'QUEL TEMPS') {
+function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null, accroche = 'CHEZ NOUS ?', jeuIcones?: string, ligneHaut = 'QUEL TEMPS') {
   const flocons = jeuIcones === 'flocons';
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
@@ -797,8 +957,8 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
     ctx.shadowColor = 'rgba(0,20,60,0.45)';
     ctx.shadowBlur = 24 * u;
     ctx.shadowOffsetY = 8 * u;
-    if (jeuIcones === 'extremes') iconeExtreme(ctx, icone, t + i * 0.7);
-    else iconeCatalane(ctx, icone, t + i * 0.7, flocons);
+    if (flocons) iconeCatalane(ctx, icone, t + i * 0.7, true);
+    else dessinerIcone(ctx, (JEUX_ICONES.find((j) => j.id === jeuIcones) ?? JEUX_ICONES[0]).icones[i], t + i * 0.7);
     ctx.restore();
   }
   pied(ctx, logo);
@@ -2180,12 +2340,12 @@ export default function VideoWeekEnd({
     return Object.fromEntries(villes.map((v) => [v, parNom.get(v)]));
   }, [listeVilles, dep, villes]);
   const carteDansVideo = avecCarte && villes.some((v) => positions[v]);
-  const [jeuIcones, setJeuIcones] = useState<'temps' | 'extremes'>('temps');
+  const [jeuIcones, setJeuIcones] = useState<string>('temps');
   const [accrocheId, setAccrocheId] = useState(0);
   const textes = useMemo(() => {
     let t = textesVideo(mode, jours, ecart, france ? 'auto' : special, france);
     // Jeu « extrêmes » : remplace les icônes du temps (la variante montagne garde ses flocons).
-    if (jeuIcones === 'extremes' && t.icones !== 'flocons') t = { ...t, icones: 'extremes' as const };
+    if (t.icones !== 'flocons') t = { ...t, icones: jeuIcones };
     // Autre accroche que la classique : ses deux lignes remplacent « QUEL TEMPS » et « CHEZ NOUS ? ».
     const a = ACCROCHES[accrocheId];
     return accrocheId > 0 && a ? { ...t, ligneHaut: a.haut, accroche: a.bas } : t;
@@ -2583,9 +2743,12 @@ export default function VideoWeekEnd({
         </label>
         <label className="text-sm font-medium">
           <span className={legende}>Icônes de l’accroche</span>
-          <select value={jeuIcones} onChange={(e) => setJeuIcones(e.target.value as 'temps' | 'extremes')} className={selectBarre}>
-            <option value="temps">Le temps (soleil et pluie)</option>
-            <option value="extremes">⚡ Percutantes (éclair et goutte)</option>
+          <select value={jeuIcones} onChange={(e) => setJeuIcones(e.target.value)} className={selectBarre}>
+            {JEUX_ICONES.map((j, k) => (
+              <option key={j.id} value={j.id}>
+                {k + 1}. {j.libelle}
+              </option>
+            ))}
           </select>
         </label>
         {genre === 'previsions' && (
