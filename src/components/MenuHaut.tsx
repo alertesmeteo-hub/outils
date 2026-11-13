@@ -99,7 +99,7 @@ const RUBRIQUES: Rubrique[] = [
       { href: 'https://dicton-du-jour.alertes-meteo.com/', libelle: '📜 Dicton du jour' },
     ],
   },
-  { titre: 'Record', pages: ['/outils/records-temperature/', '/outils/nuits-tropicales/'].map(lien) },
+  { titre: 'Record', pages: ['/outils/records-temperature/', '/outils/nuits-tropicales/', '/outils/graph/'].map(lien) },
 ];
 
 /** Menu horizontal en haut de toutes les pages : une entrée par rubrique, qui déroule ses pages (survol ou clic). « ALERTES » en rouge. */

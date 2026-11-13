@@ -82,6 +82,7 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
     pages: [
       { href: '/outils/records-temperature/', libelle: 'Records de température' },
       { href: '/outils/nuits-tropicales/', libelle: 'Nuits tropicales' },
+      { href: '/outils/graph/', libelle: 'Graph : ITN, températures, pluie' },
     ],
   },
 ];

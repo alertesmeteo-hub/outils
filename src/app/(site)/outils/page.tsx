@@ -171,6 +171,17 @@ export default async function AllTools() {
             </span>
           </Link>
         </li>
+        <li>
+          <Link href="/outils/graph/" className="card flex h-full gap-3 p-4 transition-shadow hover:shadow-md">
+            <span aria-hidden className="text-3xl">📈</span>
+            <span>
+              <strong className="block leading-snug">Graph : ITN, températures, pluie</strong>
+              <span className="mt-1 block text-sm text-muted">
+                Indicateur thermique national (estimé) et graphiques de température et de pluie par région et département, écart à la normale, export en JPG.
+              </span>
+            </span>
+          </Link>
+        </li>
       </ul>
       <div className="mt-8"><ToolGrid tools={tools} /></div>
     </>
