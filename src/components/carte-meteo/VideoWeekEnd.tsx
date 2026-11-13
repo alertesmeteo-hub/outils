@@ -2748,6 +2748,9 @@ export default function VideoWeekEnd({
           <input type="range" min={0} max={total} step={0.05} value={Math.min(t, total)} onChange={(e) => { setLecture(false); setT(Number(e.target.value)); }} className="flex-1" aria-label="Position dans la vidéo" />
           <span className="w-14 text-right text-xs tabular-nums text-muted">{Math.round(t * 10) / 10} s</span>
         </div>
+        <button type="button" onClick={exporter} disabled={!contexte || !!etat} className="btn-primary w-full rounded-lg px-4 py-3 font-semibold disabled:opacity-60" style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
+          {etat ?? '🎬 Créer la vidéo (MP4)'}
+        </button>
         {genre === 'previsions' && (
         <div className="flex w-full flex-col gap-2" style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
           <button type="button" onClick={genererTexte} disabled={!contexte || texteEnCours} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium disabled:opacity-60">
