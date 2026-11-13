@@ -337,6 +337,11 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
     () => [...dansZone].sort((a, b) => (theme.ordre === 'desc' ? b.valeur - a.valeur : a.valeur - b.valeur) || a.nom.localeCompare(b.nom, 'fr')),
     [dansZone, theme.ordre]
   );
+  // Cartes froid et gel en chiffres : les 3 températures les plus élevées passent en rouge.
+  const codesRouges = useMemo(() => {
+    if (!theme.id.startsWith('risque-froid') || theme.texteValeur) return new Set<string>();
+    return new Set([...dansZone].filter((p) => !p.neige).sort((a, b) => b.valeur - a.valeur || a.nom.localeCompare(b.nom, 'fr')).slice(0, 3).map((p) => p.code));
+  }, [dansZone, theme.id, theme.texteValeur]);
   const top = useMemo(() => tries.filter((p) => !p.neige && !palierDe(theme.paliers, p.valeur).neutre).slice(0, NOMBRE_TOP), [tries, theme.paliers]);
 
   /** Teinte des départements : valeur la plus marquante du département (moyenne pour les écarts et les nuages). */
@@ -711,7 +716,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
                 className="cinfo-bulle"
                 onPointerDown={onValeurMove && !edition ? (e) => debutPicto(e, p.code, decalagesValeurs, onValeurMove, undefined) : undefined}
                 title={onValeurMove && !edition ? 'Glisser pour déplacer la valeur' : undefined}
-                style={{ background: palier.fond, color: palier.texte, cursor: onValeurMove && !edition ? 'grab' : undefined, touchAction: onValeurMove && !edition ? 'none' : undefined, transform: decalagesValeurs?.[p.code] ? `translate(${decalagesValeurs[p.code][0]}px, ${decalagesValeurs[p.code][1]}px)` : undefined }}
+                style={{ background: codesRouges.has(p.code) ? '#e5191e' : palier.fond, color: codesRouges.has(p.code) ? '#ffffff' : palier.texte, cursor: onValeurMove && !edition ? 'grab' : undefined, touchAction: onValeurMove && !edition ? 'none' : undefined, transform: decalagesValeurs?.[p.code] ? `translate(${decalagesValeurs[p.code][0]}px, ${decalagesValeurs[p.code][1]}px)` : undefined }}
               >
                 {avecFleche(p) && (
                   <svg viewBox="-12 -12 24 24" aria-hidden>

@@ -1413,7 +1413,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                             : (theme as ThemePrevision).periode
                             ? (theme as ThemePrevision).montagne
                               ? `${sousTitrePeriode} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET PLUS`
-                              : sousTitrePeriode
+                              : theme.id === 'risque-froid-periode' ? `NUIT ${sousTitrePeriode}` : sousTitrePeriode
                             : (theme as ThemePrevision).montagne
                               ? `${libelleJour(dateISO)} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET PLUS`
                               : libelleJour(dateISO)) +

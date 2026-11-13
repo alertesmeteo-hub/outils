@@ -525,17 +525,18 @@ function paliersRisque(seuils: [number, number, number, number], unite: string):
   const couleurs: [string, string][] = [['#f5c400', NOIR], ['#ff8c1a', NOIR], ['#e5191e', BLANC], ['#7b2cbf', BLANC]];
   return [3, 2, 1, 0].map((k) => p(seuils[k], couleurs[k][0], couleurs[k][1], `${nom[k]} (≥ ${seuils[k]} ${unite})`)).concat([p(-Infinity, '#e5e7eb', NOIR, 'Pas de risque', true)]);
 }
-/** Froid : le niveau monte quand la valeur baisse (≤ 0, ≤ -5…). Paliers du plus haut au plus bas. */
-function paliersFroid(seuils: [number, number, number, number], unite: string): Palier[] {
-  const nom = ['Faible', 'Modéré', 'Fort', 'Sévère'];
-  const couleurs: [string, string][] = [['#2f9bff', BLANC], ['#1a4fc4', BLANC], ['#12308f', BLANC], ['#0a1a5c', BLANC]];
-  // Un palier couvre de son seuil (exclu) jusqu'au seuil précédent : son « min » est juste au-dessus du seuil suivant.
-  return seuils.map((seuil, k) => p(k === 3 ? -Infinity : seuils[k + 1] + 0.01, couleurs[k][0], couleurs[k][1], `${nom[k]} (≤ ${seuil} ${unite})`));
-}
+/** Froid en chiffres (valeurs arrondies à l'affichage) : pas de risque dès 3 °, faible à 2 °, risque sous 2 °, en bleus. */
+const PALIERS_FROID_CHIFFRES: Palier[] = [
+  p(2.5, '#e5e7eb', NOIR, 'Pas de risque (≥ 3 °C)', true),
+  p(1.5, '#8ec8ff', NOIR, 'Faible (2 °C)'),
+  p(-4.99, '#2f9bff', BLANC, 'Risque (≤ 1 °C)'),
+  p(-9.99, '#1a4fc4', BLANC, 'Fort (≤ -5 °C)'),
+  p(-Infinity, '#0a1a5c', BLANC, 'Sévère (≤ -10 °C)'),
+];
 const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => {
   const vent = (champ: (x: PointCarte) => number | null | undefined, seuils: [number, number, number, number]) => ({ valeur: champ, unite: 'km/h', decimales: 0, paliers: paliersRisque(seuils, 'km/h') });
   const chaud = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: paliersRisque([30, 34, 38, 42], '°C') });
-  const froid = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: [p(0.01, '#e5e7eb', NOIR, 'Pas de risque', true), ...paliersFroid([0, -5, -10, -15], '°C')] });
+  const froid = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: PALIERS_FROID_CHIFFRES });
   const pluie = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: 'mm', decimales: 0, paliers: paliersRisque([10, 30, 60, 100], 'mm') });
   const neige = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: 'cm', decimales: 0, paliers: paliersRisque([1, 5, 15, 30], 'cm') });
   const verglas = (niveau: (x: PointCarte) => number | null, pluieDe: (x: PointCarte) => number | null | undefined) => ({
