@@ -62,8 +62,18 @@ export async function exporterEnJpg(noeud: HTMLElement, nomFichier: string, larg
     document.documentElement.classList.remove('cmap-export-en-cours');
     remettre();
   }
+  // Téléchargement par un objet Blob (et non un gros lien « data: ») : le navigateur garde le nom du fichier et son extension .jpg
+  // (avec un lien data:, Edge enregistrait parfois un fichier « <identifiant>.tmp »).
+  // (décodage à la main : fetch(data:) serait refusé par la politique de sécurité du site, connect-src.)
+  const octets = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+  const blob = new Blob([octets], { type: 'image/jpeg' });
+  const adresse = URL.createObjectURL(blob);
   const lien = document.createElement('a');
-  lien.href = dataUrl;
+  lien.href = adresse;
   lien.download = nomFichier.endsWith('.jpg') ? nomFichier : `${nomFichier}.jpg`;
+  lien.style.display = 'none';
+  document.body.appendChild(lien);
   lien.click();
+  lien.remove();
+  setTimeout(() => URL.revokeObjectURL(adresse), 60_000);
 }
