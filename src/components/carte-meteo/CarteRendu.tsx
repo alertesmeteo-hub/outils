@@ -57,7 +57,7 @@ export function TuileFond({ t, couche }: { t: Tuile; couche: Couche }) {
 export const LARGEUR_CARTE = 1280;
 export const HAUTEUR_CARTE = 720;
 /** Carte de France : noms des mers à leur place fixe (pixels d'une carte de 960 × 720) : Atlantique à gauche dans l'océan, Méditerranée en bas sous le Languedoc. */
-const MER_FRANCE = { atlantique: { x: 88, y: 417 }, mediterranee: { x: 632, y: 644 } };
+const MER_FRANCE = { atlantique: { x: 88, y: 417 }, mediterranee: { x: 632, y: 672 } };
 
 export interface Contour {
   code: string;
