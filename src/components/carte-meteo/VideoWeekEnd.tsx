@@ -649,48 +649,52 @@ function floconCatalan(ctx: CanvasRenderingContext2D, x: number, y: number, r: n
 }
 
 
-/** Jeu « extrêmes » : éclair, thermomètre, parapluie, flocon, plus francs et plus lisibles de loin (repère de 100 × 100). */
+/** Jeu « percutantes » : éclair géant, soleil à lunettes, grosses gouttes, flocon : formes pleines, lisibles de loin (repère de 100 × 100). */
+function goutteForme(): [number, number][] {
+  // Goutte d'une seule pièce : pointe en haut, ventre rond en bas (tangentes depuis la pointe).
+  const pts: [number, number][] = [[0, -46]];
+  for (let a = -25.7; a <= 205.7; a += 12) pts.push([Math.cos((a * Math.PI) / 180) * 26, 14 + Math.sin((a * Math.PI) / 180) * 26]);
+  return pts;
+}
 function iconeExtreme(ctx: CanvasRenderingContext2D, i: number, t: number) {
   if (i === 0) {
-    // Nuage d'orage et éclair qui claque (flash par intermittence).
-    nuageCatalan(ctx, 0, -18, 1.15);
-    const flash = 0.55 + 0.45 * Math.max(0, Math.sin(t * 5));
-    ctx.globalAlpha = flash;
-    forme(ctx, [{ p: [[8, -6], [-18, 26], [-3, 26], [-12, 52], [22, 14], [5, 14], [18, -6]] }], JAUNE_CATALAN, ROUGE_CATALAN, 4);
-    ctx.globalAlpha = 1;
-  } else if (i === 1) {
-    // Thermomètre dont le mercure monte et descend, avec ses graduations.
-    const niveau = 22 + 30 * (0.5 + 0.5 * Math.sin(t * 1.8));
-    for (let g = 0; g < 4; g++) {
+    // Éclair géant qui claque : étincelles de chaque côté et légère pulsation.
+    const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+    for (const [sx, sy] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+      const d = 40 + pulse * 6;
       traitCerne(ctx, () => {
         ctx.beginPath();
-        ctx.moveTo(14, -34 + g * 14);
-        ctx.lineTo(g % 2 ? 24 : 32, -34 + g * 14);
-      }, JAUNE_CATALAN, ROUGE_CATALAN, 4);
+        ctx.moveTo(sx * d, sy * 22);
+        ctx.lineTo(sx * (d + 12), sy * (22 + 12));
+      }, ROUGE_CATALAN, ROUGE_CATALAN, 4);
     }
-    forme(ctx, [{ r: [-11, -50, 22, 78, 11] }, { c: [0, 32, 21] }], JAUNE_CATALAN, ROUGE_CATALAN, 4);
-    forme(ctx, [{ c: [0, 32, 13] }, { r: [-5, 32 - niveau, 10, niveau, 5] }], ROUGE_CATALAN, ROUGE_CATALAN, 1);
-  } else if (i === 2) {
-    // Parapluie ouvert sous la pluie.
-    const arc: [number, number][] = [];
-    for (let k = 0; k <= 12; k++) {
-      const a = Math.PI + (k * Math.PI) / 12;
-      arc.push([Math.cos(a) * 46, 4 + Math.sin(a) * 40]);
-    }
-    for (let k = 0; k < 3; k++) arc.push([46 - (k + 1) * (92 / 3) + 8, k % 2 ? 4 : 12]);
+    ctx.save();
+    ctx.scale(1 + pulse * 0.05, 1 + pulse * 0.05);
+    forme(ctx, [{ p: [[14, -48], [-24, 4], [-5, 4], [-18, 48], [28, -8], [6, -8], [24, -48]] }], JAUNE_CATALAN, ROUGE_CATALAN, 5);
+    ctx.restore();
+  } else if (i === 1) {
+    // Soleil à lunettes et grand sourire.
+    soleilCatalan(ctx, 0, 0, 30, t);
+    ctx.fillStyle = ROUGE_CATALAN;
+    for (const x of [-26, 2]) { rectArrondi(ctx, x, -13, 24, 18, 7); ctx.fill(); }
+    ctx.fillRect(-3, -9, 6, 4);
     traitCerne(ctx, () => {
       ctx.beginPath();
-      ctx.moveTo(0, 4);
-      ctx.lineTo(0, 38);
-      ctx.arc(-8, 38, 8, 0, Math.PI * 0.95);
-    }, JAUNE_CATALAN, ROUGE_CATALAN, 5);
-    forme(ctx, [{ p: arc }], ROUGE_CATALAN, JAUNE_CATALAN, 4);
-    for (let g = 0; g < 3; g++) {
-      const cycle = (t * 1.1 + g * 0.33) % 1;
-      ctx.globalAlpha = Math.min(1, (1 - cycle) * 2);
-      forme(ctx, [{ r: [-44 + g * 44 + cycle * 4, -48 + cycle * 36 + 36, 7, 14, 3.5] }], JAUNE_CATALAN, ROUGE_CATALAN, 2);
-    }
-    ctx.globalAlpha = 1;
+      ctx.arc(0, 8, 15, 0.15 * Math.PI, 0.85 * Math.PI);
+    }, ROUGE_CATALAN, ROUGE_CATALAN, 5);
+  } else if (i === 2) {
+    // Grosse goutte qui rebondit, entourée de deux petites.
+    const goutte = (x: number, y: number, k: number) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(k, k);
+      forme(ctx, [{ p: goutteForme() }], ROUGE_CATALAN, JAUNE_CATALAN, 5);
+      forme(ctx, [{ c: [-11, 12, 5] }], '#ffffff', '#ffffff', 0.5);
+      ctx.restore();
+    };
+    goutte(-31, 22 - Math.abs(Math.sin(t * 2.6 + 1)) * 8, 0.5);
+    goutte(31, 24 - Math.abs(Math.sin(t * 2.6 + 2)) * 8, 0.44);
+    goutte(0, -2 - Math.abs(Math.sin(t * 2.6)) * 10, 0.95);
   } else {
     floconCatalan(ctx, 0, 0, 46, t, 0);
   }
@@ -2132,7 +2136,7 @@ export default function VideoWeekEnd({
     let vivant = true;
     Promise.all(
       [...fichiers].map((f) =>
-        Promise.all([charger(f).then((img) => imageDe.set(f, img)), (f.includes('/pictos-alertes-pro/') ? Promise.resolve(null) : chargerPictoAnime(f)).then((a) => (a ? animes.set(f, a) : animes.delete(f)))])
+        Promise.all([charger(f).then((img) => imageDe.set(f, img)), chargerPictoAnime(f).then((a) => (a ? animes.set(f, a) : animes.delete(f)))])
       )
     ).then(() => vivant && setPrets((n) => n + 1)).catch(() => {});
     // Fond de carte du début : chargé ici pour que l'aperçu le montre dès qu'il est prêt.
@@ -2582,7 +2586,7 @@ export default function VideoWeekEnd({
           <span className={legende}>Icônes de l’accroche</span>
           <select value={jeuIcones} onChange={(e) => setJeuIcones(e.target.value as 'temps' | 'extremes')} className={selectBarre}>
             <option value="temps">Le temps (soleil, éclaircies, pluie, vent)</option>
-            <option value="extremes">⚡ Percutantes (éclair, thermomètre, parapluie, flocon)</option>
+            <option value="extremes">⚡ Percutantes (éclair, soleil à lunettes, goutte, flocon)</option>
           </select>
         </label>
         <button

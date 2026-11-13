@@ -42,6 +42,19 @@ const GROUPE_MOIS = 'Bilan du mois';
 
 /** Groupe des cartes de risque (voir THEMES_PREVISION) : bouton rouge « Risques » du menu Cartes. */
 const GROUPE_RISQUES = 'Risques';
+/** Couleurs proposées pour le territoire (France ou zone affichée) : surtout des nuances de gris. */
+const COULEURS_FRANCE: { libelle: string; valeur: string }[] = [
+  { libelle: 'Blanc', valeur: '#ffffff' },
+  { libelle: 'Gris très clair', valeur: '#f0f2f5' },
+  { libelle: 'Gris clair', valeur: '#dde1e6' },
+  { libelle: 'Gris perle', valeur: '#c3c9d0' },
+  { libelle: 'Gris moyen', valeur: '#9aa3ad' },
+  { libelle: 'Gris acier', valeur: '#757e8a' },
+  { libelle: 'Gris ardoise', valeur: '#556070' },
+  { libelle: 'Gris anthracite', valeur: '#3a424d' },
+  { libelle: 'Gris charbon', valeur: '#232930' },
+  { libelle: 'Violet bleuté (teinte d’origine)', valeur: '#8f9ee8' },
+];
 /** Petit picto des cartes de risque (type de risque, puis 📆 pour une période ou ⏱️ pour 24 h), pour les distinguer d'un coup d'œil. */
 const PICTO_RISQUE: Record<string, string> = { orage: '⛈️', froid: '❄️', pluie: '🌧️', vent: '💨', tempete: '🌪️', chaleur: '🔥', neige: '⛄', verglas: '🧊' };
 const pictoRisque = (id: string): string => {
@@ -1208,6 +1221,25 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                 </select>
               </label>
               <label className="text-sm font-medium">
+                <span className={legende}>🇫🇷 Couleur de la France</span>
+                <select value={affichage.couleurFrance ?? ''} onChange={(e) => regler({ couleurFrance: e.target.value || null })} className={selectBarre}>
+                  <option value="">Habituelle (selon le style de fond)</option>
+                  {COULEURS_FRANCE.map((c) => (
+                    <option key={c.valeur} value={c.valeur}>
+                      {c.libelle}
+                    </option>
+                  ))}
+                  {affichage.couleurFrance && !COULEURS_FRANCE.some((c) => c.valeur === affichage.couleurFrance) && <option value={affichage.couleurFrance}>Personnalisée</option>}
+                </select>
+                <input
+                  type="color"
+                  aria-label="Couleur personnalisée de la France"
+                  value={/^#[0-9a-f]{6}$/i.test(affichage.couleurFrance ?? '') ? (affichage.couleurFrance as string) : '#8f9ee8'}
+                  onChange={(e) => regler({ couleurFrance: e.target.value })}
+                  className="mt-1 h-7 w-full cursor-pointer rounded-md border border-border bg-surface"
+                />
+              </label>
+              <label className="text-sm font-medium">
                 <span className={legende}>🗺️ Fond de carte</span>
                 <select value={affichage.fond ?? ''} onChange={(e) => regler({ fond: (e.target.value || null) as Couche | null })} className={selectBarre}>
                   <option value="">Automatique (relief ou photos IGN)</option>
@@ -1512,6 +1544,25 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>🇫🇷 Couleur de la France</span>
+                <select value={affichage.couleurFrance ?? ''} onChange={(e) => regler({ couleurFrance: e.target.value || null })} className={`${selectBarre} w-full`}>
+                  <option value="">Habituelle (selon le style de fond)</option>
+                  {COULEURS_FRANCE.map((c) => (
+                    <option key={c.valeur} value={c.valeur}>
+                      {c.libelle}
+                    </option>
+                  ))}
+                  {affichage.couleurFrance && !COULEURS_FRANCE.some((c) => c.valeur === affichage.couleurFrance) && <option value={affichage.couleurFrance}>Personnalisée</option>}
+                </select>
+                <input
+                  type="color"
+                  aria-label="Couleur personnalisée de la France"
+                  value={/^#[0-9a-f]{6}$/i.test(affichage.couleurFrance ?? '') ? (affichage.couleurFrance as string) : '#8f9ee8'}
+                  onChange={(e) => regler({ couleurFrance: e.target.value })}
+                  className="mt-1 h-7 w-full cursor-pointer rounded-md border border-border bg-surface"
+                />
               </label>
               <label className="text-sm font-medium">
                 <span className={legende}>🗺️ Fond de carte</span>

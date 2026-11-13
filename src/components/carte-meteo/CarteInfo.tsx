@@ -31,6 +31,8 @@ export interface AffichageCarte {
   fond: Couche | null;
   /** Style de fond (couleurs, mer dessinée) à la place des tuiles ; null = aucun. */
   styleFond?: StyleFond | null;
+  /** Couleur du territoire (code CSS) ; null = celle du style de fond ou la teinte habituelle. */
+  couleurFrance?: string | null;
   relief: boolean;
   /** Part du relief qui transparaît (0 à 90). */
   reliefPourcent: number;
@@ -644,6 +646,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
         reliefAccentue={!!affichage?.reliefAccentue}
         fond={affichage?.fond ?? undefined}
         styleFond={styleFond}
+        couleurTerritoire={affichage?.couleurFrance ?? null}
         sansBandes={sansBandes}
         theme={affichage?.theme ?? null}
         vue={vue}

@@ -26,6 +26,13 @@ const RESOLUTION = 512; // pixels de rastérisation de chaque calque
 const Y_SOUS_NUAGE = 41;
 
 const SOLEIL = '#f59e0b';
+/** Teintes du jeu « Alertes Météo Pro » (contours foncés) : soleil et rayons, éclair, brume, pluie. */
+const SOLEILS = [SOLEIL, '#ffb000'];
+const TRAITS_SOLEIL = [...SOLEILS, '#734f00'];
+const FOUDRES = ['#facc15', '#ffd21a'];
+const BRUMES = ['#94a3b8', '#4c5666', '#a9bfe3'];
+const PLUIES = ['#3b82f6', '#1c78ff', '#0d3673'];
+const selecteurCercleSoleil = SOLEILS.map((c) => `circle[fill="${c}"]`).join(',');
 const cache = new Map<string, Promise<PictoAnime | null>>();
 
 function chargerImage(src: string): Promise<HTMLImageElement> {
@@ -39,13 +46,13 @@ function chargerImage(src: string): Promise<HTMLImageElement> {
 
 function typeDeCouche(el: Element, soleilCentre: boolean, avecNuage: boolean): TypeCouche {
   if (el.querySelector('path[d^="M10 30H38"]')) return 'nuage';
-  if (el.querySelector('path[fill="#facc15"]')) return 'foudre';
+  if (FOUDRES.some((c) => el.querySelector(`path[fill="${c}"]`))) return 'foudre';
   const traits = el.tagName === 'line' ? [el] : [...el.querySelectorAll('line')];
-  const disque = el.tagName === 'circle' ? el : el.querySelector('circle[fill="' + SOLEIL + '"]');
-  if (soleilCentre && (disque?.getAttribute('fill') === SOLEIL || (traits.length > 0 && traits.every((l) => (l.getAttribute('stroke') ?? l.parentElement?.getAttribute('stroke')) === SOLEIL)))) return 'soleil';
-  if (traits.length > 0 && el.querySelectorAll('circle').length === 0 && traits.every((l) => l.getAttribute('stroke') === '#94a3b8')) return avecNuage ? 'brume' : 'autre';
+  const disque = el.tagName === 'circle' ? el : el.querySelector(selecteurCercleSoleil);
+  if (soleilCentre && (SOLEILS.includes(disque?.getAttribute('fill') ?? '') || (traits.length > 0 && traits.every((l) => TRAITS_SOLEIL.includes(l.getAttribute('stroke') ?? l.parentElement?.getAttribute('stroke') ?? ''))))) return 'soleil';
+  if (traits.length > 0 && el.querySelectorAll('circle').length === 0 && traits.every((l) => BRUMES.includes(l.getAttribute('stroke') ?? ''))) return avecNuage ? 'brume' : 'autre';
   if (!avecNuage) return 'autre';
-  if (traits.length > 0 && traits.every((l) => l.getAttribute('stroke') === '#3b82f6')) return 'pluie';
+  if (traits.length > 0 && traits.every((l) => PLUIES.includes(l.getAttribute('stroke') ?? ''))) return 'pluie';
   return 'chute';
 }
 
@@ -58,7 +65,7 @@ async function construire(url: string): Promise<PictoAnime | null> {
   const serialiseur = new XMLSerializer();
   const defs = [...svg.children].filter((e) => e.tagName === 'defs').map((e) => serialiseur.serializeToString(e)).join('');
   const elements = [...svg.children].filter((e) => e.tagName !== 'defs');
-  const disque = svg.querySelector(`circle[fill="${SOLEIL}"]`);
+  const disque = svg.querySelector(selecteurCercleSoleil);
   const cx = Number(disque?.getAttribute('cx') ?? COTE / 2);
   const cy = Number(disque?.getAttribute('cy') ?? COTE / 2);
   const avecNuage = !!svg.querySelector('path[d^="M10 30H38"]');

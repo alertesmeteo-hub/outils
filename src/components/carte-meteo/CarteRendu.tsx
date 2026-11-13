@@ -259,6 +259,8 @@ interface Props {
   habillage?: 'catalan' | null;
   /** Style de fond (couleurs, dégradés, mer dessinée) à la place des tuiles du fond de carte. */
   styleFond?: StyleFond | null;
+  /** Couleur du territoire (France ou zone choisie) : remplace la teinte habituelle ou celle du style de fond. */
+  couleurTerritoire?: string | null;
   /** Sans les bandes de la senyera en coin (cartes tendances). */
   sansBandes?: boolean;
   /** Carte de France « mini et maxi » : mini bien plus petite, maxi un peu moins grosse, icône météo plus grande (voir globals.css). */
@@ -476,6 +478,7 @@ export default function CarteRendu({
   theme = null,
   habillage = null,
   styleFond = null,
+  couleurTerritoire = null,
   sansBandes = false,
   miniMaxiFrance = false,
   styleVent = 'pastille',
@@ -648,9 +651,9 @@ export default function CarteRendu({
             <g opacity={afficherRelief && !styleFond ? 1 - reliefVisible : 1}>
               {departements.filter((c) => selection.has(c.code)).map((c) =>
                 regions && regions.length === 0 ? (
-                  <path key={c.code} d={c.d} {...(traitSelectionStyle ?? (theme ? traitsTheme(theme).uni : TRAIT_UNI))} />
+                  <path key={c.code} d={c.d} {...(traitSelectionStyle ?? (theme ? traitsTheme(theme).uni : TRAIT_UNI))} {...(couleurTerritoire ? { fill: couleurTerritoire, fillOpacity: 1 } : {})} />
                 ) : (
-                  <path key={c.code} d={c.d} {...(traitSelectionStyle ?? (theme ? (carteLocale ? traitsTheme(theme).selection : traitsTheme(theme).selectionFrance) : carteLocale ? TRAIT_SELECTION : TRAIT_SELECTION_FRANCE))} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} {...(remplissages?.[c.code] ? { fill: remplissages[c.code] } : {})} />
+                  <path key={c.code} d={c.d} {...(traitSelectionStyle ?? (theme ? (carteLocale ? traitsTheme(theme).selection : traitsTheme(theme).selectionFrance) : carteLocale ? TRAIT_SELECTION : TRAIT_SELECTION_FRANCE))} {...(regions ? { stroke: 'none' } : {})} fillOpacity={1} {...(couleurTerritoire ? { fill: couleurTerritoire } : {})} {...(remplissages?.[c.code] ? { fill: remplissages[c.code] } : {})} />
                 )
               )}
             </g>
