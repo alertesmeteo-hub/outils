@@ -101,8 +101,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   /** Rafale (km/h) à partir de laquelle la pastille de vent s'ajoute au picto. */
   const [seuilRafale, setSeuilRafale] = useState(80);
   const [periode, setPeriode] = useState<PeriodePlanche>('journee');
-  /** Titre « TENDANCE SUR 4 JOURS : … » dans l'en-tête : masqué d'office (la période reste affichée). */
-  const [avecTitre, setAvecTitre] = useState(false);
+  /** Titre « TENDANCE SUR 4 JOURS : … » dans l'en-tête : affiché d'office. */
+  const [avecTitre, setAvecTitre] = useState(true);
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState(zoneInitiale);
   const [logoId, setLogoId] = useState('alertesmeteo');
