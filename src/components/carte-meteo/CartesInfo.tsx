@@ -203,7 +203,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const [jour, setJour] = useState(0);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
   /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
-  const [tailleValeurs, setTailleValeurs] = useState(uneCarte ? 160 : 100);
+  const [tailleValeurs, setTailleValeurs] = useState(uneCarte ? 160 : 130);
   /** Grosseur de la police du tableau (classement) : 100 = taille habituelle. */
   const [tailleTableau, setTailleTableau] = useState(100);
   const [sansTableau, setSansTableau] = useState(false);
@@ -245,6 +245,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     setMode('prevision');
     setGroupeChoisi(GROUPE_RISQUES);
     setChiffres(true);
+    setZonageFin(true);
   }, [alertesDemandees]);
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
@@ -855,6 +856,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                   setMode('prevision');
                   setGroupeChoisi(GROUPE_RISQUES);
                   setChiffres(true);
+                  setZonageFin(true);
                   if (uneCarte) {
                     setCarteChoisie(`risque-vent${dureeRisque === 'periode' ? '-periode' : dureeRisque === '24h' ? '-24h' : ''}`);
                     setFiltreGroupe(GROUPE_RISQUES);
@@ -1205,7 +1207,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-1' : ''}`}>
             <span className={legende}>{uneCarte ? 'Police' : 'Grosseur de la police des valeurs'}</span>
             <select value={tailleValeurs} onChange={(e) => setTailleValeurs(Number(e.target.value))} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Petite : plus de valeurs sur la carte ; grande : plus lisible">
-              {[60, 80, 100, 125, 150, 160, 190, 240, 300].map((n) => (
+              {[60, 80, 100, 125, 130, 150, 160, 190, 240, 300].map((n) => (
               <option key={n} value={n}>
                 {n === 100 ? '100 % (normale)' : `${n} %`}
               </option>
