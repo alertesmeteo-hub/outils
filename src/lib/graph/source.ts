@@ -3,6 +3,7 @@ import { gunzipSync } from 'node:zlib';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { REGION_PAR_DEPARTEMENT } from '../carte-meteo/regions-fr';
+import { COORDS_DEPARTEMENTS } from '../carte-meteo/departements-coords';
 import type { DonneesGraph, JourGraph, NormalesGraph, ZoneGraph } from './types';
 
 /**
@@ -46,6 +47,8 @@ interface Recent {
   jours: Record<string, Record<string, MoyDep>>;
   /** Jours sans fichier (404) : on ne les redemande pas pendant 24 h. */
   absents: Record<string, number>;
+  /** Jours comblés d'après la réanalyse Open-Meteo (ni fichier contrôlé ni archive du VPS). */
+  modele?: string[];
 }
 
 let memoire: { a: number; v: DonneesGraph } | null = null;
@@ -252,7 +255,74 @@ async function construireRecent(hist: Hist, ancien: Recent | null): Promise<Rece
     faits++;
     avancement = `observations récentes : ${faits} / ${aFaire.length} jours`;
   });
+  await completerParModele(hist, recent, hier);
   return recent;
+}
+
+const API_OPEN_METEO = 'https://archive-api.open-meteo.com/v1/archive';
+/** Jours de recul pour caler la réanalyse sur les stations (écart moyen par département, avant le trou). */
+const JOURS_CALAGE = 45;
+const LOTS_OPEN_METEO = 10;
+
+/**
+ * Trou entre la fin des fichiers contrôlés (mi-juin) et le début de l'archive du VPS (19 septembre) : jours comblés d'après la
+ * réanalyse ERA5 d'Open-Meteo au centre de chaque département. La réanalyse est calée sur les stations : on retire l'écart moyen
+ * (maximales, minimales) observé sur les JOURS_CALAGE derniers jours des fichiers contrôlés ; la pluie est prise telle quelle.
+ */
+async function completerParModele(hist: Hist, recent: Recent, hier: string) {
+  const manquants: string[] = [];
+  for (let d = ajouter(hist.fin, 1); d <= hier; d = ajouter(d, 1)) if (!recent.jours[d]) manquants.push(d);
+  if (!manquants.length) return;
+  const debut = ajouter(hist.fin, -(JOURS_CALAGE - 1));
+  const fin = manquants[manquants.length - 1];
+  const deps = Object.keys(hist.deps);
+  recent.modele ??= [];
+  const parJour: Record<string, Record<string, MoyDep>> = {};
+  const lots: string[][] = [];
+  for (let i = 0; i < deps.length; i += LOTS_OPEN_METEO) lots.push(deps.slice(i, i + LOTS_OPEN_METEO));
+  let faits = 0;
+  await enParallele(lots, async (lot) => {
+    try {
+      const pts = lot.map((dep) => COORDS_DEPARTEMENTS[dep === '20' ? '2A' : dep]);
+      const url = `${API_OPEN_METEO}?latitude=${pts.map((p) => p.lat).join(',')}&longitude=${pts.map((p) => p.lon).join(',')}&start_date=${debut}&end_date=${fin}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Europe%2FParis`;
+      const buf = await telecharger(url, 60_000);
+      if (!buf) return;
+      const rep = JSON.parse(buf.toString('utf8')) as unknown;
+      const liste = (Array.isArray(rep) ? rep : [rep]) as { daily?: { time: string[]; temperature_2m_max: (number | null)[]; temperature_2m_min: (number | null)[]; precipitation_sum: (number | null)[] } }[];
+      lot.forEach((dep, k) => {
+        const q = liste[k]?.daily;
+        if (!q) return;
+        const station = new Map((hist.deps[dep]?.jours ?? []).map((j) => [j.d, j]));
+        const ecartsTx: number[] = [];
+        const ecartsTn: number[] = [];
+        q.time.forEach((d, i) => {
+          const j = station.get(d);
+          if (!j) return;
+          if (j.tx != null && q.temperature_2m_max[i] != null) ecartsTx.push(j.tx - (q.temperature_2m_max[i] as number));
+          if (j.tn != null && q.temperature_2m_min[i] != null) ecartsTn.push(j.tn - (q.temperature_2m_min[i] as number));
+        });
+        const calTx = ecartsTx.length >= 10 ? moyenne(ecartsTx) ?? 0 : 0;
+        const calTn = ecartsTn.length >= 10 ? moyenne(ecartsTn) ?? 0 : 0;
+        q.time.forEach((d, i) => {
+          if (!manquants.includes(d)) return;
+          const tx = q.temperature_2m_max[i];
+          const tn = q.temperature_2m_min[i];
+          if (tx == null || tn == null) return;
+          (parJour[d] ??= {})[dep] = { tx: arrondi(tx + calTx), tn: arrondi(tn + calTn), rr: arrondi(q.precipitation_sum[i]) };
+        });
+      });
+    } catch (e) {
+      console.error('[graph] Open-Meteo', (e as Error).message);
+    }
+    faits++;
+    avancement = `réanalyse Open-Meteo : ${faits} / ${lots.length} lots`;
+  });
+  for (const [d, v] of Object.entries(parJour)) {
+    // Un jour compte s'il y a au moins 60 départements (comme pour la France).
+    if (Object.keys(v).length < 60) continue;
+    recent.jours[d] = v;
+    if (!recent.modele.includes(d)) recent.modele.push(d);
+  }
 }
 
 /** Une zone = moyenne des départements qui la composent, jour par jour (France : au moins 60 départements ce jour-là). */

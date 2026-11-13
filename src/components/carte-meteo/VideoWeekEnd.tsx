@@ -428,7 +428,7 @@ interface Contexte {
   logo: HTMLImageElement | null;
   departement: string;
   /** Textes selon le mode : titre de l'intro (2 lignes), sous-titre, bandeau des villes, titre du récapitulatif. */
-  textes: { intro: [string, string]; sous: string; bandeau: string; recap: string; /** Période (« CE WEEK-END ? ») : reprise après l'accroche quand l'intro parle de montagne ou de côte. */ periode?: string; /** Fin de l'accroche (« CHEZ NOUS ? »). */ accroche?: string; /** Icônes de l'accroche : par défaut le temps (soleil, nuage, pluie, vent) ; flocons pour la vidéo montagne. */ icones?: 'flocons' };
+  textes: { intro: [string, string]; sous: string; bandeau: string; recap: string; /** Période (« CE WEEK-END ? ») : reprise après l'accroche quand l'intro parle de montagne ou de côte. */ periode?: string; /** Fin de l'accroche (« CHEZ NOUS ? »). */ accroche?: string; /** Icônes de l'accroche : par défaut le temps (soleil, nuage, pluie, vent) ; flocons pour la vidéo montagne. */ icones?: 'flocons' | 'extremes' };
   /** Format « TikTok Hook » : l'écran d'accroche précède l'intro. */
   hook?: boolean;
   /** Écran carte (villes placées sur la carte du département) après l'intro. */
@@ -563,12 +563,16 @@ function texteHook(ctx: CanvasRenderingContext2D, texte: string, x: number, y: n
  * Icônes d'accroche dessinées aux couleurs catalanes (jaune et rouge), animées : soleil aux rayons qui tournent, nuage qui dérive,
  * pluie qui tombe, vent qui souffle. Repère de 100 × 100 centré en (0, 0) ; contour blanc pour ressortir sur la carte.
  */
-type Prim = { c: [number, number, number] } | { r: [number, number, number, number, number] };
+type Prim = { c: [number, number, number] } | { r: [number, number, number, number, number] } | { p: [number, number][] };
 
 function tracerPrim(ctx: CanvasRenderingContext2D, p: Prim) {
   if ('c' in p) {
     ctx.beginPath();
     ctx.arc(p.c[0], p.c[1], p.c[2], 0, Math.PI * 2);
+  } else if ('p' in p) {
+    ctx.beginPath();
+    p.p.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
   } else {
     rectArrondi(ctx, p.r[0], p.r[1], p.r[2], p.r[3], p.r[4]);
   }
@@ -644,6 +648,54 @@ function floconCatalan(ctx: CanvasRenderingContext2D, x: number, y: number, r: n
   forme(ctx, [{ c: [x, y, r * 0.17] }], ROUGE_CATALAN, JAUNE_CATALAN, 3);
 }
 
+
+/** Jeu « extrêmes » : éclair, thermomètre, parapluie, flocon, plus francs et plus lisibles de loin (repère de 100 × 100). */
+function iconeExtreme(ctx: CanvasRenderingContext2D, i: number, t: number) {
+  if (i === 0) {
+    // Nuage d'orage et éclair qui claque (flash par intermittence).
+    nuageCatalan(ctx, 0, -18, 1.15);
+    const flash = 0.55 + 0.45 * Math.max(0, Math.sin(t * 5));
+    ctx.globalAlpha = flash;
+    forme(ctx, [{ p: [[8, -6], [-18, 26], [-3, 26], [-12, 52], [22, 14], [5, 14], [18, -6]] }], JAUNE_CATALAN, ROUGE_CATALAN, 4);
+    ctx.globalAlpha = 1;
+  } else if (i === 1) {
+    // Thermomètre dont le mercure monte et descend, avec ses graduations.
+    const niveau = 22 + 30 * (0.5 + 0.5 * Math.sin(t * 1.8));
+    for (let g = 0; g < 4; g++) {
+      traitCerne(ctx, () => {
+        ctx.beginPath();
+        ctx.moveTo(14, -34 + g * 14);
+        ctx.lineTo(g % 2 ? 24 : 32, -34 + g * 14);
+      }, JAUNE_CATALAN, ROUGE_CATALAN, 4);
+    }
+    forme(ctx, [{ r: [-11, -50, 22, 78, 11] }, { c: [0, 32, 21] }], JAUNE_CATALAN, ROUGE_CATALAN, 4);
+    forme(ctx, [{ c: [0, 32, 13] }, { r: [-5, 32 - niveau, 10, niveau, 5] }], ROUGE_CATALAN, ROUGE_CATALAN, 1);
+  } else if (i === 2) {
+    // Parapluie ouvert sous la pluie.
+    const arc: [number, number][] = [];
+    for (let k = 0; k <= 12; k++) {
+      const a = Math.PI + (k * Math.PI) / 12;
+      arc.push([Math.cos(a) * 46, 4 + Math.sin(a) * 40]);
+    }
+    for (let k = 0; k < 3; k++) arc.push([46 - (k + 1) * (92 / 3) + 8, k % 2 ? 4 : 12]);
+    traitCerne(ctx, () => {
+      ctx.beginPath();
+      ctx.moveTo(0, 4);
+      ctx.lineTo(0, 38);
+      ctx.arc(-8, 38, 8, 0, Math.PI * 0.95);
+    }, JAUNE_CATALAN, ROUGE_CATALAN, 5);
+    forme(ctx, [{ p: arc }], ROUGE_CATALAN, JAUNE_CATALAN, 4);
+    for (let g = 0; g < 3; g++) {
+      const cycle = (t * 1.1 + g * 0.33) % 1;
+      ctx.globalAlpha = Math.min(1, (1 - cycle) * 2);
+      forme(ctx, [{ r: [-44 + g * 44 + cycle * 4, -48 + cycle * 36 + 36, 7, 14, 3.5] }], JAUNE_CATALAN, ROUGE_CATALAN, 2);
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    floconCatalan(ctx, 0, 0, 46, t, 0);
+  }
+}
+
 function iconeCatalane(ctx: CanvasRenderingContext2D, i: number, t: number, flocons = false) {
   ctx.save();
   if (flocons) {
@@ -689,7 +741,8 @@ function iconeCatalane(ctx: CanvasRenderingContext2D, i: number, t: number, floc
 }
 
 /** Écran d'accroche : « QUEL TEMPS » en jaune, « CHEZ NOUS ? » en rouge, qui claque (zoom arrière) à l'ouverture. */
-function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null, accroche = 'CHEZ NOUS ?', flocons = false) {
+function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null, accroche = 'CHEZ NOUS ?', jeuIcones?: 'flocons' | 'extremes') {
+  const flocons = jeuIcones === 'flocons';
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
   const bas = H - 250 * u;
@@ -726,7 +779,8 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
     ctx.shadowColor = 'rgba(0,20,60,0.45)';
     ctx.shadowBlur = 24 * u;
     ctx.shadowOffsetY = 8 * u;
-    iconeCatalane(ctx, i, t + i * 0.7, flocons);
+    if (jeuIcones === 'extremes') iconeExtreme(ctx, i, t + i * 0.7);
+    else iconeCatalane(ctx, i, t + i * 0.7, flocons);
     ctx.restore();
   }
   pied(ctx, logo);
@@ -1674,7 +1728,7 @@ function dessinerPrevisions(ctx: CanvasRenderingContext2D, t: number, c: Context
   else fond(ctx);
   if (c.hook) {
     if (t < DUREE_HOOK) {
-      dessinerHook(ctx, t, logo, textes.accroche, textes.icones === 'flocons');
+      dessinerHook(ctx, t, logo, textes.accroche, textes.icones);
       return;
     }
     t -= DUREE_HOOK;
@@ -2108,7 +2162,12 @@ export default function VideoWeekEnd({
     return Object.fromEntries(villes.map((v) => [v, parNom.get(v)]));
   }, [listeVilles, dep, villes]);
   const carteDansVideo = avecCarte && villes.some((v) => positions[v]);
-  const textes = useMemo(() => textesVideo(mode, jours, ecart, france ? 'auto' : special, france), [mode, jours, ecart, special, france]);
+  const [jeuIcones, setJeuIcones] = useState<'temps' | 'extremes'>('temps');
+  const textes = useMemo(() => {
+    const t = textesVideo(mode, jours, ecart, france ? 'auto' : special, france);
+    // Jeu « extrêmes » : remplace les icônes du temps (la variante montagne garde ses flocons).
+    return jeuIcones === 'extremes' && t.icones !== 'flocons' ? { ...t, icones: 'extremes' as const } : t;
+  }, [mode, jours, ecart, special, france, jeuIcones]);
   const legendes = legendesTexte.split('\n').map((l) => l.trim()).filter(Boolean);
   const soustitres = soustitresTexte.split(/\s+/).filter(Boolean);
   // La voix générée ne vaut que pour le texte avec lequel elle a été faite.
@@ -2517,6 +2576,13 @@ export default function VideoWeekEnd({
             <option value="auto">Habituelle (villes selon la saison)</option>
             <option value="montagne">🏔️ Spéciale montagne (villes de relief)</option>
             <option value="ete">🏖️ Spéciale été (villes du bord de mer)</option>
+          </select>
+        </label>
+        <label className="text-sm font-medium">
+          <span className={legende}>Icônes de l’accroche</span>
+          <select value={jeuIcones} onChange={(e) => setJeuIcones(e.target.value as 'temps' | 'extremes')} className={selectBarre}>
+            <option value="temps">Le temps (soleil, éclaircies, pluie, vent)</option>
+            <option value="extremes">⚡ Percutantes (éclair, thermomètre, parapluie, flocon)</option>
           </select>
         </label>
         <button

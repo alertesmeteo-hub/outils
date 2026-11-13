@@ -2,7 +2,7 @@
  * Styles de fond de la carte (option « Style de fond ») : fond uni ou dégradé, territoire coloré, mer toujours dessinée.
  * Les couleurs sont des attributs SVG (pas de CSS) pour passer dans l'export JPG.
  */
-export type StyleFond = 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'parchemin' | 'marine-creme' | 'marine-bleu';
+export type StyleFond = 'bordeaux' | 'azur' | 'sauge' | 'ardoise' | 'sable' | 'lavande' | 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'parchemin' | 'marine-creme' | 'marine-bleu';
 
 /** Une couleur, ou un dégradé en diagonale (haut gauche vers bas droit). */
 export type Peinture = string | [string, string];
@@ -27,6 +27,12 @@ export interface DefStyleFond {
 }
 
 export const STYLES_FOND: Record<StyleFond, DefStyleFond> = {
+  bordeaux: { libelle: 'Bordeaux et or uni (territoire crème)', terre: ['#98283a', '#8c2334'], mer: ['#5a1424', '#4c101d'], territoire: '#f8e7c6', contour: '#e8c872', voisins: 'rgba(232,200,114,0.35)', cote: '#e3b64f', senyera: false, texteMer: '#f1d9a0' },
+  azur: { libelle: 'Bleu azur uni (territoire clair)', terre: ['#2d6199', '#295b92'], mer: ['#17406b', '#133860'], territoire: '#e8f1fa', contour: '#ffffff', voisins: 'rgba(255,255,255,0.30)', cote: '#8fb6dc', senyera: false, texteMer: '#dbe9f6' },
+  sauge: { libelle: 'Vert sauge uni (territoire clair)', terre: ['#5f8f77', '#598a71'], mer: ['#2c5a47', '#254e3d'], territoire: '#f1f6ea', contour: '#ffffff', voisins: 'rgba(255,255,255,0.30)', cote: '#a9cdb9', senyera: false, texteMer: '#e0efe6' },
+  ardoise: { libelle: 'Ardoise unie (territoire clair)', terre: ['#556070', '#4f5a69'], mer: ['#2f3946', '#29323e'], territoire: '#eceff3', contour: '#ffffff', voisins: 'rgba(255,255,255,0.25)', cote: '#97a3b3', senyera: false, texteMer: '#dde3ea' },
+  sable: { libelle: 'Sable uni (mer bleu pâle, territoire brun)', terre: ['#ebdfc8', '#e6d8be'], mer: ['#c9dae4', '#b9cedb'], territoire: '#8a6a47', contour: '#ffffff', voisins: 'rgba(138,106,71,0.30)', cote: '#ffffff', senyera: false, texteMer: '#5b7686' },
+  lavande: { libelle: 'Lavande unie (territoire clair)', terre: ['#bdb7df', '#b5aedb'], mer: ['#8e87c6', '#8279bb'], territoire: '#f5f3fc', contour: '#ffffff', voisins: 'rgba(255,255,255,0.35)', cote: '#d8d3f0', senyera: false, texteMer: '#ffffff' },
   blanc: { libelle: 'Fond blanc vierge (territoire gris clair)', terre: '#ffffff', mer: '#ffffff', territoire: '#e4e8ed', contour: '#8c97a4', voisins: '#d3d9e0', cote: '#c5cfdb', senyera: false, texteMer: '#ffffff' },
   gris: { libelle: 'Fond gris (mer gris clair)', terre: ['#d6dadf', '#c0c6cd'], mer: ['#eef0f3', '#dde1e6'], territoire: '#f7f8fa', contour: '#6b7480', voisins: '#aab2bc', cote: '#9aa3ad', senyera: false, texteMer: '#6b7480' },
   bleu: { libelle: 'Fond bleu (mer bleue, territoire clair)', terre: ['#d3e5f6', '#b9d4ee'], mer: ['#3a86c8', '#1c5b97'], territoire: '#f4f9fe', contour: '#ffffff', voisins: '#9fc0e1', cote: '#ffffff', senyera: false, texteMer: '#ffffff' },
