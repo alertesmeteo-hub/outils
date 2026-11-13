@@ -1159,11 +1159,14 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       const kTemp = enFrance ? 1 : enDepartement ? ECHELLE_TEMP_DEPARTEMENT : ECHELLE_TEMP_LOCAL;
       // Régions et départements : « ° » après la température (+0,4 em sur une ligne simple).
       const largeurLigne = 2.35 * (1 + gros) * kPicto + (m.mini == null ? (enFrance ? 1.85 : 2.25) : 2.55) * kTemp;
-      const demiLargeur = (Math.max(largeurLigne * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4) / 2;
+      // Vue département : la température dépasse un peu la largeur mesurée (« ° » compris) et les pictos agrandis débordent : marge en plus,
+      // sinon le nuage d'une ville cache la température de sa voisine.
+      const margeDep = enDepartement ? 0.9 * em * Math.max(1, tailleIcones / 100) : 0;
+      const demiLargeur = (Math.max(largeurLigne * em, nomsVisibles ? m.nom.length * 0.32 * em : 0) + 4 + margeDep) / 2;
       // Un picto image (1,3 × 1,7 ≈ 2,2 em) est un peu plus haut qu'un emoji (≈ 1,8 em).
       const hautLigne = Math.max((m.mini != null ? 3.4 * kTemp : 2.6 * kPicto) + gros * 1.8 * kPicto, estPictoImage(m.picto) ? 2.3 * (1 + gros) * kPicto : 0);
       // La rafale n'en fait plus partie : elle est placée ensuite, là où il y a de la place, sans déplacer le picto.
-      const hauteur = hautLigne * em;
+      const hauteur = hautLigne * em + (enDepartement ? 0.4 * em : 0);
       // Disposition fixe (style de la capture) : picto centré sur le point, température au-dessus, un peu à droite.
       if (dispositionFixe) {
         const lignes = m.mini == null ? 1 : 2;

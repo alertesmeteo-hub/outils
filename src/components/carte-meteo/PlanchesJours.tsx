@@ -101,6 +101,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   /** Rafale (km/h) à partir de laquelle la pastille de vent s'ajoute au picto. */
   const [seuilRafale, setSeuilRafale] = useState(80);
   const [periode, setPeriode] = useState<PeriodePlanche>('journee');
+  /** Titre « TENDANCE SUR 4 JOURS : … » dans l'en-tête : masqué d'office (la période reste affichée). */
+  const [avecTitre, setAvecTitre] = useState(false);
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState(zoneInitiale);
   const [logoId, setLogoId] = useState('alertesmeteo');
@@ -475,6 +477,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
             </optgroup>
           </select>
         </label>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={avecTitre} onChange={(e) => setAvecTitre(e.target.checked)} />
+          Afficher le titre « Tendance sur … jours : zone »
+        </label>
         {zone === 'france' && niveauDetail !== NIVEAU_QUATRE_PICTOS && (
           <label className="text-sm font-medium">
             <span className="mb-1 block text-orange-500">Zonage (carte fine, 864 zones)</span>
@@ -560,8 +566,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                 <img src={logo.fichier} alt="" style={{ height: 84, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
               ) : null}
               <div style={{ background: 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: POLICE, fontSize: 42, lineHeight: 1.05, color: '#0b2a4a', whiteSpace: 'nowrap', overflow: 'hidden' }}>{titre}</div>
-                <div style={{ fontFamily: POLICE, fontSize: 22, color: '#2563a8', marginTop: 2 }}>{sousTitre}</div>
+                {avecTitre && <div style={{ fontFamily: POLICE, fontSize: 42, lineHeight: 1.05, color: '#0b2a4a', whiteSpace: 'nowrap', overflow: 'hidden' }}>{titre}</div>}
+                <div style={{ fontFamily: POLICE, fontSize: avecTitre ? 22 : 34, color: '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousTitre}</div>
               </div>
             </div>
 
