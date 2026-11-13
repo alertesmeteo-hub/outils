@@ -767,15 +767,16 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
   texteHook(ctx, accroche, W / 2, cy + 260 * u, 250 * u, W * 0.9, ROUGE_CATALAN);
   ctx.restore();
 
-  // Quatre grosses icônes de temps animées aux couleurs catalanes, deux au-dessus et deux sous le texte.
+  // Deux grosses icônes animées aux couleurs catalanes, une au-dessus et une sous le texte (la 1re et la 3e du jeu).
   const rangees: [number, number][] = [[90 * u, cy - 230 * u], [cy + 290 * u, bas - 130 * u]];
-  for (let i = 0; i < 4; i++) {
-    const [y0, y1] = rangees[Math.floor(i / 2)];
-    const taille = Math.min(W * 0.44, (y1 - y0) * 0.95);
-    const cx = W * (i % 2 === 0 ? 0.27 : 0.73);
+  for (let i = 0; i < 2; i++) {
+    const [y0, y1] = rangees[i];
+    const taille = Math.min(W * 0.62, (y1 - y0) * 1.05);
+    const cx = W / 2;
     const py = (y0 + y1) / 2 + Math.sin(t * 2.2 + i * 1.4) * 9 * u;
-    const pop = sortie((t - 0.12 * i) / 0.4);
+    const pop = sortie((t - 0.18 * i) / 0.4);
     const echelle = pop * (1 + 0.1 * Math.sin(Math.min(1, pop) * Math.PI));
+    const icone = i * 2;
     ctx.save();
     ctx.globalAlpha = Math.max(0, sortant);
     ctx.translate(cx, py);
@@ -783,8 +784,8 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
     ctx.shadowColor = 'rgba(0,20,60,0.45)';
     ctx.shadowBlur = 24 * u;
     ctx.shadowOffsetY = 8 * u;
-    if (jeuIcones === 'extremes') iconeExtreme(ctx, i, t + i * 0.7);
-    else iconeCatalane(ctx, i, t + i * 0.7, flocons);
+    if (jeuIcones === 'extremes') iconeExtreme(ctx, icone, t + i * 0.7);
+    else iconeCatalane(ctx, icone, t + i * 0.7, flocons);
     ctx.restore();
   }
   pied(ctx, logo);
@@ -1874,7 +1875,7 @@ export default function VideoWeekEnd({
 }) {
   const [genre, setGenre] = useState<Genre>(typeInitial === 'alerte' || typeInitial === 'tendance' ? typeInitial : 'previsions');
   // Écran final « Abonnez-vous ! » : option pour toutes les vidéos, cochée d'office dans l'alerte.
-  const [abonne, setAbonne] = useState(abonneInitial ? abonneInitial === '1' : typeInitial === 'alerte');
+  const [abonne, setAbonne] = useState(abonneInitial ? abonneInitial === '1' : true);
   // Textes libres qui apparaissent en gros dans la vidéo : un par ligne, un mot entre *étoiles* est mis en rose.
   const [legendesTexte, setLegendesTexte] = useState('');
   const [soustitresTexte, setSoustitresTexte] = useState('');
@@ -2553,6 +2554,13 @@ export default function VideoWeekEnd({
             ))}
           </select>
         </label>
+        <label className="text-sm font-medium">
+          <span className={legende}>Icônes de l’accroche</span>
+          <select value={jeuIcones} onChange={(e) => setJeuIcones(e.target.value as 'temps' | 'extremes')} className={selectBarre}>
+            <option value="temps">Le temps (soleil, éclaircies, pluie, vent)</option>
+            <option value="extremes">⚡ Percutantes (éclair, soleil à lunettes, goutte, flocon)</option>
+          </select>
+        </label>
         {genre === 'previsions' && (
         <>
         <label className="text-sm font-medium">
@@ -2580,13 +2588,6 @@ export default function VideoWeekEnd({
             <option value="auto">Habituelle (villes selon la saison)</option>
             <option value="montagne">🏔️ Spéciale montagne (villes de relief)</option>
             <option value="ete">🏖️ Spéciale été (villes du bord de mer)</option>
-          </select>
-        </label>
-        <label className="text-sm font-medium">
-          <span className={legende}>Icônes de l’accroche</span>
-          <select value={jeuIcones} onChange={(e) => setJeuIcones(e.target.value as 'temps' | 'extremes')} className={selectBarre}>
-            <option value="temps">Le temps (soleil, éclaircies, pluie, vent)</option>
-            <option value="extremes">⚡ Percutantes (éclair, soleil à lunettes, goutte, flocon)</option>
           </select>
         </label>
         <button

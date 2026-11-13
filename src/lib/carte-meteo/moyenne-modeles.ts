@@ -67,7 +67,10 @@ export function moyennePoints<P extends PointCarte>(listes: P[][]): P[] {
       if (champ.startsWith('direction')) point[champ] = moyenneAngles(nombres);
       else if (champ.startsWith('code')) point[champ] = plusFrequente(nombres);
       else {
-        const m = nombres.reduce((a, c) => a + c, 0) / nombres.length;
+        // Pluie : médiane des modèles (un modèle isolé qui annonce 13 mm alors que les autres n'en voient pas ne doit pas faire apparaître la pluie).
+        const tri = [...nombres].sort((x, y) => x - y);
+        const mediane = tri.length % 2 ? tri[(tri.length - 1) / 2] : (tri[tri.length / 2 - 1] + tri[tri.length / 2]) / 2;
+        const m = champ.startsWith('pluie') ? mediane : nombres.reduce((a, c) => a + c, 0) / nombres.length;
         // Rafales, vent, nuages et niveau d'orage en entiers ; le reste (T°, pluie, neige, visibilité) au dixième.
         point[champ] = /^(rafale|vent|nuages|orage)/.test(champ) ? Math.round(m) : arrondi(m, 1);
       }

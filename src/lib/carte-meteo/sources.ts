@@ -801,7 +801,10 @@ async function chargerPrevisionsVillesMoyenne(dateISO: string, dep: string): Pro
     const memes = parModele.map((m) => m.get(base.code)).filter((x): x is PointCarte => x != null);
     for (const champ of CHAMPS_MOYENNE) {
       const valeurs = memes.map((x) => x[champ]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-      const m = valeurs.length ? valeurs.reduce((a, b) => a + b, 0) / valeurs.length : null;
+      // Pluie : médiane des modèles (un modèle isolé qui annonce 13 mm alors que les autres n'en voient pas ne doit pas faire apparaître la pluie).
+      const tri = [...valeurs].sort((x, y) => x - y);
+      const mediane = tri.length ? (tri.length % 2 ? tri[(tri.length - 1) / 2] : (tri[tri.length / 2 - 1] + tri[tri.length / 2]) / 2) : null;
+      const m = champ.startsWith('pluie') ? mediane : valeurs.length ? valeurs.reduce((a, b) => a + b, 0) / valeurs.length : null;
       point[champ] = m == null ? null : champ.startsWith('nuages') ? Math.round(m) : Math.round(m * 10) / 10;
     }
     for (const champ of CHAMPS_VOILE) {
@@ -856,7 +859,11 @@ export async function chargerPrevisionsZones(modele: ModeleSource, date: string,
   const resultats = await enParallele(CODES_DEPARTEMENTS, CONCURRENCE, async (dep) => {
     const extrait = await extraitDepartement(modele, dep);
     // Choisir avant le filtrage météo : les centres ne changent pas avec l'échéance.
-    return repartir(extrait.villes, 9).map((v) => ({
+    // Pas de commune au-dessus de 500 m dans le zonage (minimales, maximales…) : celles d'altitude ont l'option « Relief ». Département
+    // sans assez de communes basses (Hautes-Alpes…) : les plus basses, au nombre de trois au moins.
+    const basses = extrait.villes.filter((v) => (v.altitude ?? 0) <= ALTITUDE_MAX_FRANCE);
+    const retenues = basses.length >= 3 ? basses : [...extrait.villes].sort((x, y) => (x.altitude ?? 0) - (y.altitude ?? 0)).slice(0, 3);
+    return repartir(retenues, 9).map((v) => ({
       ...pointDepuisSerie(v.code, v.nom, v.serie, date, fin), dep, lat: v.lat, lon: v.lon,
     }));
   });
