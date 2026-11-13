@@ -330,13 +330,16 @@ export function useContours(fichier: string | null): ContourBoite[] {
 const texte = (v: number | null) => (v == null ? '' : String(Math.round(v)));
 
 /** Pictos de l'après-midi et de la journée d'un point, d'après la nébulosité et les précipitations de la période. */
+/** Pas de picto de pluie en dessous de 1 mm de précipitations (cumul de la période) : la pluie n'est retenue qu'au-delà. */
+const pluiePicto = (mm: number | null | undefined) => (mm == null ? null : mm > 1 ? mm : 0);
+
 function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoM: PictoMeteo; pictoAM: PictoMeteo; pictoJ: PictoMeteo; pictoS: PictoMeteo; pictoN: PictoMeteo } {
   return {
-    pictoS: averseNuageGris(pictoDepuisPrevision({ code: p.codeSoiree ?? null, nuages: p.nuagesSoiree ?? null, pluie: p.pluieSoiree ?? null, temperature: p.tempSoiree ?? null, voile: p.voileSoiree, nuit: true }, jeu), jeu),
-    pictoN: averseNuageGris(pictoDepuisPrevision({ code: p.codeNuit ?? null, nuages: p.nuagesNuit ?? null, pluie: p.pluieNuit ?? null, temperature: p.tempNuit ?? null, voile: p.voileNuit, nuit: true }, jeu), jeu),
-    pictoM: averseNuageGris(pictoDepuisPrevision({ code: p.codeMatin, nuages: p.nuagesMatin, pluie: p.pluieMatin, temperature: p.tempMatin, voile: p.voileMatin }, jeu), jeu),
-    pictoAM: averseNuageGris(pictoDepuisPrevision({ code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: p.pluieApresMidi, temperature: p.tempApresMidi, voile: p.voileApresMidi }, jeu), jeu),
-    pictoJ: averseNuageGris(pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: p.pluieJournee, temperature: p.maxi, voile: p.voileJournee }, jeu), jeu),
+    pictoS: averseNuageGris(pictoDepuisPrevision({ code: p.codeSoiree ?? null, nuages: p.nuagesSoiree ?? null, pluie: pluiePicto(p.pluieSoiree ?? null), temperature: p.tempSoiree ?? null, voile: p.voileSoiree, nuit: true }, jeu), jeu),
+    pictoN: averseNuageGris(pictoDepuisPrevision({ code: p.codeNuit ?? null, nuages: p.nuagesNuit ?? null, pluie: pluiePicto(p.pluieNuit ?? null), temperature: p.tempNuit ?? null, voile: p.voileNuit, nuit: true }, jeu), jeu),
+    pictoM: averseNuageGris(pictoDepuisPrevision({ code: p.codeMatin, nuages: p.nuagesMatin, pluie: pluiePicto(p.pluieMatin), temperature: p.tempMatin, voile: p.voileMatin }, jeu), jeu),
+    pictoAM: averseNuageGris(pictoDepuisPrevision({ code: p.codeApresMidi, nuages: p.nuagesApresMidi, pluie: pluiePicto(p.pluieApresMidi), temperature: p.tempApresMidi, voile: p.voileApresMidi }, jeu), jeu),
+    pictoJ: averseNuageGris(pictoDepuisPrevision({ code: p.codeJournee, nuages: p.nuagesJournee, pluie: pluiePicto(p.pluieJournee), temperature: p.maxi, voile: p.voileJournee }, jeu), jeu),
   };
 }
 
@@ -1143,7 +1146,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     const obstacles: Rect[] = [
       enFrance ? { x: largeurCarte - 28 - largeurLogo, y: 21, w: largeurLogo, h: hauteurLogo + 1 } : { x: 29, y: HAUTEUR_CARTE - 21 - hauteurLogo - 1, w: logoDroite - 29, h: hauteurLogo + 1 },
       enFrance ? { x: xTitreFrance, y: 6, w: 410, h: 67 } : { x: largeurCarte - 28 - 460, y: 6, w: 460, h: 67 },
-      ...(!enFrance && habillage === 'catalan' ? [{ x: 0, y: 0, w: 330, h: 135 }] : []),
+      ...(!enFrance && habillage === 'catalan' ? [{ x: 0, y: 0, w: 560, h: 150 }] : []),
       ...(pied ? [{ x: 29, y: HAUTEUR_CARTE - 36, w: 300, h: 36 }] : []),
       ...(enFrance ? [{ x: moyennesGauche, y: 340, w: LARGEUR_MOYENNES, h: 125 }] : []),
     ];
