@@ -81,16 +81,31 @@ body {
 .cmap-catalan::before { top: 0; }
 .cmap-catalan::after { bottom: 0; }
 .cmap-catalan { box-shadow: inset 0 0 0 3px rgba(252, 221, 9, 0.35); }
-/* Titre en ruban catalan : la senyera (5 bandes jaunes, 4 rouges) en fond, queue d'aronde aux extrémités, texte blanc cerné de sombre. */
+/*
+ * Titre « bulletin télé » : bandeau bordeaux dégradé aux angles biseautés, fines bandes catalanes en diagonale à gauche, filet doré,
+ * ombre portée (une plaque décalée derrière : clip-path ne permet pas de box-shadow), date en blanc, moment de la journée dans un petit encadré.
+ * Aucun filtre SVG : l'export JPG les rend noirs.
+ */
 .cmap-catalan .cmap-titre {
-  background: linear-gradient(180deg, #fcdd09 0 11.11%, #da121a 11.11% 22.22%, #fcdd09 22.22% 33.33%, #da121a 33.33% 44.44%, #fcdd09 44.44% 55.55%, #da121a 55.55% 66.66%, #fcdd09 66.66% 77.77%, #da121a 77.77% 88.88%, #fcdd09 88.88% 100%);
-  border: none; border-radius: 0; padding: 8px 50px 9px;
-  clip-path: polygon(0 0, 100% 0, calc(100% - 20px) 50%, 100% 100%, 0 100%, 20px 50%);
-  box-shadow: inset 0 0 0 3px rgba(58, 5, 8, 0.85);
+  background: none; border: none; border-radius: 0; box-shadow: none; text-align: left;
+  padding: 8px 36px 9px 72px;
 }
-.cmap-catalan .cmap-titre::before, .cmap-catalan .cmap-titre::after { content: none; }
-.cmap-catalan .cmap-date { color: #fff; font-size: 40px; text-shadow: 2px 0 0 #3a0508, -2px 0 0 #3a0508, 0 2px 0 #3a0508, 0 -2px 0 #3a0508, 2px 2px 0 #3a0508, -2px -2px 0 #3a0508, 2px -2px 0 #3a0508, -2px 2px 0 #3a0508, 0 3px 4px rgba(0, 0, 0, 0.55); }
-.cmap-catalan .cmap-sous-titre { color: #fff; font-size: 23px; font-weight: 700; text-shadow: 2px 0 0 #3a0508, -2px 0 0 #3a0508, 0 2px 0 #3a0508, 0 -2px 0 #3a0508, 2px 2px 0 #3a0508, -2px -2px 0 #3a0508, 2px -2px 0 #3a0508, -2px 2px 0 #3a0508, 0 3px 4px rgba(0, 0, 0, 0.55); }
+.cmap-catalan .cmap-titre::before, .cmap-catalan .cmap-titre::after {
+  content: ''; position: absolute; inset: 0; clip-path: polygon(13px 0, calc(100% - 13px) 0, 100% 13px, 100% calc(100% - 13px), calc(100% - 13px) 100%, 13px 100%, 0 calc(100% - 13px), 0 13px);
+}
+.cmap-catalan .cmap-titre::before { z-index: -2; transform: translate(4px, 5px); background: rgba(0, 0, 0, 0.5); }
+.cmap-catalan .cmap-titre::after {
+  z-index: -1;
+  background:
+    repeating-linear-gradient(118deg, #fcdd09 0 3.5px, #da121a 3.5px 7px) 0 0 / 54px 100% no-repeat,
+    linear-gradient(180deg, #8e1626 0%, #5c0d19 100%);
+  box-shadow: inset 0 0 0 2px #fcdd09, inset 0 -4px 0 0 rgba(0, 0, 0, 0.25);
+}
+.cmap-catalan .cmap-date { color: #fff; font-size: 40px; letter-spacing: 0.03em; text-shadow: 0 2px 3px rgba(0, 0, 0, 0.65); }
+.cmap-catalan .cmap-sous-titre {
+  display: inline-block; margin-top: 5px; padding: 1px 14px 2px; color: #fff; font-size: 19px; font-weight: 700; letter-spacing: 0.1em;
+  background: #b3121c; border: 1.5px solid #fcdd09; border-radius: 3px;
+}
 .cmap-theme-halloween { background: radial-gradient(ellipse at 70% 15%, #4a2480 0%, #24103f 45%, #0d0618 100%); }
 .cmap-theme-halloween .cmap-titre { background: rgba(20, 10, 36, 0.92); border: 2px solid #ff8a1f; box-shadow: 0 0 14px rgba(255, 138, 31, 0.55); }
 .cmap-theme-halloween .cmap-date { color: #ff9a2e; }
