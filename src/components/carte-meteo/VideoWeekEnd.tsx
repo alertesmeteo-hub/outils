@@ -161,6 +161,19 @@ function choisirVilles(dep: string, liste: VilleListe[], montagnes: VilleListe[]
 const montagnardes = (liste: VilleListe[], reliefs: VilleListe[], altitudeMin: number): VilleListe[] => [...reliefs, ...liste.filter((v) => (v.altitude ?? 0) >= altitudeMin)];
 /** Accroche du format « TikTok Hook » : « Quel temps chez nous ? » aux couleurs catalanes, avant l'intro. */
 const DUREE_HOOK = 2.5;
+/** Dix accroches d'ouverture (jaune puis rouge) : la 1re est la classique, qui s'adapte au lieu (montagne, côte, France). */
+const ACCROCHES: { libelle: string; haut: string; bas: string }[] = [
+  { libelle: 'QUEL TEMPS CHEZ NOUS ? (classique)', haut: 'QUEL TEMPS', bas: 'CHEZ NOUS ?' },
+  { libelle: 'PARAPLUIE OU LUNETTES ?', haut: 'PARAPLUIE OU', bas: 'LUNETTES ?' },
+  { libelle: 'ATTENTION, ÇA CHANGE !', haut: 'ATTENTION', bas: 'ÇA CHANGE !' },
+  { libelle: 'SOLEIL OU PLUIE CHEZ VOUS ?', haut: 'SOLEIL OU PLUIE', bas: 'CHEZ VOUS ?' },
+  { libelle: 'NE SORTEZ PAS SANS REGARDER !', haut: 'NE SORTEZ PAS', bas: 'SANS REGARDER !' },
+  { libelle: 'LA MÉTÉO QUI VA TOUT CHANGER', haut: 'LA MÉTÉO QUI', bas: 'CHANGE TOUT !' },
+  { libelle: 'ON PREND LE PARAPLUIE ?', haut: 'ON PREND LE', bas: 'PARAPLUIE ?' },
+  { libelle: 'LE TEMPS VA-T-IL TENIR ?', haut: 'LE TEMPS', bas: 'VA TENIR ?' },
+  { libelle: 'VOTRE MÉTÉO EN 15 SECONDES', haut: 'VOTRE MÉTÉO', bas: 'EN 15 SECONDES' },
+  { libelle: 'LA VÉRITÉ SUR LE TEMPS !', haut: 'LA VÉRITÉ', bas: 'SUR LE TEMPS !' },
+];
 const JAUNE_CATALAN = '#fcdd09';
 const ROUGE_CATALAN = '#da121a';
 const DUREE_INTRO = 3;
@@ -428,7 +441,7 @@ interface Contexte {
   logo: HTMLImageElement | null;
   departement: string;
   /** Textes selon le mode : titre de l'intro (2 lignes), sous-titre, bandeau des villes, titre du récapitulatif. */
-  textes: { intro: [string, string]; sous: string; bandeau: string; recap: string; /** Période (« CE WEEK-END ? ») : reprise après l'accroche quand l'intro parle de montagne ou de côte. */ periode?: string; /** Fin de l'accroche (« CHEZ NOUS ? »). */ accroche?: string; /** Icônes de l'accroche : par défaut le temps (soleil, nuage, pluie, vent) ; flocons pour la vidéo montagne. */ icones?: 'flocons' | 'extremes' };
+  textes: { intro: [string, string]; sous: string; bandeau: string; recap: string; /** Période (« CE WEEK-END ? ») : reprise après l'accroche quand l'intro parle de montagne ou de côte. */ periode?: string; /** Fin de l'accroche (« CHEZ NOUS ? »). */ accroche?: string; /** Première ligne de l'accroche (« QUEL TEMPS » par défaut). */ ligneHaut?: string; /** Icônes de l'accroche : par défaut le temps (soleil, nuage, pluie, vent) ; flocons pour la vidéo montagne. */ icones?: 'flocons' | 'extremes' };
   /** Format « TikTok Hook » : l'écran d'accroche précède l'intro. */
   hook?: boolean;
   /** Écran carte (villes placées sur la carte du département) après l'intro. */
@@ -745,7 +758,7 @@ function iconeCatalane(ctx: CanvasRenderingContext2D, i: number, t: number, floc
 }
 
 /** Écran d'accroche : « QUEL TEMPS » en jaune, « CHEZ NOUS ? » en rouge, qui claque (zoom arrière) à l'ouverture. */
-function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null, accroche = 'CHEZ NOUS ?', jeuIcones?: 'flocons' | 'extremes') {
+function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageElement | null, accroche = 'CHEZ NOUS ?', jeuIcones?: 'flocons' | 'extremes', ligneHaut = 'QUEL TEMPS') {
   const flocons = jeuIcones === 'flocons';
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
@@ -763,7 +776,7 @@ function dessinerHook(ctx: CanvasRenderingContext2D, t: number, logo: HTMLImageE
   ctx.translate(-W / 2, -cy);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  texteHook(ctx, 'QUEL TEMPS', W / 2, cy - 20 * u, 250 * u, W * 0.9, JAUNE_CATALAN);
+  texteHook(ctx, ligneHaut, W / 2, cy - 20 * u, 250 * u, W * 0.9, JAUNE_CATALAN);
   texteHook(ctx, accroche, W / 2, cy + 260 * u, 250 * u, W * 0.9, ROUGE_CATALAN);
   ctx.restore();
 
@@ -1733,7 +1746,7 @@ function dessinerPrevisions(ctx: CanvasRenderingContext2D, t: number, c: Context
   else fond(ctx);
   if (c.hook) {
     if (t < DUREE_HOOK) {
-      dessinerHook(ctx, t, logo, textes.accroche, textes.icones);
+      dessinerHook(ctx, t, logo, textes.accroche, textes.icones, textes.ligneHaut);
       return;
     }
     t -= DUREE_HOOK;
@@ -2168,11 +2181,15 @@ export default function VideoWeekEnd({
   }, [listeVilles, dep, villes]);
   const carteDansVideo = avecCarte && villes.some((v) => positions[v]);
   const [jeuIcones, setJeuIcones] = useState<'temps' | 'extremes'>('temps');
+  const [accrocheId, setAccrocheId] = useState(0);
   const textes = useMemo(() => {
-    const t = textesVideo(mode, jours, ecart, france ? 'auto' : special, france);
+    let t = textesVideo(mode, jours, ecart, france ? 'auto' : special, france);
     // Jeu « extrêmes » : remplace les icônes du temps (la variante montagne garde ses flocons).
-    return jeuIcones === 'extremes' && t.icones !== 'flocons' ? { ...t, icones: 'extremes' as const } : t;
-  }, [mode, jours, ecart, special, france, jeuIcones]);
+    if (jeuIcones === 'extremes' && t.icones !== 'flocons') t = { ...t, icones: 'extremes' as const };
+    // Autre accroche que la classique : ses deux lignes remplacent « QUEL TEMPS » et « CHEZ NOUS ? ».
+    const a = ACCROCHES[accrocheId];
+    return accrocheId > 0 && a ? { ...t, ligneHaut: a.haut, accroche: a.bas } : t;
+  }, [mode, jours, ecart, special, france, jeuIcones, accrocheId]);
   const legendes = legendesTexte.split('\n').map((l) => l.trim()).filter(Boolean);
   const soustitres = soustitresTexte.split(/\s+/).filter(Boolean);
   // La voix générée ne vaut que pour le texte avec lequel elle a été faite.
@@ -2555,10 +2572,20 @@ export default function VideoWeekEnd({
           </select>
         </label>
         <label className="text-sm font-medium">
+          <span className={legende}>Texte de l’accroche (10 au choix)</span>
+          <select value={accrocheId} onChange={(e) => setAccrocheId(Number(e.target.value))} className={selectBarre}>
+            {ACCROCHES.map((a, k) => (
+              <option key={a.libelle} value={k}>
+                {k + 1}. {a.libelle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
           <span className={legende}>Icônes de l’accroche</span>
           <select value={jeuIcones} onChange={(e) => setJeuIcones(e.target.value as 'temps' | 'extremes')} className={selectBarre}>
-            <option value="temps">Le temps (soleil, éclaircies, pluie, vent)</option>
-            <option value="extremes">⚡ Percutantes (éclair, soleil à lunettes, goutte, flocon)</option>
+            <option value="temps">Le temps (soleil et pluie)</option>
+            <option value="extremes">⚡ Percutantes (éclair et goutte)</option>
           </select>
         </label>
         {genre === 'previsions' && (

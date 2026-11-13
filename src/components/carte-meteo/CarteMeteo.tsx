@@ -1167,22 +1167,25 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       // Disposition fixe (style de la capture) : picto centré sur le point, température au-dessus, un peu à droite.
       if (dispositionFixe) {
         const lignes = m.mini == null ? 1 : 2;
-        const hautTexte = (1.32 + 0.98 * (lignes - 1)) * em + (nomsVisibles ? 0.9 * em : 0);
+        // Dimensions mesurées à la taille de pictos de 100 % : elles suivent le curseur « Taille des pictos » (sinon les pictos agrandis
+        // se chevauchent et cachent la température du voisin).
+        const kf = Math.max(1, tailleIcones / 100);
+        const hautTexte = ((1.32 + 0.98 * (lignes - 1)) * kf) * em + (nomsVisibles ? 0.9 * em : 0);
         return {
           code: m.code,
           x: m.x,
           y: m.y,
           // Mesuré dans le rendu (picto 1,13 em, température 0,72 em, agrandis de 30 % par `.cmap-capture`) : dessin du picto
           // ±0,74 em ; température de -0,22 à 1,27 em (« ° » compris) en x, de 1,32 à 0,42 em au-dessus du centre.
-          gauche: 0.74 * em,
-          droite: 1.27 * em,
+          gauche: 0.74 * kf * em,
+          droite: 1.27 * kf * em,
           haut: hautTexte,
-          bas: 0.74 * em,
+          bas: 0.74 * kf * em,
           // Forme en « L » : un voisin peut se loger sous la température ou au-dessus du picto à gauche (avec le seul rectangle
           // englobant, la moitié des points de la carte de référence étaient repoussés, jusqu'à 80 px, ou écartés).
           parties: [
-            { gauche: 0.74 * em, haut: 0.74 * em, droite: 0.74 * em, bas: 0.74 * em },
-            { gauche: 0.22 * em, haut: hautTexte, droite: 1.27 * em, bas: -0.42 * em },
+            { gauche: 0.74 * kf * em, haut: 0.74 * kf * em, droite: 0.74 * kf * em, bas: 0.74 * kf * em },
+            { gauche: 0.22 * kf * em, haut: hautTexte, droite: 1.27 * kf * em, bas: -0.42 * kf * em },
           ],
           // Villes imposées (Perpignan, Montpellier, Marseille, Paris, Lille) : jamais déplacées.
           // Villes ajoutées en « Élevé » : après les points de référence, et seulement près de leur ville.
