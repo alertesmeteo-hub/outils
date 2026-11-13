@@ -2,7 +2,7 @@
  * Styles de fond de la carte (option « Style de fond ») : fond uni ou dégradé, territoire coloré, mer toujours dessinée.
  * Les couleurs sont des attributs SVG (pas de CSS) pour passer dans l'export JPG.
  */
-export type StyleFond = 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'parchemin' | 'marine-creme' | 'marine-bleu';
+export type StyleFond = 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'parchemin' | 'marine-creme' | 'marine-bleu';
 
 /** Une couleur, ou un dégradé en diagonale (haut gauche vers bas droit). */
 export type Peinture = string | [string, string];
@@ -27,6 +27,9 @@ export interface DefStyleFond {
 }
 
 export const STYLES_FOND: Record<StyleFond, DefStyleFond> = {
+  blanc: { libelle: 'Fond blanc vierge (territoire gris clair)', terre: '#ffffff', mer: '#ffffff', territoire: '#e4e8ed', contour: '#8c97a4', voisins: '#d3d9e0', cote: '#c5cfdb', senyera: false, texteMer: '#ffffff' },
+  gris: { libelle: 'Fond gris (mer gris clair)', terre: ['#d6dadf', '#c0c6cd'], mer: ['#eef0f3', '#dde1e6'], territoire: '#f7f8fa', contour: '#6b7480', voisins: '#aab2bc', cote: '#9aa3ad', senyera: false, texteMer: '#6b7480' },
+  bleu: { libelle: 'Fond bleu (mer bleue, territoire clair)', terre: ['#d3e5f6', '#b9d4ee'], mer: ['#3a86c8', '#1c5b97'], territoire: '#f4f9fe', contour: '#ffffff', voisins: '#9fc0e1', cote: '#ffffff', senyera: false, texteMer: '#ffffff' },
   clair: { libelle: 'Fond clair', terre: ['#f7f8fa', '#e9edf2'], mer: ['#d4e9f4', '#a9d0e6'], territoire: '#3d6cb0', contour: '#ffffff', voisins: '#c5cfdb', cote: '#8fbad3', senyera: false, texteMer: '#2f5f7f' },
   'bleu-nuit': { libelle: 'Fond bleu nuit', terre: ['#12304f', '#0a1f36'], mer: ['#1c5f8a', '#0f3d62'], territoire: '#5b9bd5', contour: '#ffffff', voisins: '#38597b', cote: '#3b84b0', senyera: false, texteMer: '#e6f2fa' },
   creme: { libelle: 'Crème et senyera (territoire bleu-gris)', terre: ['#fbefd9', '#f1d5a8'], mer: ['#a6d4ea', '#5aa7d6'], territoire: '#52689a', contour: '#ffffff', voisins: '#dcc3a0', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },

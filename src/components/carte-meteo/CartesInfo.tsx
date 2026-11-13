@@ -42,6 +42,13 @@ const GROUPE_MOIS = 'Bilan du mois';
 
 /** Groupe des cartes de risque (voir THEMES_PREVISION) : bouton rouge « Risques » du menu Cartes. */
 const GROUPE_RISQUES = 'Risques';
+/** Petit picto des cartes de risque (type de risque, puis 📆 pour une période ou ⏱️ pour 24 h), pour les distinguer d'un coup d'œil. */
+const PICTO_RISQUE: Record<string, string> = { orage: '⛈️', froid: '❄️', pluie: '🌧️', vent: '💨', tempete: '🌪️', chaleur: '🔥', neige: '⛄', verglas: '🧊' };
+const pictoRisque = (id: string): string => {
+  const type = Object.keys(PICTO_RISQUE).find((k) => id.startsWith(`risque-${k}`)) ?? (id === 'orages' ? 'orage' : null);
+  if (!type) return '';
+  return `${PICTO_RISQUE[type]}${id.endsWith('-periode') ? '📆' : id.endsWith('-24h') ? '⏱️' : ''} `;
+};
 
 const MODES: [Mode, string][] = [
   ['prevision', 'Prévisions'],
@@ -1187,6 +1194,32 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               </select>
             </label>
           )}
+          {!uneCarte && (
+            <>
+              <label className="text-sm font-medium">
+                <span className={legende}>🖼️ Style de fond</span>
+                <select value={affichage.styleFond ?? ''} onChange={(e) => regler({ styleFond: estStyleFond(e.target.value) ? e.target.value : null })} className={selectBarre}>
+                  <option value="">Aucun (fond de carte)</option>
+                  {ORDRE_STYLES_FOND.map((st) => (
+                    <option key={st} value={st}>
+                      {STYLES_FOND[st].libelle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>🗺️ Fond de carte</span>
+                <select value={affichage.fond ?? ''} onChange={(e) => regler({ fond: (e.target.value || null) as Couche | null })} className={selectBarre}>
+                  <option value="">Automatique (relief ou photos IGN)</option>
+                  {(Object.keys(LIBELLES_COUCHES) as Couche[]).map((c) => (
+                    <option key={c} value={c}>
+                      {LIBELLES_COUCHES[c]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-1' : ''}`}>
             <span className={legende}>{uneCarte ? 'Tableau' : 'Tableau du classement'}</span>
             <select value={sansTableau ? 'sans' : 'avec'} onChange={(e) => setSansTableau(e.target.value === 'sans')} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`}>
@@ -1230,7 +1263,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               <span className="w-40 text-xs font-bold uppercase tracking-wide text-muted">{nomGroupe(g.groupe)}</span>
               {g.themes.map((t) => (
                 <a key={t.id} href={`#carte-${t.id}`} className={`rounded-md border px-2 py-1 text-xs font-medium hover:bg-bg ${(t as ThemePrevision).run ? 'border-red-600 font-semibold text-red-600' : 'border-border'}`}>
-                  {t.court}
+                  {t.groupe === GROUPE_RISQUES ? pictoRisque(t.id) : ''}{t.court}
                 </a>
               ))}
             </div>
@@ -1609,35 +1642,6 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               </label>
             </div>
             <p className="mt-3 text-xs text-muted">Pictos, rafales, textes et icônes à poser : bouton « Carte avec pictos » en haut de la page.</p>
-          </details>
-        )}
-        {!uneCarte && (
-          <details open className="mt-4 rounded-xl border border-primary/30 bg-surface p-4">
-            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-primary">Fond de la carte</summary>
-            <div className="mt-3 grid grid-cols-1 items-end gap-x-6 gap-y-3 sm:grid-cols-2">
-              <label className="text-sm font-medium">
-                <span className={legende}>🖼️ Style de fond</span>
-                <select value={affichage.styleFond ?? ''} onChange={(e) => regler({ styleFond: estStyleFond(e.target.value) ? e.target.value : null })} className={`${selectBarre} w-full`}>
-                  <option value="">Aucun (fond de carte ci-dessous)</option>
-                  {ORDRE_STYLES_FOND.map((s) => (
-                    <option key={s} value={s}>
-                      {STYLES_FOND[s].libelle}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-medium">
-                <span className={legende}>🗺️ Fond de carte</span>
-                <select value={affichage.fond ?? ''} onChange={(e) => regler({ fond: (e.target.value || null) as Couche | null })} className={`${selectBarre} w-full`}>
-                  <option value="">Automatique (relief ou photos IGN)</option>
-                  {(Object.keys(LIBELLES_COUCHES) as Couche[]).map((c) => (
-                    <option key={c} value={c}>
-                      {LIBELLES_COUCHES[c]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
           </details>
         )}
     </div>
