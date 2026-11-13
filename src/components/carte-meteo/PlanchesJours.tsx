@@ -20,7 +20,7 @@ import { PERIODES_PLANCHE, pictoDuJour, pointDeLaPeriode, pointsParQuart, versPo
 import { ChoixPicto, FenetrePicto } from './ChoixPicto';
 import { TuileFond } from './CarteRendu';
 import { DecorStyle, FondStyleSvg, positionMer, useTerres } from './FondStyle';
-import { DEPARTEMENTS_MER_A_L_EST, ORDRE_STYLES_FOND, STYLES_FOND, estStyleFond, type StyleFond } from '@/lib/carte-meteo/styles-fond';
+import { ORDRE_STYLES_FOND, STYLES_FOND, estStyleFond, type StyleFond } from '@/lib/carte-meteo/styles-fond';
 import TableauPrevisions, { type CelluleJour, type LigneTableau } from './TableauPrevisions';
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, useFleuves, FICHIERS_CONTOURS } from './CarteMeteo';
 import { statsDe, type CarteTexte, type RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
@@ -265,10 +265,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
 
   const vue = useMemo(() => {
     const boite = unirBoites(contours.filter((c) => codes.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
-    // Style de fond sur un département du littoral méditerranéen : bande de mer à droite (comme sur la carte du département).
-    const merALEst = !!styleFond && zoneCarte.startsWith('dep:') && DEPARTEMENTS_MER_A_L_EST.includes(zoneCarte.slice(4));
-    return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8 - (merALEst ? largeurCarte * 0.133 : 0), bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : merALEst ? 0.02 : 0.05);
-  }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte, styleFond]);
+    return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : 0.05);
+  }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte]);
   /** Fond de la carte : tuiles de relief ou de photos aériennes (null = fond uni bleu). Automatique : pour un département ou une région seulement. */
   const couche: Couche | null = styleFond ? null : fondChoisi === 'uni' ? null : fondChoisi === 'auto' ? (zoneCarte === 'france' ? null : coucheParDefaut(vue)) : fondChoisi;
   const merVisible = useMemo(() => (styleFond ? positionMer(terresEurope, vue, largeurCarte, hauteurCarte) : null), [styleFond, terresEurope, vue, largeurCarte, hauteurCarte]);
@@ -649,7 +647,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                         )}
                       </g>
                     </svg>
-                    {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={merVisible} bandes={false} />}
+                    {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={null} bandes={false} />}
                     <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: 'rgba(255,255,255,0.94)', color: '#0b2a4a', fontFamily: POLICE, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
                       {jourLibelle(date)}
                     </div>

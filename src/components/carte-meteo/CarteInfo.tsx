@@ -11,7 +11,7 @@ import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { cheminPictoImage, type ThemeCarte } from '@/lib/carte-meteo/pictos';
 import type { Couche } from '@/lib/carte-meteo/tuiles';
-import { DEPARTEMENTS_MER_A_L_EST, type StyleFond } from '@/lib/carte-meteo/styles-fond';
+import type { StyleFond } from '@/lib/carte-meteo/styles-fond';
 import { angleFleche } from '@/lib/carte-meteo/vent';
 import { PALIERS_NEIGE, palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
@@ -315,11 +315,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
   const vue = useMemo(() => {
     const boite = unirBoites(contoursDep.filter((c) => selection.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
     // Régions et départements : la colonne de gauche reste libre pour le classement et la légende.
-    if (enFrance) return ajusterVue(boite, ZONE_FRANCE, 0.01);
-    // Style de fond sur un département du littoral méditerranéen : bande de mer à droite (comme sur la carte du département).
-    if (styleFond && zone.startsWith('dep:') && DEPARTEMENTS_MER_A_L_EST.includes(zone.slice(4))) return ajusterVue(boite, { ...ZONE_UTILE, droite: ZONE_UTILE.droite - 170 }, 0.02);
-    return ajusterVue(boite, ZONE_UTILE, enDepartement ? 0.03 : 0.06);
-  }, [contoursDep, selection, enFrance, enDepartement, styleFond, zone]);
+    return enFrance ? ajusterVue(boite, ZONE_FRANCE, 0.01) : ajusterVue(boite, ZONE_UTILE, enDepartement ? 0.03 : 0.06);
+  }, [contoursDep, selection, enFrance, enDepartement]);
 
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const logoUrl = logo?.fichier || null;
