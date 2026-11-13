@@ -1659,6 +1659,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       hauteurLogo={hauteurLogo}
       pied={pied}
       titreGauche={enFrance ? xTitreFrance : dateGauche ? 14 : undefined}
+      piedGauche={enFrance}
       titreADroite={!enFrance && !dateGauche}
       logoEnBas={!enFrance}
       etiquetteMer

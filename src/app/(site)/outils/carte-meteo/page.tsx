@@ -46,7 +46,7 @@ export default async function PageCarteMeteo() {
 
       <h2 className="mt-12 text-2xl font-extrabold">France : demain après-midi, mini et maxi</h2>
       <div className="mt-6">
-        <CarteMeteo aujourdhui={aujourdhui} initial={initialDemain} reglages={{ jour: 1, miniMaxi: true, jeuPictos: 'alertes-pro' }} />
+        <CarteMeteo aujourdhui={aujourdhui} initial={initialDemain} reglages={{ jour: 1, miniMaxi: true, jeuPictos: 'alertes-pro', tailleIcones: 140 }} />
       </div>
     </>
   );

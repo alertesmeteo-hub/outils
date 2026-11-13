@@ -239,6 +239,8 @@ interface Props {
   titreEchelle?: number;
   /** Date et sous-titre alignés à gauche, à cette position (px de la carte) : carte de France. */
   titreGauche?: number;
+  /** Pied « alertes-meteo.com » à gauche (carte de France) au lieu de la droite. */
+  piedGauche?: boolean;
   /** Logo en bas à gauche (au lieu du haut à gauche). */
   logoEnBas?: boolean;
   /** Écrit « Mer Méditerranée » dans la mer visible quand la carte n'a pas de style de fond. */
@@ -462,6 +464,7 @@ export default function CarteRendu({
   titreADroite = false,
   titreEchelle = 1,
   titreGauche,
+  piedGauche = false,
   logoEnBas = false,
   etiquetteMer = false,
   deplacerMers = false,
@@ -719,7 +722,7 @@ export default function CarteRendu({
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
         </div>
 
-        {pied && <div className="cmap-pied" style={etiquetteMer ? { left: 'auto', right: 29, textAlign: 'right', color: '#000', textShadow: '0 0 3px #fff, 0 0 3px #fff' } : undefined}>{etiquetteMer && /^alertes-meteo\.com$/i.test(pied) ? <><span style={{ color: '#da121a' }}>A</span>lertes-meteo.com</> : pied}</div>}
+        {pied && <div className="cmap-pied" style={etiquetteMer ? { left: piedGauche ? 29 : 'auto', right: piedGauche ? 'auto' : 29, textAlign: piedGauche ? 'left' : 'right', color: '#000', textShadow: '0 0 3px #fff, 0 0 3px #fff' } : undefined}>{etiquetteMer && /^alertes-meteo\.com$/i.test(pied) ? <><span style={{ color: '#da121a' }}>A</span>lertes-meteo.com</> : pied}</div>}
 
         <div className="cmap-moyennes" style={moyennesGauche != null ? { left: moyennesGauche } : undefined}>
           {moyennes.map((m) => (
