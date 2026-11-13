@@ -68,6 +68,9 @@ export function pointDeLaPeriode(p: PointJour, periode: PeriodePlanche): PointJo
 
 export function versPointJour(p: PointCarte): PointJour | null {
   if (p.lat == null || p.lon == null) return null;
+  // Le temps de la journée (picto) est celui de 14 h à 18 h : nuages moyens, cumul de pluie sur ces heures (moyenne des modèles pour la
+  // « Moyenne des modèles »). Sans ces valeurs (modèle à pas de 3 h ou 6 h), on garde celles de la journée de 7 h à 20 h.
+  const creneau = p.nuagesVideo != null || p.pluieVideo != null || p.codeVideo != null;
   return {
     code: p.code,
     nom: p.nom,
@@ -75,10 +78,10 @@ export function versPointJour(p: PointCarte): PointJour | null {
     lon: p.lon,
     maxi: p.maxi,
     mini: p.mini,
-    codeJournee: p.codeJournee,
-    nuagesJournee: p.nuagesJournee,
-    pluieJournee: p.pluieJournee,
-    voileJournee: p.voileJournee,
+    codeJournee: creneau ? p.codeVideo ?? null : p.codeJournee,
+    nuagesJournee: creneau ? p.nuagesVideo ?? null : p.nuagesJournee,
+    pluieJournee: creneau ? p.pluieVideo ?? null : p.pluieJournee,
+    voileJournee: creneau ? p.voileVideo : p.voileJournee,
     rafale: p.rafaleJournee,
     direction: p.directionRafaleJournee,
     orage: p.orageJournee,
