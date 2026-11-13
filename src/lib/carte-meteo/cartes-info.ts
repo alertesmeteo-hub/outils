@@ -73,7 +73,7 @@ export interface ThemePrevision extends ThemeInfo {
   /** Carte mixte : pluie (mm) en plaine et neige fraîche (cm) sur les communes de montagne (lues à part, ?montagne=1). */
   pluieEtNeige?: boolean;
   /** Cartes de risque, option « chiffres » : valeur brute (km/h, mm, °C…) à la place du niveau, colorée selon les mêmes seuils. */
-  brut?: { valeur: (x: PointCarte) => number | null | undefined; unite: string; decimales: number; paliers: Palier[] };
+  brut?: { valeur: (x: PointCarte) => number | null | undefined; unite: string; decimales: number; paliers: Palier[]; ordre?: 'asc' | 'desc' };
 }
 
 /** Cartes du réchauffement climatique : fiches régionales Météo-France (TRACC) ou pluies DRIAS par commune. */
@@ -536,7 +536,7 @@ const PALIERS_FROID_CHIFFRES: Palier[] = [
 const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => {
   const vent = (champ: (x: PointCarte) => number | null | undefined, seuils: [number, number, number, number]) => ({ valeur: champ, unite: 'km/h', decimales: 0, paliers: paliersRisque(seuils, 'km/h') });
   const chaud = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: paliersRisque([30, 34, 38, 42], '°C') });
-  const froid = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: PALIERS_FROID_CHIFFRES });
+  const froid = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: PALIERS_FROID_CHIFFRES, ordre: 'asc' as const });
   const pluie = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: 'mm', decimales: 0, paliers: paliersRisque([10, 30, 60, 100], 'mm') });
   const neige = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: 'cm', decimales: 0, paliers: paliersRisque([1, 5, 15, 30], 'cm') });
   const verglas = (niveau: (x: PointCarte) => number | null, pluieDe: (x: PointCarte) => number | null | undefined) => ({
