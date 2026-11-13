@@ -85,6 +85,11 @@ export interface PointCarte {
   /** Ciel voilé (nuages hauts sans nuages bas ni moyens) le matin, l'après-midi et sur la journée. Absents des anciennes réponses. */
   voileMatin?: boolean;
   voileApresMidi?: boolean;
+  /** Temps de 14 h à 18 h (pictos des vidéos) : code, nuages (%), pluie (mm) et ciel voilé. Absents des anciennes réponses. */
+  codeVideo?: number | null;
+  nuagesVideo?: number | null;
+  pluieVideo?: number | null;
+  voileVideo?: boolean;
   voileJournee?: boolean;
   mini: number | null;
   maxi: number | null;
@@ -476,6 +481,8 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
   const apresMidi = jour.filter((l) => l.heure >= 15 && l.heure <= 18).map((l) => l.i);
   // Après-midi : 15 h à 18 h (heure de Paris), moyenne des échéances pour la température, le ciel et la pluie.
   const chaleurApresMidi = apresMidi;
+  // Pictos des vidéos : le temps entre 14 h et 18 h.
+  const creneauVideo = jour.filter((l) => l.heure >= 14 && l.heure <= 18).map((l) => l.i);
   const ciel = jour.filter((l) => l.heure >= 7 && l.heure <= 20).map((l) => l.i);
   // Soirée : 18 h à 22 h (température de 21 h). Nuit : de 22 h à 6 h le lendemain matin.
   const soiree = jour.filter((l) => l.heure >= 18 && l.heure <= 21).map((l) => l.i);
@@ -520,6 +527,10 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
     ...(finPeriode ? valeursSurPeriode(serie, dateISO, finPeriode) : {}),
     voileMatin: voilePeriode(serie, matin),
     voileApresMidi: voilePeriode(serie, apresMidi),
+    codeVideo: codePeriode(serie, creneauVideo),
+    nuagesVideo: arrondi(moyenne(creneauVideo.map((i) => serie.nuages[i]))),
+    pluieVideo: arrondi(somme(creneauVideo.map((i) => serie.pluie[i])), 1),
+    voileVideo: voilePeriode(serie, creneauVideo),
     voileJournee: voilePeriode(serie, ciel),
     tempSoiree: soiree21.length ? arrondi(serie.temp[soiree21[0].i], 1) : null,
     rafaleSoiree: arrondi(maximum(soiree.map((i) => serie.rafale[i]))),

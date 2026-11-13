@@ -274,13 +274,17 @@ const degre = (v: number | null) => (v == null ? '–' : `${v}°`);
 /** Sous 0,5 mm, la pluie ne fait pas le picto de pluie (ni les textes de la légende du post). */
 const SEUIL_PLUIE = 0.5;
 const pluieRetenue = (mm: number | null | undefined) => (mm != null && mm >= SEUIL_PLUIE ? mm : 0);
+/** Picto de pluie seulement au-delà de 1 mm (cumul de 14 h à 18 h). */
+const pluiePicto = (mm: number | null | undefined) => (mm != null && mm > 1 ? mm : 0);
 /** Cumul de pluie tel qu'écrit dans la vidéo : « < 1 mm » de 0,1 à 1 mm, « < 5 mm » de 1 à 5 mm, la valeur au-delà ; rien sous 0,1 mm. */
 const libellePluie = (mm: number | null | undefined): string | null =>
   mm == null || mm < 0.1 ? null : mm < 1 ? '< 1 mm' : mm < 5 ? '< 5 mm' : `${(Math.round(mm * 10) / 10).toLocaleString('fr-FR')} mm`;
 
 function versJour(p: PointCarte | undefined, jeu: JeuAlertes = 'alertes'): JourVille {
   if (!p) return { maxi: null, mini: null, rafale: null, pluie: null, picto: null };
-  const picto = pictoDepuisPrevision({ code: p.codeJournee ?? null, nuages: p.nuagesJournee ?? null, pluie: p.pluieJournee == null ? null : pluieRetenue(p.pluieJournee), temperature: p.maxi ?? null, voile: p.voileJournee }, 'alertes') as string;
+  // Picto : le temps de 14 h à 18 h (à défaut, celui de la journée), pluie seulement si plus de 1 mm.
+  const creneau = p.nuagesVideo != null || p.codeVideo != null;
+  const picto = pictoDepuisPrevision({ code: (creneau ? p.codeVideo : p.codeJournee) ?? null, nuages: (creneau ? p.nuagesVideo : p.nuagesJournee) ?? null, pluie: (creneau ? p.pluieVideo : p.pluieJournee) == null ? null : pluiePicto(creneau ? p.pluieVideo : p.pluieJournee), temperature: p.maxi ?? null, voile: creneau ? p.voileVideo : p.voileJournee }, 'alertes') as string;
   return { maxi: arrondi(p.maxi), mini: arrondi(p.mini), rafale: arrondi5(p.rafaleJournee), pluie: p.pluieJournee == null ? 0 : Math.round(p.pluieJournee * 10) / 10, picto: cheminPictoImage(selonJeu(picto, jeu)) ?? null };
 }
 
