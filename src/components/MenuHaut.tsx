@@ -83,6 +83,7 @@ const RUBRIQUES: Rubrique[] = [
     ].map(lien),
   },
   { titre: 'Tab Val', href: '/outils/tab-val/', pages: [] },
+  { titre: 'Graph', href: '/outils/graph/', pages: [] },
   {
     titre: 'Liens',
     pages: [
