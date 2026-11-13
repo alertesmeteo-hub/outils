@@ -368,7 +368,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
   }, [dansZone, enDepartement, theme, valeursDepartements]);
 
   const cellules = useMemo(() => {
-    if (!zonageFin || theme.sansTeinte || ('montagne' in theme && theme.montagne)) return undefined;
+    if (!zonageFin || theme.sansTeinte) return undefined;
     return departements.flatMap((dep) => {
       const locaux = pointsCorriges.filter((p) => p.dep === dep.code && !p.neige && Number.isFinite(p.valeur) && valeurPlausible(theme, p.valeur));
       const centres = locaux.map((p) => versMonde(p.lat, p.lon));
@@ -580,9 +580,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, run, logoId,
 
   return (
     <div className="min-w-0" ref={colonneRef}>
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="mb-2 flex flex-col gap-2">
         <p className="text-base font-bold">{theme.court}</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 [&_button]:whitespace-nowrap">
           {texteIA.bouton}
           <TexteSurCarte cible={carteRef} donnees={texteIA.construire} enLigne emplacement={emplacementTexte} />
           <button

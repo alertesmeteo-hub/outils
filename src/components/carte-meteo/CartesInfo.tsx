@@ -1355,7 +1355,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                         </p>
                       ) : (
                         <CarteInfo
-                          zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
+                          zonageFin={zonageFin && niveau === 'france'} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                           {...retouchesDe(theme.id)}
                           theme={theme}
                           zone={zone}
@@ -1401,7 +1401,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                       )
                     ) : mode === 'prevision' ? (
                       <CarteInfo
-                          zonageFin={zonageFin && niveau === 'france' && !(theme as ThemePrevision).montagne} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
+                          zonageFin={zonageFin && niveau === 'france'} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                         {...retouchesDe(theme.id)}
                         theme={(theme as ThemePrevision).run && sousTitreRun ? { ...theme, titre: theme.titre.replace('À LA FIN DU RUN', `AU ${sousTitreRun.fin}`) } : theme}
                         zone={zone}
@@ -1609,6 +1609,35 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               </label>
             </div>
             <p className="mt-3 text-xs text-muted">Pictos, rafales, textes et icônes à poser : bouton « Carte avec pictos » en haut de la page.</p>
+          </details>
+        )}
+        {!uneCarte && (
+          <details open className="mt-4 rounded-xl border border-primary/30 bg-surface p-4">
+            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-primary">Fond de la carte</summary>
+            <div className="mt-3 grid grid-cols-1 items-end gap-x-6 gap-y-3 sm:grid-cols-2">
+              <label className="text-sm font-medium">
+                <span className={legende}>🖼️ Style de fond</span>
+                <select value={affichage.styleFond ?? ''} onChange={(e) => regler({ styleFond: estStyleFond(e.target.value) ? e.target.value : null })} className={`${selectBarre} w-full`}>
+                  <option value="">Aucun (fond de carte ci-dessous)</option>
+                  {ORDRE_STYLES_FOND.map((s) => (
+                    <option key={s} value={s}>
+                      {STYLES_FOND[s].libelle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-medium">
+                <span className={legende}>🗺️ Fond de carte</span>
+                <select value={affichage.fond ?? ''} onChange={(e) => regler({ fond: (e.target.value || null) as Couche | null })} className={`${selectBarre} w-full`}>
+                  <option value="">Automatique (relief ou photos IGN)</option>
+                  {(Object.keys(LIBELLES_COUCHES) as Couche[]).map((c) => (
+                    <option key={c} value={c}>
+                      {LIBELLES_COUCHES[c]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </details>
         )}
     </div>

@@ -56,7 +56,7 @@ export async function GET(req: Request) {
     try {
       const altParam = Number(url.searchParams.get('alt') ?? 1000);
       const altitudeMin = [300, 500, 1000, 2000].includes(altParam) ? altParam : 1000;
-      const points = await chargerPrevisionsMontagne(modele, date, liste, fin, altitudeMin);
+      const points = await chargerPrevisionsMontagne(modele, date, liste, fin, altitudeMin, !liste && url.searchParams.get('zones') === '9');
       return NextResponse.json({ modele, date, montagne: true, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
     } catch (erreur) {
       console.error('Erreur carte météo (montagne)', erreur);

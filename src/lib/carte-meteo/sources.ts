@@ -829,7 +829,9 @@ export async function chargerPrevisionsMontagne(
   /** Valeurs sur une période (du jour demandé à ce jour inclus), voir pointDepuisSerie. */
   finPeriode?: string,
   /** Altitude minimale du point du modèle (300, 500, 1 000 ou 2 000 m) ; 1 000 par défaut. */
-  altitudeMin = 1000
+  altitudeMin = 1000,
+  /** Zonage fin : toutes les communes d'altitude retenues par département (jusqu'à 8), pas seulement la plus peuplée. */
+  toutesLesCommunes = false
 ): Promise<(PointCarte & { dep: string })[]> {
   const liste = deps ?? CODES_DEPARTEMENTS;
   // La moyenne des modèles n'existe qu'en vue département (villes) : la montagne prend alors AROME.
@@ -839,7 +841,7 @@ export async function chargerPrevisionsMontagne(
   resultats.forEach((r, i) => {
     if (r.status === 'rejected') return;
     const hautes = altitudeMin === 1000 ? r.value.montagne : r.value.montagneAlt?.[altitudeMin] ?? [];
-    const villes = deps ? hautes : hautes.slice(0, 1);
+    const villes = deps || toutesLesCommunes ? hautes : hautes.slice(0, 1);
     for (const v of villes) {
       const p = pointDepuisSerie(v.code, v.nom, v.serie, dateISO, finPeriode);
       if (p.maxi != null) points.push({ ...p, lat: v.lat, lon: v.lon, altitude: v.altitude, dep: liste[i] });
