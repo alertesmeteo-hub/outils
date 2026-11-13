@@ -346,6 +346,9 @@ export function averseNuageGris(picto: PictoMeteo, jeu: JeuPictos): PictoMeteo {
   return jeu === 'alertes' && picto === 'am:averses' ? 'am:averses-gris' : picto;
 }
 
+/** Cumul minimal (mm) pour un picto de pluie ; en dessous, le picto suit la nébulosité (la neige garde son seuil de 0,3 mm). */
+const SEUIL_PLUIE_MM = 1;
+
 export interface EntreePicto {
   code: number | null;
   nuages: number | null;
@@ -384,7 +387,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
     const neige = codeNeigeVraisemblable(code, temperature) || (precipite && temperature != null && temperature <= 1.5);
     if (neige && precipite) return mm >= 3 ? 'am:forte-neige' : ciel < 75 ? 'am:averses-neige' : 'am:neige';
     if ((code === 45 || code === 48) && !precipite) return e.nuit ? 'am:nuit-brouillard' : 'am:brouillard';
-    if (precipite) {
+    if (precipite && mm >= SEUIL_PLUIE_MM) {
       if (mm >= 8) return 'am:forte-pluie';
       const averses = e.nuit ? 'am:averses-nuit' : 'am:averses';
       if (mm >= 2) return ciel < 75 ? averses : 'am:pluie';
@@ -405,7 +408,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
     const neige = codeNeigeVraisemblable(code, temperature) || (precipite && temperature != null && temperature <= 1.5);
     if (neige && precipite) return mm >= 3 ? 'mc:extreme-snow' : ciel < 75 ? 'mc:partly-cloudy-day-snow' : 'mc:overcast-snow';
     if ((code === 45 || code === 48) && !precipite) return 'mc:fog';
-    if (precipite) {
+    if (precipite && mm >= SEUIL_PLUIE_MM) {
       if (mm >= 8) return 'mc:extreme-day-rain';
       if (mm >= 2) return ciel < 75 ? 'mc:partly-cloudy-day-rain' : 'mc:rain';
       return ciel < 75 ? 'mc:partly-cloudy-day-drizzle' : 'mc:drizzle';
@@ -425,7 +428,7 @@ export function pictoDepuisPrevision(e: EntreePicto, jeu: JeuPictos = 'emoji'): 
   if ((code === 45 || code === 48) && !precipite) return images ? 'img:3' : '🌫️';
 
   const ciel = nuages ?? 50;
-  if (precipite) {
+  if (precipite && (pluie ?? 0) >= SEUIL_PLUIE_MM) {
     const mm = pluie ?? 0;
     if (mm >= 8) return images ? 'img:10' : '🌧️';
     if (mm >= 2) return images ? 'img:6' : '🌧️';
