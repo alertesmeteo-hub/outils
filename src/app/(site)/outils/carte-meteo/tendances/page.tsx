@@ -46,7 +46,7 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
   return (
     <>
       <h1 className="text-3xl font-extrabold">Planches tendances : 2 à 16 jours</h1>
-      <p className="mt-2 max-w-3xl text-muted">
+      <p className="mt-2 text-muted">
         Huit cartes de France sur la même page, pour les 2, 4, 6, 8, 10, 12, 14 et 16 prochains jours à partir d&apos;aujourd&apos;hui : choisissez le cumul de pluie,
         les rafales, les températures maximales ou minimales, ou la neige. Les pictos montrent le temps qui domine sur la période. Modèle {infos.libelle} ({infos.fournisseur}) ;
         chaque carte se corrige à la main et s&apos;exporte en JPG. Pour une carte jour par jour, voir les{' '}
