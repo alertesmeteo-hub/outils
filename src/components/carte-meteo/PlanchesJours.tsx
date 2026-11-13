@@ -45,11 +45,12 @@ const NIVEAUX_ORAGE = ['', 'FAIBLE', 'MODÉRÉ', 'FORT', 'SÉVÈRE'];
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
 
 /** Jour en toutes lettres : « MERCREDI 11 NOVEMBRE » (le 1er du mois : « 1ER »). */
+/** « SAMEDI 14 NOVEMBRE 2026 » : le jour avec son année. */
+const jourLibelleAnnee = (dateISO: string) => `${jourLibelle(dateISO)} ${dateISO.slice(0, 4)}`;
 const jourLibelle = (dateISO: string) =>
   new Date(`${dateISO}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).toUpperCase().replace(/ 1 /, ' 1ER ');
 /** Cours d'eau : tracés arrondis d'épaisseur constante à l'écran. */
 const COURS_EAU = { fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke' } as const;
-const LOGO_PIED = LOGOS_PRESETS.find((l) => l.id === 'pays-catalan-hd')!;
 
 interface Props {
   aujourdhui: string;
@@ -78,9 +79,25 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const duree = weekEnd ? 2 : dureeChoisie;
   const depart = weekEnd ? departWeekEnd : departChoisi;
   const tableauRef = useRef<HTMLDivElement>(null);
+  /** Passage (run) du modèle en pied de planche : « 13/11/2026 à 00 h UTC » ; rien si le modèle n'en a pas (moyenne des modèles). */
+  const [run, setRun] = useState<{ modele: string; z: string; date: string } | null>(null);
+  useEffect(() => {
+    if (modele.id === 'moyenne') return;
+    let actif = true;
+    fetch(`/api/carte-meteo/run/?modele=${modele.id}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ z?: string | null; date?: string | null }>) : Promise.reject()))
+      .then((j) => actif && j.z && j.date && setRun({ modele: modele.id, z: j.z, date: j.date }))
+      .catch(() => {});
+    return () => {
+      actif = false;
+    };
+  }, [modele.id]);
+  const runTexte = run && run.modele === modele.id ? `${run.date.slice(8, 10)}/${run.date.slice(5, 7)}/${run.date.slice(0, 4)} à ${run.z.slice(0, 2)} h UTC` : '';
+  /** Date d'élaboration de la planche (Paris), en bas à droite. */
+  const dateElaboree = new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
   /** Grosseur de la pastille de rafale (%), plus petite par défaut. */
   const [risques, setRisques] = useState(true);
-  const [tailleRafale, setTailleRafale] = useState(115);
+  const [tailleRafale, setTailleRafale] = useState(70);
   /** Rafale (km/h) à partir de laquelle la pastille de vent s'ajoute au picto. */
   const [seuilRafale, setSeuilRafale] = useState(80);
   const [periode, setPeriode] = useState<PeriodePlanche>('journee');
@@ -330,7 +347,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const titre = weekEnd ? `MÉTÉO DU WEEK-END : ${nomZone.toUpperCase()}` : `TENDANCE SUR ${duree} JOURS : ${nomZone.toUpperCase()}`;
   const moment = periode === 'journee' ? '' : ` · ${(PERIODES_PLANCHE.find((x) => x.id === periode)?.libelle ?? '').replace(/ \(.*\)$/, '').toUpperCase()}`;
-  const sousTitre = (weekEnd && dates.length === 2 ? `${jourLibelle(dates[0])} ET ${jourLibelle(dates[1])} · ${modele.libelle}` : `DU ${jourLibelle(dates[0])} AU ${jourLibelle(dates[dates.length - 1])} · ${modele.libelle}`) + moment;
+  // Les années ne sont écrites qu'une fois (sur le dernier jour) quand la période tient dans une même année.
+  const memeAnnee = dates[0].slice(0, 4) === dates[dates.length - 1].slice(0, 4);
+  const premierJour = memeAnnee ? jourLibelle(dates[0]) : jourLibelleAnnee(dates[0]);
+  const sousTitre = (weekEnd && dates.length === 2 ? `${premierJour} ET ${jourLibelleAnnee(dates[1])}` : `DU ${premierJour} AU ${jourLibelleAnnee(dates[dates.length - 1])}`) + moment;
 
   async function exporterTableau() {
     const noeud = tableauRef.current;
@@ -694,10 +714,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
 
             <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: HAUTEUR_PIED, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${MARGE}px`, fontSize: 16, color: '#cfe3fa' }}>
               <span>
-                Prévisions {modele.libelle} ({modele.fournisseur}) · {parQuarts ? 'moyenne par zone' : `un point par ${enDepartement ? 'ville' : 'département'}`} · <span style={{ color: '#ff8a8a' }}>maximale</span> puis <span style={{ color: '#7db4ff' }}>minimale</span>{couche ? ` · Fond : ${CREDITS_COUCHES[couche]}` : ''}
+                Prévisions {modele.libelle} ({modele.fournisseur}){runTexte ? ` · modèle du ${runTexte}` : ''}{couche ? ` · Fond : ${CREDITS_COUCHES[couche]}` : ''}
               </span>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={LOGO_PIED.fichier} alt="Météo Pays Catalan" style={{ height: 56 }} />
+              <span style={{ fontWeight: 700, color: '#fff' }}>Carte élaborée le : {dateElaboree}</span>
             </div>
           </div>
         </div>
