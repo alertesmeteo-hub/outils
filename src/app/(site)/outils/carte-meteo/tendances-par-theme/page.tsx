@@ -56,6 +56,7 @@ export default async function PageTendancesParTheme({ searchParams }: { searchPa
           return (
             <Link
               key={id}
+              prefetch={false}
               href={`/outils/carte-meteo/tendances-par-theme/?modele=${id}`}
               aria-current={id === modele ? 'page' : undefined}
               className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${id === modele ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
@@ -71,6 +72,7 @@ export default async function PageTendancesParTheme({ searchParams }: { searchPa
         {[0, 2, 3, 4, 5, 6, 7, 8].map((n) => (
           <Link
             key={n}
+            prefetch={false}
             href={`/outils/carte-meteo/tendances-par-theme/?modele=${modele}${n ? `&zones=${n}` : ''}`}
             aria-current={n === nbZones ? 'page' : undefined}
             className={`rounded-full border px-3 py-1 font-semibold ${n === nbZones ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}

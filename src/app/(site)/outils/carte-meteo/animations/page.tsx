@@ -40,6 +40,7 @@ export default async function PageAnimations({ searchParams }: { searchParams: P
           return (
             <Link
               key={id}
+              prefetch={false}
               href={`/outils/carte-meteo/animations/?modele=${id}`}
               aria-current={id === modele ? 'page' : undefined}
               className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${id === modele ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}

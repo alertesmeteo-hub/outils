@@ -144,7 +144,7 @@ export default function MenuHaut() {
           if (g.href) {
             return (
               <li key={g.titre} className="relative">
-                <Link href={g.href} className={`flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 hover:bg-bg ${chemin === g.href ? 'bg-bg' : ''}`}>
+                <Link href={g.href} prefetch={false} className={`flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 hover:bg-bg ${chemin === g.href ? 'bg-bg' : ''}`}>
                   {g.titre}
                 </Link>
               </li>
@@ -172,7 +172,7 @@ export default function MenuHaut() {
                           {x.libelle} <span aria-hidden className="text-xs opacity-60">↗</span>
                         </a>
                       ) : (
-                        <Link href={x.href} className={`block rounded-md px-3 py-2 hover:bg-bg ${g.rouge ? 'text-red-600' : ''}`}>
+                        <Link href={x.href} prefetch={false} className={`block rounded-md px-3 py-2 hover:bg-bg ${g.rouge ? 'text-red-600' : ''}`}>
                           {x.libelle}
                         </Link>
                       )}

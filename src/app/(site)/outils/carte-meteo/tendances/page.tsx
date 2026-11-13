@@ -81,6 +81,7 @@ export default async function PageTendances({ searchParams }: { searchParams: Pr
           return (
             <Link
               key={id}
+              prefetch={false}
               href={`/outils/carte-meteo/tendances/?modele=${id}`}
               aria-current={id === modele ? 'page' : undefined}
               className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${id === modele ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}

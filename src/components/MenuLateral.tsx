@@ -70,7 +70,7 @@ export default function MenuLateral() {
     `flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 leading-tight ${actif ? 'bg-[#e00020] font-semibold text-white' : 'hover:bg-surface'}`;
   const ligne = (href: string, libelle: string, logo?: string, actif = false) => (
     <li key={href} className="flex items-center gap-0.5">
-      <Link href={href} aria-current={actif ? 'page' : undefined} className={lien(actif)}>
+      <Link href={href} prefetch={false} aria-current={actif ? 'page' : undefined} className={lien(actif)}>
         {logo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logo} alt="" className="h-4 w-4 shrink-0 object-contain" />
@@ -93,7 +93,7 @@ export default function MenuLateral() {
 
   return (
     <nav aria-label="Pages de travail" className="sticky top-24 hidden max-h-[calc(100vh-7rem)] flex-col gap-1 overflow-y-auto pr-1 text-[15px] xl:flex">
-      <Link href="/outils/" aria-current={chemin === '/outils' ? 'page' : undefined} className={`${lien(chemin === '/outils')} flex-none`}>
+      <Link href="/outils/" prefetch={false} aria-current={chemin === '/outils' ? 'page' : undefined} className={`${lien(chemin === '/outils')} flex-none`}>
         Tous les outils
       </Link>
       {favoris.length > 0 && (
@@ -122,7 +122,7 @@ export default function MenuLateral() {
             <ul className="ml-3 mt-0.5 flex flex-col gap-0.5 border-l border-border pl-2">
               {g.href && (
                 <li className="flex items-center">
-                  <Link href={g.href} aria-current={sansAncre(g.href) === chemin && !ancre ? 'page' : undefined} className={lien(sansAncre(g.href) === chemin && !ancre)}>
+                  <Link href={g.href} prefetch={false} aria-current={sansAncre(g.href) === chemin && !ancre ? 'page' : undefined} className={lien(sansAncre(g.href) === chemin && !ancre)}>
                     Vue d&apos;ensemble
                   </Link>
                 </li>
