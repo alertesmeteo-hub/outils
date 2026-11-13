@@ -103,7 +103,7 @@ body {
 }
 .cmap-catalan .cmap-date { color: #fff !important; font-size: 40px; letter-spacing: 0.03em; text-shadow: 0 2px 3px rgba(0, 0, 0, 0.65); }
 .cmap-catalan .cmap-sous-titre {
-  display: inline-block; margin-top: 5px; padding: 1px 14px 2px; color: #fff; font-size: 19px; font-weight: 700; letter-spacing: 0.1em;
+  display: inline-block; margin-top: 5px; padding: 2px 15px 3px; color: #fff; font-size: 21px; font-weight: 400; letter-spacing: 0.09em; text-shadow: none;
   background: #b3121c; border: 1.5px solid #fcdd09; border-radius: 3px;
 }
 .cmap-theme-halloween { background: radial-gradient(ellipse at 70% 15%, #4a2480 0%, #24103f 45%, #0d0618 100%); }
