@@ -7,7 +7,7 @@ import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import TexteSurCarte from '@/components/carte-meteo/TexteSurCarte';
 import { useTexteIA } from '@/components/carte-meteo/TexteIA';
 import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
-import type { DonneesGraph, JourGraph, ReponseGraph, ZoneGraph } from '@/lib/graph/types';
+import type { DonneesGraph, JourGraph, ReponseGraph, ReponseZone, ZoneGraph } from '@/lib/graph/types';
 
 /**
  * Module Graph : graphiques de température et de pluie pour la France, une région ou un département, avec l'indicateur thermique
@@ -249,6 +249,8 @@ export default function Graph() {
   const [reponse, setReponse] = useState<ReponseGraph | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [zone, setZone] = useState('FR');
+  /** Zones déjà chargées : une requête par zone affichée (toutes ensemble pèsent ~3 Mo). */
+  const [zonesChargees, setZonesChargees] = useState<Record<string, ZoneGraph>>({});
   const [type, setType] = useState<Type>('tm');
   const [periode, setPeriode] = useState<Periode>('90');
   const [message, setMessage] = useState<string | null>(null);
@@ -289,18 +291,34 @@ export default function Graph() {
     };
   }, []);
 
-  const donnees: DonneesGraph | null = reponse?.etat === 'pret' ? reponse.donnees : null;
+  const liste = reponse?.etat === 'pret' ? reponse : null;
+  useEffect(() => {
+    if (!liste || zonesChargees[zone] || !liste.zones.includes(zone)) return;
+    let annule = false;
+    fetch(`/api/graph/?zone=${encodeURIComponent(zone)}`)
+      .then((r) => r.json() as Promise<ReponseZone>)
+      .then((j) => {
+        if (!annule && j.etat === 'pret') setZonesChargees((a) => ({ ...a, [zone]: j.zone }));
+      })
+      .catch(() => {
+        if (!annule) setErreur('Les données de cette zone ne répondent pas pour le moment.');
+      });
+    return () => {
+      annule = true;
+    };
+  }, [liste, zone, zonesChargees]);
+  const donnees: DonneesGraph | null = useMemo(() => (liste ? { genere: liste.genere, derniereDate: liste.derniereDate, zones: zonesChargees } : null), [liste, zonesChargees]);
   const z = donnees?.zones[zone] ?? null;
 
   const choixZones = useMemo(() => {
-    if (!donnees) return { regions: [] as { cle: string; nom: string }[], departements: [] as { cle: string; nom: string }[] };
-    const regions = Object.keys(donnees.zones).filter((k) => k.startsWith('reg:')).map((k) => ({ cle: k, nom: k.slice(4) })).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
-    const departements = Object.keys(donnees.zones)
+    if (!liste) return { regions: [] as { cle: string; nom: string }[], departements: [] as { cle: string; nom: string }[] };
+    const regions = liste.zones.filter((k) => k.startsWith('reg:')).map((k) => ({ cle: k, nom: k.slice(4) })).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+    const departements = liste.zones
       .filter((k) => k.startsWith('dep:'))
       .map((k) => ({ cle: k, nom: `${k.slice(4)} · ${k === 'dep:20' ? 'Corse (2A et 2B)' : DEPARTEMENTS_FR[k.slice(4)] ?? k.slice(4)}` }))
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { numeric: true }));
     return { regions, departements };
-  }, [donnees]);
+  }, [liste]);
 
   const nomZone = zone === 'FR' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : choixZones.departements.find((d) => d.cle === zone)?.nom.split(' · ')[1] ?? zone;
 
@@ -608,10 +626,10 @@ export default function Graph() {
           )}
         </div>
       ) : (
-        <p className="mt-6 text-sm text-muted">Pas de donnée pour cette zone.</p>
+        <p className="mt-6 text-sm text-muted">{z === null && liste?.zones.includes(zone) ? 'Chargement de la zone…' : 'Pas de donnée pour cette zone.'}</p>
       )}
       <p className="mt-4 max-w-3xl text-xs text-muted">
-        <strong>ITN estimé :</strong> moyenne des températures moyennes quotidiennes ((maxi + mini) / 2) de {donnees.zones.FR?.stations ?? '—'} stations Météo-France de basse altitude (800 m au plus) réparties sur tous les départements, chaque département pesant autant. Ce n’est pas l’indicateur officiel de Météo-France (qui utilise 30 stations) : il en donne l’allure et l’écart à la normale 1991-2020, calculée mois par mois sur les mêmes stations. Les régions et les départements se calculent de la même façon. Dernier jour : {jourMoisAnnee(donnees.derniereDate)}.
+        <strong>ITN estimé :</strong> moyenne des températures moyennes quotidiennes ((maxi + mini) / 2) de {liste?.stationsFR ?? '—'} stations Météo-France de basse altitude (800 m au plus) réparties sur tous les départements, chaque département pesant autant. Ce n’est pas l’indicateur officiel de Météo-France (qui utilise 30 stations) : il en donne l’allure et l’écart à la normale 1991-2020, calculée mois par mois sur les mêmes stations. Les régions et les départements se calculent de la même façon. Dernier jour : {jourMoisAnnee(donnees.derniereDate)}.
       </p>
     </div>
   );

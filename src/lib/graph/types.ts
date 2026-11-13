@@ -33,7 +33,11 @@ export interface DonneesGraph {
   zones: Record<string, ZoneGraph>;
 }
 
-/** Réponse de l'API : les données, ou l'état du calcul quand il n'est pas fini. */
+/**
+ * Réponses de l'API (les séries de toutes les zones pèsent ~3 Mo : la page ne charge que la zone affichée).
+ * /api/graph/ : la liste des zones, ou l'état du calcul quand il n'est pas fini ; /api/graph/?zone=<clé> : une seule zone.
+ */
 export type ReponseGraph =
-  | { etat: 'pret'; donnees: DonneesGraph }
+  | { etat: 'pret'; genere: string; derniereDate: string; zones: string[]; stationsFR: number | null }
   | { etat: 'calcul'; avancement: string };
+export type ReponseZone = { etat: 'pret'; zone: ZoneGraph } | { etat: 'absente' };
