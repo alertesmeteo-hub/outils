@@ -1617,7 +1617,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       reliefVisible={reliefPourcent / 100}
       fond={couche}
       styleFond={styleFond}
-      sansBandes={zone === 'france'}
+      sansBandes={!zone.startsWith('dep:')}
       vue={vue}
       departements={departementsAffiches}
       regions={regionsAffichees}
