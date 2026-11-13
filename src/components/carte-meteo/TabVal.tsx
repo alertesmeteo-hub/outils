@@ -176,7 +176,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
     if (st.valeur === 'barre') {
       const part = etendue.max === etendue.min ? 1 : 0.5 + (0.5 * (v - etendue.min)) / (etendue.max - etendue.min);
       return (
-        <span style={{ display: 'block', width: largeurMesure - 12, height: 44, background: st.barreFond, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
+        <span style={{ display: 'block', width: largeurMesure, height: 44, background: st.barreFond, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(part * 100)}%`, background: fond, borderRadius: 6 }} />
           <span style={{ position: 'absolute', left: 12, top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontFamily: st.policeValeur, fontSize: 29, lineHeight: 1, color: texteCouleur }}>{nombreTexte}</span>
         </span>

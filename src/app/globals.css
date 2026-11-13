@@ -81,21 +81,27 @@ body {
 .cmap-catalan::before { top: 0; }
 .cmap-catalan::after { bottom: 0; }
 .cmap-catalan { box-shadow: inset 0 0 0 3px rgba(252, 221, 9, 0.35); }
-/* Titre en parchemin : papier ancien aux bords brunis, avec deux rouleaux aux extrémités. */
+/* Titre en parchemin : papier ancien (grain, bords brunis, filet rouge catalan) enroulé sur deux rouleaux en bois doré. */
 .cmap-catalan .cmap-titre {
-  background: radial-gradient(ellipse at 28% 18%, #fffaf0 0%, #f7e7b4 48%, #e9cd85 100%);
-  border: 2px solid #b7872f; border-radius: 4px; padding: 6px 30px 8px;
-  box-shadow: inset 0 0 22px rgba(139, 94, 20, 0.38), 0 3px 10px rgba(30, 15, 0, 0.5);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .27 0 0 0 0 .08 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 50% 35%, #fffaea 0%, #f6e4ac 52%, #dfbb68 100%);
+  border: none; border-radius: 3px; padding: 9px 40px 10px;
+  box-shadow: inset 0 0 28px 5px rgba(122, 78, 16, 0.5), inset 0 0 0 1px rgba(110, 70, 10, 0.55), 0 5px 14px rgba(25, 12, 0, 0.6);
+  outline: 1.5px solid rgba(160, 28, 34, 0.55); outline-offset: -8px;
 }
 .cmap-catalan .cmap-titre::before, .cmap-catalan .cmap-titre::after {
-  content: ''; position: absolute; top: -5px; bottom: -5px; width: 17px; border-radius: 9px;
-  background: linear-gradient(90deg, #a67420 0%, #f8dd8f 42%, #fff3c4 55%, #a67420 100%);
-  box-shadow: 0 2px 6px rgba(30, 15, 0, 0.5), inset 0 0 0 1px rgba(110, 70, 10, 0.55);
+  content: ''; position: absolute; top: -9px; bottom: -9px; width: 25px; border-radius: 12px;
+  background:
+    radial-gradient(ellipse 11px 4px at 50% 4px, #5a370b 0 78%, transparent 82%),
+    radial-gradient(ellipse 11px 4px at 50% calc(100% - 4px), #5a370b 0 78%, transparent 82%),
+    linear-gradient(90deg, #7a4d10 0%, #cfa44c 16%, #fff1b8 38%, #f0d27f 58%, #b98a2c 82%, #6e440d 100%);
+  box-shadow: 0 4px 9px rgba(25, 12, 0, 0.6), inset 0 0 0 1px rgba(80, 48, 6, 0.65);
 }
-.cmap-catalan .cmap-titre::before { left: -9px; }
-.cmap-catalan .cmap-titre::after { right: -9px; }
-.cmap-catalan .cmap-date { color: #8f1b20; font-size: 40px; text-shadow: 0 1px 0 rgba(255, 246, 214, 0.9); }
-.cmap-catalan .cmap-sous-titre { color: #7a5a0e; font-size: 23px; font-weight: 700; }
+.cmap-catalan .cmap-titre::before { left: -15px; }
+.cmap-catalan .cmap-titre::after { right: -15px; }
+.cmap-catalan .cmap-date { color: #a01c22; font-size: 40px; text-shadow: 0 1px 0 rgba(255, 248, 220, 0.95), 0 2px 3px rgba(110, 70, 10, 0.3); }
+.cmap-catalan .cmap-sous-titre { color: #5d3a08; font-size: 23px; font-weight: 700; text-shadow: 0 1px 0 rgba(255, 248, 220, 0.8); }
 .cmap-theme-halloween { background: radial-gradient(ellipse at 70% 15%, #4a2480 0%, #24103f 45%, #0d0618 100%); }
 .cmap-theme-halloween .cmap-titre { background: rgba(20, 10, 36, 0.92); border: 2px solid #ff8a1f; box-shadow: 0 0 14px rgba(255, 138, 31, 0.55); }
 .cmap-theme-halloween .cmap-date { color: #ff9a2e; }
