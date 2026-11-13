@@ -528,7 +528,7 @@ function paliersRisque(seuils: [number, number, number, number], unite: string):
 /** Froid : le niveau monte quand la valeur baisse (≤ 0, ≤ -5…). Paliers du plus haut au plus bas. */
 function paliersFroid(seuils: [number, number, number, number], unite: string): Palier[] {
   const nom = ['Faible', 'Modéré', 'Fort', 'Sévère'];
-  const couleurs: [string, string][] = [['#f5c400', NOIR], ['#ff8c1a', NOIR], ['#e5191e', BLANC], ['#7b2cbf', BLANC]];
+  const couleurs: [string, string][] = [['#2f9bff', BLANC], ['#1a4fc4', BLANC], ['#12308f', BLANC], ['#0a1a5c', BLANC]];
   // Un palier couvre de son seuil (exclu) jusqu'au seuil précédent : son « min » est juste au-dessus du seuil suivant.
   return seuils.map((seuil, k) => p(k === 3 ? -Infinity : seuils[k + 1] + 0.01, couleurs[k][0], couleurs[k][1], `${nom[k]} (≤ ${seuil} ${unite})`));
 }
