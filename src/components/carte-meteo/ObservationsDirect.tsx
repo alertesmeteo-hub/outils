@@ -37,10 +37,13 @@ export default function ObservationsDirect() {
   const [echelleTop, setEchelleTop] = useState(0);
   // Cartes de pluie : valeurs affichées à partir de ce cumul (mm) ; 0 = toutes.
   const [seuilMm, setSeuilMm] = useState(10);
-  // Nom de la ville sous chaque valeur, et flèche vers la station.
-  const [reperes, setReperes] = useState(true);
+  // Nom de la ville sous chaque valeur, et flèche vers la station (décoché par défaut).
+  const [reperes, setReperes] = useState(false);
   const [policeV, setPoliceV] = useState<PoliceValeurs>('condensee');
   const [tailleNoms, setTailleNoms] = useState(1.2);
+  // Densité : part du nombre maximal de valeurs affichées ; valeurs en mer : autorisées ou ramenées sur la terre.
+  const [densite, setDensite] = useState(1);
+  const [valeursEnMer, setValeursEnMer] = useState(false);
   const zone = useZone('zone-observations-en-direct');
   const [themeId, setThemeId] = useState(THEMES_OBS.find((t) => t.id === 'obs-rr48')?.id ?? THEMES_OBS[0]?.id ?? '');
   const [pluieId, setPluieId] = useState(THEMES_PLUIE[0]?.id ?? '');
@@ -129,6 +132,20 @@ export default function ObservationsDirect() {
         <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
           <input type="checkbox" checked={reperes} onChange={(e) => setReperes(e.target.checked)} />
           Flèches et noms des villes
+        </label>
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Densité des valeurs</span>
+          <select value={densite} onChange={(e) => setDensite(Number(e.target.value))} className={selectBarre} title="Part des stations affichées : moins de valeurs = carte plus aérée">
+            <option value={1}>Maximale (toutes)</option>
+            <option value={0.7}>Élevée</option>
+            <option value={0.45}>Moyenne</option>
+            <option value={0.25}>Faible</option>
+            <option value={0.12}>Très faible</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 pb-1.5 text-sm font-medium">
+          <input type="checkbox" checked={valeursEnMer} onChange={(e) => setValeursEnMer(e.target.checked)} />
+          Autoriser les valeurs en mer
         </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Pluie : afficher à partir de</span>
@@ -251,6 +268,8 @@ export default function ObservationsDirect() {
             topRouge
             titreDroite={echelleTop !== 0}
             echelleValeurs={taille / 100}
+            partValeurs={densite}
+            valeursEnMer={valeursEnMer}
           />
         </div>
       )}
@@ -291,6 +310,8 @@ export default function ObservationsDirect() {
             prefixeFichier={`pluie-en-direct-${zone.nomFichier}`}
             contexte="Pluie relevée par les stations Météo-France, normales 1991-2020 et records de chaque station (fiches climatologiques Météo-France)"
             echelleValeurs={taille / 100}
+            partValeurs={densite}
+            valeursEnMer={valeursEnMer}
             echelleTop={echelleTop || 1}
             sansTableau={echelleTop === 0}
             topRouge

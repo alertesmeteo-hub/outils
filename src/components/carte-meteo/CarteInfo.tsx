@@ -22,6 +22,8 @@ import { useTexteIA } from './TexteIA';
 import { estStationGrandeVille } from '@/lib/carte-meteo/stations-bilan';
 import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import TexteSurCarte from './TexteSurCarte';
+import { PictoZone, largeurPicto } from './PictosZones';
+import { ARRONDI_ZONES_DEFAUT, lisserContoursZones } from '@/lib/carte-meteo/lissage-zones';
 import {
   GRIS_HORS_ZONE,
   accepteZones,
@@ -81,6 +83,8 @@ export interface AffichageCarte {
   elaboreeLe?: string;
   /** Style des cartes : valeurs (habituel) ou zones et fourchettes (cartes qui teintent les départements) ; absent = valeurs. */
   styleCarte?: StyleCarte;
+  /** Zones et fourchettes : rayon (px de la carte) de l'adoucissement des limites de zones ; 0 = contours bruts des départements ; absent = léger. */
+  arrondiZones?: number;
 }
 export const AffichageContexte = createContext<AffichageCarte | null>(null);
 
@@ -177,6 +181,8 @@ interface Props {
   onPictoMove?: (code: string, dx: number, dy: number) => void;
   /** Part du nombre maximal de valeurs affichées (1 = tout ce qui tient ; 0,22 = l'essentiel). */
   partValeurs?: number;
+  /** Autorise les pastilles sur la mer (sinon elles sont ramenées ou écartées vers la terre). */
+  valeursEnMer?: boolean;
   /** Carte figée rouverte : retouches à rétablir à l'ouverture (lues une seule fois). */
   retouchesInitiales?: RetouchesCarte;
   /** Appelé à chaque retouche (et quand elles sont remises à zéro), pour que la page puisse les garder avec la carte figée. */
@@ -207,115 +213,10 @@ function titreEnMinuscules(titre: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-/** Largeur d'un picto des zones pour sa hauteur (le thermomètre est étroit). */
-const largeurPicto = (type: PictoZones, hauteur: number) => (type === 'thermometre' ? hauteur * 0.4 : hauteur * 0.92);
-
-/**
- * Pictos des cartes en zones, dans le style du thermomètre : forme blanche cerclée de la couleur donnée, cœur plein de cette
- * couleur (attributs SVG uniquement, pour l'export JPG). Carré de `hauteur` px, sauf le thermomètre (étroit).
- */
-function PictoZone({ type, hauteur, couleur, graduations = false }: { type: PictoZones; hauteur: number; couleur: string; graduations?: boolean }) {
-  if (type === 'thermometre') return <Thermometre hauteur={hauteur} couleur={couleur} graduations={graduations} />;
-  const trait = { fill: 'none', stroke: couleur, strokeWidth: 7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-  const halo = { ...trait, stroke: '#ffffff', strokeWidth: 15 };
-  const cerne = { fill: '#ffffff', stroke: couleur, strokeWidth: 4.5, strokeLinejoin: 'round' as const };
-  // Cœur plein : la même forme réduite autour de son centre.
-  const coeur = (d: string, k = 0.6, cx = 50, cy = 50) => <path d={d} fill={couleur} transform={`translate(${cx} ${cy}) scale(${k}) translate(${-cx} ${-cy})`} />;
-  const traits = (d: string[]) => (
-    <>
-      {d.map((x) => <path key={`h${x}`} d={x} {...halo} />)}
-      {d.map((x) => <path key={x} d={x} {...trait} />)}
-    </>
-  );
-  let contenu: React.ReactNode;
-  switch (type) {
-    case 'goutte': {
-      const d = 'M50 5 C50 5 17 44 17 64 A33 33 0 0 0 83 64 C83 44 50 5 50 5 Z';
-      contenu = (<><path d={d} {...cerne} />{coeur(d, 0.6, 50, 64)}</>);
-      break;
-    }
-    case 'flocon': {
-      const branche = 'M50 6 V94 M50 22 L39 12 M50 22 L61 12 M50 78 L39 88 M50 78 L61 88';
-      contenu = (
-        <>
-          {[0, 60, 120].map((a) => <path key={`h${a}`} d={branche} {...halo} transform={`rotate(${a} 50 50)`} />)}
-          {[0, 60, 120].map((a) => <path key={a} d={branche} {...trait} transform={`rotate(${a} 50 50)`} />)}
-          <circle cx={50} cy={50} r={7} fill={couleur} stroke="#ffffff" strokeWidth={3} />
-        </>
-      );
-      break;
-    }
-    case 'vent':
-      contenu = traits(['M8 34 H60 A13 13 0 1 0 47 21', 'M8 54 H78 A13 13 0 1 1 65 67', 'M8 74 H44']);
-      break;
-    case 'eclair': {
-      const d = 'M60 4 L20 56 H46 L36 96 L82 40 H55 L68 4 Z';
-      contenu = (<><path d={d} {...cerne} />{coeur(d, 0.55, 50, 50)}</>);
-      break;
-    }
-    case 'soleil':
-      contenu = (
-        <>
-          {traits([0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
-            const r = (a * Math.PI) / 180;
-            const p = (k: number) => `${(50 + k * Math.cos(r)).toFixed(1)} ${(50 + k * Math.sin(r)).toFixed(1)}`;
-            return `M${p(36)} L${p(46)}`;
-          }))}
-          <circle cx={50} cy={50} r={26} {...cerne} />
-          <circle cx={50} cy={50} r={17} fill={couleur} />
-        </>
-      );
-      break;
-    case 'nuage': {
-      const d = 'M27 78 A17 17 0 0 1 25 44 A25 25 0 0 1 72 37 A20.5 20.5 0 0 1 75 78 Z';
-      contenu = (<><path d={d} {...cerne} />{coeur(d, 0.58, 50, 60)}</>);
-      break;
-    }
-    case 'brouillard':
-      contenu = traits(['M12 26 H70', 'M24 44 H88', 'M12 62 H76', 'M28 80 H86']);
-      break;
-    case 'pression':
-      contenu = (
-        <>
-          <circle cx={50} cy={52} r={42} {...cerne} />
-          {traits(['M24 70 A30 30 0 1 1 76 70'])}
-          <path d="M50 52 L68 30" {...trait} strokeWidth={6} />
-          <circle cx={50} cy={52} r={8} fill={couleur} />
-        </>
-      );
-      break;
-    default:
-      contenu = (
-        <>
-          <path d="M50 7 L95 89 H5 Z" {...cerne} strokeWidth={5} />
-          <rect x={44} y={32} width={12} height={32} rx={6} fill={couleur} />
-          <circle cx={50} cy={75} r={6.5} fill={couleur} />
-        </>
-      );
-  }
-  return (
-    <svg viewBox="0 0 100 100" width={largeurPicto(type, hauteur)} height={hauteur} aria-hidden style={{ display: 'block', flex: 'none', overflow: 'visible' }}>
-      {contenu}
-    </svg>
-  );
-}
-
-/** Picto thermomètre (attributs SVG, pour l'export JPG) : tube blanc cerclé, colonne et réservoir de la couleur donnée. */
-function Thermometre({ hauteur, couleur, graduations = false }: { hauteur: number; couleur: string; graduations?: boolean }) {
-  return (
-    <svg viewBox="0 0 40 100" width={hauteur * 0.4} height={hauteur} aria-hidden style={{ display: 'block', flex: 'none', overflow: 'visible' }}>
-      <rect x={12} y={3} width={16} height={70} rx={8} fill="#ffffff" stroke={couleur} strokeWidth={3} />
-      <circle cx={20} cy={80} r={15} fill="#ffffff" stroke={couleur} strokeWidth={3} />
-      <rect x={16.5} y={34} width={7} height={46} rx={3.5} fill={couleur} />
-      <circle cx={20} cy={80} r={10.5} fill={couleur} />
-      {graduations && [14, 24, 34, 44, 54].map((y) => <line key={y} x1={30} y1={y} x2={y % 20 === 14 ? 37 : 34} y2={y} stroke={couleur} strokeWidth={2.4} strokeLinecap="round" />)}
-    </svg>
-  );
-}
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -511,6 +412,19 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     for (const [dep, v] of parDep) valeurs[dep] = enMoyenne ? moyenne(v) : theme.ordre === 'desc' ? Math.max(...v) : Math.min(...v);
     return calculerZones(contoursDep, valeurs, theme.ordre, zonesTemperature ? undefined : reglesPaliers(theme, Object.values(valeurs)));
   }, [enZones, contoursDep, dansZone, theme, zonesTemperature]);
+
+  /**
+   * Zones et fourchettes : contours des départements adoucis. Les limites de zones et les frontières entre départements perdent
+   * leurs angles vifs ; la silhouette de la France (côtes, frontières) reste exacte (voir lissage-zones).
+   */
+  const arrondiZones = affichage?.arrondiZones ?? ARRONDI_ZONES_DEFAUT;
+  const departementsRendus = useMemo(() => {
+    if (!enZones || arrondiZones <= 0 || contoursDep.length === 0) return departements;
+    const zoneDe = new Map<string, string>();
+    for (const z of zonesTemp) for (const dep of z.departements) zoneDe.set(dep, z.cle);
+    const lisses = lisserContoursZones(contoursDep, (code) => (selection.has(code) ? zoneDe.get(code) ?? 'gris' : null), arrondiZones / vue.echelle);
+    return departements.map((c) => (lisses.has(c.code) ? { ...c, d: lisses.get(c.code)! } : c));
+  }, [enZones, arrondiZones, zonesTemp, contoursDep, departements, selection, vue.echelle]);
 
   /** Teinte des départements : valeur la plus marquante du département (moyenne pour les écarts et les nuages). */
   const remplissages = useMemo(() => {
@@ -711,7 +625,14 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
       ...(texteIA.rect ? [texteIA.rect] : []),
     ];
     // Toutes les stations : une pastille peut s'écarter un peu plus de sa station pour trouver une place libre.
-    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * (avecReperes ? 7 : theme.toutes ? 1.6 : 0.9), undefined, avecReperes);
+    // Valeurs en mer : par défaut, une pastille ne se pose jamais sur la mer (son centre doit être sur un département).
+    let surTerre: ((e: unknown, x: number, y: number) => boolean) | undefined;
+    const ctx = !valeursEnMer && typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+    if (ctx) {
+      const chemins = contoursDep.map((c) => new Path2D(c.d));
+      surTerre = (_e, x, y) => chemins.some((ch) => ctx.isPointInPath(ch, (x - vue.tx) / vue.echelle, (y - vue.ty) / vue.echelle));
+    }
+    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * (avecReperes ? 7 : theme.toutes ? 1.6 : 0.9), surTerre, avecReperes);
     const parCode = new Map(ecran.map((e) => [e.p.code, e.p]));
     const origine = new Map(ecran.map((e) => [e.p.code, { ox: e.x, oy: e.y }]));
     let restantes = plafond;
@@ -720,7 +641,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
       .filter((e) => e.priorite === 0 || restantes-- > 0)
       .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)!, ...origine.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, avecReperes, echNoms, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos, enZones]);
+  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, avecReperes, echNoms, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos, enZones, valeursEnMer]);
 
   // Zones et fourchettes : une étiquette par zone (fourchette, avec un petit picto sur les grandes zones) et une par valeur
   // locale, posées au centre de leur zone puis écartées au besoin pour ne pas se chevaucher.
@@ -882,7 +803,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
         sansBandes={sansBandes}
         theme={enZones ? null : affichage?.theme ?? null}
         vue={vue}
-        departements={departements}
+        departements={departementsRendus}
         regions={regionsAffichees}
         selection={selection}
         marqueurs={[]}

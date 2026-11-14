@@ -130,6 +130,12 @@ export function adoucir(couleur: string, part = 0.55): string {
   return `#${canal((n >> 16) & 255)}${canal((n >> 8) & 255)}${canal(n & 255)}`;
 }
 
+/**
+ * Pas des fourchettes affichées, par unité : toujours de 5 en 5 mm (« 10 à 20 mm », jamais « 11 à 18 mm ») et de 10 en 10 km/h
+ * pour les rafales et les vents (« 60 à 90 km/h »). Les autres unités gardent la précision du thème.
+ */
+const PAS_AFFICHAGE: Record<string, number> = { mm: 5, 'km/h': 10 };
+
 /** Nombre maximal de classes lisibles sur une carte en zones. */
 const MAX_CLASSES = 5;
 /** Écart significatif minimal selon l'unité (valeurs déjà arrondies au pas de la carte : 5 km/h, 5 mm au-delà de 20 mm…). */
@@ -163,8 +169,15 @@ export function reglesPaliers(theme: Pick<ThemeInfo, 'paliers' | 'ordre' | 'deci
   // Couleur d'une classe : celle de son palier le plus marquant (le plus fort, ou le plus bas pour les cartes « asc »).
   const couleurs = groupes.map((g) => adoucir(paliers[theme.ordre === 'asc' ? g[0] : g[g.length - 1]].fond));
   const pas = theme.texteValeur ? 1 : 10 ** -theme.decimales;
-  // Une petite valeur non nulle (0,3 mm) ne s'affiche pas « 0 » : elle compte pour le plus petit pas (1 mm).
-  const arrondir = theme.texteValeur ? Math.round : (v: number) => (!theme.signe && v > 0 && Math.round(v / pas) === 0 ? pas : Math.round(v / pas) * pas);
+  // Pas d'affichage : 5 mm, 10 km/h (voir PAS_AFFICHAGE) ; sinon la précision du thème.
+  const pasAffichage = theme.texteValeur || theme.signe ? 0 : PAS_AFFICHAGE[theme.unite] ?? 0;
+  // Une petite valeur non nulle (0,3 mm) ne s'affiche pas « 0 » : elle compte pour le plus petit pas (1 mm). Avec un pas de
+  // 5 mm ou 10 km/h, elle arrondit à 0 et l'étiquette dit « 0 à 5 mm » (voir texteFourchetteTheme).
+  const arrondir = theme.texteValeur
+    ? Math.round
+    : pasAffichage
+      ? (v: number) => Math.round(v / pasAffichage) * pasAffichage
+      : (v: number) => (!theme.signe && v > 0 && Math.round(v / pas) === 0 ? pas : Math.round(v / pas) * pas);
   const minimum = theme.texteValeur ? 1 : ECART_MIN[theme.unite] ?? Math.max(pas, 1);
   return {
     classe: (v) => {
@@ -196,6 +209,9 @@ const uniteTheme = (theme: Pick<ThemeInfo, 'unite' | 'texteValeur'>) => (theme.t
 /** Fourchette d'une carte quelconque : « 20 à 40 mm », « 60 à 90 km/h », « −2 à +1° », « Faible à Fort », « 15 mm ». */
 export function texteFourchetteTheme(theme: Pick<ThemeInfo, 'decimales' | 'signe' | 'unite' | 'texteValeur'>, min: number, max: number): string {
   if (theme.texteValeur) return min === max ? theme.texteValeur(min) : `${theme.texteValeur(min)} à ${theme.texteValeur(max)}`;
+  // Pas de 5 mm ou 10 km/h : une zone dont toutes les valeurs arrondissent à 0 (moins de 2,5 mm) s'écrit « 0 à 5 mm ».
+  const pas = theme.signe ? 0 : PAS_AFFICHAGE[theme.unite] ?? 0;
+  if (pas && min === 0 && max === 0) max = pas;
   const signe = min < 0;
   const u = uniteTheme(theme);
   return min === max ? `${nombreTheme(theme, min, signe)}${u}` : `${nombreTheme(theme, min, signe)} à ${nombreTheme(theme, max, signe)}${u}`;

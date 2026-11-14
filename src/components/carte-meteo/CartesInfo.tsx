@@ -26,6 +26,7 @@ import {
   type ThemeInfo,
   type ThemePrevision,
 } from '@/lib/carte-meteo/cartes-info';
+import { ARRONDIS_ZONES, ARRONDI_ZONES_DEFAUT } from '@/lib/carte-meteo/lissage-zones';
 import CarteInfo, { AffichageContexte, type AffichageCarte, type PoliceValeurs, type PointInfo, type RetouchesCarte } from './CarteInfo';
 import { THEMES_CARTE } from '@/lib/carte-meteo/pictos';
 import { LIBELLES_COUCHES, type Couche } from '@/lib/carte-meteo/tuiles';
@@ -1216,6 +1217,18 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                   <option value="zones">Zones et fourchettes</option>
                 </select>
               </label>
+              {affichage.styleCarte === 'zones' && (
+                <label className="text-sm font-medium" title="Adoucit les limites des zones : les angles vifs des contours de départements s'arrondissent (la silhouette de la France ne change pas)">
+                  <span className={legende}>〰️ Arrondi des zones</span>
+                  <select value={affichage.arrondiZones ?? ARRONDI_ZONES_DEFAUT} onChange={(e) => regler({ arrondiZones: Number(e.target.value) })} className={`${selectBarre} font-semibold`}>
+                    {ARRONDIS_ZONES.map((a) => (
+                      <option key={a.valeur} value={a.valeur}>
+                        {a.libelle}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="text-sm font-medium">
                 <span className={legende}>🖼️ Style de fond</span>
                 <select value={affichage.styleFond ?? ''} onChange={(e) => regler({ styleFond: estStyleFond(e.target.value) ? e.target.value : null })} className={selectBarre}>
@@ -1538,6 +1551,18 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                   <option value="zones">Zones et fourchettes</option>
                 </select>
               </label>
+              {affichage.styleCarte === 'zones' && (
+                <label className="text-sm font-medium" title="Adoucit les limites des zones : les angles vifs des contours de départements s'arrondissent (la silhouette de la France ne change pas)">
+                  <span className={legende}>〰️ Arrondi des zones</span>
+                  <select value={affichage.arrondiZones ?? ARRONDI_ZONES_DEFAUT} onChange={(e) => regler({ arrondiZones: Number(e.target.value) })} className={`${selectBarre} w-full font-semibold`}>
+                    {ARRONDIS_ZONES.map((a) => (
+                      <option key={a.valeur} value={a.valeur}>
+                        {a.libelle}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="text-sm font-medium">
                 <span className={legende}>🎨 Thème de la carte</span>
                 <select value={affichage.theme ?? ''} onChange={(e) => regler({ theme: (e.target.value || null) as AffichageCarte['theme'] })} className={`${selectBarre} w-full`}>
