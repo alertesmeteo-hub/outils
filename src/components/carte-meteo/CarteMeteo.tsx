@@ -525,6 +525,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const [dateGauche, setDateGauche] = useState(habillage === 'catalan');
   const [deplacerMers, setDeplacerMers] = useState(false);
   const [resetMers, setResetMers] = useState(0);
+  /** Noms des mers figés : positions mémorisées au moment où l'on coche, puis fixes quel que soit le cadrage. */
+  const [mersFigees, setMersFigees] = useState<{ med?: { x: number; y: number }; atl?: { x: number; y: number } } | null>(null);
+  const positionsMers = useRef<{ med?: { x: number; y: number }; atl?: { x: number; y: number } }>({});
   const [afficherFleuves, setAfficherFleuves] = useState(true);
   /** Densité choisie dans le menu ; null = par défaut selon la zone (voir densiteFleuves). */
   const [densiteChoisie, setDensiteFleuves] = useState<DensiteFleuves | null>(null);
@@ -1594,6 +1597,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         <input type="checkbox" checked={deplacerMers} onChange={(e) => setDeplacerMers(e.target.checked)} />
         Déplacer les noms des mers
       </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={mersFigees != null} onChange={(e) => setMersFigees(e.target.checked ? { ...positionsMers.current } : null)} />
+        Figer les noms des mers
+      </label>
       {deplacerMers && <button type="button" className="rounded-md border border-border px-2 py-1" onClick={() => setResetMers((n) => n + 1)}>Réinitialiser les positions</button>}
       <span>Taille des pictos : {tailleIcones} %</span>
       <button type="button" onClick={() => setTailleIcones((t) => Math.max(40, t - 10))} className="rounded-md border border-border px-3 py-1 text-base leading-none" aria-label="Réduire les pictos">
@@ -1673,7 +1680,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       titreADroite={!enFrance && !dateGauche}
       logoEnBas={!enFrance}
       etiquetteMer
-      deplacerMers={deplacerMers && !enExport}
+      deplacerMers={deplacerMers && !enExport && mersFigees == null}
+      mersFigees={mersFigees}
+      onPositionMer={(cle, p) => { positionsMers.current[cle] = p; }}
       resetMers={resetMers}
       logoDroite={enFrance ? largeurCarte - 28 : null}
       grosPictos={enDepartement}

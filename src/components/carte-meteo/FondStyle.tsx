@@ -320,15 +320,23 @@ function EtiquetteMer({ mer, couleur, contour = false, atlantique = false, echel
 }
 
 /** Nom de la mer seul, sur une carte à fond photo (sans style de fond). */
-export function DecorMer({ largeur, hauteur, mer, atlantique = false, deplacable = false, couleur = '#ffffff', echelle = 1 }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null; atlantique?: boolean; deplacable?: boolean; couleur?: string; echelle?: number }) {
+export function DecorMer({ largeur, hauteur, mer: merAuto, atlantique = false, deplacable = false, couleur = '#ffffff', echelle = 1, figee = null, onPosition }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null; atlantique?: boolean; deplacable?: boolean; couleur?: string; echelle?: number; /** Position figée (pixels de la carte) : remplace la position automatique, quel que soit le cadrage. */ figee?: { x: number; y: number } | null; /** Appelée avec la position réelle du nom (position de base + déplacement). */ onPosition?: (p: { x: number; y: number }) => void }) {
   const [decalage, setDecalage] = useState({ x: 0, y: 0 });
   const glissement = useRef<{ x: number; y: number; dx: number; dy: number; facteur: number } | null>(null);
+  const mer = figee ?? merAuto;
+  const rapport = useRef(onPosition);
+  rapport.current = onPosition;
+  const posX = mer ? mer.x + (figee ? 0 : decalage.x) : null;
+  const posY = mer ? mer.y + (figee ? 0 : decalage.y) : null;
+  useEffect(() => {
+    if (posX != null && posY != null) rapport.current?.({ x: posX, y: posY });
+  }, [posX, posY]);
   if (!mer) return null;
   return (
     <svg className="cmap-decor" viewBox={`0 0 ${largeur} ${hauteur}`} width={largeur} height={hauteur} aria-hidden>
       <g
         style={{ pointerEvents: deplacable ? 'all' : 'none', cursor: deplacable ? 'grab' : undefined, touchAction: 'none' }}
-        transform={`translate(${decalage.x} ${decalage.y})`}
+        transform={figee ? undefined : `translate(${decalage.x} ${decalage.y})`}
         onPointerDown={(e) => {
           if (!deplacable) return;
           e.stopPropagation(); e.preventDefault();
