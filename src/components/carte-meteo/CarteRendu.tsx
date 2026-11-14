@@ -275,6 +275,8 @@ interface Props {
   styleVent?: StyleVent;
   /** Couleur de la date du titre (bleu nuit par défaut, voir .cmap-date). */
   couleurTitre?: string;
+  /** Sans le bandeau du titre (la carte pose le sien, ex. style « zones et fourchettes »). */
+  sansTitre?: boolean;
   fleuves?: Fleuves | null;
   /** Densité des cours d'eau : faible = les quatre grands fleuves, moyen = fleuves et grandes rivières, dense = tout. */
   densiteFleuves?: DensiteFleuves;
@@ -489,6 +491,7 @@ export default function CarteRendu({
   miniMaxiFrance = false,
   styleVent = 'pastille',
   couleurTitre,
+  sansTitre = false,
   fleuves = null,
   densiteFleuves = 'faible',
   opaciteFleuves = 1,
@@ -538,7 +541,7 @@ export default function CarteRendu({
   const atlantiqueVisible = useMemo(() => (etiquetteMer && !theme ? positionMer(terresEurope, vue, largeur, HAUTEUR_CARTE, 'atlantique') : null), [etiquetteMer, theme, terresEurope, vue, largeur]);
   const defStyle = styleFond ? STYLES_FOND[styleFond] : null;
   // Style de fond : territoire plein (contour du style), voisins en simple trait ; sinon les traits habituels.
-  const traitSelectionStyle = defStyle ? { ...TRAIT_SELECTION, fill: defStyle.territoire, fillOpacity: 1, stroke: defStyle.contour, strokeOpacity: 1, strokeWidth: 1.6 } : null;
+  const traitSelectionStyle = defStyle ? { ...TRAIT_SELECTION, fill: defStyle.territoire, fillOpacity: 1, stroke: defStyle.contour, strokeOpacity: 1, strokeWidth: defStyle.epaisseurContour ?? 1.6 } : null;
   const traitVoisinsStyle = defStyle ? { ...TRAIT_HORS_SELECTION, fill: 'none', fillOpacity: 1, stroke: defStyle.voisins, strokeOpacity: 1, strokeWidth: 1 } : null;
   /** Rafale ajoutée dont le choix de direction est ouvert. */
   const [directionOuvertePour, setDirectionOuvertePour] = useState<string | null>(null);
@@ -723,13 +726,13 @@ export default function CarteRendu({
           />
         )}
 
-        <div
+        {!sansTitre && <div
           className={`cmap-titre ${titreGauche != null ? 'cmap-titre-gauche' : titreADroite ? 'cmap-titre-droite' : ''}`}
           style={titreGauche != null ? { left: titreGauche } : titreADroite && titreEchelle < 1 ? { transform: `scale(${titreEchelle})`, transformOrigin: 'top right' } : undefined}
         >
           <div className="cmap-date" style={couleurTitre ? { color: couleurTitre } : undefined}>{titre}</div>
           {sousTitre && <div className="cmap-sous-titre">{sousTitre}</div>}
-        </div>
+        </div>}
 
         {pied && <div className="cmap-pied" style={etiquetteMer ? { left: piedGauche ? 29 : 'auto', right: piedGauche ? 'auto' : 29, textAlign: piedGauche ? 'left' : 'right', color: '#000', textShadow: '0 0 3px #fff, 0 0 3px #fff' } : undefined}>{etiquetteMer && /^alertes-meteo\.com$/i.test(pied) ? <><span style={{ color: '#da121a' }}>A</span>lertes-meteo.com</> : pied}</div>}
 

@@ -1209,6 +1209,13 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           )}
           {!uneCarte && (
             <>
+              <label className="text-sm font-medium" title="Zones et fourchettes : cartes des températures minimales, maximales et du matin ; les autres cartes restent en valeurs">
+                <span className={legende}>🌡️ Style de carte</span>
+                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => regler({ styleCarte: e.target.value === 'zones' ? 'zones' : 'valeurs' })} className={selectBarre}>
+                  <option value="valeurs">Valeurs (habituel)</option>
+                  <option value="zones">Zones et fourchettes (températures)</option>
+                </select>
+              </label>
               <label className="text-sm font-medium">
                 <span className={legende}>🖼️ Style de fond</span>
                 <select value={affichage.styleFond ?? ''} onChange={(e) => regler({ styleFond: estStyleFond(e.target.value) ? e.target.value : null })} className={selectBarre}>
@@ -1472,6 +1479,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
                         run={(theme as ThemePrevision).cumulJours ? undefined : runCarte}
+                        dateCarte={dateISO}
                         sousTitre={
                           ((theme as ThemePrevision).fenetreHeures
                             ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!, instantFige)
@@ -1523,6 +1531,13 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           <details open className="mt-4 rounded-xl border border-primary/30 bg-surface p-4">
             <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-primary">Affichage de la carte</summary>
             <div className="mt-3 grid grid-cols-1 items-end gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-sm font-medium" title="Zones et fourchettes : cartes des températures minimales, maximales et du matin">
+                <span className={legende}>🌡️ Style de carte</span>
+                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => regler({ styleCarte: e.target.value === 'zones' ? 'zones' : 'valeurs' })} className={`${selectBarre} w-full`}>
+                  <option value="valeurs">Valeurs (habituel)</option>
+                  <option value="zones">Zones et fourchettes (températures)</option>
+                </select>
+              </label>
               <label className="text-sm font-medium">
                 <span className={legende}>🎨 Thème de la carte</span>
                 <select value={affichage.theme ?? ''} onChange={(e) => regler({ theme: (e.target.value || null) as AffichageCarte['theme'] })} className={`${selectBarre} w-full`}>

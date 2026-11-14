@@ -2,7 +2,7 @@
  * Styles de fond de la carte (option « Style de fond ») : fond uni ou dégradé, territoire coloré, mer toujours dessinée.
  * Les couleurs sont des attributs SVG (pas de CSS) pour passer dans l'export JPG.
  */
-export type StyleFond = 'bordeaux' | 'azur' | 'sauge' | 'ardoise' | 'sable' | 'lavande' | 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'rouge-or-doux' | 'rouge-or-or' | 'rouge-or-rouge' | 'rouge-or-inverse' | 'rouge-or-territoire-rouge' | 'rouge-or-senyera' | 'parchemin' | 'marine-creme' | 'marine-bleu';
+export type StyleFond = 'bordeaux' | 'azur' | 'sauge' | 'ardoise' | 'sable' | 'lavande' | 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'rouge-or-doux' | 'rouge-or-or' | 'rouge-or-rouge' | 'rouge-or-inverse' | 'rouge-or-territoire-rouge' | 'rouge-or-senyera' | 'parchemin' | 'marine-creme' | 'marine-bleu' | 'epure';
 
 /** Une couleur, ou un dégradé en diagonale (haut gauche vers bas droit). */
 export type Peinture = string | [string, string];
@@ -24,6 +24,8 @@ export interface DefStyleFond {
   senyera: boolean;
   /** Couleur du texte « Mer Méditerranée ». */
   texteMer: string;
+  /** Épaisseur du contour des départements du territoire (1,6 par défaut). */
+  epaisseurContour?: number;
 }
 
 export const STYLES_FOND: Record<StyleFond, DefStyleFond> = {
@@ -49,6 +51,8 @@ export const STYLES_FOND: Record<StyleFond, DefStyleFond> = {
   parchemin: { libelle: 'Parchemin (mer bleue)', terre: ['#f4e8d2', '#eadcbf'], mer: ['#3b9de8', '#1d6fc2'], territoire: '#fbe3ae', contour: '#1a1a1a', voisins: '#c9b79a', cote: '#1a1a1a', senyera: true, texteMer: '#ffffff' },
   'marine-creme': { libelle: 'Bleu marine (territoire crème)', terre: ['#0e3485', '#071b52'], mer: ['#33a0ea', '#1566b8'], territoire: '#fdf0cc', contour: '#ffffff', voisins: '#2a58b0', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
   'marine-bleu': { libelle: 'Bleu marine (territoire bleu)', terre: ['#0a3f94', '#061f5c'], mer: ['#33a0ea', '#1566b8'], territoire: '#3f86e0', contour: '#ffffff', voisins: '#6a8fd6', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
+  // France seule sur un fond gris très clair (pays voisins et mer confondus), contours fins : style « zones et fourchettes ».
+  epure: { libelle: 'Épuré : France seule sur fond gris très clair', terre: '#f4f5f7', mer: '#f4f5f7', territoire: '#d9dde3', contour: '#ffffff', voisins: 'rgba(0,0,0,0)', cote: '#ffffff', senyera: false, texteMer: 'rgba(0,0,0,0)', epaisseurContour: 0.9 },
 };
 
 export const ORDRE_STYLES_FOND = Object.keys(STYLES_FOND) as StyleFond[];

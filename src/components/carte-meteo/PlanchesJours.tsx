@@ -372,7 +372,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
     if (!planchRef.current) return;
     setEnExport(true);
     try {
-      await exporterEnJpg(planchRef.current, `${weekEnd ? 'week-end' : `tendance-${duree}-jours${depart ? '-sans-j0' : ''}`}-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modele.id}`, LARGEUR, hauteur);
+      await exporterEnJpg(planchRef.current, `${weekEnd ? 'week-end' : `tendance-${duree}-jours${depart ? `-des-j${depart}` : ''}`}-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modele.id}`, LARGEUR, hauteur);
     } catch (e) {
       console.error('Export de la planche en JPG', e);
       setErreur("L'export a échoué. Réessayez dans un instant.");
@@ -451,7 +451,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
           <span className="mb-1 block">Premier jour</span>
           <select value={depart} disabled={weekEnd} onChange={(e) => setDepart(Number(e.target.value))} className={selectBarre}>
             <option value={0}>Avec aujourd&apos;hui (J0)</option>
-            <option value={1}>Sans la carte J0 (dès demain)</option>
+            <option value={1}>Sans la carte J0 (dès demain, J1)</option>
+            <option value={2}>À partir de J2</option>
+            <option value={3}>À partir de J3</option>
+            <option value={4}>À partir de J4</option>
           </select>
         </label>
         <label className="text-sm font-medium">
