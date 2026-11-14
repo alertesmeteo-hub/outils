@@ -41,6 +41,16 @@ export function pointsDuBilan(bilans: ReponseBilans, id: string, plafond = Infin
     .filter((p) => p.alt == null || p.alt <= plafond);
 }
 
+/**
+ * Stations d'altitude inconnue ou d'au plus `plafond` m (0 ou absent : toutes). Une zone sans aucune station sous le plafond
+ * (département de montagne) garde toutes les siennes : on ne vide pas un classement.
+ */
+export function sousPlafondAltitude<T extends { alt?: number | null }>(points: T[], plafond?: number): T[] {
+  if (!plafond) return points;
+  const bas = points.filter((p) => p.alt == null || p.alt <= plafond);
+  return bas.length ? bas : points;
+}
+
 /** Grandes villes qui ne sont pas chefs-lieux de leur département, avec leur département (les chefs-lieux : chefs-lieux.ts). */
 const AUTRES_GRANDES_VILLES: [string, string][] = [
   ['Toulon', '83'], ['Le Havre', '76'], ['Saint-Étienne', '42'], ['Brest', '29'], ['Reims', '51'], ['Le Mans', '72'], ['Aix-en-Provence', '13'],

@@ -6,6 +6,7 @@ import { fromClimato } from '../src/lib/obs/climato';
 import { matchStations, parseSynop } from '../src/lib/obs/synop';
 import marignane from './fixtures/normales-13054001.json';
 import { regrouperMorceaux } from '../src/lib/carte-meteo/fronts';
+import { sousPlafondAltitude } from '../src/lib/carte-meteo/stations-bilan';
 
 let fail = 0;
 const eq = (name: string, cond: boolean, info = '') => { if (!cond) { fail++; console.error('✗', name, info); } else console.log('✓', name); };
@@ -197,6 +198,22 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   eq('fronts : bouts courts aux extrémités absorbés', r3.every((x) => x === f), r3.join());
   const r4 = regrouperMorceaux([true, false, false, false], pas50(4), 250);
   eq('fronts : ligne plus courte que le minimum = un seul type', new Set(r4).size === 1, r4.join());
+}
+
+// Classement des températures : stations jusqu'à 500 m (les sommets en sont écartés), altitude inconnue ou 500 m pile gardées.
+{
+  const st = [
+    { nom: 'AIGUILLE DU MIDI', alt: 3842 as number | null, valeur: -10.4 },
+    { nom: 'LE FRASNOIS', alt: 900 as number | null, valeur: -8.1 },
+    { nom: 'ABBEVILLE', alt: 69 as number | null, valeur: -3.2 },
+    { nom: 'SANS ALTITUDE', alt: null as number | null, valeur: -2.1 },
+    { nom: 'PILE 500 M', alt: 500 as number | null, valeur: -1 },
+  ];
+  const noms = (l: typeof st) => l.map((x) => x.nom).join();
+  eq('altitude : 500 m = plaine, altitude inconnue et 500 m pile gardées', noms(sousPlafondAltitude(st, 500)) === 'ABBEVILLE,SANS ALTITUDE,PILE 500 M', noms(sousPlafondAltitude(st, 500)));
+  eq('altitude : 1 000 m garde Le Frasnois, pas l’Aiguille du Midi', noms(sousPlafondAltitude(st, 1000)) === 'LE FRASNOIS,ABBEVILLE,SANS ALTITUDE,PILE 500 M', noms(sousPlafondAltitude(st, 1000)));
+  eq('altitude : 0 ou absent = toutes les stations', sousPlafondAltitude(st, 0).length === 5 && sousPlafondAltitude(st).length === 5);
+  eq('altitude : zone sans station sous le plafond = classement gardé', sousPlafondAltitude(st.slice(0, 2), 500).length === 2);
 }
 
 console.log('Paris 21/12/2026 :', s2.metrics.map((m: any) => m.value).join(' | '), '– durée', s2.headline.value);

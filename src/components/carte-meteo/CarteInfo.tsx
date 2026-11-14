@@ -19,7 +19,7 @@ import { BOITE_FRANCE, FICHIERS_CONTOURS, LARGEUR_FRANCE, ZONE_FRANCE, ZONE_UTIL
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { statsDe } from '@/lib/carte-meteo/texte-ia';
 import { useTexteIA } from './TexteIA';
-import { estStationGrandeVille } from '@/lib/carte-meteo/stations-bilan';
+import { estStationGrandeVille, sousPlafondAltitude } from '@/lib/carte-meteo/stations-bilan';
 import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import TexteSurCarte from './TexteSurCarte';
 import { PictoZone, largeurPicto } from './PictosZones';
@@ -183,6 +183,8 @@ interface Props {
   partValeurs?: number;
   /** Autorise les pastilles sur la mer (sinon elles sont ramenées ou écartées vers la terre). */
   valeursEnMer?: boolean;
+  /** Classement (tableau « Les plus froides… ») : seules les stations situées jusqu'à cette altitude (m) y figurent, comme dans le texte IA ; 0 ou absent = toutes. */
+  altitudeMaxTableau?: number;
   /** Carte figée rouverte : retouches à rétablir à l'ouverture (lues une seule fois). */
   retouchesInitiales?: RetouchesCarte;
   /** Appelé à chaque retouche (et quand elles sont remises à zéro), pour que la page puisse les garder avec la carte figée. */
@@ -216,7 +218,7 @@ function titreEnMinuscules(titre: string): string {
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, altitudeMaxTableau, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -391,7 +393,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     if (!theme.id.startsWith('risque-froid') || theme.texteValeur) return new Set<string>();
     return new Set([...dansZone].filter((p) => !p.neige).sort((a, b) => b.valeur - a.valeur || a.nom.localeCompare(b.nom, 'fr')).slice(0, 3).map((p) => p.code));
   }, [dansZone, theme.id, theme.texteValeur]);
-  const top = useMemo(() => tries.filter((p) => !p.neige && !palierDe(theme.paliers, p.valeur).neutre).slice(0, NOMBRE_TOP), [tries, theme.paliers]);
+  // Classement : stations jusqu'à l'altitude demandée (sinon les sommets écrasent le classement des températures).
+  const triesClassement = useMemo(() => sousPlafondAltitude(tries, altitudeMaxTableau), [tries, altitudeMaxTableau]);
+  const top = useMemo(() => triesClassement.filter((p) => !p.neige && !palierDe(theme.paliers, p.valeur).neutre).slice(0, NOMBRE_TOP), [triesClassement, theme.paliers]);
 
   /**
    * Zones et fourchettes : valeur la plus marquante de chaque département (la plus basse pour les minimales ; moyenne pour les
@@ -546,15 +550,15 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
                 nom: theme.court,
                 unite: theme.texteValeur ? 'niveau de 0 à 4 (1 faible, 2 modéré, 3 fort, 4 sévère)' : theme.unite === '°' ? '°C' : theme.unite,
                 sens: theme.ordre === 'desc' ? 'plus hautes' : 'plus basses',
-                classement: tries.slice(0, 6).map((p) => ({ lieu: p.nom, departement: theme.maille ? undefined : p.dep, valeur: p.valeur })),
-                stats: statsDe(tries.map((p) => p.valeur)),
+                classement: triesClassement.slice(0, 6).map((p) => ({ lieu: p.nom, departement: theme.maille ? undefined : p.dep, valeur: p.valeur })),
+                stats: statsDe(triesClassement.map((p) => p.valeur)),
               },
               // L'autre bout du classement (le plus frais, le plus sec…) ; sans intérêt pour une carte de niveaux (orages).
               ...(theme.texteValeur ? [] : [{
                 nom: `${theme.court} (autre extrémité)`,
                 unite: theme.unite === '°' ? '°C' : theme.unite,
                 sens: (theme.ordre === 'desc' ? 'plus basses' : 'plus hautes') as 'plus basses' | 'plus hautes',
-                classement: tries.slice(-3).reverse().map((p) => ({ lieu: p.nom, departement: theme.maille ? undefined : p.dep, valeur: p.valeur })),
+                classement: triesClassement.slice(-3).reverse().map((p) => ({ lieu: p.nom, departement: theme.maille ? undefined : p.dep, valeur: p.valeur })),
               }]),
             ],
           },

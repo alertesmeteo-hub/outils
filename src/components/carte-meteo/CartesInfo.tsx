@@ -64,6 +64,20 @@ const pictoRisque = (id: string): string => {
   return `${PICTO_RISQUE[type]}${id.endsWith('-periode') ? '📆' : id.endsWith('-24h') ? '⏱️' : ''} `;
 };
 
+/** Dangers des cartes de risque, dans l'ordre des boutons « Risque » : un danger à la fois (cartes du jour, de la période et des 24 h). */
+const DANGERS: { id: string; libelle: string; picto: string }[] = [
+  { id: 'risque-orage', libelle: 'Orages', picto: PICTO_RISQUE.orage },
+  { id: 'risque-pluie', libelle: 'Pluies', picto: PICTO_RISQUE.pluie },
+  { id: 'risque-vent', libelle: 'Vent', picto: PICTO_RISQUE.vent },
+  { id: 'risque-neige', libelle: 'Neige', picto: PICTO_RISQUE.neige },
+  { id: 'risque-verglas', libelle: 'Verglas', picto: PICTO_RISQUE.verglas },
+  { id: 'risque-tempete', libelle: 'Tempête', picto: PICTO_RISQUE.tempete },
+  { id: 'risque-froid', libelle: 'Froid et gel', picto: PICTO_RISQUE.froid },
+  { id: 'risque-chaleur', libelle: 'Chaleur', picto: PICTO_RISQUE.chaleur },
+];
+/** Danger d'une carte de risque : « risque-pluie-24h » → « risque-pluie », « orages » → « risque-orage ». */
+const dangerDe = (id: string) => (id === 'orages' ? 'risque-orage' : id.replace(/-(periode|24h)$/, ''));
+
 const MODES: [Mode, string][] = [
   ['prevision', 'Prévisions'],
   ['bilan', 'Bilans des stations'],
@@ -174,17 +188,20 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   useEffect(() => {
     if (modeDemande) setMode(modeDemande);
   }, [modeDemande]);
-  // Lien direct vers une carte (#carte-tx-fin…) : ouvre la catégorie qui la contient, puis y défile.
+  // Lien direct vers une carte (#carte-tx-fin…) : ouvre le thème qui la contient, puis y défile.
   useEffect(() => {
     const ouvrirAncre = () => {
       const cible = decodeURIComponent(window.location.hash.slice(1));
       if (!cible.startsWith('carte-')) return;
       const themeId = cible.slice('carte-'.length);
-      const modeCible = ([['prevision', THEMES_PREVISION], ['bilan', THEMES_BILAN], ['climat', THEMES_CLIMAT]] as [Mode, ThemeInfo[]][])
-        .find(([, liste]) => liste.some((t) => t.id === themeId))?.[0];
-      if (!modeCible) return;
-      setMode(modeCible);
-      setGroupeChoisi('tous');
+      const trouve = ([['prevision', THEMES_PREVISION], ['bilan', THEMES_BILAN], ['climat', THEMES_CLIMAT]] as [Mode, ThemeInfo[]][])
+        .map(([m, liste]) => ({ m, theme: liste.find((t) => t.id === themeId) }))
+        .find((x) => x.theme);
+      if (!trouve?.theme) return;
+      setMode(trouve.m);
+      // Un thème à la fois : celui de la carte demandée (et, pour une carte de risque, son danger).
+      setGroupeChoisi(trouve.theme.groupe);
+      if (trouve.theme.groupe === GROUPE_RISQUES) setDangerChoisi(dangerDe(themeId));
       // La carte n'existe qu'après le rendu de la catégorie : on attend qu'elle apparaisse.
       let essais = 0;
       const defiler = () => {
@@ -250,9 +267,12 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const [horizon, setHorizon] = useState<Horizon>(2050);
   const [altitudeMax, setAltitudeMax] = useState(ALTITUDE_MAX_DEFAUT);
   /** Thème affiché (« tous » : toutes les cartes de la catégorie, rangées par thème). */
-  const [groupeChoisi, setGroupeChoisi] = useState(uneCarte ? 'Températures' : 'tous');
+  // Un thème à la fois (plus de « tous les thèmes ») : « L'essentiel » d'abord (Climat, qui n'en a pas, prend son premier thème).
+  const [groupeChoisi, setGroupeChoisi] = useState(uneCarte ? 'Températures' : ESSENTIEL);
+  /** Danger affiché dans le thème « Risques » : orages, pluies, vent, neige, verglas… */
+  const [dangerChoisi, setDangerChoisi] = useState(DANGERS[0].id);
   const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
-  // Lien « ALERTES » du menu (?cartes=alertes) : ouvre d'office toutes les cartes de risque.
+  // Lien « ALERTES » du menu (?cartes=alertes) : ouvre d'office toutes les cartes de risque (zonage « Par département » : le zonage fin reste un choix).
   const alertesDemandees = modeInitial === 'alertes';
   // Lien « Bilan du mois France » du menu (?cartes=bilan-mois) : cartes du mois (maxi, mini, pluie, soleil) pour toute la France.
   const bilanMoisDemande = modeInitial === 'bilan-mois';
@@ -266,7 +286,6 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     setMode('prevision');
     setGroupeChoisi(GROUPE_RISQUES);
     setChiffres(true);
-    setZonageFin(true);
   }, [alertesDemandees]);
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
@@ -602,12 +621,21 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   }, [modeleImpose]);
   const groupesAffiches = uneCarte
     ? groupes.map((g) => ({ ...g, themes: g.themes.filter((t) => t.id === carteEffective?.id) })).filter((g) => g.themes.length > 0)
-    : groupes.filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi);
+    : groupes
+        .filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi)
+        // Risques : un danger à la fois, avec ses cartes du jour, de la période et des 24 h glissantes.
+        .map((g) => (g.groupe === GROUPE_RISQUES && groupeChoisi === GROUPE_RISQUES ? { ...g, themes: g.themes.filter((t) => dangerDe(t.id) === dangerChoisi) } : g));
   // Les données à charger (cumuls, périodes, montagne) dépendent du groupe : il suit toujours la carte affichée.
   useEffect(() => {
     if (carteEffective && carteEffective.groupe !== groupeChoisi) setGroupeChoisi(carteEffective.groupe);
   }, [carteEffective, groupeChoisi]);
-  const baseRisque = (id: string) => (id === 'orages' ? 'risque-orage' : id.replace(/-(periode|24h)$/, ''));
+  const clesGroupes = groupes.map((g) => g.groupe).join('|');
+  useEffect(() => {
+    if (uneCarte || !clesGroupes) return;
+    const valide = groupeChoisi === 'tous' || (groupeChoisi === ESSENTIEL && mode !== 'climat') || clesGroupes.split('|').includes(groupeChoisi);
+    if (!valide) setGroupeChoisi(mode === 'climat' ? clesGroupes.split('|')[0] : ESSENTIEL);
+  }, [uneCarte, clesGroupes, groupeChoisi, mode]);
+  const baseRisque = dangerDe;
   const idRisque = (id: string, d: 'jour' | 'periode' | '24h') => {
     const base = baseRisque(id);
     const cible = d === 'jour' ? (base === 'risque-orage' ? 'orages' : base) : `${base}${d === 'periode' ? '-periode' : '-24h'}`;
@@ -777,7 +805,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                   aria-pressed={mode === valeur}
                   onClick={() => {
                     setMode(valeur);
-                    setGroupeChoisi('tous');
+                    setGroupeChoisi(ESSENTIEL);
                   }}
                   className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === valeur ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
                 >
@@ -850,7 +878,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                   aria-pressed={mode === valeur && !(valeur === 'bilan' && groupeChoisi === GROUPE_MOIS) && !(valeur === 'prevision' && groupeChoisi === GROUPE_RISQUES)}
                   onClick={() => {
                     setMode(valeur);
-                    setGroupeChoisi('tous');
+                    setGroupeChoisi(ESSENTIEL);
                   }}
                   className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${mode === valeur && !(valeur === 'bilan' && groupeChoisi === GROUPE_MOIS) && !(valeur === 'prevision' && groupeChoisi === GROUPE_RISQUES) ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
                 >
@@ -877,7 +905,6 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                   setMode('prevision');
                   setGroupeChoisi(GROUPE_RISQUES);
                   setChiffres(true);
-                  setZonageFin(true);
                   if (uneCarte) {
                     setCarteChoisie(`risque-vent${dureeRisque === 'periode' ? '-periode' : dureeRisque === '24h' ? '-24h' : ''}`);
                     setFiltreGroupe(GROUPE_RISQUES);
@@ -1142,7 +1169,6 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           <label className="text-sm font-medium">
             <span className={legende}>Thème</span>
             <select value={groupeChoisi} onChange={(e) => setGroupeChoisi(e.target.value)} className={selectBarre}>
-              <option value="tous">Tous les thèmes</option>
               {mode !== 'climat' && <option value={ESSENTIEL}>{ESSENTIEL} (maxi, mini, rafales, pluie)</option>}
               {groupes.map((g) => (
                 <option key={g.groupe} value={g.groupe}>
@@ -1151,6 +1177,24 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               ))}
             </select>
           </label>
+          )}
+          {!uneCarte && mode === 'prevision' && groupeChoisi === GROUPE_RISQUES && (
+            <fieldset>
+              <legend className={`${legende} !text-red-600`}>Risque</legend>
+              <div className="flex flex-wrap gap-1.5">
+                {DANGERS.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    aria-pressed={dangerChoisi === d.id}
+                    onClick={() => setDangerChoisi(d.id)}
+                    className={`rounded-full border-2 px-3 py-1 text-sm font-bold ${dangerChoisi === d.id ? 'border-red-600 bg-red-600 text-white' : 'border-red-600 bg-surface text-red-600'}`}
+                  >
+                    {d.picto} {d.libelle}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
           )}
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
             <span className={legende}>Logo</span>

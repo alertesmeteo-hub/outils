@@ -15,6 +15,8 @@ const THEMES_PLUIE = THEMES_BILAN.filter((t) => t.groupe === GROUPE_PLUIE_DIRECT
 /** Cartes dont les valeurs manquantes peuvent être complétées (rafales et pluie sur 24 h, température du moment). */
 const THEMES_COMPLETES = ['obs-raf24', 'obs-rr24', 'obs-t'];
 const selectBarre = 'rounded-lg border border-border bg-surface p-1.5 text-sm';
+/** Altitude maximale des stations du classement des températures (0 = toutes). */
+const ALTITUDES_TABLEAU = [500, 1000, 1500, 2000, 0];
 /** Couleur des boutons de chaque rubrique (bouton choisi : couleur du site). */
 const COULEURS: Record<(typeof RUBRIQUES_OBS)[number], string> = {
   Température: 'bg-[#e67e22] text-white',
@@ -44,6 +46,8 @@ export default function ObservationsDirect() {
   // Densité : part du nombre maximal de valeurs affichées ; valeurs en mer : autorisées ou ramenées sur la terre.
   const [densite, setDensite] = useState(1);
   const [valeursEnMer, setValeursEnMer] = useState(false);
+  // Tableau des températures : sans les stations de montagne (Aiguille du Midi, La Meije…) qui écrasent le classement.
+  const [altTableau, setAltTableau] = useState(500);
   const zone = useZone('zone-observations-en-direct');
   const [themeId, setThemeId] = useState(THEMES_OBS.find((t) => t.id === 'obs-rr48')?.id ?? THEMES_OBS[0]?.id ?? '');
   const [pluieId, setPluieId] = useState(THEMES_PLUIE[0]?.id ?? '');
@@ -169,6 +173,16 @@ export default function ObservationsDirect() {
           </select>
         </label>
         <label className="text-sm font-medium">
+          <span className="mb-1 block">Tableau des températures : stations jusqu&apos;à</span>
+          <select value={altTableau} onChange={(e) => setAltTableau(Number(e.target.value))} className={selectBarre} title="Les stations de montagne écrasent le classement des températures : seules celles situées jusqu'à cette altitude y figurent. La carte garde toutes les stations.">
+            {ALTITUDES_TABLEAU.map((a) => (
+              <option key={a} value={a}>
+                {a === 0 ? 'Toutes altitudes' : `${a.toLocaleString('fr-FR')} m d'altitude`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-medium">
           <span className="mb-1 block">Logo</span>
           <select value={logoId} onChange={(e) => setLogoId(e.target.value)} className={selectBarre}>
             {LOGOS_PRESETS.map((l) => (
@@ -262,6 +276,7 @@ export default function ObservationsDirect() {
             logoId={logoId}
             prefixeFichier={`observations-en-direct-${zone.nomFichier}`}
             contexte="Observations des stations Météo-France"
+            altitudeMaxTableau={theme.unite === '°' ? altTableau : undefined}
             mention={pointsEtAjouts.nbAjoutes[theme.id] ? 'Stations complémentaires : Météo-Ciel' : ''}
             echelleTop={echelleTop || 1}
             sansTableau={echelleTop === 0}
