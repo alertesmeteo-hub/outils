@@ -562,7 +562,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   // et rétablis à la prochaine ouverture. Pas les prévisions ni les retouches faites sur la carte (voir « Figer la carte »).
   const [memoriser, setMemoriser] = useState(false);
   const [erreurMemo, setErreurMemo] = useState<string | null>(null);
-  const parametres = JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, jeuPictos, tailleIcones, tailleVent, periode, miniMaxi, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, altitudeNeige, reglagesTexte, tailleIcone, texteNouveau, iconeNouvelle, rafaleNouvelle, provenanceNouvelle });
+  const parametres = JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, jeuPictos, tailleIcones, tailleVent, periode, miniMaxi, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, altitudeNeige, reglagesTexte, tailleIcone, texteNouveau, iconeNouvelle, rafaleNouvelle, provenanceNouvelle, mersFigees });
   useEffect(() => {
     if (compact) return;
     try {
@@ -604,6 +604,11 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       if ('iconeNouvelle' in e) setIconeNouvelle(e.iconeNouvelle as never);
       if ('rafaleNouvelle' in e) setRafaleNouvelle(e.rafaleNouvelle as never);
       if ('provenanceNouvelle' in e) setProvenanceNouvelle(e.provenanceNouvelle as never);
+      if ('mersFigees' in e) {
+        const f = e.mersFigees as { med?: { x: number; y: number }; atl?: { x: number; y: number } } | null;
+        setMersFigees(f);
+        if (f) positionsMers.current = { ...f };
+      }
       setMemoriser(true);
     } catch {
       // Sauvegarde illisible ou stockage bloqué : réglages par défaut.
