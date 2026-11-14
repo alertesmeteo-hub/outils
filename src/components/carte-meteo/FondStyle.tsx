@@ -320,23 +320,32 @@ function EtiquetteMer({ mer, couleur, contour = false, atlantique = false, echel
 }
 
 /** Nom de la mer seul, sur une carte à fond photo (sans style de fond). */
-export function DecorMer({ largeur, hauteur, mer: merAuto, atlantique = false, deplacable = false, couleur = '#ffffff', echelle = 1, figee = null, onPosition }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null; atlantique?: boolean; deplacable?: boolean; couleur?: string; echelle?: number; /** Position figée (pixels de la carte) : remplace la position automatique, quel que soit le cadrage. */ figee?: { x: number; y: number } | null; /** Appelée avec la position réelle du nom (position de base + déplacement). */ onPosition?: (p: { x: number; y: number }) => void }) {
-  const [decalage, setDecalage] = useState({ x: 0, y: 0 });
+export function DecorMer({ largeur, hauteur, mer: merAuto, atlantique = false, deplacable = false, couleur = '#ffffff', echelle = 1, figee = null, onPosition, onDeplacerFigee }: { largeur: number; hauteur: number; mer: { x: number; y: number } | null; atlantique?: boolean; deplacable?: boolean; couleur?: string; echelle?: number; /** Position figée (pixels de la carte) : remplace la position automatique, quel que soit le cadrage. */ figee?: { x: number; y: number } | null; /** Appelée avec la position réelle du nom (position de base + déplacement), et avec null quand le nom disparaît. */ onPosition?: (p: { x: number; y: number } | null) => void; /** Nom figé déplacé à la main : nouvelle position figée (fin du geste). */ onDeplacerFigee?: (p: { x: number; y: number }) => void }) {
+  // Deux décalages : celui du nom libre (relatif à sa place automatique) et celui du geste en cours sur un nom figé (versé dans la
+  // position figée en fin de geste). Un seul décalage ajouterait une seconde fois le déplacement déjà compris dans la position figée.
+  const [decalageLibre, setDecalageLibre] = useState({ x: 0, y: 0 });
+  const [decalageFige, setDecalageFige] = useState({ x: 0, y: 0 });
+  const decalage = figee ? decalageFige : decalageLibre;
+  const setDecalage = figee ? setDecalageFige : setDecalageLibre;
   const glissement = useRef<{ x: number; y: number; dx: number; dy: number; facteur: number } | null>(null);
   const mer = figee ?? merAuto;
   const rapport = useRef(onPosition);
   rapport.current = onPosition;
-  const posX = mer ? mer.x + (figee ? 0 : decalage.x) : null;
-  const posY = mer ? mer.y + (figee ? 0 : decalage.y) : null;
+  const posX = mer ? mer.x + decalage.x : null;
+  const posY = mer ? mer.y + decalage.y : null;
   useEffect(() => {
     if (posX != null && posY != null) rapport.current?.({ x: posX, y: posY });
   }, [posX, posY]);
+  // Nom retiré (mer hors cadre, autre zone) : sa position ne doit pas être figée par la suite.
+  useEffect(() => () => rapport.current?.(null), []);
   if (!mer) return null;
   return (
-    <svg className="cmap-decor" viewBox={`0 0 ${largeur} ${hauteur}`} width={largeur} height={hauteur} aria-hidden>
+    // En mode déplacement, le nom passe au-dessus des pictos et des pastilles de vent : sinon ils captent le geste quand ils le recouvrent.
+    // touch-action sur le <svg> : Chrome l'ignore sur un <g>, et le défilement tactile de la page annulerait alors le geste au doigt.
+    <svg className="cmap-decor" viewBox={`0 0 ${largeur} ${hauteur}`} width={largeur} height={hauteur} aria-hidden style={deplacable ? { zIndex: 8, touchAction: 'none' } : undefined}>
       <g
         style={{ pointerEvents: deplacable ? 'all' : 'none', cursor: deplacable ? 'grab' : undefined, touchAction: 'none' }}
-        transform={figee ? undefined : `translate(${decalage.x} ${decalage.y})`}
+        transform={decalage.x || decalage.y ? `translate(${decalage.x} ${decalage.y})` : undefined}
         onPointerDown={(e) => {
           if (!deplacable) return;
           e.stopPropagation(); e.preventDefault();
@@ -353,8 +362,21 @@ export function DecorMer({ largeur, hauteur, mer: merAuto, atlantique = false, d
             y: Math.max(30 - mer.y, Math.min(hauteur - 55 - mer.y, g.dy + (e.clientY - g.y) * g.facteur)),
           });
         }}
-        onPointerUp={(e) => { if (glissement.current) { e.stopPropagation(); glissement.current = null; e.currentTarget.releasePointerCapture(e.pointerId); } }}
-        onPointerCancel={() => { glissement.current = null; }}
+        onPointerUp={(e) => {
+          if (!glissement.current) return;
+          e.stopPropagation();
+          glissement.current = null;
+          e.currentTarget.releasePointerCapture(e.pointerId);
+          // Nom figé : le déplacement devient la nouvelle position figée.
+          if (figee && onDeplacerFigee && (decalage.x || decalage.y)) {
+            onDeplacerFigee({ x: figee.x + decalage.x, y: figee.y + decalage.y });
+            setDecalage({ x: 0, y: 0 });
+          }
+        }}
+        onPointerCancel={() => {
+          glissement.current = null;
+          if (figee) setDecalageFige({ x: 0, y: 0 });
+        }}
         onClick={(e) => { if (deplacable) e.stopPropagation(); }}
       >
         {deplacable && <rect x={mer.x - 72} y={mer.y - 28} width={144} height={78} rx={8} fill="rgba(255,255,255,0.12)" stroke="#fff" strokeDasharray="4 3" />}

@@ -22,7 +22,23 @@ import { useTexteIA } from './TexteIA';
 import { estStationGrandeVille } from '@/lib/carte-meteo/stations-bilan';
 import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import TexteSurCarte from './TexteSurCarte';
-import { GRIS_HORS_ZONE, accepteZones, calculerZones, sousTitreZones, texteFourchette, texteLocal, titreDateZones, type StyleCarte } from '@/lib/carte-meteo/zones-fourchettes';
+import {
+  GRIS_HORS_ZONE,
+  accepteZones,
+  calculerZones,
+  enClassesTemperature,
+  estBulletinTemperature,
+  pictoZones,
+  reglesPaliers,
+  sousTitreZones,
+  texteFourchette,
+  texteFourchetteTheme,
+  texteLocal,
+  texteLocalTheme,
+  titreDateZones,
+  type PictoZones,
+  type StyleCarte,
+} from '@/lib/carte-meteo/zones-fourchettes';
 
 /** Réglages d'affichage communs aux cartes d'une page (fond, relief, fleuves, contours, thème) ; absents = réglages habituels. */
 export interface AffichageCarte {
@@ -63,7 +79,7 @@ export interface AffichageCarte {
   heureElaboration?: boolean;
   /** Carte figée : instant (ISO) où elle l'a été ; « Carte élaborée le » indique alors cet instant et non l'heure de l'ouverture de la page. */
   elaboreeLe?: string;
-  /** Style des cartes de températures (minimales, maximales, matin) : valeurs (habituel) ou zones et fourchettes ; absent = valeurs. */
+  /** Style des cartes : valeurs (habituel) ou zones et fourchettes (cartes qui teintent les départements) ; absent = valeurs. */
   styleCarte?: StyleCarte;
 }
 export const AffichageContexte = createContext<AffichageCarte | null>(null);
@@ -181,9 +197,108 @@ const PAR_DEPARTEMENT = { france: 1, region: 4, departement: Infinity };
 
 const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 
-/** Zones et fourchettes, vue France : cadrage laissant la colonne de gauche au grand thermomètre et le haut au titre. */
+/** Zones et fourchettes, vue France : cadrage laissant la colonne de gauche au grand picto (thermomètre…) et le haut au titre. */
 const ZONE_FRANCE_ZONES = { gauche: 150, haut: 100, droite: LARGEUR_FRANCE - 12, bas: HAUTEUR_CARTE - 34 };
 const POLICE_ZONES = 'Arial, Helvetica, sans-serif';
+
+/** Titre d'une carte en zones (hors bulletins de températures) : titre du thème en minuscules (« Cumuls de pluie »). */
+function titreEnMinuscules(titre: string): string {
+  const t = titre.toLowerCase().replace(/°c/g, '°C').replace(/\butc\b/g, 'UTC');
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** Largeur d'un picto des zones pour sa hauteur (le thermomètre est étroit). */
+const largeurPicto = (type: PictoZones, hauteur: number) => (type === 'thermometre' ? hauteur * 0.4 : hauteur * 0.92);
+
+/**
+ * Pictos des cartes en zones, dans le style du thermomètre : forme blanche cerclée de la couleur donnée, cœur plein de cette
+ * couleur (attributs SVG uniquement, pour l'export JPG). Carré de `hauteur` px, sauf le thermomètre (étroit).
+ */
+function PictoZone({ type, hauteur, couleur, graduations = false }: { type: PictoZones; hauteur: number; couleur: string; graduations?: boolean }) {
+  if (type === 'thermometre') return <Thermometre hauteur={hauteur} couleur={couleur} graduations={graduations} />;
+  const trait = { fill: 'none', stroke: couleur, strokeWidth: 7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  const halo = { ...trait, stroke: '#ffffff', strokeWidth: 15 };
+  const cerne = { fill: '#ffffff', stroke: couleur, strokeWidth: 4.5, strokeLinejoin: 'round' as const };
+  // Cœur plein : la même forme réduite autour de son centre.
+  const coeur = (d: string, k = 0.6, cx = 50, cy = 50) => <path d={d} fill={couleur} transform={`translate(${cx} ${cy}) scale(${k}) translate(${-cx} ${-cy})`} />;
+  const traits = (d: string[]) => (
+    <>
+      {d.map((x) => <path key={`h${x}`} d={x} {...halo} />)}
+      {d.map((x) => <path key={x} d={x} {...trait} />)}
+    </>
+  );
+  let contenu: React.ReactNode;
+  switch (type) {
+    case 'goutte': {
+      const d = 'M50 5 C50 5 17 44 17 64 A33 33 0 0 0 83 64 C83 44 50 5 50 5 Z';
+      contenu = (<><path d={d} {...cerne} />{coeur(d, 0.6, 50, 64)}</>);
+      break;
+    }
+    case 'flocon': {
+      const branche = 'M50 6 V94 M50 22 L39 12 M50 22 L61 12 M50 78 L39 88 M50 78 L61 88';
+      contenu = (
+        <>
+          {[0, 60, 120].map((a) => <path key={`h${a}`} d={branche} {...halo} transform={`rotate(${a} 50 50)`} />)}
+          {[0, 60, 120].map((a) => <path key={a} d={branche} {...trait} transform={`rotate(${a} 50 50)`} />)}
+          <circle cx={50} cy={50} r={7} fill={couleur} stroke="#ffffff" strokeWidth={3} />
+        </>
+      );
+      break;
+    }
+    case 'vent':
+      contenu = traits(['M8 34 H60 A13 13 0 1 0 47 21', 'M8 54 H78 A13 13 0 1 1 65 67', 'M8 74 H44']);
+      break;
+    case 'eclair': {
+      const d = 'M60 4 L20 56 H46 L36 96 L82 40 H55 L68 4 Z';
+      contenu = (<><path d={d} {...cerne} />{coeur(d, 0.55, 50, 50)}</>);
+      break;
+    }
+    case 'soleil':
+      contenu = (
+        <>
+          {traits([0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
+            const r = (a * Math.PI) / 180;
+            const p = (k: number) => `${(50 + k * Math.cos(r)).toFixed(1)} ${(50 + k * Math.sin(r)).toFixed(1)}`;
+            return `M${p(36)} L${p(46)}`;
+          }))}
+          <circle cx={50} cy={50} r={26} {...cerne} />
+          <circle cx={50} cy={50} r={17} fill={couleur} />
+        </>
+      );
+      break;
+    case 'nuage': {
+      const d = 'M27 78 A17 17 0 0 1 25 44 A25 25 0 0 1 72 37 A20.5 20.5 0 0 1 75 78 Z';
+      contenu = (<><path d={d} {...cerne} />{coeur(d, 0.58, 50, 60)}</>);
+      break;
+    }
+    case 'brouillard':
+      contenu = traits(['M12 26 H70', 'M24 44 H88', 'M12 62 H76', 'M28 80 H86']);
+      break;
+    case 'pression':
+      contenu = (
+        <>
+          <circle cx={50} cy={52} r={42} {...cerne} />
+          {traits(['M24 70 A30 30 0 1 1 76 70'])}
+          <path d="M50 52 L68 30" {...trait} strokeWidth={6} />
+          <circle cx={50} cy={52} r={8} fill={couleur} />
+        </>
+      );
+      break;
+    default:
+      contenu = (
+        <>
+          <path d="M50 7 L95 89 H5 Z" {...cerne} strokeWidth={5} />
+          <rect x={44} y={32} width={12} height={32} rx={6} fill={couleur} />
+          <circle cx={50} cy={75} r={6.5} fill={couleur} />
+        </>
+      );
+  }
+  return (
+    <svg viewBox="0 0 100 100" width={largeurPicto(type, hauteur)} height={hauteur} aria-hidden style={{ display: 'block', flex: 'none', overflow: 'visible' }}>
+      {contenu}
+    </svg>
+  );
+}
 
 /** Picto thermomètre (attributs SVG, pour l'export JPG) : tube blanc cerclé, colonne et réservoir de la couleur donnée. */
 function Thermometre({ hauteur, couleur, graduations = false }: { hauteur: number; couleur: string; graduations?: boolean }) {
@@ -268,9 +383,14 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     onRetouches?.({ corrections, retires: [...retires], titre: titreSaisi, sousTitre: sousTitreSaisi, titreTop: titreTopSaisi });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [corrections, retires, titreSaisi, sousTitreSaisi, titreTopSaisi]);
-  // Style « zones et fourchettes » : départements regroupés en zones de même classe de température, une fourchette par zone.
-  const enZones = affichage?.styleCarte === 'zones' && accepteZones(theme.id) && !valeursDepartements && !zonageFin;
-  const titre = titreSaisi ?? (enZones ? (dateCarte ? titreDateZones(dateCarte) : theme.court) : theme.titre);
+  // Style « zones et fourchettes » : départements regroupés en zones de même classe de valeurs, une fourchette par zone.
+  // Projections par région (valeurs des départements fournies) et zonage fin : restent en valeurs.
+  const enZones = affichage?.styleCarte === 'zones' && accepteZones(theme) && !valeursDepartements && !zonageFin;
+  // Minimales, maximales, matin : titre = jour prévu, sous-titre = nature des valeurs ; les autres : nom de la carte et date / période.
+  const bulletinTemperature = enZones && estBulletinTemperature(theme.id);
+  const zonesTemperature = enZones && enClassesTemperature(theme);
+  const picto: PictoZones = zonesTemperature ? 'thermometre' : pictoZones(theme);
+  const titre = titreSaisi ?? (enZones ? (bulletinTemperature ? (dateCarte ? titreDateZones(dateCarte) : theme.court) : titreEnMinuscules(theme.titre)) : theme.titre);
   // Heure du run : « AROME (12z) » à la place du nom du modèle quand le sous-titre le contient, sinon ajouté à la fin.
   const sousTitreAvecRun = (() => {
     if (!affichage?.heureRun || !run) return sousTitre;
@@ -278,7 +398,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     const i = sousTitre.toUpperCase().indexOf(run.modele);
     return i >= 0 ? `${sousTitre.slice(0, i)}${nomRun}${sousTitre.slice(i + run.modele.length)}` : `${sousTitre} · ${nomRun}`;
   })();
-  const sousTitreAffiche = sousTitreSaisi ?? (enZones ? sousTitreZones(theme.id) : sousTitreAvecRun);
+  const sousTitreAffiche = sousTitreSaisi ?? (bulletinTemperature ? sousTitreZones(theme.id) : sousTitreAvecRun);
   /** Date d'élaboration de la carte (Paris), en bas à droite. */
   const maintenant = affichage?.elaboreeLe ? new Date(affichage.elaboreeLe) : new Date();
   const dateElaboree =
@@ -372,17 +492,25 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
   }, [dansZone, theme.id, theme.texteValeur]);
   const top = useMemo(() => tries.filter((p) => !p.neige && !palierDe(theme.paliers, p.valeur).neutre).slice(0, NOMBRE_TOP), [tries, theme.paliers]);
 
-  /** Zones et fourchettes : valeur la plus marquante de chaque département (la plus basse pour les minimales), regroupées en zones. */
+  /**
+   * Zones et fourchettes : valeur la plus marquante de chaque département (la plus basse pour les minimales ; moyenne pour les
+   * écarts et les nuages, comme la teinte habituelle), regroupées en zones. Températures : classes de 5 °C ; autres cartes :
+   * classes tirées des paliers du thème.
+   */
   const zonesTemp = useMemo(() => {
     if (!enZones || contoursDep.length === 0) return [];
-    const valeurs: Record<string, number> = {};
+    const parDep = new Map<string, number[]>();
     for (const p of dansZone) {
       if (p.neige) continue;
-      const v = valeurs[p.dep];
-      valeurs[p.dep] = v == null ? p.valeur : theme.ordre === 'desc' ? Math.max(v, p.valeur) : Math.min(v, p.valeur);
+      const liste = parDep.get(p.dep) ?? [];
+      liste.push(p.valeur);
+      parDep.set(p.dep, liste);
     }
-    return calculerZones(contoursDep, valeurs, theme.ordre);
-  }, [enZones, contoursDep, dansZone, theme.ordre]);
+    const enMoyenne = !zonesTemperature && (theme.signe || theme.id === 'nuages' || theme.id === 't');
+    const valeurs: Record<string, number> = {};
+    for (const [dep, v] of parDep) valeurs[dep] = enMoyenne ? moyenne(v) : theme.ordre === 'desc' ? Math.max(...v) : Math.min(...v);
+    return calculerZones(contoursDep, valeurs, theme.ordre, zonesTemperature ? undefined : reglesPaliers(theme, Object.values(valeurs)));
+  }, [enZones, contoursDep, dansZone, theme, zonesTemperature]);
 
   /** Teinte des départements : valeur la plus marquante du département (moyenne pour les écarts et les nuages). */
   const remplissages = useMemo(() => {
@@ -594,23 +722,45 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, avecReperes, echNoms, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos, enZones]);
 
-  // Zones et fourchettes : une étiquette par zone (fourchette, avec un petit thermomètre sur les grandes zones) et une par valeur
+  // Zones et fourchettes : une étiquette par zone (fourchette, avec un petit picto sur les grandes zones) et une par valeur
   // locale, posées au centre de leur zone puis écartées au besoin pour ne pas se chevaucher.
-  const rectTitreZones: Rect = { x: 14, y: 10, w: Math.round(Math.max(titre.length * 23, sousTitreAffiche.length * 12.5) + 24), h: 84 };
-  const rectThermometre: Rect = { x: enFrance ? 40 : MARGE_COLONNE + 40, y: enFrance ? 250 : 300, w: 92, h: 230 };
+  // Titre en haut à gauche (gras) et sous-titre : réduits s'ils empiètent sur le logo, en haut à droite.
+  const placeTitreZones = largeur - 14 - 24 - (logoUrl ? 240 + 24 : 0);
+  const tailleTitreZones = Math.max(22, Math.min(40, placeTitreZones / (Math.max(1, titre.length) * 0.575)));
+  const tailleSousTitreZones = Math.max(14, Math.min(23, placeTitreZones / (Math.max(1, sousTitreAffiche.length) * 0.54)));
+  const rectTitreZones: Rect = {
+    x: 14,
+    y: 10,
+    w: Math.round(Math.max(titre.length * 0.575 * tailleTitreZones, sousTitreAffiche.length * 0.54 * tailleSousTitreZones) + 24),
+    h: Math.round(tailleTitreZones * 1.1 + tailleSousTitreZones * 1.1 + 18),
+  };
+  // Grand picto à gauche : le thermomètre (étroit et haut), les autres en carré.
+  const rectThermometre: Rect =
+    picto === 'thermometre'
+      ? { x: enFrance ? 40 : MARGE_COLONNE + 40, y: enFrance ? 250 : 300, w: 92, h: 230 }
+      : { x: enFrance ? 22 : MARGE_COLONNE + 22, y: enFrance ? 300 : 340, w: 128, h: 128 };
   const etiquettesZones = useMemo(() => {
     if (!enZones) return [];
+    // Hors températures : 3 valeurs locales au plus (les plus détachées de leur zone), pour ne pas encombrer la carte.
+    const locauxRetenus = new Set(
+      zonesTemp
+        .filter((z) => z.local)
+        .map((z) => ({ cle: z.cle, ecart: Math.abs(z.local!.valeur - (theme.ordre === 'asc' ? z.min : z.max)) / Math.max(1, Math.abs(theme.ordre === 'asc' ? z.min : z.max)) }))
+        .sort((a, b) => b.ecart - a.ecart)
+        .slice(0, zonesTemperature ? Infinity : 3)
+        .map((x) => x.cle)
+    );
     const elements = zonesTemp.flatMap((z) => {
       const grande = !z.petite;
       const fs = grande ? 21 : 16;
-      const texte = texteFourchette(z.min, z.max);
+      const texte = zonesTemperature ? texteFourchette(z.min, z.max) : texteFourchetteTheme(theme, z.min, z.max);
       const largeurPilule = texte.length * 0.6 * fs + 1.1 * fs;
       const thermo = grande ? 1.9 * fs : 0;
       const centre = versEcran(z.centre, vue);
-      const fourchette = { code: z.cle, texte, fs, thermo, couleur: z.couleurEtiquette, local: false, x: centre.x, y: centre.y, l: largeurPilule + (thermo ? thermo * 0.4 + 4 : 0), h: Math.max(1.5 * fs, thermo), priorite: grande ? 0 : 1 };
-      if (!z.local) return [fourchette];
+      const fourchette = { code: z.cle, texte, fs, thermo, couleur: z.couleurEtiquette, local: false, x: centre.x, y: centre.y, l: largeurPilule + (thermo ? largeurPicto(picto, thermo) + 4 : 0), h: Math.max(1.5 * fs, thermo), priorite: grande ? 0 : 1 };
+      if (!z.local || !locauxRetenus.has(z.cle)) return [fourchette];
       const c = versEcran(z.local.centre, vue);
-      const t = texteLocal(z.local.valeur);
+      const t = zonesTemperature ? texteLocal(z.local.valeur) : texteLocalTheme(theme, z.local.valeur);
       return [fourchette, { code: `loc-${z.local.departement}`, texte: t, fs: 14, thermo: 0, couleur: z.couleurEtiquette, local: true, x: c.x, y: c.y, l: t.length * 0.58 * 14 + 14, h: 21, priorite: 1 }];
     });
     const obstacles: Rect[] = [
@@ -630,7 +780,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     // Une zone garde toujours son étiquette : sans place libre, elle reste au centre de la zone.
     return elements.map((e) => ({ ...e, ...(positions.get(e.code) ?? {}) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enZones, zonesTemp, vue, largeur, logoUrl, hauteurLogo, affichage?.dateElaboration, cleTexte, rectTitreZones.w, enFrance]);
+  }, [enZones, zonesTemp, vue, largeur, logoUrl, hauteurLogo, affichage?.dateElaboration, cleTexte, rectTitreZones.w, rectTitreZones.h, enFrance, theme, zonesTemperature, picto]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -853,15 +1003,21 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
         {enZones && (
           <>
             <div style={{ position: 'absolute', left: rectTitreZones.x + 10, top: rectTitreZones.y + 4, zIndex: 4, fontFamily: POLICE_ZONES, whiteSpace: 'nowrap', lineHeight: 1.1 }}>
-              <div style={{ fontSize: 40, fontWeight: 900, color: '#0b2e6b' }}>{titre}</div>
-              <div style={{ marginTop: 3, fontSize: 23, fontWeight: 700, color: '#1d5fae' }}>{sousTitreAffiche}</div>
+              <div style={{ fontSize: Math.round(tailleTitreZones), fontWeight: 900, color: '#0b2e6b' }}>{titre}</div>
+              <div style={{ marginTop: 3, fontSize: Math.round(tailleSousTitreZones), fontWeight: 700, color: '#1d5fae' }}>{sousTitreAffiche}</div>
             </div>
             <div style={{ position: 'absolute', left: rectThermometre.x, top: rectThermometre.y, zIndex: 4, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.25))' }}>
-              <Thermometre hauteur={rectThermometre.h} couleur={theme.ordre === 'desc' ? '#c4441c' : '#1d5fae'} graduations />
+              <PictoZone type={picto} hauteur={rectThermometre.h} couleur={zonesTemperature && theme.ordre === 'desc' ? '#c4441c' : '#1d5fae'} graduations />
             </div>
+            {zonesTemp.length === 0 && (
+              // Aucune zone (pas de neige, pas de risque…) : on l'écrit, plutôt que de laisser une carte grise muette.
+              <div style={{ position: 'absolute', left: largeur / 2 + (enFrance ? 60 : 0), top: HAUTEUR_CARTE / 2, transform: 'translate(-50%, -50%)', zIndex: 4, fontFamily: POLICE_ZONES, fontSize: 22, fontWeight: 800, lineHeight: 1, padding: '0.3em 0.7em', borderRadius: 999, background: '#1d5fae', color: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)', whiteSpace: 'nowrap' }}>
+                {theme.paliers.find((x) => x.neutre)?.libelle ?? 'Aucune valeur notable'}
+              </div>
+            )}
             {etiquettesZones.map((e) => (
               <div key={e.code} style={{ position: 'absolute', left: e.x, top: e.y, transform: 'translate(-50%, -50%)', zIndex: 4, display: 'flex', alignItems: 'center', gap: 4, fontFamily: POLICE_ZONES, whiteSpace: 'nowrap' }}>
-                {e.thermo > 0 && <Thermometre hauteur={e.thermo} couleur={e.couleur} />}
+                {e.thermo > 0 && <PictoZone type={picto} hauteur={e.thermo} couleur={e.couleur} />}
                 <span
                   style={
                     e.local

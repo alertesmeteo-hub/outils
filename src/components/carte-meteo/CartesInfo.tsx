@@ -1209,11 +1209,11 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           )}
           {!uneCarte && (
             <>
-              <label className="text-sm font-medium" title="Zones et fourchettes : cartes des températures minimales, maximales et du matin ; les autres cartes restent en valeurs">
-                <span className={legende}>🌡️ Style de carte</span>
-                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => regler({ styleCarte: e.target.value === 'zones' ? 'zones' : 'valeurs' })} className={selectBarre}>
+              <label className="text-sm font-medium" title="Zones et fourchettes : départements regroupés en zones de même niveau, une fourchette de valeurs par zone">
+                <span className={legende}>🗺️ Style de carte</span>
+                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => regler({ styleCarte: e.target.value === 'zones' ? 'zones' : 'valeurs' })} className={`${selectBarre} !border-orange-500 !bg-orange-500/15 font-semibold ring-2 ring-orange-500`}>
                   <option value="valeurs">Valeurs (habituel)</option>
-                  <option value="zones">Zones et fourchettes (températures)</option>
+                  <option value="zones">Zones et fourchettes</option>
                 </select>
               </label>
               <label className="text-sm font-medium">
@@ -1531,11 +1531,11 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           <details open className="mt-4 rounded-xl border border-primary/30 bg-surface p-4">
             <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-primary">Affichage de la carte</summary>
             <div className="mt-3 grid grid-cols-1 items-end gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="text-sm font-medium" title="Zones et fourchettes : cartes des températures minimales, maximales et du matin">
-                <span className={legende}>🌡️ Style de carte</span>
-                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => regler({ styleCarte: e.target.value === 'zones' ? 'zones' : 'valeurs' })} className={`${selectBarre} w-full`}>
+              <label className="text-sm font-medium" title="Zones et fourchettes : départements regroupés en zones de même niveau, une fourchette de valeurs par zone">
+                <span className={legende}>🗺️ Style de carte</span>
+                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => regler({ styleCarte: e.target.value === 'zones' ? 'zones' : 'valeurs' })} className={`${selectBarre} w-full !border-orange-500 !bg-orange-500/15 font-semibold ring-2 ring-orange-500`}>
                   <option value="valeurs">Valeurs (habituel)</option>
-                  <option value="zones">Zones et fourchettes (températures)</option>
+                  <option value="zones">Zones et fourchettes</option>
                 </select>
               </label>
               <label className="text-sm font-medium">

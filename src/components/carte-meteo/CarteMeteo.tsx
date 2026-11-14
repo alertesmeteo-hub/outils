@@ -528,6 +528,14 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Noms des mers figés : positions mémorisées au moment où l'on coche, puis fixes quel que soit le cadrage. */
   const [mersFigees, setMersFigees] = useState<{ med?: { x: number; y: number }; atl?: { x: number; y: number } } | null>(null);
   const positionsMers = useRef<{ med?: { x: number; y: number }; atl?: { x: number; y: number } }>({});
+  /** « Réinitialiser » avec des noms figés : les noms reprennent leur place automatique (rapportée par leurs effets, qui passent
+   *  avant celui-ci), puis sont figés de nouveau à cette place. */
+  const refigerMers = useRef(false);
+  useEffect(() => {
+    if (!refigerMers.current || mersFigees != null) return;
+    refigerMers.current = false;
+    setMersFigees({ ...positionsMers.current });
+  }, [mersFigees, resetMers]);
   const [afficherFleuves, setAfficherFleuves] = useState(true);
   /** Densité choisie dans le menu ; null = par défaut selon la zone (voir densiteFleuves). */
   const [densiteChoisie, setDensiteFleuves] = useState<DensiteFleuves | null>(null);
@@ -1606,7 +1614,22 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         <input type="checkbox" checked={mersFigees != null} onChange={(e) => setMersFigees(e.target.checked ? { ...positionsMers.current } : null)} />
         Figer les noms des mers
       </label>
-      {deplacerMers && <button type="button" className="rounded-md border border-border px-2 py-1" onClick={() => setResetMers((n) => n + 1)}>Réinitialiser les positions</button>}
+      {deplacerMers && (
+        <button
+          type="button"
+          className="rounded-md border border-border px-2 py-1"
+          onClick={() => {
+            // Noms figés : on revient aux positions automatiques du cadrage actuel, puis on les fige à nouveau (voir l'effet plus haut).
+            if (mersFigees) {
+              refigerMers.current = true;
+              setMersFigees(null);
+            }
+            setResetMers((n) => n + 1);
+          }}
+        >
+          Réinitialiser les positions
+        </button>
+      )}
       <span>Taille des pictos : {tailleIcones} %</span>
       <button type="button" onClick={() => setTailleIcones((t) => Math.max(40, t - 10))} className="rounded-md border border-border px-3 py-1 text-base leading-none" aria-label="Réduire les pictos">
         −
@@ -1685,9 +1708,13 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       titreADroite={!enFrance && !dateGauche}
       logoEnBas={!enFrance}
       etiquetteMer
-      deplacerMers={deplacerMers && !enExport && mersFigees == null}
+      deplacerMers={deplacerMers && !enExport}
       mersFigees={mersFigees}
-      onPositionMer={(cle, p) => { positionsMers.current[cle] = p; }}
+      onPositionMer={(cle, p) => {
+        if (p) positionsMers.current[cle] = p;
+        else delete positionsMers.current[cle];
+      }}
+      onDeplacerMerFigee={(cle, p) => setMersFigees((f) => (f ? { ...f, [cle]: p } : f))}
       resetMers={resetMers}
       logoDroite={enFrance ? largeurCarte - 28 : null}
       grosPictos={enDepartement}

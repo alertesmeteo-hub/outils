@@ -249,7 +249,9 @@ interface Props {
   /** Noms des mers figés (positions en pixels de la carte) : ils ne bougent plus quand le cadrage change. */
   mersFigees?: { med?: { x: number; y: number }; atl?: { x: number; y: number } } | null;
   /** Position réelle d'un nom de mer (« med » ou « atl »), pour la figer. */
-  onPositionMer?: (cle: 'med' | 'atl', p: { x: number; y: number }) => void;
+  onPositionMer?: (cle: 'med' | 'atl', p: { x: number; y: number } | null) => void;
+  /** Nom de mer figé déplacé à la main : nouvelle position figée. */
+  onDeplacerMerFigee?: (cle: 'med' | 'atl', p: { x: number; y: number }) => void;
   resetMers?: number;
   /** Pictos plus grands (vue département). */
   grosPictos?: boolean;
@@ -478,6 +480,7 @@ export default function CarteRendu({
   deplacerMers = false,
   mersFigees = null,
   onPositionMer,
+  onDeplacerMerFigee,
   resetMers = 0,
   grosPictos = false,
   carteLocale = false,
@@ -714,8 +717,9 @@ export default function CarteRendu({
         {/* Habillage catalan, carte locale : bandes de la senyera en haut à gauche (la date est à droite). */}
         {habillage === 'catalan' && logoEnBas && !styleFond && !theme && <BandesCoin largeur={largeur} hauteur={HAUTEUR_CARTE} />}
 
-        {etiquetteMer && !theme && <DecorMer figee={mersFigees?.med ?? null} onPosition={(p) => onPositionMer?.('med', p)} key={`med-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={moyennesGauche != null ? MER_FRANCE.mediterranee : merVisible ?? null} echelle={logoEnBas ? 1 : 0.85} deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
-        {(atlantiqueVisible || moyennesGauche != null) && etiquetteMer && !theme && <DecorMer figee={mersFigees?.atl ?? null} onPosition={(p) => onPositionMer?.('atl', p)} key={`atl-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={moyennesGauche != null ? MER_FRANCE.atlantique : { ...atlantiqueVisible!, x: Math.max(75, atlantiqueVisible!.x - 90) }} atlantique deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
+        {etiquetteMer && !theme && <DecorMer figee={mersFigees?.med ?? null} onPosition={(p) => onPositionMer?.('med', p)} onDeplacerFigee={(p) => onDeplacerMerFigee?.('med', p)} key={`med-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={moyennesGauche != null ? MER_FRANCE.mediterranee : merVisible ?? null} echelle={logoEnBas ? 1 : 0.85} deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
+        {/* Atlantique figé : affiché à sa place mémorisée même si le cadrage ne montre plus l'océan (comme la Méditerranée). */}
+        {(atlantiqueVisible || moyennesGauche != null || mersFigees?.atl) && etiquetteMer && !theme && <DecorMer figee={mersFigees?.atl ?? null} onPosition={(p) => onPositionMer?.('atl', p)} onDeplacerFigee={(p) => onDeplacerMerFigee?.('atl', p)} key={`atl-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={moyennesGauche != null ? MER_FRANCE.atlantique : atlantiqueVisible ? { ...atlantiqueVisible, x: Math.max(75, atlantiqueVisible.x - 90) } : null} atlantique deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
 
         {logoUrl && (
           <img
